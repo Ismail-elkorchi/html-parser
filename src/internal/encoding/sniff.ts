@@ -213,9 +213,33 @@ function extractCharsetFromContent(content: string): string | null {
   return stripQuotes(captured);
 }
 
+function stripHtmlComments(input: string): string {
+  let cursor = 0;
+  let output = "";
+
+  while (cursor < input.length) {
+    const commentStart = input.indexOf("<!--", cursor);
+    if (commentStart === -1) {
+      output += input.slice(cursor);
+      break;
+    }
+
+    output += input.slice(cursor, commentStart);
+
+    const commentEnd = input.indexOf("-->", commentStart + 4);
+    if (commentEnd === -1) {
+      break;
+    }
+
+    cursor = commentEnd + 3;
+  }
+
+  return output;
+}
+
 function sniffMetaCharset(bytes: Uint8Array, maxPrescanBytes: number): string | null {
   const scanSize = Math.min(bytes.length, maxPrescanBytes);
-  const scan = decodeLatin1(bytes.subarray(0, scanSize)).replace(/<!--[\s\S]*?-->/g, "");
+  const scan = stripHtmlComments(decodeLatin1(bytes.subarray(0, scanSize)));
 
   for (const tag of extractMetaTags(scan)) {
     const attrs = parseMetaAttributes(tag);
