@@ -3,18 +3,37 @@ import tseslint from "typescript-eslint";
 import boundaries from "eslint-plugin-boundaries";
 import importPlugin from "eslint-plugin-import";
 
+const typedFiles = ["src/**/*.ts", "tests/**/*.ts"];
+
+const recommendedTypeChecked = tseslint.configs.recommendedTypeChecked.map((config) => ({
+  ...config,
+  files: typedFiles
+}));
+
+const strictTypeChecked = tseslint.configs.strictTypeChecked.map((config) => ({
+  ...config,
+  files: typedFiles
+}));
+
 export default [
   {
     ignores: ["dist/**", "node_modules/**", "tmp/**"]
   },
   {
     files: ["**/*.js", "**/*.mjs", "**/*.cjs"],
-    ...js.configs.recommended
+    ...js.configs.recommended,
+    languageOptions: {
+      ...js.configs.recommended.languageOptions,
+      globals: {
+        console: "readonly",
+        URL: "readonly"
+      }
+    }
   },
-  ...tseslint.configs.recommendedTypeChecked,
-  ...tseslint.configs.strictTypeChecked,
+  ...recommendedTypeChecked,
+  ...strictTypeChecked,
   {
-    files: ["src/**/*.ts", "tests/**/*.ts"],
+    files: typedFiles,
     languageOptions: {
       parserOptions: {
         project: "./tsconfig.eslint.json",
@@ -40,13 +59,13 @@ export default [
     },
     rules: {
       "@typescript-eslint/await-thenable": "error",
-      "@typescript-eslint/no-floating-promises": "error",
-      "@typescript-eslint/no-misused-promises": "error",
-      "@typescript-eslint/no-unnecessary-type-assertion": "error",
       "@typescript-eslint/consistent-type-imports": [
         "error",
         { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
       ],
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
       "import/no-duplicates": "error",
       "import/order": [
         "error",
@@ -59,7 +78,7 @@ export default [
           }
         }
       ],
-      "boundaries/allowed-types": [
+      "boundaries/element-types": [
         "error",
         {
           "default": "disallow",
@@ -86,7 +105,14 @@ export default [
         {
           "patterns": [
             {
-              "group": ["src/public", "src/public/*", "../public", "../public/*", "../../public", "../../public/*"],
+              "group": [
+                "src/public",
+                "src/public/*",
+                "../public",
+                "../public/*",
+                "../../public",
+                "../../public/*"
+              ],
               "message": "src/internal must not import src/public."
             }
           ]
