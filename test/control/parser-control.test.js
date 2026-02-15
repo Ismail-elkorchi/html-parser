@@ -29,9 +29,15 @@ test("parseFragment uses explicit context", () => {
   assert.equal(fragment.contextTagName, "section");
 });
 
-test("basic serialization placeholder", () => {
+test("deterministic fragment ids for identical input", () => {
+  const first = parseFragment("<em>alpha</em>", "section");
+  const second = parseFragment("<em>alpha</em>", "section");
+  assert.deepEqual(first, second);
+});
+
+test("serialize reflects full document tree", () => {
   const tree = parse("content");
-  assert.equal(serialize(tree), "<html>content</html>");
+  assert.equal(serialize(tree), "<html><head></head><body>content</body></html>");
 });
 
 test("budget exceed is structured", () => {
