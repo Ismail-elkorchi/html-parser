@@ -11,7 +11,6 @@ const SERIALIZER_FILES = [
   "vendor/html5lib-tests/serializer/injectmeta.test"
 ];
 
-const SKIP_DECISION_RECORD = "docs/decisions/ADR-001-serializer-conformance-skips.md";
 const HOLDOUT_MOD = 10;
 
 function computeHoldout(id) {
@@ -30,16 +29,15 @@ for (const file of SERIALIZER_FILES) {
     tests.push({
       id: `${file}#${index + 1}`,
       input: test.input ?? [],
-      expected: Array.isArray(test.expected) ? String(test.expected[0] ?? "") : ""
+      expected: Array.isArray(test.expected) ? String(test.expected[0] ?? "") : "",
+      options: test.options ?? {}
     });
   }
 }
 
 let passed = 0;
 let failed = 0;
-let skipped = 0;
 let holdoutExcluded = 0;
-const skips = [];
 const failures = [];
 
 for (const test of tests) {
@@ -48,18 +46,13 @@ for (const test of tests) {
     continue;
   }
 
-  const actual = serializeFixtureTokenStream(test.input);
+  const actual = serializeFixtureTokenStream(test.input, test.options);
   if (actual === test.expected) {
     passed += 1;
     continue;
   }
 
-  skipped += 1;
-  skips.push({
-    id: test.id,
-    reason: "Serializer option and namespace parity for this case is pending.",
-    decisionRecord: SKIP_DECISION_RECORD
-  });
+  failed += 1;
   failures.push({
     id: test.id,
     expected: test.expected,
@@ -74,13 +67,13 @@ const report = {
     total: tests.length - holdoutExcluded,
     passed,
     failed,
-    skipped
+    skipped: 0
   },
   holdout: {
     excluded: holdoutExcluded,
     rule: `hash(id) % ${HOLDOUT_MOD} === 0`
   },
-  skips,
+  skips: [],
   failures
 };
 
@@ -91,4 +84,4 @@ if (failed > 0) {
   process.exit(1);
 }
 
-console.log(`Serializer fixtures: passed=${passed}, skipped=${skipped}, holdoutExcluded=${holdoutExcluded}`);
+console.log(`Serializer fixtures: passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);

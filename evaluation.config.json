@@ -27,12 +27,12 @@
         "maxSkips": 0
       },
       "encoding": {
-        "minPassRate": 0.99,
-        "maxSkips": 10
+        "minPassRate": 1,
+        "maxSkips": 0
       },
       "serializer": {
-        "minPassRate": 0.99,
-        "maxSkips": 250
+        "minPassRate": 1,
+        "maxSkips": 0
       },
       "holdout": {
         "minPassRate": 0,
