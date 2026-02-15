@@ -128,6 +128,9 @@ function parseMetaAttributes(tag: string): Map<string, string> {
         while (index < body.length && body[index] !== quote) {
           index += 1;
         }
+        if (index >= body.length) {
+          return new Map();
+        }
         value = body.slice(valueStart, index);
         if (index < body.length && body[index] === quote) {
           index += 1;
@@ -147,6 +150,55 @@ function parseMetaAttributes(tag: string): Map<string, string> {
   return attrs;
 }
 
+function extractMetaTags(scan: string): string[] {
+  const tags: string[] = [];
+  let index = 0;
+
+  while (index < scan.length) {
+    const lt = scan.indexOf("<", index);
+    if (lt === -1 || lt + 2 > scan.length) {
+      break;
+    }
+
+    let cursor = lt + 1;
+    let quote: "\"" | "'" | null = null;
+    let closed = false;
+
+    while (cursor < scan.length) {
+      const ch = scan[cursor];
+      if (quote === null && (ch === "\"" || ch === "'")) {
+        quote = ch;
+        cursor += 1;
+        continue;
+      }
+
+      if (quote !== null && ch === quote) {
+        quote = null;
+        cursor += 1;
+        continue;
+      }
+
+      if (quote === null && ch === ">") {
+        const tag = scan.slice(lt, cursor + 1);
+        if (/^<meta(?=[\t\n\f\r />])/i.test(tag)) {
+          tags.push(tag);
+        }
+        index = cursor + 1;
+        closed = true;
+        break;
+      }
+
+      cursor += 1;
+    }
+
+    if (!closed) {
+      break;
+    }
+  }
+
+  return tags;
+}
+
 function extractCharsetFromContent(content: string): string | null {
   const match = content.match(/charset\s*=\s*("[^"]*"|'[^']*'|[^\s;"'>]+)/i);
   if (!match) {
@@ -164,10 +216,8 @@ function extractCharsetFromContent(content: string): string | null {
 function sniffMetaCharset(bytes: Uint8Array, maxPrescanBytes: number): string | null {
   const scanSize = Math.min(bytes.length, maxPrescanBytes);
   const scan = decodeLatin1(bytes.subarray(0, scanSize)).replace(/<!--[\s\S]*?-->/g, "");
-  const metaPattern = /<meta\b[^>]*>/gi;
 
-  for (const match of scan.matchAll(metaPattern)) {
-    const tag = match[0];
+  for (const tag of extractMetaTags(scan)) {
     const attrs = parseMetaAttributes(tag);
 
     const direct = attrs.get("charset");

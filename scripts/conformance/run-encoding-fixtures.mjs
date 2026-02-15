@@ -8,14 +8,6 @@ const ENCODING_FIXTURE_FILES = [
   "vendor/html5lib-tests/encoding/tests2.dat",
   "vendor/html5lib-tests/encoding/test-yahoo-jp.dat"
 ];
-const SKIP_DECISION_RECORD = "docs/decisions/ADR-001-encoding-malformed-meta-skips.md";
-const SKIP_CASE_IDS = new Set([
-  "vendor/html5lib-tests/encoding/tests1.dat#15",
-  "vendor/html5lib-tests/encoding/tests1.dat#25",
-  "vendor/html5lib-tests/encoding/tests1.dat#34",
-  "vendor/html5lib-tests/encoding/tests1.dat#35",
-  "vendor/html5lib-tests/encoding/tests1.dat#36"
-]);
 
 function parseDatFixtures(text, fileName) {
   const lines = text.split(/\r?\n/);
@@ -89,22 +81,10 @@ for (const fixturePath of ENCODING_FIXTURE_FILES) {
 
 const encoder = new TextEncoder();
 const failures = [];
-const skips = [];
 let passed = 0;
 let failed = 0;
-let skipped = 0;
 
 for (const fixture of allCases) {
-  if (SKIP_CASE_IDS.has(fixture.id)) {
-    skipped += 1;
-    skips.push({
-      id: fixture.id,
-      reason: "Malformed markup requires tokenizer-integrated prescan semantics.",
-      decisionRecord: SKIP_DECISION_RECORD
-    });
-    continue;
-  }
-
   const bytes = encoder.encode(fixture.data);
   const result = sniffHtmlEncoding(bytes, { defaultEncoding: "windows-1252" });
 
@@ -132,9 +112,9 @@ const report = {
     total: allCases.length,
     passed,
     failed,
-    skipped
+    skipped: 0
   },
-  skips,
+  skips: [],
   failures
 };
 
