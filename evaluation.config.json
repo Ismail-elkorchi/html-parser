@@ -23,8 +23,8 @@
         "maxSkips": 0
       },
       "tree": {
-        "minPassRate": 0,
-        "maxSkips": 300
+        "minPassRate": 1,
+        "maxSkips": 0
       },
       "encoding": {
         "minPassRate": 0.99,

@@ -1,7 +1,8 @@
-export { buildTreeFromTokens } from "./build.js";
+export { buildTreeFromHtml, buildTreeFromTokens } from "./build.js";
 export { normalizeTree } from "./normalize.js";
 
 export type {
+  TreeBuildOptions,
   TreeBudgets,
   TreeBuildResult,
   TreeBuilderError,

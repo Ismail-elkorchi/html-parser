@@ -60,7 +60,7 @@ async function main() {
   const results = [];
   let failed = false;
 
-  // ADR-006 enforces tokenizer mismatch-as-failure; ADR-007 will extend this to tree construction.
+  // ADR-006 and ADR-007 enforce mismatch-as-failure for tokenizer and tree conformance.
   for (const suite of suites) {
     const startedAt = Date.now();
     try {

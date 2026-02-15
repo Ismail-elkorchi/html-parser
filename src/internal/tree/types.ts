@@ -5,6 +5,11 @@ export interface TreeBudgets {
   readonly maxAttributeBytes?: number;
 }
 
+export interface TreeBuildOptions {
+  readonly fragmentContextTagName?: string;
+  readonly scriptingEnabled?: boolean;
+}
+
 export interface TreeNodeDocument {
   readonly kind: "document";
   readonly children: readonly TreeNode[];
@@ -30,6 +35,8 @@ export interface TreeNodeComment {
 export interface TreeNodeDoctype {
   readonly kind: "doctype";
   readonly name: string;
+  readonly publicId: string;
+  readonly systemId: string;
 }
 
 export type TreeNode =
