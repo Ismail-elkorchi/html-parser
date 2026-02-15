@@ -4,7 +4,7 @@ This repository uses pull-request-only delivery.
 
 ## Required branch protection (main)
 - Require pull requests before merging.
-- Require at least 1 approving review.
+- Require approving review count: `0` (PR-only enforcement with status checks).
 - Dismiss stale approvals when new commits are pushed.
 - Require conversation resolution before merging.
 - Require linear history.
@@ -34,7 +34,7 @@ Payload applied:
   "required_pull_request_reviews": {
     "dismiss_stale_reviews": true,
     "require_code_owner_reviews": false,
-    "required_approving_review_count": 1,
+    "required_approving_review_count": 0,
     "require_last_push_approval": false
   },
   "restrictions": null,
