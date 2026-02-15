@@ -32,12 +32,16 @@
     "test:tokenizer": "npm run build && node scripts/conformance/run-tokenizer-fixtures.mjs",
     "test:tree": "npm run build && node scripts/conformance/run-tree-fixtures.mjs",
     "test:serializer": "npm run build && node scripts/conformance/run-serializer-fixtures.mjs",
+    "test:holdout": "npm run build && node scripts/conformance/run-holdout-fixtures.mjs",
+    "test:browser-diff": "npm run build && node scripts/oracles/run-browser-diff.mjs",
+    "test:fuzz": "npm run build && node scripts/fuzz/run-fuzz.mjs",
+    "test:bench": "npm run build && node scripts/bench/run-bench.mjs",
     "smoke:node": "npm run build && node scripts/smoke/control.mjs",
     "smoke:deno": "deno run --allow-read scripts/smoke/control.mjs",
     "smoke:bun": "bun run scripts/smoke/control.mjs",
     "pack:check": "node scripts/eval/pack-check.mjs",
-    "eval:ci": "node scripts/eval/check-docs.mjs && node scripts/eval/check-no-node-builtins.mjs && node scripts/eval/pack-check.mjs && node scripts/eval/check-gates.mjs --profile=ci && node scripts/eval/score.mjs --profile=ci && node scripts/eval/report.mjs --profile=ci",
-    "eval:release": "node scripts/eval/check-docs.mjs && node scripts/eval/check-no-node-builtins.mjs && node scripts/eval/pack-check.mjs && node scripts/eval/check-gates.mjs --profile=release && node scripts/eval/score.mjs --profile=release && node scripts/eval/report.mjs --profile=release"
+    "eval:ci": "npm test && node scripts/eval/check-docs.mjs && node scripts/eval/check-no-node-builtins.mjs && node scripts/eval/pack-check.mjs && node scripts/eval/check-gates.mjs --profile=ci && node scripts/eval/score.mjs --profile=ci && node scripts/eval/report.mjs --profile=ci",
+    "eval:release": "npm test && npm run test:holdout && npm run test:browser-diff && npm run test:fuzz && npm run test:bench && node scripts/eval/check-docs.mjs && node scripts/eval/check-no-node-builtins.mjs && node scripts/eval/pack-check.mjs && node scripts/eval/check-gates.mjs --profile=release && node scripts/eval/score.mjs --profile=release && node scripts/eval/report.mjs --profile=release"
   },
   "dependencies": {},
   "devDependencies": {
