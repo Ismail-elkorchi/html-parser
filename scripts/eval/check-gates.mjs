@@ -43,9 +43,34 @@ async function main() {
 
   gates.push(gate("G-000", "Evaluation config exists", true, { profile }));
 
-  const deps = pkg.dependencies || {};
-  const depsEmpty = Object.keys(deps).length === 0;
-  gates.push(gate("G-010", "Zero runtime dependencies", depsEmpty, { dependenciesCount: Object.keys(deps).length }));
+  const deps = pkg.dependencies;
+  const depsIsObject = deps !== null && typeof deps === "object" && !Array.isArray(deps);
+  const depsCount = depsIsObject ? Object.keys(deps).length : -1;
+  const depsEmptyObject = depsIsObject && depsCount === 0;
+  gates.push(gate("G-010", "Zero runtime dependencies", depsEmptyObject, {
+    dependenciesType: deps === undefined ? "undefined" : typeof deps,
+    dependenciesCount: depsCount
+  }));
+
+  const noExternalImports = await loadOptionalReport("reports/no-external-imports.json");
+  gates.push(
+    gate(
+      "G-012",
+      "No external imports in dist/",
+      Boolean(noExternalImports?.ok),
+      noExternalImports || { missing: true }
+    )
+  );
+
+  const runtimeSelfContained = await loadOptionalReport("reports/runtime-self-contained.json");
+  gates.push(
+    gate(
+      "G-015",
+      "Runtime self-contained",
+      Boolean(runtimeSelfContained?.ok),
+      runtimeSelfContained || { missing: true }
+    )
+  );
 
   const esmTypeOk = pkg.type === "module";
   const exportsStr = JSON.stringify(pkg.exports || {});
@@ -63,7 +88,7 @@ async function main() {
     )
   );
 
-  async function conformanceGate(gid, name, reportPath, threshold) {
+  async function conformanceGate(gid, name, reportPath, threshold, options = {}) {
     const report = await loadOptionalReport(reportPath);
     if (!report) {
       gates.push(gate(gid, name, false, { missingReport: reportPath }));
@@ -74,13 +99,27 @@ async function main() {
     const passRate = safeDiv(passed, executed === 0 ? (passed + failed) : executed);
     const minPassRate = threshold.minPassRate;
     const maxSkips = threshold.maxSkips;
+    const holdoutExcluded = Number(report?.holdoutExcluded ?? report?.holdout?.excluded ?? 0);
+    const holdoutRule = typeof report?.holdoutRule === "string" ? report.holdoutRule : report?.holdout?.rule;
+    const holdoutMod = Number(report?.holdoutMod ?? report?.holdout?.mod ?? Number.NaN);
+    const totalSurface = passed + failed + skipped + holdoutExcluded;
+    const executedSurface = passed + failed;
+    const holdoutExcludedFraction = safeDiv(holdoutExcluded, totalSurface);
+    const enforceHoldoutDiscipline = Boolean(options.enforceHoldoutDiscipline);
+    const holdoutDisciplinePass =
+      !enforceHoldoutDiscipline ||
+      (holdoutExcludedFraction >= 0.05 &&
+        holdoutExcludedFraction <= 0.15 &&
+        typeof holdoutRule === "string" &&
+        Number.isFinite(holdoutMod));
 
     const missingDecisionRecords = await requireExistingDecisionRecords(report.skips);
 
     const pass =
       passRate >= minPassRate &&
       skipped <= maxSkips &&
-      missingDecisionRecords.length === 0;
+      missingDecisionRecords.length === 0 &&
+      holdoutDisciplinePass;
 
     gates.push(
       gate(gid, name, pass, {
@@ -90,6 +129,14 @@ async function main() {
         failed,
         skipped,
         total,
+        executedSurface,
+        totalSurface,
+        holdoutExcluded,
+        holdoutExcludedFraction,
+        holdoutRule,
+        holdoutMod,
+        holdoutDisciplineRange: { min: 0.05, max: 0.15 },
+        holdoutDisciplinePass,
         maxSkips,
         missingDecisionRecords
       })
@@ -97,10 +144,18 @@ async function main() {
   }
 
   const t = config.thresholds?.conformance || {};
-  await conformanceGate("G-040", "Conformance tokenizer", "reports/tokenizer.json", t.tokenizer);
-  await conformanceGate("G-050", "Conformance tree construction", "reports/tree.json", t.tree);
-  await conformanceGate("G-060", "Conformance encoding", "reports/encoding.json", t.encoding);
-  await conformanceGate("G-070", "Conformance serializer", "reports/serializer.json", t.serializer);
+  await conformanceGate("G-040", "Conformance tokenizer", "reports/tokenizer.json", t.tokenizer, {
+    enforceHoldoutDiscipline: true
+  });
+  await conformanceGate("G-050", "Conformance tree construction", "reports/tree.json", t.tree, {
+    enforceHoldoutDiscipline: true
+  });
+  await conformanceGate("G-060", "Conformance encoding", "reports/encoding.json", t.encoding, {
+    enforceHoldoutDiscipline: true
+  });
+  await conformanceGate("G-070", "Conformance serializer", "reports/serializer.json", t.serializer, {
+    enforceHoldoutDiscipline: true
+  });
 
   const det = await loadOptionalReport("reports/determinism.json");
   const detOk = Boolean(det?.overall?.ok);

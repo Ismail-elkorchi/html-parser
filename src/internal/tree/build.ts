@@ -1,4 +1,4 @@
-import { parse, parseFragment, type DefaultTreeAdapterTypes } from "parse5";
+import { parse, parseFragment } from "../parse5-runtime.js";
 
 import type {
   TreeAttribute,
@@ -22,20 +22,58 @@ const MATHML_NAMESPACE = "http://www.w3.org/1998/Math/MathML";
 const CONTEXT_DOCUMENT_HTML =
   "<!doctype html><html><head><title>x</title></head><body><table><tbody><tr><td></td></tr><caption></caption><colgroup></colgroup></table><frameset></frameset></body></html>";
 
-type Parse5Document = DefaultTreeAdapterTypes.Document;
-type Parse5DocumentFragment = DefaultTreeAdapterTypes.DocumentFragment;
-type Parse5ParentNode = DefaultTreeAdapterTypes.ParentNode;
-type Parse5ChildNode = DefaultTreeAdapterTypes.ChildNode;
-type Parse5Element = DefaultTreeAdapterTypes.Element;
-type Parse5Template = DefaultTreeAdapterTypes.Template;
-type Parse5TextNode = DefaultTreeAdapterTypes.TextNode;
-type Parse5CommentNode = DefaultTreeAdapterTypes.CommentNode;
-type Parse5DocumentType = DefaultTreeAdapterTypes.DocumentType;
 type Parse5Attribute = {
   readonly name: string;
   readonly value: string;
   readonly prefix?: string;
 };
+
+interface Parse5NodeBase {
+  readonly nodeName: string;
+  parentNode?: Parse5ParentNode | null;
+  readonly sourceCodeLocation?: unknown;
+}
+
+interface Parse5ParentNode extends Parse5NodeBase {
+  childNodes: Parse5ChildNode[];
+}
+
+interface Parse5Document extends Parse5ParentNode {
+  readonly nodeName: "#document";
+}
+
+interface Parse5DocumentFragment extends Parse5ParentNode {
+  readonly nodeName: "#document-fragment";
+}
+
+interface Parse5Element extends Parse5ParentNode {
+  readonly tagName: string;
+  readonly namespaceURI: string;
+  attrs: Parse5Attribute[];
+}
+
+interface Parse5TextNode extends Parse5NodeBase {
+  readonly nodeName: "#text";
+  readonly value: string;
+}
+
+interface Parse5CommentNode extends Parse5NodeBase {
+  readonly nodeName: "#comment";
+  readonly data: string;
+}
+
+interface Parse5DocumentType extends Parse5NodeBase {
+  readonly nodeName: "#documentType";
+  readonly name: string;
+  readonly publicId?: string | null;
+  readonly systemId?: string | null;
+}
+
+type Parse5ChildNode =
+  | Parse5TextNode
+  | Parse5CommentNode
+  | Parse5DocumentType
+  | Parse5Element;
 
 interface SourceLocationLike {
   readonly startOffset?: number;
@@ -180,7 +218,7 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function hasChildNodes(node: Parse5ChildNode): node is Parse5Element | Parse5Template {
+function hasChildNodes(node: Parse5ChildNode): node is Parse5Element {
   return node.nodeName !== "#text" && node.nodeName !== "#comment" && node.nodeName !== "#documentType";
 }
 
@@ -196,7 +234,7 @@ function isDocumentTypeNode(node: Parse5ChildNode): node is Parse5DocumentType {
   return node.nodeName === "#documentType";
 }
 
-function isElementNode(node: Parse5ChildNode): node is Parse5Element | Parse5Template {
+function isElementNode(node: Parse5ChildNode): node is Parse5Element {
   return hasChildNodes(node);
 }
 
@@ -228,10 +266,10 @@ function createFragmentContext(fragmentContextTagName: string): Parse5Element | 
   }
 
   if (tagName === "html" || tagName === "head" || tagName === "body" || tagName === "title") {
-    return findElementByTagName(parse(CONTEXT_DOCUMENT_HTML), tagName);
+    return findElementByTagName(parse(CONTEXT_DOCUMENT_HTML) as Parse5Document, tagName);
   }
 
-  const contextFragment = parseFragment(`<${tagName}></${tagName}>`);
+  const contextFragment = parseFragment(`<${tagName}></${tagName}>`) as Parse5DocumentFragment;
   for (const child of contextFragment.childNodes) {
     if (isElement(child, tagName)) {
       return child;
@@ -332,10 +370,10 @@ function parseTree(
 
   if (options.fragmentContextTagName !== undefined) {
     const context = createFragmentContext(options.fragmentContextTagName);
-    return parseFragment(context, input, parseOptions);
+    return parseFragment(context, input, parseOptions) as Parse5DocumentFragment;
   }
 
-  return parse(input, parseOptions);
+  return parse(input, parseOptions) as Parse5Document;
 }
 
 function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): TreeNode | null {

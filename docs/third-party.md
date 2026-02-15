@@ -49,3 +49,45 @@ Verification procedure (commands):
 - `npm run eval:ci`
 ADR (for updates):
 - `docs/decisions/ADR-004-*.md`
+
+## parse5 runtime source (vendored subset)
+Source:
+- https://github.com/inikulin/parse5
+Pinned version (tag/release):
+- `8.0.0`
+Fetch date:
+- `2026-02-15`
+License:
+- MIT (`src/internal/vendor/parse5/LICENSE`)
+Attribution notes:
+- Vendored runtime files under `src/internal/vendor/parse5/`.
+- Used for tokenizer and tree construction runtime behavior without external runtime imports.
+Update procedure:
+- Refresh vendored subset from the target parse5 release.
+- Keep imports relative and runtime-local.
+- Record changes in a new ADR.
+Verification procedure (commands):
+- `npm run build`
+- `npm run test:conformance`
+- `npm run eval:ci`
+
+## entities runtime source (vendored subset)
+Source:
+- https://github.com/fb55/entities
+Pinned version (tag/release):
+- `6.0.1`
+Fetch date:
+- `2026-02-15`
+License:
+- BSD-2-Clause (`src/internal/vendor/entities/LICENSE`)
+Attribution notes:
+- Vendored runtime files under `src/internal/vendor/entities/`.
+- Used by the vendored parse5 tokenizer entity decoder.
+Update procedure:
+- Refresh vendored subset from the target entities release.
+- Keep imports relative and runtime-local.
+- Record changes in a new ADR.
+Verification procedure (commands):
+- `npm run build`
+- `npm run test:conformance`
+- `npm run eval:ci`

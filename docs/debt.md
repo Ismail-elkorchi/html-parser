@@ -74,16 +74,6 @@ Removal plan:
 ADR:
 - docs/decisions/ADR-005-dev-toolchain-baseline.md
 
-## parse5@8.0.0
-Value:
-- Standards-aligned tokenizer implementation used by the internal tokenizer adapter.
-Cost:
-- Additional dependency maintenance and update tracking for a large parsing library.
-Removal plan:
-- Replace adapter with an in-repo tokenizer implementation and remove parse5.
-ADR:
-- docs/decisions/ADR-005-parse5-tokenizer-adapter.md
-
 ## playwright@1.58.2
 Value:
 - Real multi-engine browser oracle (Chromium/Firefox/WebKit) for release differential checks.

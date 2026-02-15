@@ -17,7 +17,7 @@ const strictTypeChecked = tseslint.configs.strictTypeChecked.map((config) => ({
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", "tmp/**"]
+    ignores: ["dist/**", "node_modules/**", "tmp/**", "src/internal/vendor/**"]
   },
   {
     files: ["**/*.js", "**/*.mjs", "**/*.cjs"],

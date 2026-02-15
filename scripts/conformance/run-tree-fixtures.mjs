@@ -14,6 +14,7 @@ const TREE_FILES = [
 ];
 
 const HOLDOUT_MOD = 10;
+const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
 const DIVERGENCE_LIMIT = 25;
 
 function computeHoldout(id) {
@@ -224,8 +225,12 @@ const report = {
   },
   holdout: {
     excluded: holdoutExcluded,
-    rule: `hash(id) % ${HOLDOUT_MOD} === 0`
+    rule: HOLDOUT_RULE,
+    mod: HOLDOUT_MOD
   },
+  holdoutExcluded,
+  holdoutRule: HOLDOUT_RULE,
+  holdoutMod: HOLDOUT_MOD,
   skips: [],
   failures
 };

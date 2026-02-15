@@ -8,6 +8,16 @@ const ENCODING_FIXTURE_FILES = [
   "vendor/html5lib-tests/encoding/tests2.dat",
   "vendor/html5lib-tests/encoding/test-yahoo-jp.dat"
 ];
+const HOLDOUT_MOD = 10;
+const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
+
+function computeHoldout(id) {
+  let hash = 0;
+  for (let index = 0; index < id.length; index += 1) {
+    hash = (Math.imul(hash, 29) + id.charCodeAt(index)) >>> 0;
+  }
+  return hash % HOLDOUT_MOD === 0;
+}
 
 function parseDatFixtures(text, fileName) {
   const lines = text.split(/\r?\n/);
@@ -83,8 +93,14 @@ const encoder = new TextEncoder();
 const failures = [];
 let passed = 0;
 let failed = 0;
+let holdoutExcluded = 0;
 
 for (const fixture of allCases) {
+  if (computeHoldout(fixture.id)) {
+    holdoutExcluded += 1;
+    continue;
+  }
+
   const bytes = encoder.encode(fixture.data);
   const result = sniffHtmlEncoding(bytes, { defaultEncoding: "windows-1252" });
 
@@ -109,11 +125,19 @@ const report = {
   suite: "encoding",
   timestamp: new Date().toISOString(),
   cases: {
-    total: allCases.length,
+    total: allCases.length - holdoutExcluded,
     passed,
     failed,
     skipped: 0
   },
+  holdout: {
+    excluded: holdoutExcluded,
+    rule: HOLDOUT_RULE,
+    mod: HOLDOUT_MOD
+  },
+  holdoutExcluded,
+  holdoutRule: HOLDOUT_RULE,
+  holdoutMod: HOLDOUT_MOD,
   skips: [],
   failures
 };
@@ -121,8 +145,8 @@ const report = {
 await writeJson("reports/encoding.json", report);
 
 if (failed > 0) {
-  console.error(`Encoding fixture failures: ${failed}/${allCases.length}`);
+  console.error(`Encoding fixture failures: ${failed}/${allCases.length - holdoutExcluded}`);
   process.exit(1);
 }
 
-console.log(`Encoding fixtures passed: ${passed}/${allCases.length}`);
+console.log(`Encoding fixtures passed: ${passed}/${allCases.length - holdoutExcluded}`);
