@@ -4,6 +4,7 @@ import type {
   Attribute,
   BudgetExceededPayload,
   Chunk,
+  ChunkOptions,
   DocumentTree,
   ElementNode,
   FragmentTree,
@@ -21,6 +22,7 @@ export type {
   BudgetOptions,
   BudgetExceededPayload,
   Chunk,
+  ChunkOptions,
   CommentNode,
   DocumentTree,
   DoctypeNode,
@@ -73,7 +75,7 @@ function withSpan(includeSpans: boolean, start: number, end: number): Span | und
 }
 
 function enforceBudget(
-  budget: "maxInputBytes" | "maxNodes" | "maxTraceEvents",
+  budget: BudgetExceededPayload["budget"],
   limit: number | undefined,
   actual: number
 ): void {
@@ -89,29 +91,57 @@ function enforceBudget(
   });
 }
 
-function buildTrace(enabled: boolean | undefined, maxTraceEvents: number | undefined): TraceEvent[] | undefined {
+function eventSize(event: TraceEvent): number {
+  return event.detail.length + event.stage.length + 24;
+}
+
+function pushTrace(
+  trace: TraceEvent[] | undefined,
+  stage: TraceEvent["stage"],
+  detail: string,
+  budgets: ParseOptions["budgets"] | undefined
+): TraceEvent[] | undefined {
+  if (!trace) {
+    return undefined;
+  }
+
+  const next = [...trace, { seq: trace.length + 1, stage, detail }];
+  enforceBudget("maxTraceEvents", budgets?.maxTraceEvents, next.length);
+
+  const bytes = next.reduce((total, item) => total + eventSize(item), 0);
+  enforceBudget("maxTraceBytes", budgets?.maxTraceBytes, bytes);
+
+  return next;
+}
+
+function buildTrace(enabled: boolean | undefined, budgets: ParseOptions["budgets"]): TraceEvent[] | undefined {
   if (!enabled) {
     return undefined;
   }
 
-  const trace: TraceEvent[] = [
+  const base: TraceEvent[] = [
     { seq: 1, stage: "decode", detail: "input received" },
     { seq: 2, stage: "tokenize", detail: "stub tokenization" },
     { seq: 3, stage: "tree", detail: "stub tree construction" }
   ];
 
-  enforceBudget("maxTraceEvents", maxTraceEvents, trace.length);
-  return trace;
+  enforceBudget("maxTraceEvents", budgets?.maxTraceEvents, base.length);
+  const bytes = base.reduce((total, item) => total + eventSize(item), 0);
+  enforceBudget("maxTraceBytes", budgets?.maxTraceBytes, bytes);
+
+  return base;
 }
 
 function parseAsDocument(html: string, options: ParseOptions = {}): DocumentTree {
+  const startedAt = Date.now();
   const assigner = new NodeIdAssigner();
   const includeSpans = options.includeSpans ?? false;
-  const trace = buildTrace(options.trace, options.budgets?.maxTraceEvents);
+  const budgets = options.budgets;
+  let trace = buildTrace(options.trace, budgets);
   const textSpan = withSpan(includeSpans, 0, html.length);
   const rootSpan = withSpan(includeSpans, 0, html.length);
 
-  enforceBudget("maxInputBytes", options.budgets?.maxInputBytes, html.length);
+  enforceBudget("maxInputBytes", budgets?.maxInputBytes, html.length);
 
   const textNode: HtmlNode = {
     id: assigner.next(),
@@ -129,6 +159,8 @@ function parseAsDocument(html: string, options: ParseOptions = {}): DocumentTree
     ...(rootSpan ? { span: rootSpan } : {})
   };
 
+  trace = pushTrace(trace, "tree", "document wrapped in html element", budgets);
+
   const documentTree: DocumentTree = {
     id: assigner.next(),
     kind: "document",
@@ -137,7 +169,9 @@ function parseAsDocument(html: string, options: ParseOptions = {}): DocumentTree
     ...(trace ? { trace } : {})
   };
 
-  enforceBudget("maxNodes", options.budgets?.maxNodes, 3);
+  enforceBudget("maxNodes", budgets?.maxNodes, 3);
+  enforceBudget("maxDepth", budgets?.maxDepth, 2);
+  enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
 
   return documentTree;
 }
@@ -161,6 +195,7 @@ export function parseFragment(
   contextTagName: string,
   options: ParseOptions = {}
 ): FragmentTree {
+  const startedAt = Date.now();
   const normalizedContext = contextTagName.trim().toLowerCase();
   if (normalizedContext.length === 0) {
     throw new Error("contextTagName must be a non-empty tag name");
@@ -168,11 +203,21 @@ export function parseFragment(
 
   const assigner = new NodeIdAssigner();
   const includeSpans = options.includeSpans ?? false;
-  const trace = buildTrace(options.trace, options.budgets?.maxTraceEvents);
+  const budgets = options.budgets;
+  let trace = buildTrace(options.trace, budgets);
   const textSpan = withSpan(includeSpans, 0, html.length);
   const rootSpan = withSpan(includeSpans, 0, html.length);
 
-  enforceBudget("maxInputBytes", options.budgets?.maxInputBytes, html.length);
+  enforceBudget("maxInputBytes", budgets?.maxInputBytes, html.length);
+
+  const contextNamespace =
+    normalizedContext === "svg"
+      ? "svg"
+      : normalizedContext === "math" || normalizedContext === "mathml"
+        ? "mathml"
+        : "html";
+
+  trace = pushTrace(trace, "fragment", `fragment-context:${contextNamespace}:${normalizedContext}`, budgets);
 
   const textNode: HtmlNode = {
     id: assigner.next(),
@@ -184,7 +229,7 @@ export function parseFragment(
   const contextElement: ElementNode = {
     id: assigner.next(),
     kind: "element",
-    tagName: normalizedContext,
+    tagName: contextNamespace === "html" ? normalizedContext : `${contextNamespace}:${normalizedContext}`,
     attributes: normalizeAttributes([]),
     children: [textNode],
     ...(rootSpan ? { span: rootSpan } : {})
@@ -199,7 +244,9 @@ export function parseFragment(
     ...(trace ? { trace } : {})
   };
 
-  enforceBudget("maxNodes", options.budgets?.maxNodes, 3);
+  enforceBudget("maxNodes", budgets?.maxNodes, 3);
+  enforceBudget("maxDepth", budgets?.maxDepth, 2);
+  enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
 
   return fragmentTree;
 }
@@ -208,9 +255,12 @@ export async function parseStream(
   stream: ReadableStream<Uint8Array>,
   options: ParseOptions = {}
 ): Promise<DocumentTree> {
+  const startedAt = Date.now();
+  const budgets = options.budgets;
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let buffered = 0;
 
   for (;;) {
     const next = await reader.read();
@@ -221,7 +271,11 @@ export async function parseStream(
     const chunk = next.value;
     chunks.push(chunk);
     total += chunk.byteLength;
-    enforceBudget("maxInputBytes", options.budgets?.maxInputBytes, total);
+    buffered += chunk.byteLength;
+
+    enforceBudget("maxInputBytes", budgets?.maxInputBytes, total);
+    enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, buffered);
+    enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
   }
 
   const combined = new Uint8Array(total);
@@ -232,7 +286,16 @@ export async function parseStream(
     offset += chunk.byteLength;
   }
 
-  return parseBytes(combined, options);
+  const parsed = parseBytes(combined, options);
+
+  if (parsed.trace) {
+    const withStream = pushTrace([...parsed.trace], "stream", "stream-read-complete", budgets);
+    if (withStream) {
+      return { ...parsed, trace: withStream };
+    }
+  }
+
+  return parsed;
 }
 
 function serializeNode(node: HtmlNode): string {
@@ -265,16 +328,32 @@ export function serialize(tree: DocumentTree | FragmentTree | HtmlNode): string 
   return serializeNode(tree);
 }
 
+function extractText(node: HtmlNode): string {
+  if (node.kind === "text") {
+    return node.value;
+  }
+
+  if (node.kind !== "element") {
+    return "";
+  }
+
+  return node.children.map((child) => extractText(child)).join("");
+}
+
 function collectOutlineNodes(node: HtmlNode, depth: number, entries: OutlineEntry[]): void {
   if (node.kind !== "element") {
     return;
   }
 
-  entries.push({
-    nodeId: node.id,
-    depth,
-    tagName: node.tagName
-  });
+  const normalized = node.tagName.toLowerCase();
+  if (/^h[1-6]$/.test(normalized) || normalized === "section" || normalized === "article") {
+    entries.push({
+      nodeId: node.id,
+      depth,
+      tagName: node.tagName,
+      text: extractText(node).slice(0, 200)
+    });
+  }
 
   for (const child of node.children) {
     collectOutlineNodes(child, depth + 1, entries);
@@ -290,10 +369,56 @@ export function outline(tree: DocumentTree | FragmentTree): Outline {
   return { entries };
 }
 
-export function chunk(tree: DocumentTree | FragmentTree): Chunk[] {
-  return tree.children.map((node, index) => ({
-    index,
-    nodeId: node.id,
-    content: serialize(node)
-  }));
+function countNodes(node: HtmlNode): number {
+  if (node.kind !== "element") {
+    return 1;
+  }
+  return 1 + node.children.reduce((total, child) => total + countNodes(child), 0);
+}
+
+export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions = {}): Chunk[] {
+  const maxChars = options.maxChars ?? 8192;
+  const maxNodes = options.maxNodes ?? 256;
+  const chunks: Chunk[] = [];
+  let activeContent = "";
+  let activeNodes = 0;
+  let activeNodeId: NodeId | null = null;
+  let index = 0;
+
+  const flush = () => {
+    if (activeNodeId === null) {
+      return;
+    }
+
+    chunks.push({
+      index,
+      nodeId: activeNodeId,
+      content: activeContent,
+      nodes: activeNodes
+    });
+    index += 1;
+    activeContent = "";
+    activeNodes = 0;
+    activeNodeId = null;
+  };
+
+  for (const node of tree.children) {
+    const content = serialize(node);
+    const nodes = countNodes(node);
+
+    const nextChars = activeContent.length + content.length;
+    const nextNodes = activeNodes + nodes;
+    if (activeNodeId !== null && (nextChars > maxChars || nextNodes > maxNodes)) {
+      flush();
+    }
+
+    if (activeNodeId === null) {
+      activeNodeId = node.id;
+    }
+    activeContent += content;
+    activeNodes += nodes;
+  }
+
+  flush();
+  return chunks;
 }

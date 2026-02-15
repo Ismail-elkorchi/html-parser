@@ -25,8 +25,12 @@ export interface ParseError {
 
 export interface BudgetOptions {
   readonly maxInputBytes?: number;
+  readonly maxBufferedBytes?: number;
   readonly maxNodes?: number;
+  readonly maxDepth?: number;
   readonly maxTraceEvents?: number;
+  readonly maxTraceBytes?: number;
+  readonly maxTimeMs?: number;
 }
 
 export interface ParseOptions {
@@ -38,7 +42,7 @@ export interface ParseOptions {
 
 export interface TraceEvent {
   readonly seq: number;
-  readonly stage: "decode" | "tokenize" | "tree" | "serialize";
+  readonly stage: "decode" | "tokenize" | "tree" | "fragment" | "stream" | "serialize";
   readonly detail: string;
 }
 
@@ -97,6 +101,7 @@ export interface OutlineEntry {
   readonly nodeId: NodeId;
   readonly depth: number;
   readonly tagName: string;
+  readonly text: string;
 }
 
 export interface Outline {
@@ -107,11 +112,24 @@ export interface Chunk {
   readonly index: number;
   readonly nodeId: NodeId;
   readonly content: string;
+  readonly nodes: number;
+}
+
+export interface ChunkOptions {
+  readonly maxChars?: number;
+  readonly maxNodes?: number;
 }
 
 export interface BudgetExceededPayload {
   readonly code: "BUDGET_EXCEEDED";
-  readonly budget: "maxInputBytes" | "maxNodes" | "maxTraceEvents";
+  readonly budget:
+    | "maxInputBytes"
+    | "maxBufferedBytes"
+    | "maxNodes"
+    | "maxDepth"
+    | "maxTraceEvents"
+    | "maxTraceBytes"
+    | "maxTimeMs";
   readonly limit: number;
   readonly actual: number;
 }

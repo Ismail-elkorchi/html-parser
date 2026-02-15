@@ -1,6 +1,22 @@
 {
   "suite": "determinism",
-  "timestamp": "2026-02-15T05:42:26.794Z",
+  "timestamp": "2026-02-15T05:58:13.581Z",
+  "cases": [
+    {
+      "id": "det-document-1",
+      "ok": true,
+      "hashes": {
+        "node": "sha256:5a073ed65ec61595ea885e622e75b57b40d99a76176f31fd118defd53d4170d5"
+      }
+    },
+    {
+      "id": "det-fragment-1",
+      "ok": true,
+      "hashes": {
+        "node": "sha256:601e9ffac1e23a881f626ec64b5f3b8a840febd1967ebc6e93a40723f17c5dfb"
+      }
+    }
+  ],
   "overall": {
     "ok": true,
     "strategy": "deterministic pre-order incremental NodeId assignment"

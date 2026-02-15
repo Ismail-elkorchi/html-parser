@@ -32,10 +32,11 @@ const fragment = parseFragment("child", "section");
 ensure(fragment.contextTagName === "section", "fragment context mismatch");
 
 const out = outline(parsed);
-ensure(out.entries.length === 1, "outline generation mismatch");
+ensure(out.entries.length === 0, "outline generation mismatch");
 
 const chunks = chunk(parsed);
 ensure(chunks.length === 1, "chunk generation mismatch");
+ensure(chunks[0]?.nodes === 2, "chunk node count mismatch");
 
 let budgetError = null;
 try {
