@@ -22,6 +22,7 @@ This repository uses pull-request-only delivery.
 These map to the CI jobs in `.github/workflows/ci.yml`.
 `dependency-review` is defined in `.github/workflows/dependency-review.yml`.
 `codeql-analyze` is defined in `.github/workflows/codeql.yml`.
+`node` includes `npm run eval:ci` enforcement.
 
 ## Oracle workflow
 - `.github/workflows/oracle.yml` runs `npm run eval:release` on schedule and manual dispatch.

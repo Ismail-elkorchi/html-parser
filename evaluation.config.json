@@ -4,8 +4,8 @@
     "ci": {
       "requireHoldouts": false,
       "requireBrowserDiff": false,
-      "requireDeno": false,
-      "requireBun": false,
+      "requireDeno": true,
+      "requireBun": true,
       "requireBrowserSmoke": false
     },
     "release": {
@@ -35,8 +35,8 @@
         "maxSkips": 0
       },
       "holdout": {
-        "minPassRate": 0,
-        "maxSkips": 300
+        "minPassRate": 1,
+        "maxSkips": 0
       }
     },
     "browserDiff": {
