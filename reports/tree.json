@@ -1,0 +1,3099 @@
+{
+  "suite": "tree",
+  "timestamp": "2026-02-15T05:53:43.515Z",
+  "cases": {
+    "total": 248,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 248
+  },
+  "holdout": {
+    "excluded": 29,
+    "rule": "hash(id) % 10 === 0"
+  },
+  "skips": [
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#1",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#2",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#3",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#4",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#5",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#6",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#7",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#9",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#10",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#11",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#12",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#13",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#14",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#16",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#17",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#18",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#19",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#20",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#21",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#22",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#23",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#25",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#26",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#27",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#28",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#29",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#30",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#31",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#32",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#34",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#35",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#36",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#37",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#38",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#39",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#40",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#41",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#43",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#44",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#45",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#46",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#47",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#48",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#49",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#50",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#52",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#53",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#54",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#55",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#56",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#57",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#58",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#59",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#61",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#62",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#63",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#64",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#65",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#66",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#67",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#68",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#69",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#70",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#71",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#72",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#73",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#74",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#75",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#76",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#77",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#78",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#80",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#81",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#82",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#83",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#84",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#85",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#86",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#87",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#89",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#90",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#91",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#92",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#93",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#94",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#95",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#96",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#98",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#99",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#100",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#101",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#102",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#104",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#105",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#106",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#107",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#108",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#109",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#110",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#111",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#1",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#2",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#4",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#5",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#6",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#7",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#8",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#9",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#10",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#11",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#12",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#13",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#14",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#15",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#17",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#18",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#19",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#20",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#21",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#22",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#23",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#24",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#26",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#27",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#28",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#29",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#30",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#31",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#32",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#33",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#35",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#36",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#37",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#38",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#39",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#40",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#41",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#42",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#44",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#45",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#46",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#47",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#48",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#49",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#50",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#51",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#53",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#54",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#55",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#56",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#57",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#58",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#59",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#60",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#62",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#63",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#1",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#3",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#4",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#5",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#6",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#7",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#8",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#9",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#10",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#12",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#13",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#14",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#15",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#16",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#17",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#18",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#19",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#21",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#22",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#23",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#24",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#2",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#3",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#4",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#5",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#6",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#7",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#8",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#9",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#1",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#2",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#3",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#4",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#5",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#6",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#7",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#8",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#9",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#10",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#11",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#12",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#13",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#14",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#15",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#16",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#1",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#2",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#3",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#4",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#5",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#6",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#7",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#8",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#10",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#11",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#13",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#14",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#15",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#16",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#17",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#18",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#19",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#20",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#22",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#23",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#24",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#25",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#26",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#27",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#28",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#29",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#31",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#32",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#33",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#34",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#35",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#36",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#37",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#38",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#39",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#40",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#41",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#42",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#43",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#44",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#45",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#46",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#47",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#48",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#50",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#51",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#52",
+      "reason": "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
+      "decisionRecord": "docs/decisions/ADR-001-tree-construction-conformance-skips.md"
+    }
+  ],
+  "failures": [
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#1",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#2",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#3",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#4",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#5",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#6",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#7",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#9",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#10",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#11",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#12",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#13",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#14",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#16",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#17",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#18",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#19",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#20",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#21",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#22",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#23",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#25",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#26",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 6
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#27",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#28",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#29",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#30",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#31",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 7
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#32",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#34",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 11
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#35",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#36",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#37",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#38",
+      "tokenizerErrors": [
+        {
+          "code": "missing-end-tag-name",
+          "index": 0
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#39",
+      "tokenizerErrors": [
+        {
+          "code": "missing-end-tag-name",
+          "index": 0
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#40",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#41",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#43",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#44",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#45",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#46",
+      "tokenizerErrors": [
+        {
+          "code": "missing-end-tag-name",
+          "index": 0
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#47",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#48",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#49",
+      "tokenizerErrors": [
+        {
+          "code": "missing-end-tag-name",
+          "index": 0
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#50",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#52",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#53",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#54",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#55",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#56",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 4
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#57",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#58",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#59",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#61",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#62",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#63",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#64",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#65",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#66",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#67",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#68",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#69",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#70",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#71",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#72",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#73",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 10
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#74",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 10
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#75",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 10
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 12
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#76",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 10
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 12
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#77",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#78",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#80",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#81",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#82",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#83",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#84",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#85",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#86",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#87",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#89",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#90",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#91",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#92",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#93",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#94",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#95",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#96",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#98",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 6
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#99",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#100",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#101",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#102",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 7
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#104",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 8
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 9
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#105",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#106",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#107",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#108",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#109",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#110",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 4
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 6
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 7
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 8
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 9
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests1.dat#111",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 4
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 6
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 7
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 8
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 9
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 10
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 11
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#1",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#2",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#4",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#5",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#6",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#7",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#8",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#9",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#10",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#11",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#12",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#13",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#14",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#15",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#17",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#18",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#19",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#20",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#21",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#22",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#23",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#24",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#26",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#27",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#28",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#29",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#30",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#31",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#32",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#33",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#35",
+      "tokenizerErrors": [
+        {
+          "code": "eof-in-comment",
+          "index": 15
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#36",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#37",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#38",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#39",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#40",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#41",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#42",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#44",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#45",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#46",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#47",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#48",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#49",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#50",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#51",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#53",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#54",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#55",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#56",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#57",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#58",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#59",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#60",
+      "tokenizerErrors": [
+        {
+          "code": "eof-in-comment",
+          "index": 15
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#62",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests2.dat#63",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#1",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#3",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#4",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#5",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#6",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#7",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#8",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#9",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#10",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#12",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#13",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#14",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#15",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#16",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 4
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#17",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#18",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#19",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#21",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#22",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#23",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests3.dat#24",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#2",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#3",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#4",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#5",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#6",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#7",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#8",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests4.dat#9",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#1",
+      "tokenizerErrors": [
+        {
+          "code": "eof-in-comment",
+          "index": 8
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#2",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#3",
+      "tokenizerErrors": [
+        {
+          "code": "eof-in-comment",
+          "index": 8
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#4",
+      "tokenizerErrors": [
+        {
+          "code": "eof-in-comment",
+          "index": 8
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#5",
+      "tokenizerErrors": [
+        {
+          "code": "eof-in-comment",
+          "index": 9
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#6",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#7",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#8",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#9",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#10",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#11",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#12",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#13",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#14",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#15",
+      "tokenizerErrors": [
+        {
+          "code": "eof-in-comment",
+          "index": 7
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests5.dat#16",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#1",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#2",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#3",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#4",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#5",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#6",
+      "tokenizerErrors": [
+        {
+          "code": "eof-in-comment",
+          "index": 0
+        }
+      ],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#7",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#8",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#10",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#11",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#13",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#14",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#15",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#16",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#17",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#18",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#19",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#20",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#22",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 4
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 6
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 7
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 8
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 9
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 10
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 11
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#23",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#24",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 4
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 6
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 7
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#25",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 4
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#26",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#27",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#28",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#29",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#31",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#32",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#33",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#34",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#35",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#36",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#37",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#38",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#39",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#40",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 4
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 6
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 7
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 8
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 9
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#41",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#42",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#43",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 1
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 3
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 4
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 5
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 6
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 7
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 8
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 9
+        },
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 10
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#44",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#45",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 2
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#46",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#47",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#48",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#50",
+      "tokenizerErrors": [],
+      "treeErrors": []
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#51",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    },
+    {
+      "id": "vendor/html5lib-tests/tree-construction/tests6.dat#52",
+      "tokenizerErrors": [],
+      "treeErrors": [
+        {
+          "code": "unexpected-end-tag",
+          "tokenIndex": 0
+        }
+      ]
+    }
+  ]
+}
