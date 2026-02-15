@@ -1,6 +1,6 @@
 {
   "suite": "gates",
-  "timestamp": "2026-02-15T05:34:56.883Z",
+  "timestamp": "2026-02-15T05:42:34.596Z",
   "profile": "ci",
   "allPass": false,
   "gates": [
@@ -35,9 +35,9 @@
       "pass": true,
       "details": {
         "suite": "no-node-builtins",
-        "timestamp": "2026-02-15T05:34:55.849Z",
+        "timestamp": "2026-02-15T05:42:33.817Z",
         "ok": true,
-        "checkedFiles": 4,
+        "checkedFiles": 8,
         "findings": []
       }
     },
@@ -62,7 +62,14 @@
       "name": "Conformance encoding",
       "pass": false,
       "details": {
-        "missingReport": "reports/encoding.json"
+        "passRate": 1,
+        "minPassRate": 0.99,
+        "passed": 77,
+        "failed": 0,
+        "skipped": 5,
+        "total": 82,
+        "maxSkips": 0,
+        "missingDecisionRecords": []
       }
     },
     {
@@ -76,9 +83,14 @@
     {
       "id": "G-080",
       "name": "Determinism",
-      "pass": false,
+      "pass": true,
       "details": {
-        "missing": true
+        "suite": "determinism",
+        "timestamp": "2026-02-15T05:42:26.794Z",
+        "overall": {
+          "ok": true,
+          "strategy": "deterministic pre-order incremental NodeId assignment"
+        }
       }
     },
     {
@@ -97,9 +109,27 @@
     {
       "id": "G-100",
       "name": "Cross-runtime smoke",
-      "pass": false,
+      "pass": true,
       "details": {
-        "missing": true
+        "suite": "smoke",
+        "timestamp": "2026-02-15T05:42:26.794Z",
+        "runtimes": {
+          "node": {
+            "ok": true
+          },
+          "deno": {
+            "ok": false,
+            "pending": true
+          },
+          "bun": {
+            "ok": false,
+            "pending": true
+          },
+          "browser": {
+            "ok": false,
+            "pending": true
+          }
+        }
       }
     },
     {
@@ -108,7 +138,7 @@
       "pass": true,
       "details": {
         "suite": "pack",
-        "timestamp": "2026-02-15T05:34:56.804Z",
+        "timestamp": "2026-02-15T05:42:34.535Z",
         "ok": true,
         "tarball": "html-parser-0.1.0.tgz",
         "dependenciesEmpty": true,
@@ -123,7 +153,7 @@
       "pass": true,
       "details": {
         "suite": "docs",
-        "timestamp": "2026-02-15T05:34:55.795Z",
+        "timestamp": "2026-02-15T05:42:33.772Z",
         "ok": true,
         "missingFiles": [],
         "missingReadmeSections": []

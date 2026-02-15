@@ -1,8 +1,10 @@
 import {
   BudgetExceededError,
-  deterministicHash,
+  chunk,
+  outline,
   parseBytes,
-  parseString,
+  parse,
+  parseFragment,
   serialize
 } from "../../dist/mod.js";
 
@@ -12,23 +14,32 @@ function ensure(condition, message) {
   }
 }
 
-const parsed = parseString("<p>smoke</p>");
-ensure(parsed.serialization === "<p>smoke</p>", "parseString serialization mismatch");
-ensure(parsed.tree.type === "document", "parseString root type mismatch");
+const parsed = parse("<p>smoke</p>");
+ensure(parsed.kind === "document", "parse root type mismatch");
+ensure(serialize(parsed) === "<html><p>smoke</p></html>", "parse output mismatch");
 
 const fromBytes = parseBytes(new Uint8Array([0x68, 0x74, 0x6d, 0x6c]));
-ensure(fromBytes.serialization === "html", "parseBytes decoding mismatch");
+ensure(serialize(fromBytes) === "<html>html</html>", "parseBytes decoding mismatch");
 
 const serialized = serialize(parsed);
-ensure(serialized === "<p>smoke</p>", "serialize mismatch");
+ensure(serialized === "<html><p>smoke</p></html>", "serialize mismatch");
 
-const hashA = deterministicHash(parseString("deterministic", { seed: 7 }));
-const hashB = deterministicHash(parseString("deterministic", { seed: 7 }));
-ensure(hashA === hashB, "deterministic hash mismatch");
+const first = parse("deterministic");
+const second = parse("deterministic");
+ensure(JSON.stringify(first) === JSON.stringify(second), "deterministic output mismatch");
+
+const fragment = parseFragment("child", "section");
+ensure(fragment.contextTagName === "section", "fragment context mismatch");
+
+const out = outline(parsed);
+ensure(out.entries.length === 1, "outline generation mismatch");
+
+const chunks = chunk(parsed);
+ensure(chunks.length === 1, "chunk generation mismatch");
 
 let budgetError = null;
 try {
-  parseString("budget", { budgets: { maxInputBytes: 3 } });
+  parse("budget", { budgets: { maxInputBytes: 3 } });
 } catch (error) {
   budgetError = error;
 }
