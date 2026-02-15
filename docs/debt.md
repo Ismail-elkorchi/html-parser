@@ -83,3 +83,13 @@ Removal plan:
 - Replace adapter with an in-repo tokenizer implementation and remove parse5.
 ADR:
 - docs/decisions/ADR-005-parse5-tokenizer-adapter.md
+
+## playwright@1.58.2
+Value:
+- Real multi-engine browser oracle (Chromium/Firefox/WebKit) for release differential checks.
+Cost:
+- Large browser download footprint and additional CI runtime in oracle workflows.
+Removal plan:
+- Keep oracle isolated to scheduled/manual workflows, then replace with a smaller equivalent harness if coverage parity is preserved.
+ADR:
+- docs/decisions/ADR-005-playwright-browser-oracle.md

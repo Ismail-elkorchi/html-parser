@@ -23,6 +23,11 @@ These map to the CI jobs in `.github/workflows/ci.yml`.
 `dependency-review` is defined in `.github/workflows/dependency-review.yml`.
 `codeql-analyze` is defined in `.github/workflows/codeql.yml`.
 
+## Oracle workflow
+- `.github/workflows/oracle.yml` runs `npm run eval:release` on schedule and manual dispatch.
+- It installs Playwright browsers (`chromium`, `firefox`, `webkit`) before release evaluation.
+- This workflow is intentionally not a required pull-request check to keep PR CI latency stable.
+
 ## Applied branch protection payload
 Applied with:
 - `gh api -X PUT repos/Ismail-elkorchi/html-parser/branches/main/protection --input <payload>`
