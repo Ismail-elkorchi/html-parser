@@ -14,8 +14,12 @@
 - `trace`: `false`
 - `transportEncodingLabel`: undefined
 - `budgets.maxInputBytes`: undefined
+- `budgets.maxBufferedBytes`: undefined
 - `budgets.maxNodes`: undefined
+- `budgets.maxDepth`: undefined
 - `budgets.maxTraceEvents`: undefined
+- `budgets.maxTraceBytes`: undefined
+- `budgets.maxTimeMs`: undefined
 
 `parseBytes` decoding order:
 1) BOM detection
@@ -40,5 +44,12 @@
 When `trace: true`, trace output is bounded by `budgets.maxTraceEvents`.
 Each event:
 - `seq`: monotonic sequence number
-- `stage`: `decode` | `tokenize` | `tree` | `serialize`
+- `stage`: `decode` | `tokenize` | `tree` | `fragment` | `stream` | `serialize`
 - `detail`: stable descriptive string
+
+## Foreign content scope (v1)
+- Fragment parsing is namespace-aware for HTML, SVG, and MathML context tags.
+- For SVG and MathML contexts, fragment roots are represented with a deterministic prefixed tag name:
+  - `svg:<context>`
+  - `mathml:<context>`
+- Full HTML insertion-mode parity inside foreign content is not complete in v1 and is tracked as fixture debt.

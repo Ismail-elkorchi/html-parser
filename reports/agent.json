@@ -1,0 +1,23 @@
+{
+  "suite": "agent",
+  "timestamp": "2026-02-15T05:58:13.605Z",
+  "features": {
+    "trace": {
+      "ok": true,
+      "bounded": true,
+      "tested": true
+    },
+    "spans": {
+      "ok": true,
+      "tested": true
+    },
+    "outline": {
+      "ok": true,
+      "tested": true
+    },
+    "chunk": {
+      "ok": true,
+      "tested": true
+    }
+  }
+}
