@@ -1,0 +1,193 @@
+# Evaluation report formats
+
+All evaluation outputs MUST be written under `reports/` as JSON.
+These reports are read by:
+- `scripts/eval/check-gates.mjs`
+- `scripts/eval/score.mjs`
+
+Common fields:
+- `suite`: string (e.g., "tokenizer")
+- `timestamp`: ISO string
+- `artifact`: object describing pinned inputs (fixture commit, dataset hash, etc)
+- `cases`: { passed, failed, skipped, total }
+- `failures`: array of objects (optional)
+- `skips`: array of objects (optional, but required if skipped > 0)
+
+## Conformance suite reports
+Files:
+- reports/tokenizer.json
+- reports/tree.json
+- reports/encoding.json
+- reports/serializer.json
+- reports/holdout.json
+
+Shape:
+{
+  "suite": "tokenizer",
+  "timestamp": "...",
+  "artifact": {
+    "html5libTestsCommit": "...",
+    "entitiesHash": "sha256:..."
+  },
+  "cases": { "passed": 0, "failed": 0, "skipped": 0, "total": 0 },
+  "failures": [
+    {
+      "id": "path/to/file#caseId",
+      "message": "brief",
+      "repro": { "input": "...", "options": { } },
+      "triageRecord": "docs/triage/....md"
+    }
+  ],
+  "skips": [
+    {
+      "id": "path/to/file#caseId",
+      "reason": "why skipped",
+      "decisionRecord": "docs/decisions/ADR-001-....md"
+    }
+  ]
+}
+
+Rules:
+- total = passed + failed + skipped
+- If skipped > 0, each skip MUST include an existing decisionRecord path.
+
+## Determinism report
+File:
+- reports/determinism.json
+
+Shape:
+{
+  "suite": "determinism",
+  "timestamp": "...",
+  "cases": [
+    {
+      "id": "det-001",
+      "ok": true,
+      "hashes": {
+        "node": "sha256:....",
+        "deno": "sha256:....",
+        "bun": "sha256:....",
+        "browser": "sha256:...."
+      }
+    }
+  ],
+  "overall": { "ok": true }
+}
+
+## Budgets report
+File:
+- reports/budgets.json
+
+Shape:
+{
+  "suite": "budgets",
+  "timestamp": "...",
+  "overall": { "ok": true },
+  "checks": [
+    {
+      "id": "budget-maxNodes",
+      "ok": true,
+      "expectedErrorCode": "BUDGET_MAX_NODES",
+      "observedErrorCode": "BUDGET_MAX_NODES"
+    }
+  ]
+}
+
+## Smoke report
+File:
+- reports/smoke.json
+
+Shape:
+{
+  "suite": "smoke",
+  "timestamp": "...",
+  "runtimes": {
+    "node": { "ok": true, "version": "v24.x" },
+    "deno": { "ok": true, "version": "2.x" },
+    "bun":  { "ok": true, "version": "1.x" },
+    "browser": { "ok": true, "engine": "chromium" }
+  }
+}
+
+## Browser differential report
+File:
+- reports/browser-diff.json
+
+Shape:
+{
+  "suite": "browser-diff",
+  "timestamp": "...",
+  "corpus": { "name": "curated-v1", "cases": 5000 },
+  "engines": {
+    "chromium": { "compared": 0, "agreed": 0, "disagreed": 0 },
+    "firefox":  { "compared": 0, "agreed": 0, "disagreed": 0 },
+    "webkit":   { "compared": 0, "agreed": 0, "disagreed": 0 }
+  },
+  "disagreements": [
+    {
+      "id": "case-0001",
+      "engine": "chromium",
+      "triageRecord": "docs/triage/....md"
+    }
+  ]
+}
+
+## Fuzz report (recommended)
+File:
+- reports/fuzz.json
+
+Shape:
+{
+  "suite": "fuzz",
+  "timestamp": "...",
+  "runs": 1000,
+  "crashes": 0,
+  "hangs": 0,
+  "budgetErrors": 120,
+  "findings": []
+}
+
+## Agent feature report
+File:
+- reports/agent.json
+
+Shape:
+{
+  "suite": "agent",
+  "timestamp": "...",
+  "features": {
+    "trace": { "ok": true, "bounded": true, "tested": true },
+    "spans": { "ok": true, "tested": true },
+    "outline": { "ok": true, "tested": true },
+    "chunk": { "ok": true, "tested": true }
+  }
+}
+
+## Packaging report
+File:
+- reports/pack.json
+
+Shape:
+{
+  "suite": "pack",
+  "timestamp": "...",
+  "ok": true,
+  "tarball": "html-parser-1.0.0.tgz",
+  "forbiddenIncluded": [],
+  "dependenciesEmpty": true,
+  "esmOnly": true,
+  "exportsOk": true
+}
+
+## Docs report
+File:
+- reports/docs.json
+
+Shape:
+{
+  "suite": "docs",
+  "timestamp": "...",
+  "ok": true,
+  "missingFiles": [],
+  "missingReadmeSections": []
+}

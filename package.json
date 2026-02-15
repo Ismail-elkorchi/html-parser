@@ -9,12 +9,12 @@
     "node": ">=24.0.0",
     "npm": ">=11.0.0"
   },
-  "main": "./dist/public/index.js",
-  "types": "./dist/public/index.d.ts",
+  "main": "./dist/mod.js",
+  "types": "./dist/mod.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/public/index.d.ts",
-      "import": "./dist/public/index.js"
+      "types": "./dist/mod.d.ts",
+      "import": "./dist/mod.js"
     }
   },
   "files": [
@@ -22,13 +22,18 @@
   ],
   "scripts": {
     "lint": "eslint . --max-warnings=0",
-    "lint:fix": "eslint . --fix --max-warnings=0",
+    "fmt": "eslint . --fix --max-warnings=0",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "build": "tsc -p tsconfig.build.json",
-    "test": "node --test",
-    "test:control": "node --test tests/control/**/*.test.js",
-    "eval:ci": "node scripts/eval/ci.mjs",
-    "eval:release": "node scripts/eval/release.mjs"
+    "test": "npm run build && node --test test/**/*.test.js tests/**/*.test.js",
+    "test:control": "npm run build && node --test test/control/**/*.test.js tests/control/**/*.test.js",
+    "test:holdout": "npm run build && node --test test/holdout/**/*.test.js",
+    "smoke:node": "npm run build && node scripts/smoke/control.mjs",
+    "smoke:deno": "deno run --allow-read scripts/smoke/control.mjs",
+    "smoke:bun": "bun run scripts/smoke/control.mjs",
+    "pack:check": "node scripts/eval/pack-check.mjs",
+    "eval:ci": "node scripts/eval/check-docs.mjs && node scripts/eval/check-no-node-builtins.mjs && node scripts/eval/pack-check.mjs && node scripts/eval/check-gates.mjs --profile=ci && node scripts/eval/score.mjs --profile=ci && node scripts/eval/report.mjs --profile=ci",
+    "eval:release": "node scripts/eval/check-docs.mjs && node scripts/eval/check-no-node-builtins.mjs && node scripts/eval/pack-check.mjs && node scripts/eval/check-gates.mjs --profile=release && node scripts/eval/score.mjs --profile=release && node scripts/eval/report.mjs --profile=release"
   },
   "dependencies": {},
   "devDependencies": {

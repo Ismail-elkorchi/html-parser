@@ -1,0 +1,15 @@
+{
+  "$schema": "https://jsr.io/schema/config-file.v1.json",
+  "name": "@html-parser/core",
+  "version": "0.0.0",
+  "exports": {
+    ".": "./src/mod.ts"
+  },
+  "exclude": [
+    "vendor/**",
+    "test/**",
+    "tests/**",
+    "reports/**",
+    "tmp/**"
+  ]
+}

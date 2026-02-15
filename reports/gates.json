@@ -1,0 +1,133 @@
+{
+  "suite": "gates",
+  "timestamp": "2026-02-15T05:34:56.883Z",
+  "profile": "ci",
+  "allPass": false,
+  "gates": [
+    {
+      "id": "G-000",
+      "name": "Evaluation config exists",
+      "pass": true,
+      "details": {
+        "profile": "ci"
+      }
+    },
+    {
+      "id": "G-010",
+      "name": "Zero runtime dependencies",
+      "pass": true,
+      "details": {
+        "dependenciesCount": 0
+      }
+    },
+    {
+      "id": "G-020",
+      "name": "ESM only",
+      "pass": true,
+      "details": {
+        "type": "module",
+        "requireKeysPresent": false
+      }
+    },
+    {
+      "id": "G-030",
+      "name": "No Node builtin imports in src/",
+      "pass": true,
+      "details": {
+        "suite": "no-node-builtins",
+        "timestamp": "2026-02-15T05:34:55.849Z",
+        "ok": true,
+        "checkedFiles": 4,
+        "findings": []
+      }
+    },
+    {
+      "id": "G-040",
+      "name": "Conformance tokenizer",
+      "pass": false,
+      "details": {
+        "missingReport": "reports/tokenizer.json"
+      }
+    },
+    {
+      "id": "G-050",
+      "name": "Conformance tree construction",
+      "pass": false,
+      "details": {
+        "missingReport": "reports/tree.json"
+      }
+    },
+    {
+      "id": "G-060",
+      "name": "Conformance encoding",
+      "pass": false,
+      "details": {
+        "missingReport": "reports/encoding.json"
+      }
+    },
+    {
+      "id": "G-070",
+      "name": "Conformance serializer",
+      "pass": false,
+      "details": {
+        "missingReport": "reports/serializer.json"
+      }
+    },
+    {
+      "id": "G-080",
+      "name": "Determinism",
+      "pass": false,
+      "details": {
+        "missing": true
+      }
+    },
+    {
+      "id": "G-090",
+      "name": "Budgets and no hangs",
+      "pass": false,
+      "details": {
+        "budgets": {
+          "missing": true
+        },
+        "fuzz": {
+          "missing": true
+        }
+      }
+    },
+    {
+      "id": "G-100",
+      "name": "Cross-runtime smoke",
+      "pass": false,
+      "details": {
+        "missing": true
+      }
+    },
+    {
+      "id": "G-110",
+      "name": "Packaging sanity",
+      "pass": true,
+      "details": {
+        "suite": "pack",
+        "timestamp": "2026-02-15T05:34:56.804Z",
+        "ok": true,
+        "tarball": "html-parser-0.1.0.tgz",
+        "dependenciesEmpty": true,
+        "esmOnly": true,
+        "exportsOk": true,
+        "forbiddenIncluded": []
+      }
+    },
+    {
+      "id": "G-120",
+      "name": "Docs and dataset hygiene",
+      "pass": true,
+      "details": {
+        "suite": "docs",
+        "timestamp": "2026-02-15T05:34:55.795Z",
+        "ok": true,
+        "missingFiles": [],
+        "missingReadmeSections": []
+      }
+    }
+  ]
+}
