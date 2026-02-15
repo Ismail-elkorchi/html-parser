@@ -40,8 +40,8 @@
       }
     },
     "browserDiff": {
-      "minAgreement": 0.995,
-      "minEnginesPresent": 1
+      "minAgreement": 0.999,
+      "minEnginesPresent": 3
     },
     "determinism": {
       "requireNode": true

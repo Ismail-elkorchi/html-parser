@@ -1,17 +1,15 @@
-name: Release
+name: Oracle
 
 on:
-  push:
-    tags:
-      - "v*"
+  schedule:
+    - cron: "41 2 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  release:
+  browser-oracle:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,26 +31,11 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2
 
-      - name: Install
+      - name: Install dependencies
         run: npm ci
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Build
-        run: npm run build
-
       - name: Evaluate release profile
         run: npm run eval:release
-
-      - name: Publish npm (optional)
-        if: ${{ secrets.NPM_TOKEN != '' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
-
-      - name: Publish JSR (optional)
-        if: ${{ secrets.JSR_TOKEN != '' }}
-        env:
-          JSR_TOKEN: ${{ secrets.JSR_TOKEN }}
-        run: npx -y jsr publish
