@@ -1,7 +1,7 @@
 {
   "suite": "no-node-builtins",
-  "timestamp": "2026-02-15T05:42:33.817Z",
+  "timestamp": "2026-02-15T06:04:19.300Z",
   "ok": true,
-  "checkedFiles": 8,
+  "checkedFiles": 17,
   "findings": []
 }

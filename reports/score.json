@@ -1,0 +1,132 @@
+{
+  "suite": "score",
+  "timestamp": "2026-02-15T06:04:19.984Z",
+  "profile": "release",
+  "total": 85,
+  "breakdown": {
+    "correctness": {
+      "score": 25,
+      "details": {
+        "tokRate": 1,
+        "treeRate": 0,
+        "encRate": 1,
+        "serRate": 1
+      }
+    },
+    "browserDiff": {
+      "score": 20,
+      "details": {
+        "presentEngines": [
+          "chromium"
+        ],
+        "agreement": 1
+      }
+    },
+    "performance": {
+      "score": 15,
+      "details": {
+        "benchmarksCompared": 1,
+        "ratio": 105.48849999999996
+      }
+    },
+    "robustness": {
+      "score": 10,
+      "details": {
+        "fuzz": {
+          "suite": "fuzz",
+          "timestamp": "2026-02-15T06:04:17.548Z",
+          "runs": 600,
+          "seed": "0x9e3779b9",
+          "crashes": 0,
+          "hangs": 0,
+          "budgetErrors": 0,
+          "findings": []
+        },
+        "budgets": {
+          "suite": "budgets",
+          "timestamp": "2026-02-15T06:04:05.309Z",
+          "overall": {
+            "ok": true
+          },
+          "checks": [
+            {
+              "id": "budget-max-input-bytes",
+              "ok": true,
+              "expectedErrorCode": "maxInputBytes",
+              "observedErrorCode": "maxInputBytes"
+            },
+            {
+              "id": "budget-max-nodes",
+              "ok": true,
+              "expectedErrorCode": "maxNodes",
+              "observedErrorCode": "maxNodes"
+            },
+            {
+              "id": "budget-max-depth",
+              "ok": true,
+              "expectedErrorCode": "maxDepth",
+              "observedErrorCode": "maxDepth"
+            },
+            {
+              "id": "budget-max-trace-events",
+              "ok": true,
+              "expectedErrorCode": "maxTraceEvents",
+              "observedErrorCode": "maxTraceEvents"
+            },
+            {
+              "id": "budget-max-trace-bytes",
+              "ok": true,
+              "expectedErrorCode": "maxTraceBytes",
+              "observedErrorCode": "maxTraceBytes"
+            },
+            {
+              "id": "budget-max-time-ms",
+              "ok": true,
+              "expectedErrorCode": "maxTimeMs",
+              "observedErrorCode": "maxTimeMs"
+            },
+            {
+              "id": "budget-max-buffered-bytes",
+              "ok": true,
+              "expectedErrorCode": "maxBufferedBytes",
+              "observedErrorCode": "maxBufferedBytes"
+            }
+          ]
+        }
+      }
+    },
+    "agentFirst": {
+      "score": 10,
+      "details": {
+        "suite": "agent",
+        "timestamp": "2026-02-15T06:04:05.326Z",
+        "features": {
+          "trace": {
+            "ok": true,
+            "bounded": true,
+            "tested": true
+          },
+          "spans": {
+            "ok": true,
+            "tested": true
+          },
+          "outline": {
+            "ok": true,
+            "tested": true
+          },
+          "chunk": {
+            "ok": true,
+            "tested": true
+          }
+        }
+      }
+    },
+    "packagingTrust": {
+      "score": 5,
+      "details": {
+        "packOk": true,
+        "docsOk": true
+      }
+    }
+  }
+}

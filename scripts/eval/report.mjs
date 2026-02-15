@@ -7,6 +7,15 @@ async function main() {
 
   const gates = (await fileExists("reports/gates.json")) ? await readJson("reports/gates.json") : null;
   const score = (await fileExists("reports/score.json")) ? await readJson("reports/score.json") : null;
+  const conformanceReports = await Promise.all(
+    [
+      "reports/tokenizer.json",
+      "reports/tree.json",
+      "reports/encoding.json",
+      "reports/serializer.json",
+      "reports/holdout.json"
+    ].map(async (path) => ((await fileExists(path)) ? readJson(path) : null))
+  );
 
   const lines = [];
   lines.push(`# Evaluation report (${profile})`);
@@ -57,6 +66,29 @@ async function main() {
   lines.push("- Any oracle choice or normalization rule MUST have an ADR (ADR-003).");
   lines.push("- Any dataset update MUST have an ADR (ADR-004).");
   lines.push("- Any dev dependency addition MUST have an ADR (ADR-005) and a debt entry in docs/debt.md.");
+  lines.push("");
+
+  const decisionRecords = new Set([
+    "docs/decisions/ADR-002-staged-threshold-realignment.md",
+    "docs/decisions/ADR-003-browser-diff-normalization-v1.md"
+  ]);
+
+  for (const report of conformanceReports) {
+    if (!report) {
+      continue;
+    }
+    for (const skip of report.skips || []) {
+      if (typeof skip?.decisionRecord === "string" && skip.decisionRecord.length > 0) {
+        decisionRecords.add(skip.decisionRecord);
+      }
+    }
+  }
+
+  lines.push("## Decision records referenced");
+  lines.push("");
+  for (const record of [...decisionRecords].sort()) {
+    lines.push(`- ${record}`);
+  }
   lines.push("");
 
   const out = lines.join("\n") + "\n";

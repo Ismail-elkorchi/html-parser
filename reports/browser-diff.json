@@ -1,0 +1,17 @@
+{
+  "suite": "browser-diff",
+  "timestamp": "2026-02-15T06:04:15.818Z",
+  "corpus": {
+    "name": "curated-v1",
+    "seed": "0x5f3759df",
+    "cases": 102
+  },
+  "engines": {
+    "chromium": {
+      "compared": 102,
+      "agreed": 102,
+      "disagreed": 0
+    }
+  },
+  "disagreements": []
+}
