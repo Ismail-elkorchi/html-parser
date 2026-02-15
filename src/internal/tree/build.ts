@@ -1,6 +1,7 @@
 import { parse, parseFragment, type DefaultTreeAdapterTypes } from "parse5";
 
 import type {
+  TreeAttribute,
   TreeBudgets,
   TreeBuildOptions,
   TreeBuildResult,
@@ -9,7 +10,8 @@ import type {
   TreeNodeComment,
   TreeNodeDoctype,
   TreeNodeElement,
-  TreeNodeText
+  TreeNodeText,
+  TreeSpan
 } from "./types.js";
 import type { HtmlToken } from "../tokenizer/tokens.js";
 
@@ -35,8 +37,16 @@ type Parse5Attribute = {
   readonly prefix?: string;
 };
 
+interface SourceLocationLike {
+  readonly startOffset?: number;
+  readonly endOffset?: number;
+  readonly attrs?: Readonly<Record<string, SourceLocationLike | undefined>>;
+  readonly startTag?: SourceLocationLike;
+}
+
 interface BuildState {
   readonly budgets: TreeBudgets | undefined;
+  readonly captureSpans: boolean;
   readonly errors: TreeBuilderError[];
   nodeCount: number;
 }
@@ -82,26 +92,80 @@ function formatAttributeName(attribute: Parse5Attribute): string {
   return attribute.name;
 }
 
+function asSourceLocation(value: unknown): SourceLocationLike | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const startOffset = candidate["startOffset"];
+  const endOffset = candidate["endOffset"];
+
+  if (typeof startOffset !== "number" || typeof endOffset !== "number") {
+    return undefined;
+  }
+
+  return candidate as unknown as SourceLocationLike;
+}
+
+function toTreeSpan(location: SourceLocationLike | undefined): TreeSpan | undefined {
+  if (!location) {
+    return undefined;
+  }
+
+  if (
+    typeof location.startOffset !== "number" ||
+    typeof location.endOffset !== "number" ||
+    location.startOffset < 0 ||
+    location.endOffset < location.startOffset
+  ) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    start: location.startOffset,
+    end: location.endOffset
+  });
+}
+
+function toElementTreeSpan(location: SourceLocationLike | undefined): TreeSpan | undefined {
+  return toTreeSpan(location) ?? toTreeSpan(location?.startTag);
+}
+
 function normalizeAttributes(
   attrs: readonly Parse5Attribute[],
   state: BuildState,
-  tokenIndex: number
-): Readonly<Record<string, string>> {
+  tokenIndex: number,
+  sourceLocation: SourceLocationLike | undefined
+): readonly TreeAttribute[] {
   const maxAttributesPerElement = state.budgets?.maxAttributesPerElement;
   if (maxAttributesPerElement !== undefined && attrs.length > maxAttributesPerElement) {
     pushError(state.errors, "max-attributes-per-element-exceeded", tokenIndex);
   }
 
-  const record: Record<string, string> = {};
+  const normalized: TreeAttribute[] = [];
+  const seen = new Set<string>();
   let totalAttributeBytes = 0;
 
   for (const attr of attrs) {
     const name = formatAttributeName(attr);
     totalAttributeBytes += name.length + attr.value.length;
 
-    if (record[name] === undefined) {
-      record[name] = attr.value;
+    if (seen.has(name)) {
+      continue;
     }
+
+    seen.add(name);
+    const rawLocation = sourceLocation?.attrs?.[attr.name] ?? sourceLocation?.attrs?.[name];
+    const span = state.captureSpans ? toTreeSpan(rawLocation) : undefined;
+
+    normalized.push(
+      Object.freeze({
+        name,
+        value: attr.value,
+        ...(span ? { span } : {})
+      })
+    );
   }
 
   const maxAttributeBytes = state.budgets?.maxAttributeBytes;
@@ -109,7 +173,7 @@ function normalizeAttributes(
     pushError(state.errors, "max-attribute-bytes-exceeded", tokenIndex);
   }
 
-  return Object.freeze(record);
+  return Object.freeze(normalized);
 }
 
 function readString(value: unknown): string {
@@ -260,6 +324,7 @@ function parseTree(
 ): Parse5Document | Parse5DocumentFragment {
   const parseOptions = {
     scriptingEnabled: options.scriptingEnabled ?? true,
+    sourceCodeLocationInfo: options.captureSpans ?? false,
     onParseError(error: { readonly code: string; readonly startOffset: number }): void {
       pushError(errors, error.code, error.startOffset);
     }
@@ -274,13 +339,17 @@ function parseTree(
 }
 
 function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): TreeNode | null {
+  const sourceLocation = state.captureSpans ? asSourceLocation(node.sourceCodeLocation) : undefined;
+  const nodeSpan = toTreeSpan(sourceLocation);
+
   if (isTextNode(node)) {
     state.nodeCount += 1;
     enforceTreeBudgets(depth, state, 0);
 
     const textNode: TreeNodeText = {
       kind: "text",
-      value: readString(node.value)
+      value: readString(node.value),
+      ...(nodeSpan ? { span: nodeSpan } : {})
     };
 
     return textNode;
@@ -292,7 +361,8 @@ function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): T
 
     const commentNode: TreeNodeComment = {
       kind: "comment",
-      value: readString(node.data)
+      value: readString(node.data),
+      ...(nodeSpan ? { span: nodeSpan } : {})
     };
 
     return commentNode;
@@ -306,7 +376,8 @@ function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): T
       kind: "doctype",
       name: readString(node.name),
       publicId: readString(node.publicId),
-      systemId: readString(node.systemId)
+      systemId: readString(node.systemId),
+      ...(nodeSpan ? { span: nodeSpan } : {})
     };
 
     return doctypeNode;
@@ -327,11 +398,13 @@ function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): T
     }
   }
 
+  const elementSpan = toElementTreeSpan(sourceLocation);
   const elementNode: TreeNodeElement = {
     kind: "element",
     name: formatElementName(node.namespaceURI, node.tagName),
-    attributes: normalizeAttributes(node.attrs, state, 0),
-    children
+    attributes: normalizeAttributes(node.attrs, state, 0, sourceLocation),
+    children,
+    ...(elementSpan ? { span: elementSpan } : {})
   };
 
   return elementNode;
@@ -402,6 +475,7 @@ export function buildTreeFromHtml(
 
   const state: BuildState = {
     budgets,
+    captureSpans: options.captureSpans ?? false,
     errors,
     nodeCount: 0
   };

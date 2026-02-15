@@ -1,4 +1,4 @@
-import type { TreeNode, TreeNodeDocument } from "../tree/types.js";
+import type { TreeAttribute, TreeNode, TreeNodeDocument } from "../tree/types.js";
 
 const VOID_ELEMENTS = new Set([
   "area",
@@ -49,14 +49,12 @@ function chooseQuote(value: string): "\"" | "'" | null {
   return "\"";
 }
 
-function serializeAttributes(attributes: Readonly<Record<string, string>>): string {
-  const names = Object.keys(attributes).sort();
-  if (names.length === 0) {
+function serializeAttributes(attributes: readonly TreeAttribute[]): string {
+  if (attributes.length === 0) {
     return "";
   }
 
-  const parts = names.map((name) => {
-    const value = attributes[name] ?? "";
+  const parts = attributes.map(({ name, value }) => {
     const quote = chooseQuote(value);
     if (quote === null) {
       return `${name}=${escapeAttribute(value, "\"")}`;

@@ -6,11 +6,14 @@
 - `parseFragment(html, contextTagName, options)`
 - `parseStream(stream, options)`
 - `serialize(tree, options)`
+- `computePatch(originalHtml, edits)`
+- `applyPatchPlan(originalHtml, plan)`
 - `outline(tree, options)`
 - `chunk(tree, options)`
 
 ## Options and defaults
-- `includeSpans`: `false`
+- `captureSpans`: `false`
+- `includeSpans`: `false` (legacy alias for `captureSpans`)
 - `trace`: `false`
 - `transportEncodingLabel`: undefined
 - `budgets.maxInputBytes`: undefined
@@ -29,8 +32,14 @@
 
 ## Determinism contract
 - Node IDs are assigned with deterministic pre-order incremental numbering.
-- Attribute ordering is stable by lexical attribute name.
+- Attribute ordering is stable by input order after duplicate-name normalization.
 - For equal input + options, API output is byte-for-byte stable.
+
+## Span precision
+- Node and attribute spans are populated only when `captureSpans: true`.
+- Spans are source offsets from parse5 location metadata.
+- Implied nodes added by tree construction (for example inferred wrappers) may not expose spans.
+- Patch planning requires spans on targeted nodes.
 
 ## Budgets contract
 - Budget violations throw `BudgetExceededError`.
