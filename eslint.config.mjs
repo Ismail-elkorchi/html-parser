@@ -25,7 +25,9 @@ export default [
     languageOptions: {
       ...js.configs.recommended.languageOptions,
       globals: {
+        Buffer: "readonly",
         console: "readonly",
+        process: "readonly",
         URL: "readonly"
       }
     }

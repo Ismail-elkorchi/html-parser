@@ -1,0 +1,10 @@
+{
+  "suite": "pack",
+  "timestamp": "2026-02-15T05:34:56.804Z",
+  "ok": true,
+  "tarball": "html-parser-0.1.0.tgz",
+  "dependenciesEmpty": true,
+  "esmOnly": true,
+  "exportsOk": true,
+  "forbiddenIncluded": []
+}
