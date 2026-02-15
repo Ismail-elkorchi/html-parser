@@ -5,7 +5,7 @@ A parser qualifies as “best” only if it passes ALL gates in the chosen profi
 and then achieves the highest composite score under `evaluation.config.json`.
 
 Profiles:
-- `ci`: day-to-day enforcement (no holdouts, browser diff optional)
+- `ci`: day-to-day enforcement (no holdouts, browser diff optional, Node+Deno+Bun smoke required)
 - `release`: release enforcement (holdouts required, browser diff required)
 
 Artifacts pinned by:
@@ -102,7 +102,7 @@ Evidence:
 Requirement:
 - Smoke tests pass on:
   - Node (mandatory)
-  - Deno and Bun (mandatory in release profile)
+  - Deno and Bun (mandatory in CI and release profiles)
 
 Evidence:
 - `reports/smoke.json`
@@ -139,6 +139,10 @@ Evidence:
 Release includes ALL CI gates plus:
 
 ### R-200: Holdout suite executed and passes
+Requirement:
+- Holdout pass rate must meet strict threshold (`1.0`).
+- Holdout skips must be `0`.
+
 Evidence:
 - `reports/holdout.json`
 
@@ -146,8 +150,8 @@ Evidence:
 
 ### R-210: Browser differential oracle (required)
 Requirement:
-- Browser differential agreement meets `thresholds.browserDiff.minAgreement`
-- Must include at least `thresholds.browserDiff.minEnginesPresent` engines.
+- Browser differential agreement must meet strict threshold (`>= 0.999`).
+- Must include Chromium, Firefox, and WebKit (`minEnginesPresent = 3`).
 
 Evidence:
 - `reports/browser-diff.json`

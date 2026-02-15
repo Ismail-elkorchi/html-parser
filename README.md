@@ -21,3 +21,15 @@ Agent-first TypeScript HTML parser under strict deterministic and security polic
 ## Development workflow
 - Pull requests only.
 - Squash merge and delete branch after merge.
+
+## Verification commands
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+- `npm test`
+- `npm run eval:ci`
+
+## Release evaluation
+- `npm run eval:release` is the release gate.
+- Browser differential requires Chromium, Firefox, and WebKit.
+- CI runs release oracle on `.github/workflows/oracle.yml` (scheduled/manual) and on tag releases.

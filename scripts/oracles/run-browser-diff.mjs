@@ -9,6 +9,10 @@ import { writeJson } from "../eval/util.mjs";
 const SEED = 0x5f3759df;
 const RANDOM_CASES = 96;
 
+if (process.platform === "linux" && process.env["PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS"] === undefined) {
+  process.env["PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS"] = "1";
+}
+
 function nextSeed(seed) {
   return (Math.imul(seed, 1664525) + 1013904223) >>> 0;
 }
