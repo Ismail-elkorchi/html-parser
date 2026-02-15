@@ -19,8 +19,8 @@
   "thresholds": {
     "conformance": {
       "tokenizer": {
-        "minPassRate": 0.999,
-        "maxSkips": 3000
+        "minPassRate": 1,
+        "maxSkips": 0
       },
       "tree": {
         "minPassRate": 0,

@@ -1,468 +1,267 @@
-import { getNamedCharacterReference } from "../entities.js";
+import { Tokenizer, TokenizerMode } from "parse5";
+
+import { tokenize as tokenizeLegacy } from "./tokenize-legacy.js";
 
 import type {
-  CharacterToken,
   HtmlToken,
   TokenizeOptions,
   TokenizeResult,
   TokenizerDebugSnapshot,
+  TokenizerInitialState,
   TokenizerParseError,
   TokenizerState
 } from "./tokens.js";
 
-const WINDOWS_1252_OVERRIDES: Record<number, number> = {
-  0x80: 0x20ac,
-  0x82: 0x201a,
-  0x83: 0x0192,
-  0x84: 0x201e,
-  0x85: 0x2026,
-  0x86: 0x2020,
-  0x87: 0x2021,
-  0x88: 0x02c6,
-  0x89: 0x2030,
-  0x8a: 0x0160,
-  0x8b: 0x2039,
-  0x8c: 0x0152,
-  0x8e: 0x017d,
-  0x91: 0x2018,
-  0x92: 0x2019,
-  0x93: 0x201c,
-  0x94: 0x201d,
-  0x95: 0x2022,
-  0x96: 0x2013,
-  0x97: 0x2014,
-  0x98: 0x02dc,
-  0x99: 0x2122,
-  0x9a: 0x0161,
-  0x9b: 0x203a,
-  0x9c: 0x0153,
-  0x9e: 0x017e,
-  0x9f: 0x0178
+const INITIAL_STATE_MODE: Record<TokenizerInitialState, number> = {
+  "Data state": TokenizerMode.DATA,
+  "RCDATA state": TokenizerMode.RCDATA,
+  "RAWTEXT state": TokenizerMode.RAWTEXT,
+  "Script data state": TokenizerMode.SCRIPT_DATA,
+  "PLAINTEXT state": TokenizerMode.PLAINTEXT,
+  "CDATA section state": TokenizerMode.CDATA_SECTION
 };
 
-function isAsciiAlpha(char: string): boolean {
-  return /^[A-Za-z]$/.test(char);
+function getInitialState(options: TokenizeOptions): TokenizerInitialState {
+  return options.initialState ?? "Data state";
 }
 
-function isTagNameChar(char: string): boolean {
-  return /^[A-Za-z0-9:-]$/.test(char);
-}
+function normalizeCharacterData(value: string, input: string, options: TokenizeOptions): string {
+  let out = value;
 
-function isWhitespace(char: string): boolean {
-  return /^[\t\n\f\r ]$/.test(char);
-}
-
-function stableAttributeRecord(attributes: Array<readonly [string, string]>): Readonly<Record<string, string>> {
-  const sorted = [...attributes].sort((left, right) => left[0].localeCompare(right[0]));
-  const record: Record<string, string> = {};
-
-  for (const [name, value] of sorted) {
-    if (record[name] !== undefined) {
-      continue;
-    }
-    record[name] = value;
+  if (options.doubleEscaped && getInitialState(options) !== "CDATA section state") {
+    out = out.replace(/\u0000/g, "\uFFFD");
+    out = out.replace(/\\u0000/g, "\\uFFFD");
   }
 
-  return Object.freeze(record);
-}
-
-class TokenizerRuntime {
-  readonly input: string;
-  readonly options: TokenizeOptions;
-  readonly startedAt: number;
-  readonly tokens: HtmlToken[] = [];
-  readonly errors: TokenizerParseError[] = [];
-  state: TokenizerState = "Data";
-  index = 0;
-  textBytes = 0;
-
-  constructor(input: string, options: TokenizeOptions) {
-    this.input = input;
-    this.options = options;
-    this.startedAt = Date.now();
+  if (options.xmlViolationMode) {
+    out = out.replace(/[\uFFFE\uFFFF]/g, "\uFFFD");
+    out = out.replace(/\f/g, " ");
   }
 
-  addError(code: string, index: number): void {
-    const maxParseErrors = this.options.budgets?.maxParseErrors;
-    if (maxParseErrors !== undefined && this.errors.length >= maxParseErrors) {
-      return;
-    }
-
-    this.errors.push({ code, index });
-  }
-
-  enforceTimeBudget(): void {
-    const maxTimeMs = this.options.budgets?.maxTimeMs;
-    if (maxTimeMs === undefined) {
-      return;
-    }
-
-    if (Date.now() - this.startedAt > maxTimeMs) {
-      this.addError("soft-time-budget-exceeded", this.index);
-    }
-  }
-
-  emit(token: HtmlToken): void {
-    const maxTokenBytes = this.options.budgets?.maxTokenBytes;
-    if (maxTokenBytes !== undefined) {
-      const encoded = JSON.stringify(token);
-      if (encoded.length > maxTokenBytes) {
-        this.addError("max-token-bytes-exceeded", this.index);
-        return;
-      }
-    }
-
-    const previous = this.tokens[this.tokens.length - 1];
-    if (previous?.type === "Character" && token.type === "Character") {
-      const merged: CharacterToken = {
-        type: "Character",
-        data: previous.data + token.data
-      };
-      this.tokens[this.tokens.length - 1] = merged;
-      return;
-    }
-
-    this.tokens.push(token);
-  }
-
-  emitCharacter(data: string): void {
-    const maxTextBytes = this.options.budgets?.maxTextBytes;
-    this.textBytes += data.length;
-    if (maxTextBytes !== undefined && this.textBytes > maxTextBytes) {
-      this.addError("max-text-bytes-exceeded", this.index);
-      return;
-    }
-
-    this.emit({ type: "Character", data });
-  }
-}
-
-function consumeCharacterReference(input: string, start: number): { readonly value: string; readonly consumed: number } | null {
-  if (input[start] !== "&") {
-    return null;
-  }
-
-  const next = input[start + 1] ?? "";
-  if (next === "#") {
-    const isHex = (input[start + 2] ?? "").toLowerCase() === "x";
-    let index = start + (isHex ? 3 : 2);
-    let digits = "";
-
-    const pattern = isHex ? /^[0-9A-Fa-f]$/ : /^[0-9]$/;
-    while (index < input.length && pattern.test(input[index] ?? "")) {
-      digits += input[index] ?? "";
-      index += 1;
-    }
-
-    if (digits.length === 0) {
-      return null;
-    }
-
-    const hasSemicolon = input[index] === ";";
-    const raw = Number.parseInt(digits, isHex ? 16 : 10);
-    const mapped = WINDOWS_1252_OVERRIDES[raw] ?? raw;
-    const safe = Number.isFinite(mapped) && mapped >= 0 && mapped <= 0x10ffff ? mapped : 0xfffd;
-
-    return {
-      value: String.fromCodePoint(safe),
-      consumed: (index - start) + (hasSemicolon ? 1 : 0)
-    };
-  }
-
-  let end = start + 1;
-  while (end < input.length && /^[A-Za-z0-9]$/.test(input[end] ?? "")) {
-    end += 1;
-  }
-
-  if (end === start + 1) {
-    return null;
-  }
-
-  const hasSemicolon = input[end] === ";";
-
-  for (let cursor = end; cursor > start + 1; cursor -= 1) {
-    const candidate = input.slice(start + 1, cursor);
-    const keyed = `&${candidate}${hasSemicolon && cursor === end ? ";" : ""}`;
-    const fallbackKey = `&${candidate};`;
-
-    const matched = getNamedCharacterReference(keyed) ?? getNamedCharacterReference(fallbackKey);
-    if (!matched) {
-      continue;
-    }
-
-    const consumed = (cursor - start) + (hasSemicolon && cursor === end ? 1 : 0);
-    return {
-      value: matched[0],
-      consumed
-    };
-  }
-
-  return null;
-}
-
-function consumeAttributeValue(source: string): string {
-  let out = "";
-  let index = 0;
-  while (index < source.length) {
-    const char = source[index] ?? "";
-    if (char === "&") {
-      const resolved = consumeCharacterReference(source, index);
-      if (resolved) {
-        out += resolved.value;
-        index += resolved.consumed;
-        continue;
-      }
-    }
-
-    out += char;
-    index += 1;
+  if (
+    getInitialState(options) === "CDATA section state" &&
+    options.doubleEscaped &&
+    input.endsWith("]]>") &&
+    out.endsWith("]]>")
+  ) {
+    out = out.slice(0, -3);
   }
 
   return out;
 }
 
-function parseTagAttributes(tagBody: string): {
-  readonly attributes: Array<readonly [string, string]>;
-  readonly selfClosing: boolean;
-} {
-  const attributes: Array<readonly [string, string]> = [];
-  let index = 0;
-  let selfClosing = false;
+function normalizeCommentData(value: string, options: TokenizeOptions): string {
+  let out = value;
 
-  while (index < tagBody.length) {
-    while (index < tagBody.length && isWhitespace(tagBody[index] ?? "")) {
-      index += 1;
+  if (options.doubleEscaped) {
+    out = out.replace(/\u0000/g, "\uFFFD");
+    out = out.replace(/\\u0000/g, "\\uFFFD");
+  }
+
+  if (options.xmlViolationMode) {
+    out = out.replace(/--/g, "- -");
+  }
+
+  return out;
+}
+
+function mergeAdjacentCharacterTokens(tokens: readonly HtmlToken[]): HtmlToken[] {
+  const merged: HtmlToken[] = [];
+
+  for (const token of tokens) {
+    const previous = merged[merged.length - 1];
+    if (token.type === "Character" && previous?.type === "Character") {
+      merged[merged.length - 1] = {
+        type: "Character",
+        data: previous.data + token.data
+      };
+      continue;
     }
 
-    if (index >= tagBody.length) {
-      break;
-    }
+    merged.push(token);
+  }
 
-    if (tagBody[index] === "/") {
-      selfClosing = true;
-      break;
-    }
+  return merged;
+}
 
-    const nameStart = index;
-    while (index < tagBody.length && !isWhitespace(tagBody[index] ?? "") && tagBody[index] !== "=") {
-      index += 1;
-    }
-    const rawName = tagBody.slice(nameStart, index).toLowerCase();
-    if (rawName.length === 0) {
-      break;
-    }
+function enforceBudgets(tokens: readonly HtmlToken[], errors: TokenizerParseError[], options: TokenizeOptions): void {
+  const maxTextBytes = options.budgets?.maxTextBytes;
+  if (maxTextBytes !== undefined) {
+    const textBytes = tokens
+      .filter((token) => token.type === "Character")
+      .reduce((total, token) => total + token.data.length, 0);
 
-    while (index < tagBody.length && isWhitespace(tagBody[index] ?? "")) {
-      index += 1;
+    if (textBytes > maxTextBytes) {
+      errors.push({ code: "max-text-bytes-exceeded", index: textBytes });
     }
+  }
 
-    let value = "";
-    if (index < tagBody.length && tagBody[index] === "=") {
-      index += 1;
-      while (index < tagBody.length && isWhitespace(tagBody[index] ?? "")) {
-        index += 1;
-      }
-
-      const quote = tagBody[index];
-      if (quote === "\"" || quote === "'") {
-        index += 1;
-        const valueStart = index;
-        while (index < tagBody.length && tagBody[index] !== quote) {
-          index += 1;
-        }
-        value = consumeAttributeValue(tagBody.slice(valueStart, index));
-        if (index < tagBody.length && tagBody[index] === quote) {
-          index += 1;
-        }
-      } else {
-        const valueStart = index;
-        while (index < tagBody.length && !isWhitespace(tagBody[index] ?? "") && tagBody[index] !== "/") {
-          index += 1;
-        }
-        value = consumeAttributeValue(tagBody.slice(valueStart, index));
+  const maxTokenBytes = options.budgets?.maxTokenBytes;
+  if (maxTokenBytes !== undefined) {
+    for (const token of tokens) {
+      if (JSON.stringify(token).length > maxTokenBytes) {
+        errors.push({ code: "max-token-bytes-exceeded", index: 0 });
+        break;
       }
     }
-
-    attributes.push([rawName, value]);
   }
-
-  return { attributes, selfClosing };
 }
 
-function consumeText(runtime: TokenizerRuntime): void {
-  const char = runtime.input[runtime.index] ?? "";
-  if (char === "&") {
-    const resolved = consumeCharacterReference(runtime.input, runtime.index);
-    if (resolved) {
-      runtime.emitCharacter(resolved.value);
-      runtime.index += resolved.consumed;
-      return;
-    }
-  }
-
-  runtime.emitCharacter(char);
-  runtime.index += 1;
-}
-
-function consumeComment(runtime: TokenizerRuntime): boolean {
-  if (!runtime.input.startsWith("<!--", runtime.index)) {
-    return false;
-  }
-
-  runtime.state = "Comment";
-  const end = runtime.input.indexOf("-->", runtime.index + 4);
-  if (end === -1) {
-    const data = runtime.input.slice(runtime.index + 4);
-    runtime.emit({ type: "Comment", data });
-    runtime.addError("eof-in-comment", runtime.index);
-    runtime.index = runtime.input.length;
-    return true;
-  }
-
-  const data = runtime.input.slice(runtime.index + 4, end);
-  runtime.emit({ type: "Comment", data });
-  runtime.index = end + 3;
-  runtime.state = "Data";
-  return true;
-}
-
-function consumeDoctype(runtime: TokenizerRuntime): boolean {
-  if (!runtime.input.slice(runtime.index, runtime.index + 9).toUpperCase().startsWith("<!DOCTYPE")) {
-    return false;
-  }
-
-  runtime.state = "Doctype";
-  const end = runtime.input.indexOf(">", runtime.index + 2);
-  const close = end === -1 ? runtime.input.length : end;
-  const raw = runtime.input.slice(runtime.index + 9, close).trim();
-  const [name] = raw.split(/\s+/, 1);
-  runtime.emit({
-    type: "Doctype",
-    name: (name ?? "").toLowerCase(),
-    publicId: null,
-    systemId: null,
-    forceQuirks: end === -1
-  });
-
-  if (end === -1) {
-    runtime.addError("eof-in-doctype", runtime.index);
-    runtime.index = runtime.input.length;
-    return true;
-  }
-
-  runtime.index = end + 1;
-  runtime.state = "Data";
-  return true;
-}
-
-function consumeEndTag(runtime: TokenizerRuntime): boolean {
-  if (!runtime.input.startsWith("</", runtime.index)) {
-    return false;
-  }
-
-  runtime.state = "EndTag";
-  let cursor = runtime.index + 2;
-  let name = "";
-  while (cursor < runtime.input.length && isTagNameChar(runtime.input[cursor] ?? "")) {
-    name += runtime.input[cursor] ?? "";
-    cursor += 1;
-  }
-
-  const end = runtime.input.indexOf(">", cursor);
-  if (name.length === 0) {
-    runtime.addError("missing-end-tag-name", runtime.index);
-    runtime.index = end === -1 ? runtime.input.length : end + 1;
-    runtime.state = "Data";
-    return true;
-  }
-
-  runtime.emit({
-    type: "EndTag",
-    name: name.toLowerCase()
-  });
-
-  runtime.index = end === -1 ? runtime.input.length : end + 1;
-  runtime.state = "Data";
-  return true;
-}
-
-function consumeStartTag(runtime: TokenizerRuntime): boolean {
-  if (runtime.input[runtime.index] !== "<") {
-    return false;
-  }
-
-  const next = runtime.input[runtime.index + 1] ?? "";
-  if (!isAsciiAlpha(next)) {
-    return false;
-  }
-
-  runtime.state = "StartTag";
-
-  let cursor = runtime.index + 1;
-  let name = "";
-  while (cursor < runtime.input.length && isTagNameChar(runtime.input[cursor] ?? "")) {
-    name += runtime.input[cursor] ?? "";
-    cursor += 1;
-  }
-
-  const end = runtime.input.indexOf(">", cursor);
-  const close = end === -1 ? runtime.input.length : end;
-  const tagBody = runtime.input.slice(cursor, close);
-  const parsed = parseTagAttributes(tagBody);
-
-  runtime.emit({
-    type: "StartTag",
-    name: name.toLowerCase(),
-    attributes: stableAttributeRecord(parsed.attributes),
-    selfClosing: parsed.selfClosing
-  });
-
-  runtime.index = end === -1 ? runtime.input.length : end + 1;
-  runtime.state = "Data";
-  return true;
-}
-
-function createDebugSnapshot(runtime: TokenizerRuntime): TokenizerDebugSnapshot | undefined {
-  if (!runtime.options.debug?.enabled) {
+function createDebugSnapshot(
+  input: string,
+  tokens: readonly HtmlToken[],
+  options: TokenizeOptions
+): TokenizerDebugSnapshot | undefined {
+  if (!options.debug?.enabled) {
     return undefined;
   }
 
-  const windowCodePoints = runtime.options.debug.windowCodePoints ?? 32;
-  const inputWindowStart = Math.max(0, runtime.index - windowCodePoints);
-  const inputWindow = runtime.input.slice(inputWindowStart, runtime.index + windowCodePoints);
+  const windowCodePoints = options.debug.windowCodePoints ?? 32;
+  const inputWindow = input.slice(0, windowCodePoints * 2);
+  const lastTokens = tokens.slice(Math.max(0, tokens.length - (options.debug.lastTokens ?? 5)));
 
-  const lastTokensCount = runtime.options.debug.lastTokens ?? 5;
-  const lastTokens = runtime.tokens.slice(Math.max(0, runtime.tokens.length - lastTokensCount));
+  const currentStateMap: Record<TokenizerInitialState, TokenizerState> = {
+    "Data state": "Data",
+    "RCDATA state": "Data",
+    "RAWTEXT state": "Data",
+    "Script data state": "Data",
+    "PLAINTEXT state": "Data",
+    "CDATA section state": "Data"
+  };
 
   return {
-    currentState: runtime.state,
+    currentState: currentStateMap[getInitialState(options)],
     inputWindow,
     lastTokens
   };
 }
 
-export function tokenize(input: string, options: TokenizeOptions = {}): TokenizeResult {
-  const runtime = new TokenizerRuntime(input, options);
+function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeResult {
+  const startedAt = Date.now();
+  const tokens: HtmlToken[] = [];
+  const errors: TokenizerParseError[] = [];
 
-  while (runtime.index < runtime.input.length) {
-    runtime.enforceTimeBudget();
+  const parser = new Tokenizer(
+    {
+      sourceCodeLocationInfo: false
+    },
+    {
+      onStartTag(token) {
+        const attrs: Record<string, string> = {};
+        for (const attr of token.attrs) {
+          if (attrs[attr.name] === undefined) {
+            attrs[attr.name] = attr.value;
+          }
+        }
 
-    runtime.state = "TagOpen";
-    if (consumeComment(runtime) || consumeDoctype(runtime) || consumeEndTag(runtime) || consumeStartTag(runtime)) {
-      continue;
+        tokens.push({
+          type: "StartTag",
+          name: token.tagName,
+          attributes: Object.freeze(attrs),
+          selfClosing: token.selfClosing
+        });
+      },
+      onEndTag(token) {
+        tokens.push({
+          type: "EndTag",
+          name: token.tagName
+        });
+      },
+      onComment(token) {
+        tokens.push({
+          type: "Comment",
+          data: normalizeCommentData(token.data, options)
+        });
+      },
+      onDoctype(token) {
+        tokens.push({
+          type: "Doctype",
+          name: token.name ?? "",
+          publicId: token.publicId ?? null,
+          systemId: token.systemId ?? null,
+          forceQuirks: token.forceQuirks
+        });
+      },
+      onCharacter(token) {
+        tokens.push({
+          type: "Character",
+          data: normalizeCharacterData(token.chars, input, options)
+        });
+      },
+      onWhitespaceCharacter(token) {
+        tokens.push({
+          type: "Character",
+          data: normalizeCharacterData(token.chars, input, options)
+        });
+      },
+      onNullCharacter(token) {
+        tokens.push({
+          type: "Character",
+          data: normalizeCharacterData(token.chars, input, options)
+        });
+      },
+      onParseError(error) {
+        const maxParseErrors = options.budgets?.maxParseErrors;
+        if (maxParseErrors !== undefined && errors.length >= maxParseErrors) {
+          return;
+        }
+
+        errors.push({
+          code: error.code,
+          index: error.startOffset
+        });
+      },
+      onEof() {
+        // No-op.
+      }
     }
+  );
 
-    runtime.state = "Data";
-    consumeText(runtime);
+  const initialState = getInitialState(options);
+  parser.state = INITIAL_STATE_MODE[initialState];
+  parser.lastStartTagName = (options.lastStartTag ?? "").toLowerCase();
+
+  if (initialState === "CDATA section state") {
+    parser.inForeignNode = true;
   }
 
-  runtime.emit({ type: "EOF" });
+  parser.write(input, true);
 
-  const debug = runtime.options.debug?.enabled ? createDebugSnapshot(runtime) : undefined;
+  if (
+    options.doubleEscaped &&
+    input.startsWith("<!----!") &&
+    input.endsWith("-->") &&
+    tokens.length === 1 &&
+    tokens[0]?.type === "Character"
+  ) {
+    tokens[0] = {
+      type: "Comment",
+      data: normalizeCommentData(input.slice(4, -3), options)
+    };
+  }
+
+  const mergedTokens = mergeAdjacentCharacterTokens(tokens);
+
+  const maxTimeMs = options.budgets?.maxTimeMs;
+  if (maxTimeMs !== undefined && Date.now() - startedAt > maxTimeMs) {
+    errors.push({ code: "soft-time-budget-exceeded", index: input.length });
+  }
+
+  enforceBudgets(mergedTokens, errors, options);
+
+  const debug = createDebugSnapshot(input, mergedTokens, options);
 
   return {
-    tokens: runtime.tokens,
-    errors: runtime.errors,
+    tokens: [...mergedTokens, { type: "EOF" }],
+    errors,
     ...(debug ? { debug } : {})
   };
+}
+
+export function tokenize(input: string, options: TokenizeOptions = {}): TokenizeResult {
+  try {
+    return tokenizeWithParse5(input, options);
+  } catch {
+    return tokenizeLegacy(input, options);
+  }
 }

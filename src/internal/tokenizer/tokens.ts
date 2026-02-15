@@ -6,6 +6,14 @@ export type TokenizerState =
   | "Comment"
   | "Doctype";
 
+export type TokenizerInitialState =
+  | "Data state"
+  | "RCDATA state"
+  | "RAWTEXT state"
+  | "Script data state"
+  | "PLAINTEXT state"
+  | "CDATA section state";
+
 export interface StartTagToken {
   readonly type: "StartTag";
   readonly name: string;
@@ -69,6 +77,10 @@ export interface TokenizerDebugOptions {
 export interface TokenizeOptions {
   readonly budgets?: TokenizerBudgets;
   readonly debug?: TokenizerDebugOptions;
+  readonly initialState?: TokenizerInitialState;
+  readonly lastStartTag?: string;
+  readonly doubleEscaped?: boolean;
+  readonly xmlViolationMode?: boolean;
 }
 
 export interface TokenizerDebugSnapshot {

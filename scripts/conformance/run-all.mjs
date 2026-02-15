@@ -60,7 +60,7 @@ async function main() {
   const results = [];
   let failed = false;
 
-  // PR 003/004 under ADR-006 and ADR-007 will enforce mismatch-as-failure accounting in suite runners.
+  // ADR-006 enforces tokenizer mismatch-as-failure; ADR-007 will extend this to tree construction.
   for (const suite of suites) {
     const startedAt = Date.now();
     try {
