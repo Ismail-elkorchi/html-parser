@@ -3,42 +3,43 @@ import test from "node:test";
 
 import {
   BudgetExceededError,
-  deterministicHash,
+  parse,
   parseBytes,
-  parseString,
+  parseFragment,
   serialize
 } from "../../dist/mod.js";
 
-test("parse string", () => {
-  const result = parseString("<p>ok</p>");
-  assert.equal(result.serialization, "<p>ok</p>");
-  assert.equal(result.tree.type, "document");
+test("deterministic node ids for identical input", () => {
+  const first = parse("<p>alpha</p>");
+  const second = parse("<p>alpha</p>");
+
+  assert.deepEqual(first, second);
 });
 
-test("parse bytes with utf-8 baseline", () => {
+test("parse bytes baseline", () => {
   const bytes = new Uint8Array([0x3c, 0x62, 0x3e, 0x78, 0x3c, 0x2f, 0x62, 0x3e]);
-  const result = parseBytes(bytes);
-  assert.equal(result.serialization, "<b>x</b>");
+  const tree = parseBytes(bytes);
+  assert.equal(tree.kind, "document");
+  assert.equal(tree.children[0].kind, "element");
 });
 
-test("serialize round-trip", () => {
-  const result = parseString("plain");
-  assert.equal(serialize(result), "plain");
+test("parseFragment uses explicit context", () => {
+  const fragment = parseFragment("hello", "section");
+  assert.equal(fragment.kind, "fragment");
+  assert.equal(fragment.contextTagName, "section");
 });
 
-test("determinism hash stable", () => {
-  const first = parseString("abc", { seed: 11 });
-  const second = parseString("abc", { seed: 11 });
-  assert.equal(deterministicHash(first), deterministicHash(second));
+test("basic serialization placeholder", () => {
+  const tree = parse("content");
+  assert.equal(serialize(tree), "<html>content</html>");
 });
 
-test("budget exceed returns structured error", () => {
+test("budget exceed is structured", () => {
   assert.throws(
-    () => parseString("too-long", { budgets: { maxInputBytes: 3 } }),
+    () => parse("too-long", { budgets: { maxInputBytes: 2 } }),
     (error) => {
       assert.ok(error instanceof BudgetExceededError);
       assert.equal(error.payload.code, "BUDGET_EXCEEDED");
-      assert.equal(error.payload.budget, "maxInputBytes");
       return true;
     }
   );

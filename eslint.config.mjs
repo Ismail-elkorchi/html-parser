@@ -28,6 +28,7 @@ export default [
         Buffer: "readonly",
         console: "readonly",
         process: "readonly",
+        TextEncoder: "readonly",
         URL: "readonly"
       }
     }

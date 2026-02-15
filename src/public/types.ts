@@ -1,0 +1,117 @@
+export type NodeId = number;
+
+export type NodeKind = "document" | "fragment" | "element" | "text" | "comment" | "doctype";
+
+export interface Span {
+  readonly start: number;
+  readonly end: number;
+}
+
+export interface Attribute {
+  readonly name: string;
+  readonly value: string;
+}
+
+export interface ParseError {
+  readonly code:
+    | "BUDGET_EXCEEDED"
+    | "STREAM_READ_FAILED"
+    | "UNSUPPORTED_ENCODING"
+    | "INVALID_FRAGMENT_CONTEXT";
+  readonly message: string;
+  readonly nodeId?: NodeId;
+  readonly span?: Span;
+}
+
+export interface BudgetOptions {
+  readonly maxInputBytes?: number;
+  readonly maxNodes?: number;
+  readonly maxTraceEvents?: number;
+}
+
+export interface ParseOptions {
+  readonly includeSpans?: boolean;
+  readonly trace?: boolean;
+  readonly transportEncodingLabel?: string;
+  readonly budgets?: BudgetOptions;
+}
+
+export interface TraceEvent {
+  readonly seq: number;
+  readonly stage: "decode" | "tokenize" | "tree" | "serialize";
+  readonly detail: string;
+}
+
+export interface TextNode {
+  readonly id: NodeId;
+  readonly kind: "text";
+  readonly value: string;
+  readonly span?: Span;
+}
+
+export interface CommentNode {
+  readonly id: NodeId;
+  readonly kind: "comment";
+  readonly value: string;
+  readonly span?: Span;
+}
+
+export interface DoctypeNode {
+  readonly id: NodeId;
+  readonly kind: "doctype";
+  readonly name: string;
+  readonly publicId?: string;
+  readonly systemId?: string;
+  readonly span?: Span;
+}
+
+export interface ElementNode {
+  readonly id: NodeId;
+  readonly kind: "element";
+  readonly tagName: string;
+  readonly attributes: readonly Attribute[];
+  readonly children: readonly HtmlNode[];
+  readonly span?: Span;
+}
+
+export type HtmlNode = ElementNode | TextNode | CommentNode | DoctypeNode;
+
+export interface DocumentTree {
+  readonly id: NodeId;
+  readonly kind: "document";
+  readonly children: readonly HtmlNode[];
+  readonly errors: readonly ParseError[];
+  readonly trace?: readonly TraceEvent[];
+}
+
+export interface FragmentTree {
+  readonly id: NodeId;
+  readonly kind: "fragment";
+  readonly contextTagName: string;
+  readonly children: readonly HtmlNode[];
+  readonly errors: readonly ParseError[];
+  readonly trace?: readonly TraceEvent[];
+}
+
+export interface OutlineEntry {
+  readonly nodeId: NodeId;
+  readonly depth: number;
+  readonly tagName: string;
+}
+
+export interface Outline {
+  readonly entries: readonly OutlineEntry[];
+}
+
+export interface Chunk {
+  readonly index: number;
+  readonly nodeId: NodeId;
+  readonly content: string;
+}
+
+export interface BudgetExceededPayload {
+  readonly code: "BUDGET_EXCEEDED";
+  readonly budget: "maxInputBytes" | "maxNodes" | "maxTraceEvents";
+  readonly limit: number;
+  readonly actual: number;
+}

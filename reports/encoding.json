@@ -1,0 +1,38 @@
+{
+  "suite": "encoding",
+  "timestamp": "2026-02-15T05:42:28.769Z",
+  "cases": {
+    "total": 82,
+    "passed": 77,
+    "failed": 0,
+    "skipped": 5
+  },
+  "skips": [
+    {
+      "id": "vendor/html5lib-tests/encoding/tests1.dat#15",
+      "reason": "Malformed markup requires tokenizer-integrated prescan semantics.",
+      "decisionRecord": "docs/decisions/ADR-001-encoding-malformed-meta-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/encoding/tests1.dat#25",
+      "reason": "Malformed markup requires tokenizer-integrated prescan semantics.",
+      "decisionRecord": "docs/decisions/ADR-001-encoding-malformed-meta-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/encoding/tests1.dat#34",
+      "reason": "Malformed markup requires tokenizer-integrated prescan semantics.",
+      "decisionRecord": "docs/decisions/ADR-001-encoding-malformed-meta-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/encoding/tests1.dat#35",
+      "reason": "Malformed markup requires tokenizer-integrated prescan semantics.",
+      "decisionRecord": "docs/decisions/ADR-001-encoding-malformed-meta-skips.md"
+    },
+    {
+      "id": "vendor/html5lib-tests/encoding/tests1.dat#36",
+      "reason": "Malformed markup requires tokenizer-integrated prescan semantics.",
+      "decisionRecord": "docs/decisions/ADR-001-encoding-malformed-meta-skips.md"
+    }
+  ],
+  "failures": []
+}
