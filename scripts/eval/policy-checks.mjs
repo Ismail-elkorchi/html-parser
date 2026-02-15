@@ -63,7 +63,7 @@ export async function runPolicyChecks(mode) {
   if (mode === "release") {
     const requiredFiles = [
       ".github/dependabot.yml",
-      ".github/workflows/scorecard.yml",
+      ".github/workflows/scorecards.yml",
       "docs/linting.md",
       "docs/typescript.md"
     ];
