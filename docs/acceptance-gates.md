@@ -25,10 +25,37 @@ Requirement:
 ### G-010: Zero runtime dependencies
 Requirement:
 - `package.json` MUST NOT contain runtime dependencies.
-- Acceptable:
-  - `"dependencies": {}` or omitted
-- Not acceptable:
-  - any non-empty `"dependencies"`
+- `dependencies` is an empty object (`{}`).
+
+Evidence:
+- `package.json`
+
+---
+
+### G-012: No external imports in build output
+Requirement:
+- Compiled ESM files under `dist/` MUST NOT contain bare package import specifiers.
+- Relative specifiers, absolute paths, `node:` builtins, and URL imports are allowed by syntax;
+  bare package imports are rejected.
+
+Evidence:
+- `reports/no-external-imports.json` with `ok=true`
+
+---
+
+### G-015: Runtime self-contained install
+Requirement:
+- A packed tarball must install with `npm install --omit=dev` in a clean directory.
+- Runtime smoke must import and execute:
+  - `parse`
+  - `serialize`
+  - `parseBytes`
+  - `parseFragment`
+  - `parseStream`
+- Smoke output must include `runtime-self-contained ok`.
+
+Evidence:
+- `reports/runtime-self-contained.json` with `ok=true`
 
 ---
 
@@ -55,6 +82,12 @@ Requirement:
 - Non-holdout tokenizer executed pass rate >= `thresholds.conformance.tokenizer.minPassRate`
 - Skips <= `thresholds.conformance.tokenizer.maxSkips`
 - Every skip MUST reference a decision record that exists.
+- Holdout discipline is enforced:
+  - `executedSurface = passed + failed`
+  - `totalSurface = passed + failed + skipped + holdoutExcluded`
+  - `holdoutExcludedFraction = holdoutExcluded / totalSurface`
+  - `holdoutExcludedFraction` MUST be within `[0.05, 0.15]`
+  - `holdoutRule` and `holdoutMod` MUST be present in the report artifact.
 
 Evidence:
 - `reports/tokenizer.json`
@@ -62,18 +95,27 @@ Evidence:
 ---
 
 ### G-050: Conformance — tree-construction fixtures
+Requirement:
+- Same requirements as G-040, including holdout discipline checks.
+
 Evidence:
 - `reports/tree.json`
 
 ---
 
 ### G-060: Conformance — encoding fixtures
+Requirement:
+- Same requirements as G-040, including holdout discipline checks.
+
 Evidence:
 - `reports/encoding.json`
 
 ---
 
 ### G-070: Conformance — serializer fixtures
+Requirement:
+- Same requirements as G-040, including holdout discipline checks.
+
 Evidence:
 - `reports/serializer.json`
 

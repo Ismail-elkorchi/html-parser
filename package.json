@@ -43,6 +43,7 @@
     "eval:ci": "node scripts/eval/run-eval.mjs --profile=ci",
     "eval:release": "node scripts/eval/run-eval.mjs --profile=release"
   },
+  "dependencies": {},
   "devDependencies": {
     "@eslint/js": "9.39.2",
     "eslint": "9.39.2",
