@@ -25,9 +25,9 @@
     "fmt": "eslint . --fix --max-warnings=0",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "build": "tsc -p tsconfig.build.json",
-    "test": "npm run test:control && npm run test:encoding && npm run test:tokenizer && npm run test:tree && npm run test:serializer",
+    "test": "npm run test:control",
     "test:control": "npm run build && node --test test/control/**/*.test.js tests/control/**/*.test.js && node scripts/eval/write-stub-reports.mjs",
-    "test:holdout": "npm run build && node --test test/holdout/**/*.test.js",
+    "test:conformance": "node scripts/conformance/run-all.mjs",
     "test:encoding": "npm run build && node scripts/conformance/run-encoding-fixtures.mjs",
     "test:tokenizer": "npm run build && node scripts/conformance/run-tokenizer-fixtures.mjs",
     "test:tree": "npm run build && node scripts/conformance/run-tree-fixtures.mjs",
@@ -40,8 +40,8 @@
     "smoke:deno": "deno run --allow-read scripts/smoke/control.mjs",
     "smoke:bun": "bun run scripts/smoke/control.mjs",
     "pack:check": "node scripts/eval/pack-check.mjs",
-    "eval:ci": "npm test && node scripts/eval/check-docs.mjs && node scripts/eval/check-no-node-builtins.mjs && node scripts/eval/pack-check.mjs && node scripts/eval/check-gates.mjs --profile=ci && node scripts/eval/score.mjs --profile=ci && node scripts/eval/report.mjs --profile=ci",
-    "eval:release": "npm test && npm run test:holdout && npm run test:browser-diff && npm run test:fuzz && npm run test:bench && node scripts/eval/check-docs.mjs && node scripts/eval/check-no-node-builtins.mjs && node scripts/eval/pack-check.mjs && node scripts/eval/check-gates.mjs --profile=release && node scripts/eval/score.mjs --profile=release && node scripts/eval/report.mjs --profile=release"
+    "eval:ci": "node scripts/eval/run-eval.mjs --profile=ci",
+    "eval:release": "node scripts/eval/run-eval.mjs --profile=release"
   },
   "dependencies": {},
   "devDependencies": {
