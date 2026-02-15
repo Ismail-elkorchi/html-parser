@@ -1,4 +1,4 @@
-import { decodeHtmlBytes } from "../internal/encoding/mod.js";
+import { decodeHtmlBytes, sniffHtmlEncoding } from "../internal/encoding/mod.js";
 import { tokenize, type TokenizerBudgets } from "../internal/tokenizer/mod.js";
 import {
   buildTreeFromHtml,
@@ -72,6 +72,7 @@ const VOID_ELEMENTS = new Set([
   "track",
   "wbr"
 ]);
+const STREAM_ENCODING_PRESCAN_BYTES = 16_384;
 
 export class BudgetExceededError extends Error {
   readonly payload: BudgetExceededPayload;
@@ -432,9 +433,33 @@ export async function parseStream(
   const startedAt = Date.now();
   const budgets = options.budgets;
   const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
   let total = 0;
-  let buffered = 0;
+  const pendingChunks: Uint8Array[] = [];
+  let pendingBytes = 0;
+  let sniff: { encoding: string; source: "bom" | "transport" | "meta" | "default" } | null = null;
+  let decoder: TextDecoder | undefined;
+  const decodedParts: string[] = [];
+  const sniffOptions =
+    options.transportEncodingLabel === undefined
+      ? { maxPrescanBytes: STREAM_ENCODING_PRESCAN_BYTES }
+      : {
+          transportEncodingLabel: options.transportEncodingLabel,
+          maxPrescanBytes: STREAM_ENCODING_PRESCAN_BYTES
+        };
+
+  const readPendingBytes = (): Uint8Array => {
+    if (pendingBytes === 0) {
+      return new Uint8Array(0);
+    }
+
+    const combined = new Uint8Array(pendingBytes);
+    let offset = 0;
+    for (const chunk of pendingChunks) {
+      combined.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return combined;
+  };
 
   for (;;) {
     const next = await reader.read();
@@ -443,35 +468,74 @@ export async function parseStream(
     }
 
     const chunkValue = next.value;
-    chunks.push(chunkValue);
     total += chunkValue.byteLength;
-    buffered += chunkValue.byteLength;
 
     enforceBudget("maxInputBytes", budgets?.maxInputBytes, total);
-    enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, buffered);
     enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
+
+    if (!sniff) {
+      pendingChunks.push(chunkValue);
+      pendingBytes += chunkValue.byteLength;
+      enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, pendingBytes);
+
+      if (pendingBytes < STREAM_ENCODING_PRESCAN_BYTES) {
+        continue;
+      }
+
+      const bufferedBytes = readPendingBytes();
+      sniff = sniffHtmlEncoding(bufferedBytes, sniffOptions);
+      decoder = new TextDecoder(sniff.encoding);
+      const decoded = decoder.decode(bufferedBytes, { stream: true });
+      if (decoded.length > 0) {
+        decodedParts.push(decoded);
+      }
+      pendingChunks.length = 0;
+      pendingBytes = 0;
+      continue;
+    }
+
+    enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, chunkValue.byteLength);
+    if (!decoder) {
+      throw new Error("stream decoder unavailable");
+    }
+
+    const decoded = decoder.decode(chunkValue, { stream: true });
+    if (decoded.length > 0) {
+      decodedParts.push(decoded);
+    }
   }
 
-  const combined = new Uint8Array(total);
-  let offset = 0;
-  for (const chunkValue of chunks) {
-    combined.set(chunkValue, offset);
-    offset += chunkValue.byteLength;
+  if (!sniff) {
+    const bufferedBytes = readPendingBytes();
+    sniff = sniffHtmlEncoding(bufferedBytes, sniffOptions);
+    decoder = new TextDecoder(sniff.encoding);
+    const decoded = decoder.decode(bufferedBytes, { stream: true });
+    if (decoded.length > 0) {
+      decodedParts.push(decoded);
+    }
   }
 
-  const parsed = parseBytes(combined, options);
+  if (!decoder) {
+    throw new Error("stream decoder initialization failed");
+  }
+
+  const decodedTail = decoder.decode();
+  if (decodedTail.length > 0) {
+    decodedParts.push(decodedTail);
+  }
+
+  const parsed = parse(decodedParts.join(""), options);
   if (!parsed.trace) {
     return parsed;
   }
 
-  const withStreamTrace = pushTrace([...parsed.trace], "stream", "stream-read-complete", budgets);
-  if (!withStreamTrace) {
-    return parsed;
-  }
+  let trace = [...parsed.trace];
+  trace = pushTrace(trace, "decode", `sniff:${sniff.source}:${sniff.encoding}`, budgets) ?? trace;
+  trace = pushTrace(trace, "stream", `stream-read-complete:${String(total)}`, budgets) ?? trace;
 
   return {
     ...parsed,
-    trace: withStreamTrace
+    trace
   };
 }
 
