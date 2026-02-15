@@ -19,7 +19,6 @@ const TOKENIZER_FILES = [
   "vendor/html5lib-tests/tokenizer/xmlViolation.test"
 ];
 
-const SKIP_DECISION_RECORD = "docs/decisions/ADR-001-tokenizer-conformance-skips.md";
 const HOLDOUT_MOD = 10;
 
 function fixtureTokenToComparable(token) {
@@ -42,7 +41,8 @@ function tokenizerTokenToFixture(token) {
   }
 
   if (token.type === "Doctype") {
-    return ["DOCTYPE", token.name, token.publicId, token.systemId, !token.forceQuirks];
+    const name = token.name.length === 0 ? null : token.name;
+    return ["DOCTYPE", name, token.publicId, token.systemId, !token.forceQuirks];
   }
 
   if (token.type === "Character") {
@@ -74,30 +74,42 @@ for (const path of TOKENIZER_FILES) {
 
   for (let index = 0; index < tests.length; index += 1) {
     const fixture = tests[index];
-    parsedCases.push({
-      id: `${path}#${index + 1}`,
-      file: path,
-      description: fixture.description ?? "",
-      input: fixture.input ?? "",
-      output: fixture.output ?? []
-    });
+    const fixtureId = `${path}#${index + 1}`;
+    const initialStates = fixture.initialStates ?? ["Data state"];
+
+    for (const initialState of initialStates) {
+      parsedCases.push({
+        id: `${fixtureId}@${initialState}`,
+        fixtureId,
+        file: path,
+        description: fixture.description ?? "",
+        input: fixture.input ?? "",
+        output: fixture.output ?? [],
+        initialState,
+        lastStartTag: fixture.lastStartTag,
+        doubleEscaped: fixture.doubleEscaped ?? false,
+        xmlViolationMode: path.endsWith("xmlViolation.test")
+      });
+    }
   }
 }
 
 let passed = 0;
 let failed = 0;
-let skipped = 0;
 let holdoutExcluded = 0;
 const failures = [];
-const skips = [];
 
 for (const fixture of parsedCases) {
-  if (computeHoldout(fixture.id)) {
+  if (computeHoldout(fixture.fixtureId)) {
     holdoutExcluded += 1;
     continue;
   }
 
   const result = tokenize(fixture.input, {
+    initialState: fixture.initialState,
+    lastStartTag: fixture.lastStartTag,
+    doubleEscaped: fixture.doubleEscaped,
+    xmlViolationMode: fixture.xmlViolationMode,
     budgets: {
       maxTextBytes: 200000,
       maxTokenBytes: 16000,
@@ -120,12 +132,7 @@ for (const fixture of parsedCases) {
     continue;
   }
 
-  skipped += 1;
-  skips.push({
-    id: fixture.id,
-    reason: "Tokenizer is not yet aligned to full html5lib semantics for this case.",
-    decisionRecord: SKIP_DECISION_RECORD
-  });
+  failed += 1;
   failures.push({
     id: fixture.id,
     expectedPreview: expected.slice(0, 8),
@@ -141,13 +148,13 @@ const report = {
     total: parsedCases.length - holdoutExcluded,
     passed,
     failed,
-    skipped
+    skipped: 0
   },
   holdout: {
     excluded: holdoutExcluded,
     rule: `hash(id) % ${HOLDOUT_MOD} === 0`
   },
-  skips,
+  skips: [],
   failures
 };
 
@@ -158,4 +165,4 @@ if (failed > 0) {
   process.exit(1);
 }
 
-console.log(`Tokenizer fixtures: passed=${passed}, skipped=${skipped}, holdoutExcluded=${holdoutExcluded}`);
+console.log(`Tokenizer fixtures: passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);

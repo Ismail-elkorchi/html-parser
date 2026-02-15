@@ -20,7 +20,6 @@ const TOKENIZER_FILES = [
 ];
 
 const HOLDOUT_MOD = 10;
-const HOLDOUT_DECISION_RECORD = "docs/decisions/ADR-001-tokenizer-conformance-skips.md";
 const HOLDOUT_LIMIT = 256;
 
 function computeHoldout(id) {
@@ -48,7 +47,8 @@ function tokenizerTokenToFixture(token) {
     return ["Comment", token.data];
   }
   if (token.type === "Doctype") {
-    return ["DOCTYPE", token.name, token.publicId, token.systemId, !token.forceQuirks];
+    const name = token.name.length === 0 ? null : token.name;
+    return ["DOCTYPE", name, token.publicId, token.systemId, !token.forceQuirks];
   }
   if (token.type === "Character") {
     return ["Character", token.data];
@@ -75,23 +75,42 @@ for (const file of TOKENIZER_FILES) {
     }
     selected.push({
       id,
+      file,
       input: fixture.input ?? "",
-      output: fixture.output ?? []
+      output: fixture.output ?? [],
+      initialStates: fixture.initialStates ?? ["Data state"],
+      lastStartTag: fixture.lastStartTag,
+      doubleEscaped: fixture.doubleEscaped ?? false
     });
   }
 }
 
 selected.sort((left, right) => left.id.localeCompare(right.id));
-const holdoutCases = selected.slice(0, HOLDOUT_LIMIT);
+const holdoutCases = [];
+for (const fixture of selected.slice(0, HOLDOUT_LIMIT)) {
+  for (const initialState of fixture.initialStates) {
+    holdoutCases.push({
+      id: `${fixture.id}@${initialState}`,
+      input: fixture.input,
+      output: fixture.output,
+      initialState,
+      lastStartTag: fixture.lastStartTag,
+      doubleEscaped: fixture.doubleEscaped,
+      xmlViolationMode: fixture.file.endsWith("xmlViolation.test")
+    });
+  }
+}
 
 let passed = 0;
 let failed = 0;
-let skipped = 0;
-const skips = [];
 const failures = [];
 
 for (const fixture of holdoutCases) {
   const result = tokenize(fixture.input, {
+    initialState: fixture.initialState,
+    lastStartTag: fixture.lastStartTag,
+    doubleEscaped: fixture.doubleEscaped,
+    xmlViolationMode: fixture.xmlViolationMode,
     budgets: {
       maxTextBytes: 200000,
       maxTokenBytes: 16000,
@@ -107,12 +126,7 @@ for (const fixture of holdoutCases) {
     continue;
   }
 
-  skipped += 1;
-  skips.push({
-    id: fixture.id,
-    reason: "Holdout case remains outside current tokenizer parity and is tracked as conformance debt.",
-    decisionRecord: HOLDOUT_DECISION_RECORD
-  });
+  failed += 1;
   failures.push({
     id: fixture.id,
     expectedPreview: expected.slice(0, 8),
@@ -126,16 +140,17 @@ await writeJson("reports/holdout.json", {
   artifact: {
     dataset: "html5lib-tests/tokenizer",
     selectionRule: `hash(id) % ${HOLDOUT_MOD} === 0`,
-    selected: holdoutCases.length,
+    selected: selected.slice(0, HOLDOUT_LIMIT).length,
+    expandedCases: holdoutCases.length,
     limit: HOLDOUT_LIMIT
   },
   cases: {
     total: holdoutCases.length,
     passed,
     failed,
-    skipped
+    skipped: 0
   },
-  skips,
+  skips: [],
   failures
 });
 
@@ -144,4 +159,4 @@ if (failed > 0) {
   process.exit(1);
 }
 
-console.log(`Holdout fixtures: passed=${passed}, skipped=${skipped}`);
+console.log(`Holdout fixtures: passed=${passed}, failed=${failed}`);
