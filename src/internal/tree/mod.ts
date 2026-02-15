@@ -2,6 +2,7 @@ export { buildTreeFromHtml, buildTreeFromTokens } from "./build.js";
 export { normalizeTree } from "./normalize.js";
 
 export type {
+  TreeAttribute,
   TreeBuildOptions,
   TreeBudgets,
   TreeBuildResult,
@@ -11,5 +12,6 @@ export type {
   TreeNodeDoctype,
   TreeNodeDocument,
   TreeNodeElement,
+  TreeSpan,
   TreeNodeText
 } from "./types.js";

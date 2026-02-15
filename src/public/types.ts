@@ -10,6 +10,7 @@ export interface Span {
 export interface Attribute {
   readonly name: string;
   readonly value: string;
+  readonly span?: Span;
 }
 
 export interface ParseError {
@@ -35,6 +36,7 @@ export interface BudgetOptions {
 }
 
 export interface ParseOptions {
+  readonly captureSpans?: boolean;
   readonly includeSpans?: boolean;
   readonly trace?: boolean;
   readonly transportEncodingLabel?: string;
@@ -119,6 +121,30 @@ export interface Chunk {
 export interface ChunkOptions {
   readonly maxChars?: number;
   readonly maxNodes?: number;
+}
+
+export interface PatchEdit {
+  readonly nodeId: NodeId;
+  readonly replacementHtml: string;
+}
+
+export interface PatchSliceStep {
+  readonly kind: "slice";
+  readonly start: number;
+  readonly end: number;
+}
+
+export interface PatchInsertStep {
+  readonly kind: "insert";
+  readonly at: number;
+  readonly text: string;
+}
+
+export type PatchStep = PatchSliceStep | PatchInsertStep;
+
+export interface PatchPlan {
+  readonly steps: readonly PatchStep[];
+  readonly result: string;
 }
 
 export interface BudgetExceededPayload {

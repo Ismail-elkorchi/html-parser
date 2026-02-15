@@ -12,8 +12,8 @@ function normalizeNode(node: TreeNode, level: number, lines: string[]): void {
   if (node.kind === "element") {
     lines.push(`| ${indent(level)}<${node.name}>`);
 
-    for (const [name, value] of Object.entries(node.attributes)) {
-      lines.push(`| ${indent(level + 1)}${name}=${quoteRaw(value)}`);
+    for (const attribute of node.attributes) {
+      lines.push(`| ${indent(level + 1)}${attribute.name}=${quoteRaw(attribute.value)}`);
     }
 
     for (const child of node.children) {

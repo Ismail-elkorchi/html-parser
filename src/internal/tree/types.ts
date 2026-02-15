@@ -5,9 +5,21 @@ export interface TreeBudgets {
   readonly maxAttributeBytes?: number;
 }
 
+export interface TreeSpan {
+  readonly start: number;
+  readonly end: number;
+}
+
+export interface TreeAttribute {
+  readonly name: string;
+  readonly value: string;
+  readonly span?: TreeSpan;
+}
+
 export interface TreeBuildOptions {
   readonly fragmentContextTagName?: string;
   readonly scriptingEnabled?: boolean;
+  readonly captureSpans?: boolean;
 }
 
 export interface TreeNodeDocument {
@@ -18,18 +30,21 @@ export interface TreeNodeDocument {
 export interface TreeNodeElement {
   readonly kind: "element";
   readonly name: string;
-  readonly attributes: Readonly<Record<string, string>>;
+  readonly attributes: readonly TreeAttribute[];
   readonly children: readonly TreeNode[];
+  readonly span?: TreeSpan;
 }
 
 export interface TreeNodeText {
   readonly kind: "text";
   readonly value: string;
+  readonly span?: TreeSpan;
 }
 
 export interface TreeNodeComment {
   readonly kind: "comment";
   readonly value: string;
+  readonly span?: TreeSpan;
 }
 
 export interface TreeNodeDoctype {
@@ -37,6 +52,7 @@ export interface TreeNodeDoctype {
   readonly name: string;
   readonly publicId: string;
   readonly systemId: string;
+  readonly span?: TreeSpan;
 }
 
 export type TreeNode =

@@ -1,6 +1,12 @@
 import { decodeHtmlBytes } from "../internal/encoding/mod.js";
 import { tokenize, type TokenizerBudgets } from "../internal/tokenizer/mod.js";
-import { buildTreeFromHtml, type TreeBudgets, type TreeNode } from "../internal/tree/mod.js";
+import {
+  buildTreeFromHtml,
+  type TreeAttribute,
+  type TreeBudgets,
+  type TreeNode,
+  type TreeSpan
+} from "../internal/tree/mod.js";
 
 import type {
   Attribute,
@@ -13,6 +19,9 @@ import type {
   NodeId,
   Outline,
   OutlineEntry,
+  PatchEdit,
+  PatchPlan,
+  PatchStep,
   ParseError,
   ParseOptions,
   Span,
@@ -35,6 +44,11 @@ export type {
   NodeKind,
   Outline,
   OutlineEntry,
+  PatchEdit,
+  PatchInsertStep,
+  PatchPlan,
+  PatchSliceStep,
+  PatchStep,
   ParseError,
   ParseOptions,
   Span,
@@ -78,26 +92,6 @@ class NodeIdAssigner {
     const value = this.#next;
     this.#next += 1;
     return value;
-  }
-}
-
-class SpanAllocator {
-  #cursor = 0;
-  readonly #enabled: boolean;
-
-  constructor(enabled: boolean) {
-    this.#enabled = enabled;
-  }
-
-  alloc(lengthHint = 1): Span | undefined {
-    if (!this.#enabled) {
-      return undefined;
-    }
-
-    const size = Math.max(1, lengthHint);
-    const start = this.#cursor;
-    this.#cursor += size;
-    return { start, end: this.#cursor };
   }
 }
 
@@ -159,8 +153,23 @@ function pushTrace(
   return next;
 }
 
-function toAttributes(record: Readonly<Record<string, string>>): readonly Attribute[] {
-  return Object.entries(record).map(([name, value]) => ({ name, value }));
+function toPublicSpan(span: TreeSpan | undefined, captureSpans: boolean): Span | undefined {
+  if (!captureSpans || !span) {
+    return undefined;
+  }
+
+  return { start: span.start, end: span.end };
+}
+
+function toAttributes(attributes: readonly TreeAttribute[], captureSpans: boolean): readonly Attribute[] {
+  return attributes.map((attribute) => {
+    const span = toPublicSpan(attribute.span, captureSpans);
+    return Object.freeze({
+      name: attribute.name,
+      value: attribute.value,
+      ...(span ? { span } : {})
+    });
+  });
 }
 
 function toParseErrors(codes: readonly string[]): readonly ParseError[] {
@@ -198,9 +207,9 @@ function treeBudgetsFromParseOptions(budgets: ParseOptions["budgets"] | undefine
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, spans: SpanAllocator): HtmlNode {
+function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, captureSpans: boolean): HtmlNode {
   if (node.kind === "text") {
-    const span = spans.alloc(node.value.length);
+    const span = toPublicSpan(node.span, captureSpans);
     return {
       id: assigner.next(),
       kind: "text",
@@ -210,7 +219,7 @@ function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, spans: SpanAl
   }
 
   if (node.kind === "comment") {
-    const span = spans.alloc(node.value.length + 7);
+    const span = toPublicSpan(node.span, captureSpans);
     return {
       id: assigner.next(),
       kind: "comment",
@@ -220,7 +229,7 @@ function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, spans: SpanAl
   }
 
   if (node.kind === "doctype") {
-    const span = spans.alloc(node.name.length + node.publicId.length + node.systemId.length + 10);
+    const span = toPublicSpan(node.span, captureSpans);
     return {
       id: assigner.next(),
       kind: "doctype",
@@ -231,9 +240,9 @@ function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, spans: SpanAl
     };
   }
 
-  const span = spans.alloc(node.name.length + 2);
-  const children = node.children.map((child) => convertTreeNode(child, assigner, spans));
-  const attributes = normalizeAttributes(toAttributes(node.attributes));
+  const span = toPublicSpan(node.span, captureSpans);
+  const children = node.children.map((child) => convertTreeNode(child, assigner, captureSpans));
+  const attributes = normalizeAttributes(toAttributes(node.attributes, captureSpans));
 
   return {
     id: assigner.next(),
@@ -282,9 +291,8 @@ function collectMetrics(nodes: readonly HtmlNode[]): NodeMetrics {
 function parseDocumentInternal(html: string, options: ParseOptions = {}): DocumentTree {
   const startedAt = Date.now();
   const budgets = options.budgets;
-  const includeSpans = options.includeSpans ?? false;
+  const captureSpans = options.captureSpans ?? options.includeSpans ?? false;
   const assigner = new NodeIdAssigner();
-  const spans = new SpanAllocator(includeSpans);
   const documentId = assigner.next();
   let trace: TraceEvent[] | undefined = options.trace ? [] : undefined;
 
@@ -296,14 +304,16 @@ function parseDocumentInternal(html: string, options: ParseOptions = {}): Docume
 
   trace = pushTrace(trace, "tokenize", `tokens:${String(tokenized.tokens.length)}`, budgets);
 
-  const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets));
+  const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets), {
+    captureSpans
+  });
 
   trace = pushTrace(trace, "tree", `tree-errors:${String(built.errors.length)}`, budgets);
   for (const treeError of built.errors.slice(0, 3)) {
     trace = pushTrace(trace, "tree", `parse-error:${treeError.code}`, budgets);
   }
 
-  const children = built.document.children.map((node) => convertTreeNode(node, assigner, spans));
+  const children = built.document.children.map((node) => convertTreeNode(node, assigner, captureSpans));
   const metrics = collectMetrics(children);
   const totalNodes = metrics.nodes + 1;
 
@@ -365,7 +375,7 @@ export function parseFragment(
 ): FragmentTree {
   const startedAt = Date.now();
   const budgets = options.budgets;
-  const includeSpans = options.includeSpans ?? false;
+  const captureSpans = options.captureSpans ?? options.includeSpans ?? false;
   const normalizedContext = contextTagName.trim().toLowerCase();
 
   if (normalizedContext.length === 0) {
@@ -375,7 +385,6 @@ export function parseFragment(
   enforceBudget("maxInputBytes", budgets?.maxInputBytes, html.length);
 
   const assigner = new NodeIdAssigner();
-  const spans = new SpanAllocator(includeSpans);
   const fragmentId = assigner.next();
   let trace: TraceEvent[] | undefined = options.trace ? [] : undefined;
 
@@ -387,7 +396,8 @@ export function parseFragment(
   trace = pushTrace(trace, "tokenize", `tokens:${String(tokenized.tokens.length)}`, budgets);
 
   const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets), {
-    fragmentContextTagName: normalizedContext
+    fragmentContextTagName: normalizedContext,
+    captureSpans
   });
 
   trace = pushTrace(trace, "tree", `tree-errors:${String(built.errors.length)}`, budgets);
@@ -395,7 +405,7 @@ export function parseFragment(
     trace = pushTrace(trace, "tree", `parse-error:${treeError.code}`, budgets);
   }
 
-  const children = built.document.children.map((node) => convertTreeNode(node, assigner, spans));
+  const children = built.document.children.map((node) => convertTreeNode(node, assigner, captureSpans));
   const metrics = collectMetrics(children);
   const totalNodes = metrics.nodes + 1;
 
@@ -557,6 +567,150 @@ function countNodes(node: HtmlNode): number {
   }
 
   return 1 + node.children.reduce((total, child) => total + countNodes(child), 0);
+}
+
+function indexNodeSpans(nodes: readonly HtmlNode[], into: Map<NodeId, Span>): void {
+  for (const node of nodes) {
+    if (node.span) {
+      into.set(node.id, node.span);
+    }
+
+    if (node.kind === "element") {
+      indexNodeSpans(node.children, into);
+    }
+  }
+}
+
+export function applyPatchPlan(originalHtml: string, plan: PatchPlan): string {
+  let cursor = 0;
+  let output = "";
+
+  for (const step of plan.steps) {
+    if (step.kind === "slice") {
+      if (step.start < cursor || step.end < step.start || step.end > originalHtml.length) {
+        throw new Error("invalid patch slice bounds");
+      }
+
+      output += originalHtml.slice(step.start, step.end);
+      cursor = step.end;
+      continue;
+    }
+
+    if (step.at !== cursor || step.at > originalHtml.length) {
+      throw new Error("invalid patch insertion offset");
+    }
+
+    output += step.text;
+  }
+
+  return output;
+}
+
+interface PlannedReplacement {
+  readonly nodeId: NodeId;
+  readonly start: number;
+  readonly end: number;
+  readonly replacementHtml: string;
+}
+
+export function computePatch(originalHtml: string, edits: readonly PatchEdit[]): PatchPlan {
+  if (edits.length === 0) {
+    const steps: readonly PatchStep[] = Object.freeze([
+      Object.freeze({ kind: "slice", start: 0, end: originalHtml.length })
+    ]);
+
+    return Object.freeze({
+      steps,
+      result: originalHtml
+    });
+  }
+
+  const parsed = parse(originalHtml, { captureSpans: true });
+  const spanByNode = new Map<NodeId, Span>();
+  indexNodeSpans(parsed.children, spanByNode);
+
+  const replacements: PlannedReplacement[] = [];
+  const seenNodeIds = new Set<NodeId>();
+  for (const edit of edits) {
+    if (seenNodeIds.has(edit.nodeId)) {
+      throw new Error(`duplicate patch edit for nodeId ${String(edit.nodeId)}`);
+    }
+
+    seenNodeIds.add(edit.nodeId);
+    const span = spanByNode.get(edit.nodeId);
+    if (!span) {
+      throw new Error(`cannot patch nodeId ${String(edit.nodeId)} without captured span`);
+    }
+
+    replacements.push({
+      nodeId: edit.nodeId,
+      start: span.start,
+      end: span.end,
+      replacementHtml: edit.replacementHtml
+    });
+  }
+
+  replacements.sort((left, right) => {
+    if (left.start !== right.start) {
+      return left.start - right.start;
+    }
+
+    if (left.end !== right.end) {
+      return left.end - right.end;
+    }
+
+    return left.nodeId - right.nodeId;
+  });
+
+  let previousEnd = -1;
+  for (const replacement of replacements) {
+    if (replacement.start < previousEnd) {
+      throw new Error("overlapping patch edits are not allowed");
+    }
+
+    previousEnd = replacement.end;
+  }
+
+  const steps: PatchStep[] = [];
+  let cursor = 0;
+  for (const replacement of replacements) {
+    if (cursor < replacement.start) {
+      steps.push(
+        Object.freeze({
+          kind: "slice",
+          start: cursor,
+          end: replacement.start
+        })
+      );
+    }
+
+    steps.push(
+      Object.freeze({
+        kind: "insert",
+        at: replacement.start,
+        text: replacement.replacementHtml
+      })
+    );
+    cursor = replacement.end;
+  }
+
+  if (cursor < originalHtml.length) {
+    steps.push(
+      Object.freeze({
+        kind: "slice",
+        start: cursor,
+        end: originalHtml.length
+      })
+    );
+  }
+
+  const frozenSteps = Object.freeze(steps.map((step) => Object.freeze(step)));
+  const result = applyPatchPlan(originalHtml, { steps: frozenSteps, result: "" });
+
+  return Object.freeze({
+    steps: frozenSteps,
+    result
+  });
 }
 
 export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions = {}): Chunk[] {
