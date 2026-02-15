@@ -1,0 +1,43 @@
+{
+  "name": "html-parser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Policy and tooling baseline for an agent-first TypeScript HTML parser.",
+  "type": "module",
+  "packageManager": "npm@11.10.0",
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
+  },
+  "main": "./dist/public/index.js",
+  "types": "./dist/public/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/public/index.d.ts",
+      "import": "./dist/public/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix --max-warnings=0",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "node --test",
+    "test:control": "node --test tests/control/**/*.test.js",
+    "eval:ci": "node scripts/eval/ci.mjs",
+    "eval:release": "node scripts/eval/release.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@eslint/js": "9.39.2",
+    "eslint": "9.39.2",
+    "eslint-import-resolver-typescript": "4.4.4",
+    "eslint-plugin-boundaries": "5.4.0",
+    "eslint-plugin-import": "2.32.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.55.0"
+  }
+}
