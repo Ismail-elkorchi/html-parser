@@ -30,6 +30,12 @@
 3) bounded `<meta charset>` prescan
 4) default fallback (`windows-1252`)
 
+`parseStream` decoding order:
+1) Read incrementally from `ReadableStream<Uint8Array>`
+2) Buffer up to the prescan window (`16384` bytes) for deterministic encoding sniff parity
+3) Decode remaining chunks with `TextDecoder(..., { stream: true })`
+4) Parse decoded text with the same tree pipeline as `parse`
+
 ## Determinism contract
 - Node IDs are assigned with deterministic pre-order incremental numbering.
 - Attribute ordering is stable by input order after duplicate-name normalization.

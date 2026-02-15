@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BudgetExceededError, chunk, outline, parse, parseStream } from "../../dist/mod.js";
+import { BudgetExceededError, chunk, outline, parse, parseBytes, parseStream } from "../../dist/mod.js";
 
 function makeStream(chunks) {
   const streamFactory = globalThis.ReadableStream;
@@ -17,6 +17,10 @@ function makeStream(chunks) {
       controller.close();
     }
   });
+}
+
+function asciiBytes(value) {
+  return Array.from(value, (char) => char.charCodeAt(0));
 }
 
 test("parseStream decodes deterministic output", async () => {
@@ -36,6 +40,18 @@ test("parseStream enforces maxBufferedBytes budget", async () => {
       return true;
     }
   );
+});
+
+test("parseStream matches parseBytes for chunked transport with sniffing", async () => {
+  const prefix = "<meta charset=windows-1252><p>";
+  const suffix = "</p>";
+  const bytes = new Uint8Array([...asciiBytes(prefix), 0xe9, ...asciiBytes(suffix)]);
+  const stream = makeStream([bytes.subarray(0, 7), bytes.subarray(7, 19), bytes.subarray(19)]);
+
+  const fromBytes = parseBytes(bytes);
+  const fromStream = await parseStream(stream);
+
+  assert.deepEqual(fromStream, fromBytes);
 });
 
 test("outline and chunk stay deterministic", () => {
