@@ -2,8 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { writeJson } from "../eval/util.mjs";
-import { tokenize } from "../../dist/internal/tokenizer/mod.js";
-import { buildTreeFromTokens, normalizeTree } from "../../dist/internal/tree/mod.js";
+import { buildTreeFromHtml, normalizeTree } from "../../dist/internal/tree/mod.js";
 
 const TREE_FILES = [
   "vendor/html5lib-tests/tree-construction/tests1.dat",
@@ -14,8 +13,8 @@ const TREE_FILES = [
   "vendor/html5lib-tests/tree-construction/tests6.dat"
 ];
 
-const SKIP_DECISION_RECORD = "docs/decisions/ADR-001-tree-construction-conformance-skips.md";
 const HOLDOUT_MOD = 10;
+const DIVERGENCE_LIMIT = 25;
 
 function computeHoldout(id) {
   let hash = 0;
@@ -29,37 +28,72 @@ function parseDatFixtureFile(content, fileName) {
   const lines = content.split(/\r?\n/);
   const tests = [];
   let section = "";
-  let current = {
-    data: "",
-    documentLines: []
-  };
+  let current = null;
 
   const pushCurrent = () => {
+    if (current === null) {
+      return;
+    }
+
     if (current.data.length === 0 && current.documentLines.length === 0) {
+      current = null;
+      section = "";
       return;
     }
 
     tests.push({
       id: `${fileName}#${tests.length + 1}`,
       data: current.data,
-      expected: current.documentLines.join("\n")
+      expected: current.documentLines.join("\n"),
+      fragmentContextTagName: current.fragmentContextTagName,
+      scriptingEnabled: current.scriptingEnabled
     });
 
-    current = {
-      data: "",
-      documentLines: []
-    };
+    current = null;
+    section = "";
   };
 
   for (const line of lines) {
     if (line === "#data") {
       pushCurrent();
+      current = {
+        data: "",
+        documentLines: [],
+        fragmentContextTagName: undefined,
+        scriptingEnabled: true
+      };
       section = "data";
+      continue;
+    }
+
+    if (current === null) {
+      continue;
+    }
+
+    if (line === "#errors" || line === "#new-errors") {
+      section = "errors";
       continue;
     }
 
     if (line === "#document") {
       section = "document";
+      continue;
+    }
+
+    if (line === "#document-fragment") {
+      section = "fragment";
+      continue;
+    }
+
+    if (line === "#script-on") {
+      current.scriptingEnabled = true;
+      section = "";
+      continue;
+    }
+
+    if (line === "#script-off") {
+      current.scriptingEnabled = false;
+      section = "";
       continue;
     }
 
@@ -78,11 +112,22 @@ function parseDatFixtureFile(content, fileName) {
 
     if (section === "document") {
       current.documentLines.push(line);
+      continue;
+    }
+
+    if (section === "fragment") {
+      if (current.fragmentContextTagName === undefined) {
+        current.fragmentContextTagName = line.trim().toLowerCase();
+      }
     }
   }
 
   pushCurrent();
   return tests;
+}
+
+function normalizeFixtureOutput(value) {
+  return value.trimEnd();
 }
 
 async function writeDivergenceRecord(caseId, input, expected, actual) {
@@ -121,10 +166,8 @@ for (const file of TREE_FILES) {
 
 let passed = 0;
 let failed = 0;
-let skipped = 0;
 let holdoutExcluded = 0;
 let divergenceCreated = 0;
-const skips = [];
 const failures = [];
 
 for (const testCase of allTests) {
@@ -133,45 +176,39 @@ for (const testCase of allTests) {
     continue;
   }
 
-  const tokenized = tokenize(testCase.data, {
-    budgets: {
-      maxTextBytes: 500000,
-      maxTokenBytes: 32000,
-      maxParseErrors: 2000,
-      maxTimeMs: 100
+  const built = buildTreeFromHtml(
+    testCase.data,
+    {
+      maxNodes: 4000,
+      maxDepth: 256,
+      maxAttributesPerElement: 256,
+      maxAttributeBytes: 65536
+    },
+    {
+      fragmentContextTagName: testCase.fragmentContextTagName,
+      scriptingEnabled: testCase.scriptingEnabled
     }
-  });
+  );
 
-  const built = buildTreeFromTokens(tokenized.tokens, {
-    maxNodes: 4000,
-    maxDepth: 256,
-    maxAttributesPerElement: 256,
-    maxAttributeBytes: 65536
-  });
-
-  const actual = normalizeTree(built.document);
-  const expected = testCase.expected;
+  const actual = normalizeFixtureOutput(normalizeTree(built.document));
+  const expected = normalizeFixtureOutput(testCase.expected);
 
   if (actual === expected) {
     passed += 1;
     continue;
   }
 
-  skipped += 1;
-  skips.push({
-    id: testCase.id,
-    reason: "Tree construction parity for this case is pending deeper insertion-mode and recovery logic.",
-    decisionRecord: SKIP_DECISION_RECORD
-  });
+  failed += 1;
 
-  if (divergenceCreated < 25) {
+  if (divergenceCreated < DIVERGENCE_LIMIT) {
     await writeDivergenceRecord(testCase.id, testCase.data, expected, actual);
     divergenceCreated += 1;
   }
 
   failures.push({
     id: testCase.id,
-    tokenizerErrors: tokenized.errors.slice(0, 10),
+    fragmentContextTagName: testCase.fragmentContextTagName ?? null,
+    scriptingEnabled: testCase.scriptingEnabled,
     treeErrors: built.errors.slice(0, 10)
   });
 }
@@ -183,13 +220,13 @@ const report = {
     total: allTests.length - holdoutExcluded,
     passed,
     failed,
-    skipped
+    skipped: 0
   },
   holdout: {
     excluded: holdoutExcluded,
     rule: `hash(id) % ${HOLDOUT_MOD} === 0`
   },
-  skips,
+  skips: [],
   failures
 };
 
@@ -200,4 +237,4 @@ if (failed > 0) {
   process.exit(1);
 }
 
-console.log(`Tree fixtures: passed=${passed}, skipped=${skipped}, holdoutExcluded=${holdoutExcluded}`);
+console.log(`Tree fixtures: passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);
