@@ -1,0 +1,23 @@
+# Tree divergence
+
+Case: vendor/html5lib-tests/tree-construction/tests1.dat#9
+
+## Input
+```html
+<html><head></head><body>
+```
+
+## Expected
+```text
+| <html>
+|   <head>
+|   <body>
+
+```
+
+## Actual
+```text
+| <html>
+|   <head>
+|   <body>
+```
