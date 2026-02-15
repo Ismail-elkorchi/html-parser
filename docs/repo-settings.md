@@ -16,8 +16,12 @@ This repository uses pull-request-only delivery.
 - `node`
 - `deno`
 - `bun`
+- `dependency-review`
+- `codeql-analyze`
 
 These map to the CI jobs in `.github/workflows/ci.yml`.
+`dependency-review` is defined in `.github/workflows/dependency-review.yml`.
+`codeql-analyze` is defined in `.github/workflows/codeql.yml`.
 
 ## Applied branch protection payload
 Applied with:
@@ -28,7 +32,7 @@ Payload applied:
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": ["node", "deno", "bun"]
+    "contexts": ["node", "deno", "bun", "dependency-review", "codeql-analyze"]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": {
@@ -44,6 +48,6 @@ Payload applied:
   "block_creations": false,
   "required_conversation_resolution": true,
   "lock_branch": false,
-  "allow_fork_syncing": true
+  "allow_fork_syncing": false
 }
 ```
