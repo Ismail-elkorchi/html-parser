@@ -24,7 +24,7 @@
     "lint": "eslint . --max-warnings=0",
     "fmt": "eslint . --fix --max-warnings=0",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/build/copy-vendor.mjs",
     "test": "npm run test:control",
     "test:control": "npm run build && node --test test/control/**/*.test.js tests/control/**/*.test.js && node scripts/eval/write-stub-reports.mjs",
     "test:conformance": "node scripts/conformance/run-all.mjs",
@@ -50,7 +50,6 @@
     "eslint-import-resolver-typescript": "4.4.4",
     "eslint-plugin-boundaries": "5.4.0",
     "eslint-plugin-import": "2.32.0",
-    "parse5": "8.0.0",
     "playwright": "1.58.2",
     "typescript": "5.9.3",
     "typescript-eslint": "8.55.0"

@@ -1,4 +1,4 @@
-import { Tokenizer, TokenizerMode } from "parse5";
+import { Tokenizer, TokenizerMode } from "../parse5-runtime.js";
 
 import { tokenize as tokenizeLegacy } from "./tokenize-legacy.js";
 
@@ -200,7 +200,7 @@ function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeRe
           data: normalizeCharacterData(token.chars, input, options)
         });
       },
-      onParseError(error) {
+      onParseError(error: { readonly code: string; readonly startOffset: number }) {
         const maxParseErrors = options.budgets?.maxParseErrors;
         if (maxParseErrors !== undefined && errors.length >= maxParseErrors) {
           return;

@@ -1,7 +1,8 @@
 # ADR-005: Add parse5 as tokenizer implementation dependency (dev)
 
-- Status: accepted
+- Status: superseded
 - Date: 2026-02-15
+- Superseded-by: docs/decisions/ADR-010-vendor-parser-runtime-source.md
 
 ## Context
 Tokenizer conformance requires a standards-aligned state machine, including nuanced behavior for script-data, character references, and state-specific fixtures. The existing in-house tokenizer did not satisfy strict mismatch-fail policy.
