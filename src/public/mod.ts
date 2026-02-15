@@ -1,4 +1,6 @@
 import { decodeHtmlBytes } from "../internal/encoding/mod.js";
+import { tokenize, type TokenizerBudgets } from "../internal/tokenizer/mod.js";
+import { buildTreeFromHtml, type TreeBudgets, type TreeNode } from "../internal/tree/mod.js";
 
 import type {
   Attribute,
@@ -6,12 +8,12 @@ import type {
   Chunk,
   ChunkOptions,
   DocumentTree,
-  ElementNode,
   FragmentTree,
   HtmlNode,
   NodeId,
   Outline,
   OutlineEntry,
+  ParseError,
   ParseOptions,
   Span,
   TraceEvent
@@ -40,6 +42,23 @@ export type {
   TraceEvent
 } from "./types.js";
 
+const VOID_ELEMENTS = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr"
+]);
+
 export class BudgetExceededError extends Error {
   readonly payload: BudgetExceededPayload;
 
@@ -62,16 +81,42 @@ class NodeIdAssigner {
   }
 }
 
-function normalizeAttributes(attributes: readonly Attribute[]): readonly Attribute[] {
-  return [...attributes].sort((left, right) => left.name.localeCompare(right.name));
-}
+class SpanAllocator {
+  #cursor = 0;
+  readonly #enabled: boolean;
 
-function withSpan(includeSpans: boolean, start: number, end: number): Span | undefined {
-  if (!includeSpans) {
-    return undefined;
+  constructor(enabled: boolean) {
+    this.#enabled = enabled;
   }
 
-  return { start, end };
+  alloc(lengthHint = 1): Span | undefined {
+    if (!this.#enabled) {
+      return undefined;
+    }
+
+    const size = Math.max(1, lengthHint);
+    const start = this.#cursor;
+    this.#cursor += size;
+    return { start, end: this.#cursor };
+  }
+}
+
+interface NodeMetrics {
+  readonly nodes: number;
+  readonly maxDepth: number;
+}
+
+function normalizeAttributes(attributes: readonly Attribute[]): readonly Attribute[] {
+  return [...attributes];
+}
+
+function toPublicTagName(internalName: string): string {
+  const separator = internalName.indexOf(" ");
+  if (separator === -1) {
+    return internalName;
+  }
+
+  return internalName.slice(separator + 1);
 }
 
 function enforceBudget(
@@ -114,80 +159,203 @@ function pushTrace(
   return next;
 }
 
-function buildTrace(enabled: boolean | undefined, budgets: ParseOptions["budgets"]): TraceEvent[] | undefined {
-  if (!enabled) {
+function toAttributes(record: Readonly<Record<string, string>>): readonly Attribute[] {
+  return Object.entries(record).map(([name, value]) => ({ name, value }));
+}
+
+function toParseErrors(codes: readonly string[]): readonly ParseError[] {
+  return codes.map((code) => ({
+    code: "PARSER_ERROR",
+    message: code
+  }));
+}
+
+function tokenizerBudgetsFromParseOptions(
+  budgets: ParseOptions["budgets"] | undefined
+): TokenizerBudgets | undefined {
+  if (!budgets) {
     return undefined;
   }
 
-  const base: TraceEvent[] = [
-    { seq: 1, stage: "decode", detail: "input received" },
-    { seq: 2, stage: "tokenize", detail: "stub tokenization" },
-    { seq: 3, stage: "tree", detail: "stub tree construction" }
-  ];
+  const next: TokenizerBudgets = {
+    ...(budgets.maxInputBytes !== undefined ? { maxTextBytes: budgets.maxInputBytes } : {}),
+    ...(budgets.maxTimeMs !== undefined ? { maxTimeMs: budgets.maxTimeMs } : {})
+  };
 
-  enforceBudget("maxTraceEvents", budgets?.maxTraceEvents, base.length);
-  const bytes = base.reduce((total, item) => total + eventSize(item), 0);
-  enforceBudget("maxTraceBytes", budgets?.maxTraceBytes, bytes);
-
-  return base;
+  return Object.keys(next).length > 0 ? next : undefined;
 }
 
-function parseAsDocument(html: string, options: ParseOptions = {}): DocumentTree {
-  const startedAt = Date.now();
-  const assigner = new NodeIdAssigner();
-  const includeSpans = options.includeSpans ?? false;
-  const budgets = options.budgets;
-  let trace = buildTrace(options.trace, budgets);
-  const textSpan = withSpan(includeSpans, 0, html.length);
-  const rootSpan = withSpan(includeSpans, 0, html.length);
+function treeBudgetsFromParseOptions(budgets: ParseOptions["budgets"] | undefined): TreeBudgets | undefined {
+  if (!budgets) {
+    return undefined;
+  }
 
-  enforceBudget("maxInputBytes", budgets?.maxInputBytes, html.length);
-
-  const textNode: HtmlNode = {
-    id: assigner.next(),
-    kind: "text",
-    value: html,
-    ...(textSpan ? { span: textSpan } : {})
+  const next: TreeBudgets = {
+    ...(budgets.maxNodes !== undefined ? { maxNodes: budgets.maxNodes } : {}),
+    ...(budgets.maxDepth !== undefined ? { maxDepth: budgets.maxDepth } : {})
   };
 
-  const htmlElement: ElementNode = {
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, spans: SpanAllocator): HtmlNode {
+  if (node.kind === "text") {
+    const span = spans.alloc(node.value.length);
+    return {
+      id: assigner.next(),
+      kind: "text",
+      value: node.value,
+      ...(span ? { span } : {})
+    };
+  }
+
+  if (node.kind === "comment") {
+    const span = spans.alloc(node.value.length + 7);
+    return {
+      id: assigner.next(),
+      kind: "comment",
+      value: node.value,
+      ...(span ? { span } : {})
+    };
+  }
+
+  if (node.kind === "doctype") {
+    const span = spans.alloc(node.name.length + node.publicId.length + node.systemId.length + 10);
+    return {
+      id: assigner.next(),
+      kind: "doctype",
+      name: node.name,
+      ...(node.publicId.length > 0 ? { publicId: node.publicId } : {}),
+      ...(node.systemId.length > 0 ? { systemId: node.systemId } : {}),
+      ...(span ? { span } : {})
+    };
+  }
+
+  const span = spans.alloc(node.name.length + 2);
+  const children = node.children.map((child) => convertTreeNode(child, assigner, spans));
+  const attributes = normalizeAttributes(toAttributes(node.attributes));
+
+  return {
     id: assigner.next(),
     kind: "element",
-    tagName: "html",
-    attributes: normalizeAttributes([]),
-    children: [textNode],
-    ...(rootSpan ? { span: rootSpan } : {})
+    tagName: toPublicTagName(node.name),
+    attributes,
+    children,
+    ...(span ? { span } : {})
   };
+}
 
-  trace = pushTrace(trace, "tree", "document wrapped in html element", budgets);
+function collectMetricsForNode(node: HtmlNode, depth: number): NodeMetrics {
+  if (node.kind !== "element") {
+    return { nodes: 1, maxDepth: depth };
+  }
 
-  const documentTree: DocumentTree = {
-    id: assigner.next(),
-    kind: "document",
-    children: [htmlElement],
-    errors: [],
-    ...(trace ? { trace } : {})
-  };
+  let nodes = 1;
+  let maxDepth = depth;
 
-  enforceBudget("maxNodes", budgets?.maxNodes, 3);
-  enforceBudget("maxDepth", budgets?.maxDepth, 2);
+  for (const child of node.children) {
+    const childMetrics = collectMetricsForNode(child, depth + 1);
+    nodes += childMetrics.nodes;
+    if (childMetrics.maxDepth > maxDepth) {
+      maxDepth = childMetrics.maxDepth;
+    }
+  }
+
+  return { nodes, maxDepth };
+}
+
+function collectMetrics(nodes: readonly HtmlNode[]): NodeMetrics {
+  let totalNodes = 0;
+  let maxDepth = 1;
+
+  for (const node of nodes) {
+    const metrics = collectMetricsForNode(node, 2);
+    totalNodes += metrics.nodes;
+    if (metrics.maxDepth > maxDepth) {
+      maxDepth = metrics.maxDepth;
+    }
+  }
+
+  return { nodes: totalNodes, maxDepth };
+}
+
+function parseDocumentInternal(html: string, options: ParseOptions = {}): DocumentTree {
+  const startedAt = Date.now();
+  const budgets = options.budgets;
+  const includeSpans = options.includeSpans ?? false;
+  const assigner = new NodeIdAssigner();
+  const spans = new SpanAllocator(includeSpans);
+  const documentId = assigner.next();
+  let trace: TraceEvent[] | undefined = options.trace ? [] : undefined;
+
+  enforceBudget("maxInputBytes", budgets?.maxInputBytes, html.length);
+  trace = pushTrace(trace, "decode", "input:string", budgets);
+
+  const tokenizerBudgets = tokenizerBudgetsFromParseOptions(budgets);
+  const tokenized = tokenizerBudgets ? tokenize(html, { budgets: tokenizerBudgets }) : tokenize(html);
+
+  trace = pushTrace(trace, "tokenize", `tokens:${String(tokenized.tokens.length)}`, budgets);
+
+  const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets));
+
+  trace = pushTrace(trace, "tree", `tree-errors:${String(built.errors.length)}`, budgets);
+  for (const treeError of built.errors.slice(0, 3)) {
+    trace = pushTrace(trace, "tree", `parse-error:${treeError.code}`, budgets);
+  }
+
+  const children = built.document.children.map((node) => convertTreeNode(node, assigner, spans));
+  const metrics = collectMetrics(children);
+  const totalNodes = metrics.nodes + 1;
+
+  enforceBudget("maxNodes", budgets?.maxNodes, totalNodes);
+  enforceBudget("maxDepth", budgets?.maxDepth, metrics.maxDepth);
   enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
 
-  return documentTree;
+  const errors = toParseErrors(built.errors.map((entry) => entry.code));
+
+  return {
+    id: documentId,
+    kind: "document",
+    children,
+    errors,
+    ...(trace ? { trace } : {})
+  };
 }
 
 export function parse(html: string, options: ParseOptions = {}): DocumentTree {
-  return parseAsDocument(html, options);
+  return parseDocumentInternal(html, options);
 }
 
 export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): DocumentTree {
+  enforceBudget("maxInputBytes", options.budgets?.maxInputBytes, bytes.byteLength);
+
   const decoded = decodeHtmlBytes(
     bytes,
     options.transportEncodingLabel
       ? { transportEncodingLabel: options.transportEncodingLabel }
       : {}
   );
-  return parseAsDocument(decoded.text, options);
+
+  const parsed = parse(decoded.text, options);
+  if (!parsed.trace) {
+    return parsed;
+  }
+
+  const withDecodeTrace = pushTrace(
+    [...parsed.trace],
+    "decode",
+    `sniff:${decoded.sniff.source}:${decoded.sniff.encoding}`,
+    options.budgets
+  );
+
+  if (!withDecodeTrace) {
+    return parsed;
+  }
+
+  return {
+    ...parsed,
+    trace: withDecodeTrace
+  };
 }
 
 export function parseFragment(
@@ -196,59 +364,55 @@ export function parseFragment(
   options: ParseOptions = {}
 ): FragmentTree {
   const startedAt = Date.now();
+  const budgets = options.budgets;
+  const includeSpans = options.includeSpans ?? false;
   const normalizedContext = contextTagName.trim().toLowerCase();
+
   if (normalizedContext.length === 0) {
     throw new Error("contextTagName must be a non-empty tag name");
   }
 
-  const assigner = new NodeIdAssigner();
-  const includeSpans = options.includeSpans ?? false;
-  const budgets = options.budgets;
-  let trace = buildTrace(options.trace, budgets);
-  const textSpan = withSpan(includeSpans, 0, html.length);
-  const rootSpan = withSpan(includeSpans, 0, html.length);
-
   enforceBudget("maxInputBytes", budgets?.maxInputBytes, html.length);
 
-  const contextNamespace =
-    normalizedContext === "svg"
-      ? "svg"
-      : normalizedContext === "math" || normalizedContext === "mathml"
-        ? "mathml"
-        : "html";
+  const assigner = new NodeIdAssigner();
+  const spans = new SpanAllocator(includeSpans);
+  const fragmentId = assigner.next();
+  let trace: TraceEvent[] | undefined = options.trace ? [] : undefined;
 
-  trace = pushTrace(trace, "fragment", `fragment-context:${contextNamespace}:${normalizedContext}`, budgets);
+  trace = pushTrace(trace, "fragment", `context:${normalizedContext}`, budgets);
 
-  const textNode: HtmlNode = {
-    id: assigner.next(),
-    kind: "text",
-    value: html,
-    ...(textSpan ? { span: textSpan } : {})
-  };
+  const tokenizerBudgets = tokenizerBudgetsFromParseOptions(budgets);
+  const tokenized = tokenizerBudgets ? tokenize(html, { budgets: tokenizerBudgets }) : tokenize(html);
 
-  const contextElement: ElementNode = {
-    id: assigner.next(),
-    kind: "element",
-    tagName: contextNamespace === "html" ? normalizedContext : `${contextNamespace}:${normalizedContext}`,
-    attributes: normalizeAttributes([]),
-    children: [textNode],
-    ...(rootSpan ? { span: rootSpan } : {})
-  };
+  trace = pushTrace(trace, "tokenize", `tokens:${String(tokenized.tokens.length)}`, budgets);
 
-  const fragmentTree: FragmentTree = {
-    id: assigner.next(),
-    kind: "fragment",
-    contextTagName: normalizedContext,
-    children: [contextElement],
-    errors: [],
-    ...(trace ? { trace } : {})
-  };
+  const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets), {
+    fragmentContextTagName: normalizedContext
+  });
 
-  enforceBudget("maxNodes", budgets?.maxNodes, 3);
-  enforceBudget("maxDepth", budgets?.maxDepth, 2);
+  trace = pushTrace(trace, "tree", `tree-errors:${String(built.errors.length)}`, budgets);
+  for (const treeError of built.errors.slice(0, 3)) {
+    trace = pushTrace(trace, "tree", `parse-error:${treeError.code}`, budgets);
+  }
+
+  const children = built.document.children.map((node) => convertTreeNode(node, assigner, spans));
+  const metrics = collectMetrics(children);
+  const totalNodes = metrics.nodes + 1;
+
+  enforceBudget("maxNodes", budgets?.maxNodes, totalNodes);
+  enforceBudget("maxDepth", budgets?.maxDepth, metrics.maxDepth);
   enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
 
-  return fragmentTree;
+  const errors = toParseErrors(built.errors.map((entry) => entry.code));
+
+  return {
+    id: fragmentId,
+    kind: "fragment",
+    contextTagName: normalizedContext,
+    children,
+    errors,
+    ...(trace ? { trace } : {})
+  };
 }
 
 export async function parseStream(
@@ -268,10 +432,10 @@ export async function parseStream(
       break;
     }
 
-    const chunk = next.value;
-    chunks.push(chunk);
-    total += chunk.byteLength;
-    buffered += chunk.byteLength;
+    const chunkValue = next.value;
+    chunks.push(chunkValue);
+    total += chunkValue.byteLength;
+    buffered += chunkValue.byteLength;
 
     enforceBudget("maxInputBytes", budgets?.maxInputBytes, total);
     enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, buffered);
@@ -280,27 +444,38 @@ export async function parseStream(
 
   const combined = new Uint8Array(total);
   let offset = 0;
-
-  for (const chunk of chunks) {
-    combined.set(chunk, offset);
-    offset += chunk.byteLength;
+  for (const chunkValue of chunks) {
+    combined.set(chunkValue, offset);
+    offset += chunkValue.byteLength;
   }
 
   const parsed = parseBytes(combined, options);
-
-  if (parsed.trace) {
-    const withStream = pushTrace([...parsed.trace], "stream", "stream-read-complete", budgets);
-    if (withStream) {
-      return { ...parsed, trace: withStream };
-    }
+  if (!parsed.trace) {
+    return parsed;
   }
 
-  return parsed;
+  const withStreamTrace = pushTrace([...parsed.trace], "stream", "stream-read-complete", budgets);
+  if (!withStreamTrace) {
+    return parsed;
+  }
+
+  return {
+    ...parsed,
+    trace: withStreamTrace
+  };
+}
+
+function escapeText(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function escapeAttribute(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
 function serializeNode(node: HtmlNode): string {
   if (node.kind === "text") {
-    return node.value;
+    return escapeText(node.value);
   }
 
   if (node.kind === "comment") {
@@ -308,14 +483,21 @@ function serializeNode(node: HtmlNode): string {
   }
 
   if (node.kind === "doctype") {
-    return `<!doctype ${node.name}>`;
+    if (node.publicId !== undefined || node.systemId !== undefined) {
+      const publicId = node.publicId ?? "";
+      const systemId = node.systemId ?? "";
+      return `<!DOCTYPE ${node.name} "${publicId}" "${systemId}">`;
+    }
+    return `<!DOCTYPE ${node.name}>`;
   }
 
-  const attr = node.attributes
-    .map((item) => `${item.name}="${item.value}"`)
-    .join(" ");
+  const attributes = node.attributes.map((entry) => `${entry.name}="${escapeAttribute(entry.value)}"`).join(" ");
+  const open = attributes.length > 0 ? `<${node.tagName} ${attributes}>` : `<${node.tagName}>`;
 
-  const open = attr.length > 0 ? `<${node.tagName} ${attr}>` : `<${node.tagName}>`;
+  if (VOID_ELEMENTS.has(node.tagName)) {
+    return open;
+  }
+
   const body = node.children.map((child) => serializeNode(child)).join("");
   return `${open}${body}</${node.tagName}>`;
 }
@@ -373,6 +555,7 @@ function countNodes(node: HtmlNode): number {
   if (node.kind !== "element") {
     return 1;
   }
+
   return 1 + node.children.reduce((total, child) => total + countNodes(child), 0);
 }
 
@@ -396,6 +579,7 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
       content: activeContent,
       nodes: activeNodes
     });
+
     index += 1;
     activeContent = "";
     activeNodes = 0;
@@ -405,9 +589,9 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
   for (const node of tree.children) {
     const content = serialize(node);
     const nodes = countNodes(node);
-
     const nextChars = activeContent.length + content.length;
     const nextNodes = activeNodes + nodes;
+
     if (activeNodeId !== null && (nextChars > maxChars || nextNodes > maxNodes)) {
       flush();
     }
@@ -415,6 +599,7 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
     if (activeNodeId === null) {
       activeNodeId = node.id;
     }
+
     activeContent += content;
     activeNodes += nodes;
   }
