@@ -1,0 +1,30 @@
+[
+  {
+    "kind": "text",
+    "value": "k"
+  },
+  {
+    "kind": "tab",
+    "value": "\t"
+  },
+  {
+    "kind": "text",
+    "value": "v"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "alpha"
+  },
+  {
+    "kind": "tab",
+    "value": "\t"
+  },
+  {
+    "kind": "text",
+    "value": "beta"
+  }
+]

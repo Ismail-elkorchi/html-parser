@@ -12,6 +12,8 @@ import {
   parseFragment,
   textContent,
   tokenizeStream,
+  visibleText,
+  visibleTextTokens,
   walk,
   walkElements
 } from "../../dist/mod.js";
@@ -414,6 +416,45 @@ async function evaluateStreamTokenFeature() {
   };
 }
 
+function evaluateVisibleTextFeature() {
+  const html = "<article><p>A <img alt=\"B\"></p><table><tr><td>x</td><td>y</td></tr></table></article>";
+  const treeA = parse(html);
+  const treeB = parse(html);
+
+  const textA = visibleText(treeA);
+  const textB = visibleText(treeB);
+  const tokensA = visibleTextTokens(treeA);
+  const tokensB = visibleTextTokens(treeB);
+
+  const deterministicText = textA === textB;
+  const deterministicTokens = JSON.stringify(tokensA) === JSON.stringify(tokensB);
+  const tokenJoinStable = tokensA.map((entry) => entry.value).join("") === textA;
+  const hasStructureTokens = tokensA.some((entry) => entry.kind === "paragraphBreak")
+    && tokensA.some((entry) => entry.kind === "tab");
+  const hasTextToken = tokensA.some((entry) => entry.kind === "text");
+  const expectedTermsPresent = textA.includes("A") && textA.includes("B") && textA.includes("x") && textA.includes("y");
+
+  return {
+    ok:
+      deterministicText &&
+      deterministicTokens &&
+      tokenJoinStable &&
+      hasStructureTokens &&
+      hasTextToken &&
+      expectedTermsPresent,
+    details: {
+      text: textA,
+      tokenCount: tokensA.length,
+      deterministicText,
+      deterministicTokens,
+      tokenJoinStable,
+      hasStructureTokens,
+      hasTextToken,
+      expectedTermsPresent
+    }
+  };
+}
+
 async function main() {
   const features = {
     trace: { ok: false, details: {} },
@@ -421,7 +462,8 @@ async function main() {
     patch: { ok: false, details: {} },
     outline: { ok: false, details: {} },
     chunk: { ok: false, details: {} },
-    streamToken: { ok: false, details: {} }
+    streamToken: { ok: false, details: {} },
+    visibleText: { ok: false, details: {} }
   };
 
   try {
@@ -458,6 +500,12 @@ async function main() {
     features.streamToken = await evaluateStreamTokenFeature();
   } catch (error) {
     features.streamToken = { ok: false, details: { error: makeReportFailure(error) } };
+  }
+
+  try {
+    features.visibleText = evaluateVisibleTextFeature();
+  } catch (error) {
+    features.visibleText = { ok: false, details: { error: makeReportFailure(error) } };
   }
 
   const overall = {

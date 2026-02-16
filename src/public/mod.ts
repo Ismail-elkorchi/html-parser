@@ -30,7 +30,9 @@ import type {
   Span,
   Token,
   TokenizeStreamOptions,
-  TraceEvent
+  TraceEvent,
+  VisibleTextOptions,
+  VisibleTextToken
 } from "./types.js";
 
 export type {
@@ -69,7 +71,9 @@ export type {
   TokenAttribute,
   TokenizeStreamOptions,
   TextNode,
-  TraceEvent
+  TraceEvent,
+  VisibleTextOptions,
+  VisibleTextToken
 } from "./types.js";
 
 const VOID_ELEMENTS = new Set([
@@ -922,6 +926,291 @@ function textContentFromNode(node: DocumentTree | FragmentTree | HtmlNode): stri
   }
 
   return node.children.map((child) => textContentFromNode(child)).join("");
+}
+
+const VISIBLE_TEXT_SKIP_TAGS = new Set(["head", "script", "style", "template"]);
+const VISIBLE_TEXT_BLOCK_BREAK_TAGS = new Set([
+  "address",
+  "article",
+  "aside",
+  "blockquote",
+  "div",
+  "dl",
+  "fieldset",
+  "figcaption",
+  "figure",
+  "footer",
+  "form",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "header",
+  "li",
+  "main",
+  "nav",
+  "ol",
+  "section",
+  "table",
+  "tbody",
+  "thead",
+  "tfoot",
+  "ul"
+]);
+
+const DEFAULT_VISIBLE_TEXT_OPTIONS: Required<VisibleTextOptions> = Object.freeze({
+  skipHiddenSubtrees: true,
+  includeControlValues: true,
+  trim: true
+});
+
+function normalizeNewlines(value: string): string {
+  return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function collapseAsciiWhitespace(value: string): string {
+  return value.replace(/[ \t\n\f\r]+/g, " ");
+}
+
+function normalizeVisibleTextSegment(value: string, preserveWhitespace: boolean): string {
+  const normalized = normalizeNewlines(value);
+  if (preserveWhitespace) {
+    return normalized;
+  }
+  return collapseAsciiWhitespace(normalized);
+}
+
+function normalizeBooleanAttribute(value: string | undefined): boolean {
+  if (value === undefined) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "" || normalized === "true" || normalized === "1";
+}
+
+function attributeValue(node: Extract<HtmlNode, { kind: "element" }>, name: string): string | undefined {
+  const target = name.toLowerCase();
+  for (const attribute of node.attributes) {
+    if (attribute.name.toLowerCase() === target) {
+      return attribute.value;
+    }
+  }
+  return undefined;
+}
+
+function shouldSkipHiddenSubtree(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  options: Required<VisibleTextOptions>
+): boolean {
+  if (!options.skipHiddenSubtrees) {
+    return false;
+  }
+  if (attributeValue(node, "hidden") !== undefined) {
+    return true;
+  }
+  return normalizeBooleanAttribute(attributeValue(node, "aria-hidden"));
+}
+
+function normalizeVisibleTextOutput(value: string, options: Required<VisibleTextOptions>): string {
+  let output = normalizeNewlines(value);
+  output = output.replace(/[ \t\f]+\n/g, "\n");
+  output = output.replace(/\n[ \t\f]+/g, "\n");
+  output = output.replace(/\n{3,}/g, "\n\n");
+  output = output.replace(/[ ]{2,}/g, " ");
+  output = output.replace(/\t{2,}/g, "\t");
+  if (options.trim) {
+    output = output.trim();
+  }
+  return output;
+}
+
+function appendVisibleText(parts: string[], value: string): void {
+  if (value.length === 0) {
+    return;
+  }
+  parts.push(value);
+}
+
+function collectVisibleTextFromNode(
+  node: HtmlNode,
+  parts: string[],
+  options: Required<VisibleTextOptions>,
+  preserveWhitespace: boolean
+): void {
+  if (node.kind === "text") {
+    appendVisibleText(parts, normalizeVisibleTextSegment(node.value, preserveWhitespace));
+    return;
+  }
+
+  if (node.kind !== "element") {
+    return;
+  }
+
+  if (shouldSkipHiddenSubtree(node, options)) {
+    return;
+  }
+
+  const tagName = node.tagName.toLowerCase();
+  if (VISIBLE_TEXT_SKIP_TAGS.has(tagName)) {
+    return;
+  }
+
+  if (tagName === "br") {
+    appendVisibleText(parts, "\n");
+    return;
+  }
+
+  if (tagName === "img" && options.includeControlValues) {
+    const alt = attributeValue(node, "alt");
+    if (alt && alt.length > 0) {
+      appendVisibleText(parts, normalizeVisibleTextSegment(alt, false));
+    }
+    return;
+  }
+
+  if (tagName === "input" && options.includeControlValues) {
+    const type = (attributeValue(node, "type") ?? "text").toLowerCase();
+    if (type !== "hidden") {
+      const value = attributeValue(node, "value");
+      if (value && value.length > 0) {
+        appendVisibleText(parts, normalizeVisibleTextSegment(value, false));
+      }
+    }
+    return;
+  }
+
+  if (tagName === "button" && options.includeControlValues) {
+    const value = attributeValue(node, "value");
+    if (value && value.length > 0) {
+      appendVisibleText(parts, normalizeVisibleTextSegment(value, false));
+      return;
+    }
+  }
+
+  if (tagName === "tr") {
+    appendVisibleText(parts, "\n");
+    let seenTableCell = false;
+    for (const child of node.children) {
+      if (child.kind === "element") {
+        const childTagName = child.tagName.toLowerCase();
+        if (childTagName === "td" || childTagName === "th") {
+          if (seenTableCell) {
+            appendVisibleText(parts, "\t");
+          }
+          collectVisibleTextFromNode(child, parts, options, preserveWhitespace);
+          seenTableCell = true;
+          continue;
+        }
+      }
+      collectVisibleTextFromNode(child, parts, options, preserveWhitespace);
+    }
+    appendVisibleText(parts, "\n");
+    return;
+  }
+
+  if (tagName === "td" || tagName === "th") {
+    for (const child of node.children) {
+      collectVisibleTextFromNode(child, parts, options, preserveWhitespace);
+    }
+    return;
+  }
+
+  const childPreserveWhitespace = preserveWhitespace || tagName === "pre" || tagName === "textarea";
+  const blockBreakBefore = tagName === "p" || VISIBLE_TEXT_BLOCK_BREAK_TAGS.has(tagName);
+  if (blockBreakBefore) {
+    appendVisibleText(parts, "\n");
+  }
+  for (const child of node.children) {
+    collectVisibleTextFromNode(child, parts, options, childPreserveWhitespace);
+  }
+  if (tagName === "p") {
+    appendVisibleText(parts, "\n\n");
+    return;
+  }
+  if (blockBreakBefore) {
+    appendVisibleText(parts, "\n");
+  }
+}
+
+function collectVisibleText(
+  nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
+  options: Required<VisibleTextOptions>
+): string {
+  const parts: string[] = [];
+  if (nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment") {
+    for (const child of nodeOrTree.children) {
+      collectVisibleTextFromNode(child, parts, options, false);
+    }
+  } else {
+    collectVisibleTextFromNode(nodeOrTree, parts, options, false);
+  }
+  return normalizeVisibleTextOutput(parts.join(""), options);
+}
+
+function tokenizeVisibleText(value: string): readonly VisibleTextToken[] {
+  const tokens: VisibleTextToken[] = [];
+  let cursor = 0;
+  let activeText = "";
+  const flushText = () => {
+    if (activeText.length === 0) {
+      return;
+    }
+    tokens.push(
+      Object.freeze({
+        kind: "text",
+        value: activeText
+      })
+    );
+    activeText = "";
+  };
+
+  while (cursor < value.length) {
+    const char = value[cursor];
+    if (char === undefined) {
+      break;
+    }
+    if (char === "\n" && value[cursor + 1] === "\n") {
+      flushText();
+      tokens.push(Object.freeze({ kind: "paragraphBreak", value: "\n\n" }));
+      cursor += 2;
+      continue;
+    }
+    if (char === "\n") {
+      flushText();
+      tokens.push(Object.freeze({ kind: "lineBreak", value: "\n" }));
+      cursor += 1;
+      continue;
+    }
+    if (char === "\t") {
+      flushText();
+      tokens.push(Object.freeze({ kind: "tab", value: "\t" }));
+      cursor += 1;
+      continue;
+    }
+    activeText += char;
+    cursor += 1;
+  }
+
+  flushText();
+  return Object.freeze(tokens);
+}
+
+export function visibleText(nodeOrTree: DocumentTree | FragmentTree | HtmlNode, options: VisibleTextOptions = {}): string {
+  const resolvedOptions: Required<VisibleTextOptions> = {
+    ...DEFAULT_VISIBLE_TEXT_OPTIONS,
+    ...options
+  };
+  return collectVisibleText(nodeOrTree, resolvedOptions);
+}
+
+export function visibleTextTokens(
+  nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
+  options: VisibleTextOptions = {}
+): readonly VisibleTextToken[] {
+  const output = visibleText(nodeOrTree, options);
+  return tokenizeVisibleText(output);
 }
 
 function* iterateNodes(

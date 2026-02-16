@@ -152,9 +152,27 @@ Requirement:
   - `outline`
   - `chunk`
   - `streamToken`
+  - `visibleText`
 
 Evidence:
 - `reports/agent.json`
+
+---
+
+### G-087: Visible text contract
+Requirement:
+- `visibleText` and `visibleTextTokens` exports are present in the public API.
+- `docs/visible-text.md` exists.
+- `test/control/visible-text.test.js` exists.
+- `test/fixtures/visible-text/v1/` has at least 30 fixture cases.
+- Each fixture case contains:
+  - `input.html`
+  - `expected.txt`
+  - `expected.tokens.json`
+- Agent report includes `features.visibleText.ok=true`.
+
+Evidence:
+- `reports/gates.json` gate `G-087`
 
 ---
 

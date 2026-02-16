@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "Line A"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "Line B"
+  }
+]

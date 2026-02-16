@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "Para A"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Para B"
+  }
+]

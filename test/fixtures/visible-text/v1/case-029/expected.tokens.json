@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "مرحبا بالعالم"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "こんにちは 世界"
+  }
+]

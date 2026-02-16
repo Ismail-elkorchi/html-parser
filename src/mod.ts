@@ -10,6 +10,8 @@ export {
   parseFragment,
   parseStream,
   serialize,
+  visibleText,
+  visibleTextTokens,
   findAllByAttr,
   findAllByTagName,
   findById,
@@ -50,5 +52,7 @@ export {
   type TokenAttribute,
   type TokenizeStreamOptions,
   type TextNode,
-  type TraceEvent
+  type TraceEvent,
+  type VisibleTextOptions,
+  type VisibleTextToken
 } from "./public/mod.js";

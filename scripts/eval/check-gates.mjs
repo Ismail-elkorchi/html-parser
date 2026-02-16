@@ -1,4 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   nowIso,
   readJson,
@@ -198,6 +200,80 @@ async function main() {
       "Agent feature report",
       agentPass,
       { required: requireAgentReport, agent: agentReport || { missing: true } }
+    )
+  );
+
+  let exportedVisibleText = false;
+  let exportedVisibleTextTokens = false;
+  let visibleTextApiError = null;
+  try {
+    const publicModule = await import(pathToFileURL(resolve("dist/mod.js")).href);
+    exportedVisibleText = typeof publicModule.visibleText === "function";
+    exportedVisibleTextTokens = typeof publicModule.visibleTextTokens === "function";
+  } catch (error) {
+    visibleTextApiError = error instanceof Error ? error.message : String(error);
+  }
+
+  const visibleTextDocsExists = await fileExists("docs/visible-text.md");
+  const visibleTextTestsExists = await fileExists("test/control/visible-text.test.js");
+
+  const fixtureRoot = "test/fixtures/visible-text/v1";
+  let fixtureCaseCount = 0;
+  let fixtureShapeOk = false;
+  let fixtureScanError = null;
+  try {
+    const fixtureEntries = await readdir(fixtureRoot, { withFileTypes: true });
+    const fixtureIds = fixtureEntries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    fixtureCaseCount = fixtureIds.length;
+
+    let allFixtureFilesPresent = true;
+    for (const fixtureId of fixtureIds) {
+      const inputPath = `${fixtureRoot}/${fixtureId}/input.html`;
+      const expectedTextPath = `${fixtureRoot}/${fixtureId}/expected.txt`;
+      const expectedTokensPath = `${fixtureRoot}/${fixtureId}/expected.tokens.json`;
+      const hasAllFiles =
+        (await fileExists(inputPath)) &&
+        (await fileExists(expectedTextPath)) &&
+        (await fileExists(expectedTokensPath));
+      if (!hasAllFiles) {
+        allFixtureFilesPresent = false;
+        break;
+      }
+    }
+    fixtureShapeOk = allFixtureFilesPresent && fixtureCaseCount >= 30;
+  } catch (error) {
+    fixtureScanError = error instanceof Error ? error.message : String(error);
+  }
+
+  const agentVisibleTextFeaturePresent = Boolean(agentReport?.features?.visibleText);
+  const agentVisibleTextFeatureOk = Boolean(agentReport?.features?.visibleText?.ok);
+  const visibleTextGatePass =
+    exportedVisibleText &&
+    exportedVisibleTextTokens &&
+    visibleTextDocsExists &&
+    visibleTextTestsExists &&
+    fixtureShapeOk &&
+    agentVisibleTextFeaturePresent &&
+    agentVisibleTextFeatureOk;
+
+  gates.push(
+    makeGate(
+      "G-087",
+      "Visible text contract",
+      visibleTextGatePass,
+      {
+        exportedVisibleText,
+        exportedVisibleTextTokens,
+        visibleTextApiError,
+        visibleTextDocsExists,
+        visibleTextTestsExists,
+        fixtureRoot,
+        fixtureCaseCount,
+        fixtureShapeOk,
+        fixtureScanError,
+        agentVisibleTextFeaturePresent,
+        agentVisibleTextFeatureOk
+      }
     )
   );
 
