@@ -200,6 +200,8 @@ Evidence:
 Requirement:
 - Browser differential agreement must meet strict threshold (`>= 0.999`).
 - Must include Chromium, Firefox, and WebKit (`minEnginesPresent = 3`).
+- Corpus execution surface must meet `thresholds.browserDiff.minCases` (`>= 500`).
+- Coverage discipline must meet `thresholds.browserDiff.minTagCoverage` (`>= 10`) for each required browser corpus tag.
 
 Evidence:
 - `reports/browser-diff.json`
