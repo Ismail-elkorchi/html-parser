@@ -336,6 +336,85 @@ async function main() {
     )
   );
 
+  let spanProvenanceApiError = null;
+  let spanProvenancePresent = false;
+  let spanProvenanceValuesOk = false;
+  let patchRejectsNonInputSpan = false;
+  try {
+    const publicModule = await import(pathToFileURL(resolve("dist/mod.js")).href);
+    const parsed = publicModule.parse("<p>x</p>", { captureSpans: true });
+    const nodes = [];
+    const stack = [...parsed.children];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node || typeof node !== "object") {
+        continue;
+      }
+      nodes.push(node);
+      if (node.kind === "element" && Array.isArray(node.children)) {
+        stack.push(...node.children);
+      }
+    }
+
+    spanProvenancePresent =
+      nodes.length > 0 &&
+      nodes.every((node) => typeof node.spanProvenance === "string");
+    spanProvenanceValuesOk = nodes.every((node) =>
+      node.spanProvenance === "input" ||
+      node.spanProvenance === "inferred" ||
+      node.spanProvenance === "none"
+    );
+
+    const nonInputNode = nodes.find(
+      (node) =>
+        node.kind === "element" &&
+        typeof node.id === "number" &&
+        node.spanProvenance !== "input"
+    );
+
+    if (nonInputNode) {
+      try {
+        publicModule.computePatch("<p>x</p>", [{ kind: "removeNode", target: nonInputNode.id }]);
+      } catch (error) {
+        patchRejectsNonInputSpan =
+          error instanceof publicModule.PatchPlanningError &&
+          error.payload?.code === "NON_INPUT_SPAN_PROVENANCE";
+      }
+    }
+  } catch (error) {
+    spanProvenanceApiError = error instanceof Error ? error.message : String(error);
+  }
+
+  const specMarkdown = await readFile("docs/spec.md", "utf8");
+  const spanProvenanceDocumented = specMarkdown.includes("spanProvenance");
+  const spansPatchTestsExist = await fileExists("test/control/spans-patch.test.js");
+  const spanProvenanceGatePass =
+    spanProvenancePresent &&
+    spanProvenanceValuesOk &&
+    patchRejectsNonInputSpan &&
+    spanProvenanceDocumented &&
+    spansPatchTestsExist &&
+    Boolean(agentReport?.features?.spans?.ok) &&
+    Boolean(agentReport?.features?.patch?.ok);
+
+  gates.push(
+    makeGate(
+      "G-089",
+      "Span provenance and patch safety",
+      spanProvenanceGatePass,
+      {
+        spanProvenanceApiError,
+        spanProvenancePresent,
+        spanProvenanceValuesOk,
+        patchRejectsNonInputSpan,
+        spanProvenanceDocumented,
+        spansPatchTestsExist,
+        agentSpansFeatureOk: Boolean(agentReport?.features?.spans?.ok),
+        agentPatchFeatureOk: Boolean(agentReport?.features?.patch?.ok)
+      }
+    )
+  );
+
   const budgets = await loadOptionalReport("reports/budgets.json");
   const fuzz = await loadOptionalReport("reports/fuzz.json");
   const requireBudgetsReport = Boolean(config.thresholds?.budgets?.requireBudgetsReport);

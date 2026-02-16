@@ -7,6 +7,8 @@ export interface Span {
   readonly end: number;
 }
 
+export type SpanProvenance = "input" | "inferred" | "none";
+
 export interface Attribute {
   readonly name: string;
   readonly value: string;
@@ -166,6 +168,7 @@ export interface TextNode {
   readonly id: NodeId;
   readonly kind: "text";
   readonly value: string;
+  readonly spanProvenance: SpanProvenance;
   readonly span?: Span;
 }
 
@@ -173,6 +176,7 @@ export interface CommentNode {
   readonly id: NodeId;
   readonly kind: "comment";
   readonly value: string;
+  readonly spanProvenance: SpanProvenance;
   readonly span?: Span;
 }
 
@@ -182,6 +186,7 @@ export interface DoctypeNode {
   readonly name: string;
   readonly publicId?: string;
   readonly systemId?: string;
+  readonly spanProvenance: SpanProvenance;
   readonly span?: Span;
 }
 
@@ -191,6 +196,7 @@ export interface ElementNode {
   readonly tagName: string;
   readonly attributes: readonly Attribute[];
   readonly children: readonly HtmlNode[];
+  readonly spanProvenance: SpanProvenance;
   readonly span?: Span;
 }
 
@@ -320,6 +326,7 @@ export interface PatchPlanningErrorPayload {
   readonly code:
     | "NODE_NOT_FOUND"
     | "MISSING_NODE_SPAN"
+    | "NON_INPUT_SPAN_PROVENANCE"
     | "INVALID_EDIT_TARGET"
     | "ATTRIBUTE_NOT_FOUND"
     | "ATTRIBUTE_SPAN_MISSING"
