@@ -1,5 +1,9 @@
 # Third-party notices
 
+Scope:
+- This notice file covers all vendored runtime sources and vendored datasets currently used by this repository.
+- First-party generated artifacts (for example `reports/*`) are not third-party materials.
+
 ## html5lib-tests
 - Source: https://github.com/html5lib/html5lib-tests
 - Location in repository: `vendor/html5lib-tests`
