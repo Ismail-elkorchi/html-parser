@@ -1,5 +1,6 @@
 import {
   BudgetExceededError,
+  PatchPlanningError,
   applyPatchPlan,
   chunk,
   computePatch,
@@ -152,61 +153,89 @@ function evaluateSpansFeature() {
 }
 
 function evaluatePatchFeature() {
-  const textSource = "<p>alpha</p>";
-  const textTree = parse(textSource, { captureSpans: true });
-  const textNode = findFirstNode(textTree.children, (node) => node.kind === "text");
-  if (!textNode) {
-    return {
-      ok: false,
-      details: {
-        reason: "text node not found in text patch fixture"
-      }
-    };
-  }
-
-  const textPatchPlanA = computePatch(textSource, [{ nodeId: textNode.id, replacementHtml: "beta" }]);
-  const textPatchPlanB = computePatch(textSource, [{ nodeId: textNode.id, replacementHtml: "beta" }]);
-  const textPatchedHtml = applyPatchPlan(textSource, textPatchPlanA);
-  const textPatchedTree = parse(textPatchedHtml);
-  const textPatchedValue = findFirstNode(textPatchedTree.children, (node) => node.kind === "text")?.value ?? "";
-  const textEditOk = textPatchedValue.includes("beta") && !textPatchedValue.includes("alpha");
-
-  const elementSource = "<div><span>a</span></div>";
-  const elementTree = parse(elementSource, { captureSpans: true });
-  const spanNode = findFirstNode(
-    elementTree.children,
-    (node) => node.kind === "element" && node.tagName === "span"
+  const source = "<div id=\"root\"><p class=\"x\">alpha</p><p>beta</p></div>";
+  const sourceTree = parse(source, { captureSpans: true });
+  const firstParagraph = findFirstNode(
+    sourceTree.children,
+    (node) => node.kind === "element" && node.tagName === "p"
   );
-  if (!spanNode) {
+  if (!firstParagraph || firstParagraph.kind !== "element") {
     return {
       ok: false,
       details: {
-        reason: "span element not found in element patch fixture"
+        reason: "paragraph node not found in patch fixture"
       }
     };
   }
 
-  const elementPatchPlan = computePatch(elementSource, [{ nodeId: spanNode.id, replacementHtml: "<strong>b</strong>" }]);
-  const elementPatchedHtml = applyPatchPlan(elementSource, elementPatchPlan);
-  const elementPatchedTree = parse(elementPatchedHtml);
-  const hasStrongNode = findFirstNode(
-    elementPatchedTree.children,
-    (node) => node.kind === "element" && node.tagName === "strong"
-  ) !== null;
+  const firstText = findFirstNode(firstParagraph.children, (node) => node.kind === "text");
+  if (!firstText || firstText.kind !== "text") {
+    return {
+      ok: false,
+      details: {
+        reason: "text node not found in patch fixture"
+      }
+    };
+  }
 
-  const deterministicPlan = JSON.stringify(textPatchPlanA.steps) === JSON.stringify(textPatchPlanB.steps);
-  const ok = textEditOk && hasStrongNode && deterministicPlan;
+  const edits = [
+    { kind: "replaceText", target: firstText.id, value: "omega" },
+    { kind: "setAttr", target: firstParagraph.id, name: "class", value: "updated" },
+    { kind: "insertHtmlAfter", target: firstParagraph.id, html: "<hr>" }
+  ];
+
+  const patchPlanA = computePatch(source, edits);
+  const patchPlanB = computePatch(source, edits);
+  const patchedHtml = applyPatchPlan(source, patchPlanA);
+  const patchedTree = parse(patchedHtml);
+
+  const patchedParagraph = findFirstNode(
+    patchedTree.children,
+    (node) => node.kind === "element" && node.tagName === "p"
+  );
+  const patchedText = findFirstNode(patchedTree.children, (node) => node.kind === "text" && node.value.includes("omega"));
+  const hasInsertedHr = findFirstNode(
+    patchedTree.children,
+    (node) => node.kind === "element" && node.tagName === "hr"
+  ) !== null;
+  const classUpdated = Boolean(
+    patchedParagraph &&
+      patchedParagraph.kind === "element" &&
+      patchedParagraph.attributes.some((entry) => entry.name === "class" && entry.value === "updated")
+  );
+  const textEditOk = patchedText !== null;
+  const deterministicPlan = JSON.stringify(patchPlanA.steps) === JSON.stringify(patchPlanB.steps);
+
+  let structuredErrorOk = false;
+  const impliedNode = findFirstNode(
+    sourceTree.children,
+    (node) =>
+      node.kind === "element" &&
+      (node.tagName === "html" || node.tagName === "body") &&
+      node.span === undefined
+  );
+  if (impliedNode) {
+    try {
+      computePatch(source, [{ kind: "removeNode", target: impliedNode.id }]);
+    } catch (error) {
+      if (error instanceof PatchPlanningError) {
+        structuredErrorOk = error.payload.code === "MISSING_NODE_SPAN";
+      }
+    }
+  }
+
+  const ok = textEditOk && classUpdated && hasInsertedHr && deterministicPlan && structuredErrorOk;
 
   return {
     ok,
     details: {
       textEditOk,
-      elementEditOk: hasStrongNode,
+      classUpdated,
+      hasInsertedHr,
       deterministicPlan,
-      textPatchedHtml,
-      elementPatchedHtml,
-      textSteps: textPatchPlanA.steps.length,
-      elementSteps: elementPatchPlan.steps.length
+      structuredErrorOk,
+      patchedHtml,
+      steps: patchPlanA.steps.length
     }
   };
 }

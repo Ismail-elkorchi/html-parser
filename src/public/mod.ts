@@ -14,12 +14,13 @@ import type {
   Chunk,
   ChunkOptions,
   DocumentTree,
+  Edit,
   FragmentTree,
   HtmlNode,
   NodeId,
   Outline,
   OutlineEntry,
-  PatchEdit,
+  PatchPlanningErrorPayload,
   PatchPlan,
   PatchStep,
   ParseError,
@@ -37,6 +38,7 @@ export type {
   CommentNode,
   DocumentTree,
   DoctypeNode,
+  Edit,
   ElementNode,
   FragmentTree,
   HtmlNode,
@@ -44,7 +46,7 @@ export type {
   NodeKind,
   Outline,
   OutlineEntry,
-  PatchEdit,
+  PatchPlanningErrorPayload,
   PatchInsertStep,
   PatchPlan,
   PatchSliceStep,
@@ -82,6 +84,20 @@ export class BudgetExceededError extends Error {
       `Budget exceeded: ${payload.budget} limit=${String(payload.limit)} actual=${String(payload.actual)}`
     );
     this.name = "BudgetExceededError";
+    this.payload = payload;
+  }
+}
+
+export class PatchPlanningError extends Error {
+  readonly payload: PatchPlanningErrorPayload;
+
+  constructor(payload: PatchPlanningErrorPayload) {
+    super(
+      `Patch planning failed: ${payload.code}${
+        payload.target === undefined ? "" : ` target=${String(payload.target)}`
+      }`
+    );
+    this.name = "PatchPlanningError";
     this.payload = payload;
   }
 }
@@ -850,6 +866,59 @@ function indexNodeSpans(nodes: readonly HtmlNode[], into: Map<NodeId, Span>): vo
   }
 }
 
+function indexNodes(nodes: readonly HtmlNode[], into: Map<NodeId, HtmlNode>): void {
+  for (const node of nodes) {
+    into.set(node.id, node);
+    if (node.kind === "element") {
+      indexNodes(node.children, into);
+    }
+  }
+}
+
+function isWhitespace(char: string): boolean {
+  return char === " " || char === "\n" || char === "\t" || char === "\r" || char === "\f";
+}
+
+function findElementStartTagClose(originalHtml: string, span: Span): number {
+  let quote: "\"" | "'" | null = null;
+
+  for (let index = span.start; index < originalHtml.length; index += 1) {
+    const current = originalHtml[index];
+    if (current === undefined) {
+      break;
+    }
+
+    if (quote === null && (current === "\"" || current === "'")) {
+      quote = current;
+      continue;
+    }
+
+    if (quote !== null && current === quote) {
+      quote = null;
+      continue;
+    }
+
+    if (quote === null && current === ">") {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function findAttributeInsertOffset(originalHtml: string, closeIndex: number, tagStart: number): number {
+  let cursor = closeIndex - 1;
+  while (cursor > tagStart && isWhitespace(originalHtml[cursor] ?? "")) {
+    cursor -= 1;
+  }
+
+  if (originalHtml[cursor] === "/") {
+    return cursor;
+  }
+
+  return closeIndex;
+}
+
 export function applyPatchPlan(originalHtml: string, plan: PatchPlan): string {
   let cursor = 0;
   let output = "";
@@ -876,13 +945,185 @@ export function applyPatchPlan(originalHtml: string, plan: PatchPlan): string {
 }
 
 interface PlannedReplacement {
-  readonly nodeId: NodeId;
+  readonly sourceIndex: number;
+  readonly target: NodeId;
   readonly start: number;
   readonly end: number;
   readonly replacementHtml: string;
 }
 
-export function computePatch(originalHtml: string, edits: readonly PatchEdit[]): PatchPlan {
+function failPatchPlanning(payload: PatchPlanningErrorPayload): never {
+  throw new PatchPlanningError(payload);
+}
+
+function requireNode(nodeById: Map<NodeId, HtmlNode>, target: NodeId): HtmlNode {
+  const node = nodeById.get(target);
+  if (!node) {
+    failPatchPlanning({ code: "NODE_NOT_FOUND", target });
+  }
+  return node;
+}
+
+function requireNodeSpan(spanByNode: Map<NodeId, Span>, target: NodeId): Span {
+  const span = spanByNode.get(target);
+  if (!span) {
+    failPatchPlanning({ code: "MISSING_NODE_SPAN", target });
+  }
+  return span;
+}
+
+function requireElementNode(nodeById: Map<NodeId, HtmlNode>, target: NodeId): Extract<HtmlNode, { kind: "element" }> {
+  const node = requireNode(nodeById, target);
+  if (node.kind !== "element") {
+    failPatchPlanning({ code: "INVALID_EDIT_TARGET", target, detail: "expected element node target" });
+  }
+  return node;
+}
+
+function buildSetAttrReplacement(
+  originalHtml: string,
+  nodeById: Map<NodeId, HtmlNode>,
+  spanByNode: Map<NodeId, Span>,
+  edit: Extract<Edit, { readonly kind: "setAttr" }>,
+  sourceIndex: number
+): PlannedReplacement {
+  const element = requireElementNode(nodeById, edit.target);
+  const existing = element.attributes.find((entry) => entry.name === edit.name);
+  const rendered = `${edit.name}="${escapeAttribute(edit.value)}"`;
+
+  if (existing) {
+    if (!existing.span) {
+      failPatchPlanning({ code: "ATTRIBUTE_SPAN_MISSING", target: edit.target, detail: edit.name });
+    }
+    return {
+      sourceIndex,
+      target: edit.target,
+      start: existing.span.start,
+      end: existing.span.end,
+      replacementHtml: rendered
+    };
+  }
+
+  const elementSpan = requireNodeSpan(spanByNode, edit.target);
+  const closeIndex = findElementStartTagClose(originalHtml, elementSpan);
+  if (closeIndex === -1) {
+    failPatchPlanning({ code: "ELEMENT_START_TAG_NOT_FOUND", target: edit.target });
+  }
+  const insertAt = findAttributeInsertOffset(originalHtml, closeIndex, elementSpan.start);
+  return {
+    sourceIndex,
+    target: edit.target,
+    start: insertAt,
+    end: insertAt,
+    replacementHtml: ` ${rendered}`
+  };
+}
+
+function buildRemoveAttrReplacement(
+  originalHtml: string,
+  nodeById: Map<NodeId, HtmlNode>,
+  spanByNode: Map<NodeId, Span>,
+  edit: Extract<Edit, { readonly kind: "removeAttr" }>,
+  sourceIndex: number
+): PlannedReplacement {
+  const element = requireElementNode(nodeById, edit.target);
+  const existing = element.attributes.find((entry) => entry.name === edit.name);
+  if (!existing) {
+    failPatchPlanning({ code: "ATTRIBUTE_NOT_FOUND", target: edit.target, detail: edit.name });
+  }
+  if (!existing.span) {
+    failPatchPlanning({ code: "ATTRIBUTE_SPAN_MISSING", target: edit.target, detail: edit.name });
+  }
+
+  const elementSpan = requireNodeSpan(spanByNode, edit.target);
+  const closeIndex = findElementStartTagClose(originalHtml, elementSpan);
+  if (closeIndex === -1) {
+    failPatchPlanning({ code: "ELEMENT_START_TAG_NOT_FOUND", target: edit.target });
+  }
+
+  let start = existing.span.start;
+  let end = existing.span.end;
+  while (start > elementSpan.start + 1 && isWhitespace(originalHtml[start - 1] ?? "")) {
+    start -= 1;
+  }
+  if (start === existing.span.start) {
+    while (end < closeIndex && isWhitespace(originalHtml[end] ?? "")) {
+      end += 1;
+    }
+  }
+
+  return {
+    sourceIndex,
+    target: edit.target,
+    start,
+    end,
+    replacementHtml: ""
+  };
+}
+
+function buildReplacement(
+  originalHtml: string,
+  nodeById: Map<NodeId, HtmlNode>,
+  spanByNode: Map<NodeId, Span>,
+  edit: Edit,
+  sourceIndex: number
+): PlannedReplacement {
+  if (edit.kind === "removeNode") {
+    const span = requireNodeSpan(spanByNode, edit.target);
+    return {
+      sourceIndex,
+      target: edit.target,
+      start: span.start,
+      end: span.end,
+      replacementHtml: ""
+    };
+  }
+
+  if (edit.kind === "replaceText") {
+    const node = requireNode(nodeById, edit.target);
+    if (node.kind !== "text") {
+      failPatchPlanning({ code: "INVALID_EDIT_TARGET", target: edit.target, detail: "expected text node target" });
+    }
+    const span = requireNodeSpan(spanByNode, edit.target);
+    return {
+      sourceIndex,
+      target: edit.target,
+      start: span.start,
+      end: span.end,
+      replacementHtml: escapeText(edit.value)
+    };
+  }
+
+  if (edit.kind === "setAttr") {
+    return buildSetAttrReplacement(originalHtml, nodeById, spanByNode, edit, sourceIndex);
+  }
+
+  if (edit.kind === "removeAttr") {
+    return buildRemoveAttrReplacement(originalHtml, nodeById, spanByNode, edit, sourceIndex);
+  }
+
+  if (edit.kind === "insertHtmlBefore") {
+    const span = requireNodeSpan(spanByNode, edit.target);
+    return {
+      sourceIndex,
+      target: edit.target,
+      start: span.start,
+      end: span.start,
+      replacementHtml: edit.html
+    };
+  }
+
+  const span = requireNodeSpan(spanByNode, edit.target);
+  return {
+    sourceIndex,
+    target: edit.target,
+    start: span.end,
+    end: span.end,
+    replacementHtml: edit.html
+  };
+}
+
+export function computePatch(originalHtml: string, edits: readonly Edit[]): PatchPlan {
   if (edits.length === 0) {
     const steps: readonly PatchStep[] = Object.freeze([
       Object.freeze({ kind: "slice", start: 0, end: originalHtml.length })
@@ -896,28 +1137,13 @@ export function computePatch(originalHtml: string, edits: readonly PatchEdit[]):
 
   const parsed = parse(originalHtml, { captureSpans: true });
   const spanByNode = new Map<NodeId, Span>();
+  const nodeById = new Map<NodeId, HtmlNode>();
   indexNodeSpans(parsed.children, spanByNode);
+  indexNodes(parsed.children, nodeById);
 
-  const replacements: PlannedReplacement[] = [];
-  const seenNodeIds = new Set<NodeId>();
-  for (const edit of edits) {
-    if (seenNodeIds.has(edit.nodeId)) {
-      throw new Error(`duplicate patch edit for nodeId ${String(edit.nodeId)}`);
-    }
-
-    seenNodeIds.add(edit.nodeId);
-    const span = spanByNode.get(edit.nodeId);
-    if (!span) {
-      throw new Error(`cannot patch nodeId ${String(edit.nodeId)} without captured span`);
-    }
-
-    replacements.push({
-      nodeId: edit.nodeId,
-      start: span.start,
-      end: span.end,
-      replacementHtml: edit.replacementHtml
-    });
-  }
+  const replacements = edits.map((edit, sourceIndex) =>
+    buildReplacement(originalHtml, nodeById, spanByNode, edit, sourceIndex)
+  );
 
   replacements.sort((left, right) => {
     if (left.start !== right.start) {
@@ -928,16 +1154,18 @@ export function computePatch(originalHtml: string, edits: readonly PatchEdit[]):
       return left.end - right.end;
     }
 
-    return left.nodeId - right.nodeId;
+    return left.sourceIndex - right.sourceIndex;
   });
 
-  let previousEnd = -1;
+  let previousEnd = 0;
   for (const replacement of replacements) {
-    if (replacement.start < previousEnd) {
-      throw new Error("overlapping patch edits are not allowed");
+    if (replacement.start < 0 || replacement.end < replacement.start || replacement.end > originalHtml.length) {
+      failPatchPlanning({ code: "OVERLAPPING_EDITS", target: replacement.target, detail: "invalid replacement bounds" });
     }
-
-    previousEnd = replacement.end;
+    if (replacement.start < previousEnd) {
+      failPatchPlanning({ code: "OVERLAPPING_EDITS", target: replacement.target });
+    }
+    previousEnd = Math.max(previousEnd, replacement.end);
   }
 
   const steps: PatchStep[] = [];

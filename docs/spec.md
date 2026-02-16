@@ -11,6 +11,14 @@
 - `outline(tree, options)`
 - `chunk(tree, options)`
 
+`computePatch` edit algebra:
+- `{ kind: "removeNode", target }`
+- `{ kind: "replaceText", target, value }`
+- `{ kind: "setAttr", target, name, value }`
+- `{ kind: "removeAttr", target, name }`
+- `{ kind: "insertHtmlBefore", target, html }`
+- `{ kind: "insertHtmlAfter", target, html }`
+
 ## Options and defaults
 - `captureSpans`: `false`
 - `includeSpans`: `false` (legacy alias for `captureSpans`)
@@ -48,7 +56,8 @@
 - Node and attribute spans are populated only when `captureSpans: true`.
 - Spans are source offsets from parse5 location metadata.
 - Implied nodes added by tree construction (for example inferred wrappers) may not expose spans.
-- Patch planning requires spans on targeted nodes.
+- Patch planning requires spans on targeted nodes and attribute edits require attribute spans.
+- If spans are missing or edits overlap, `computePatch` throws `PatchPlanningError` with a structured payload.
 
 ## Budgets contract
 - Budget violations throw `BudgetExceededError`.

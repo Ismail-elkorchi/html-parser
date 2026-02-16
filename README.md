@@ -108,17 +108,43 @@ for (const event of tree.trace ?? []) {
 ```ts
 import { applyPatchPlan, computePatch, parse } from "html-parser";
 
-const originalHtml = "<p>before</p>";
+const originalHtml = "<p class=\"x\">before</p>";
 const tree = parse(originalHtml, { captureSpans: true });
 
-const paragraph = tree.children.find((node) => node.kind === "element" && node.tagName === "html");
+const findFirst = (nodes, predicate) => {
+  for (const node of nodes) {
+    if (predicate(node)) return node;
+    if (node.kind === "element") {
+      const nested = findFirst(node.children, predicate);
+      if (nested) return nested;
+    }
+  }
+  return null;
+};
+
+const paragraph = findFirst(tree.children, (node) => node.kind === "element" && node.tagName === "p");
 // In real usage, target node IDs come from your traversal logic.
 const targetNodeId = paragraph?.id ?? tree.id;
+const textNodeId = paragraph
+  ? (findFirst(paragraph.children, (node) => node.kind === "text")?.id ?? tree.id)
+  : tree.id;
 
 const plan = computePatch(originalHtml, [
   {
-    nodeId: targetNodeId,
-    replacementHtml: "<p>after</p>"
+    kind: "setAttr",
+    target: targetNodeId,
+    name: "class",
+    value: "updated"
+  },
+  {
+    kind: "replaceText",
+    target: textNodeId,
+    value: "after"
+  },
+  {
+    kind: "insertHtmlAfter",
+    target: targetNodeId,
+    html: "<hr>"
   }
 ]);
 
