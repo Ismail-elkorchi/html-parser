@@ -35,18 +35,14 @@ Total: **85.000 / 100**
 
 ## Decision records required
 
-- Any fixture skip MUST have an ADR (ADR-001).
-- Any threshold or gate change MUST have an ADR (ADR-002).
-- Any oracle choice or normalization rule MUST have an ADR (ADR-003).
+- Any fixture skip or conformance policy change MUST have an ADR (ADR-011 or superseding record).
+- Any threshold or gate change MUST have an ADR (ADR-013 category, or a superseding gate-policy ADR).
+- Any oracle choice or normalization rule MUST have an ADR (ADR-012 category, or a superseding oracle ADR).
 - Any dataset update MUST have an ADR (ADR-004).
 - Any dev dependency addition MUST have an ADR (ADR-005) and a debt entry in docs/debt.md.
 
 ## Decision records referenced
 
-- docs/decisions/ADR-001-encoding-malformed-meta-skips.md
-- docs/decisions/ADR-001-serializer-conformance-skips.md
-- docs/decisions/ADR-001-tokenizer-conformance-skips.md
-- docs/decisions/ADR-001-tree-construction-conformance-skips.md
-- docs/decisions/ADR-002-staged-threshold-realignment.md
-- docs/decisions/ADR-003-browser-diff-normalization-v1.md
-
+- docs/decisions/ADR-011-conformance-mismatch-failures-unified.md
+- docs/decisions/ADR-012-browser-diff-multi-engine-playwright.md
+- docs/decisions/ADR-013-strict-threshold-posture-consolidated.md

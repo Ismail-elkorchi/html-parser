@@ -154,6 +154,7 @@ Evidence:
 ### G-110: Packaging sanity
 Requirement:
 - `npm pack` tarball MUST NOT include forbidden paths.
+- `npm pack` tarball MUST include `THIRD_PARTY_NOTICES.md`.
 - `exports` resolution sanity checks pass.
 
 Evidence:

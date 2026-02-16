@@ -74,6 +74,10 @@
       "parse-medium": {
         "mbPerSec": 50,
         "memoryMB": 150
+      },
+      "parse-large": {
+        "mbPerSec": 50,
+        "memoryMB": 150
       }
     }
   },
