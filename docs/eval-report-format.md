@@ -42,7 +42,7 @@ Shape:
     {
       "id": "path/to/file#caseId",
       "reason": "why skipped",
-      "decisionRecord": "docs/decisions/ADR-001-....md"
+      "decisionRecord": "docs/decisions/ADR-0NN-....md"
     }
   ]
 }
@@ -117,11 +117,29 @@ Shape:
 {
   "suite": "browser-diff",
   "timestamp": "...",
-  "corpus": { "name": "curated-v1", "cases": 5000 },
+  "corpus": { "name": "curated-v2", "seed": "0x5f3759df", "cases": 102 },
   "engines": {
-    "chromium": { "compared": 0, "agreed": 0, "disagreed": 0 },
-    "firefox":  { "compared": 0, "agreed": 0, "disagreed": 0 },
-    "webkit":   { "compared": 0, "agreed": 0, "disagreed": 0 }
+    "chromium": {
+      "compared": 0,
+      "agreed": 0,
+      "disagreed": 0,
+      "version": "138.0.0.0",
+      "userAgent": "Mozilla/5.0 ..."
+    },
+    "firefox":  {
+      "compared": 0,
+      "agreed": 0,
+      "disagreed": 0,
+      "version": "141.0",
+      "userAgent": "Mozilla/5.0 ..."
+    },
+    "webkit":   {
+      "compared": 0,
+      "agreed": 0,
+      "disagreed": 0,
+      "version": "26.0",
+      "userAgent": "Mozilla/5.0 ..."
+    }
   },
   "disagreements": [
     {
@@ -131,6 +149,11 @@ Shape:
     }
   ]
 }
+
+Rules:
+- Browser differential executes real engines (`chromium`, `firefox`, `webkit`) through Playwright.
+- Release evidence requires multi-engine execution; chromium-only fallback is not valid release evidence.
+- If an engine cannot launch, that engine entry may include `error`, and release gate must fail when required engine presence is not met.
 
 ## Fuzz report (recommended)
 File:

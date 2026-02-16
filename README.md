@@ -33,3 +33,7 @@ Agent-first TypeScript HTML parser under strict deterministic and security polic
 - `npm run eval:release` is the release gate.
 - Browser differential requires Chromium, Firefox, and WebKit.
 - CI runs release oracle on `.github/workflows/oracle.yml` (scheduled/manual) and on tag releases.
+
+## Readiness docs
+- `docs/readiness.md` defines readiness using gates and report artifacts.
+- `docs/acceptance-gates.md` defines mandatory CI and release gate evidence.
