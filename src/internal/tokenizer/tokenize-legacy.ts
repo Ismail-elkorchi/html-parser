@@ -201,24 +201,24 @@ function consumeCharacterReference(input: string, start: number): { readonly val
 }
 
 function consumeAttributeValue(source: string): string {
-  let out = "";
+  let resolvedValue = "";
   let index = 0;
   while (index < source.length) {
     const char = source[index] ?? "";
     if (char === "&") {
       const resolved = consumeCharacterReference(source, index);
       if (resolved) {
-        out += resolved.value;
+        resolvedValue += resolved.value;
         index += resolved.consumed;
         continue;
       }
     }
 
-    out += char;
+    resolvedValue += char;
     index += 1;
   }
 
-  return out;
+  return resolvedValue;
 }
 
 function parseTagAttributes(tagBody: string): {

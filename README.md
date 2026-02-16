@@ -37,3 +37,4 @@ Agent-first TypeScript HTML parser under strict deterministic and security polic
 ## Readiness docs
 - `docs/readiness.md` defines readiness using gates and report artifacts.
 - `docs/acceptance-gates.md` defines mandatory CI and release gate evidence.
+- `docs/naming-conventions.md` defines identifier and log-label naming rules.

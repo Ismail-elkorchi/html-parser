@@ -42,25 +42,25 @@ function collectImportSpecifiers(source) {
 }
 
 async function findJsFiles(rootDir) {
-  const out = [];
+  const jsFilePaths = [];
 
-  async function walk(dir) {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        await walk(full);
+  async function walk(directoryPath) {
+    const directoryEntries = await readdir(directoryPath, { withFileTypes: true });
+    for (const directoryEntry of directoryEntries) {
+      const fullPath = path.join(directoryPath, directoryEntry.name);
+      if (directoryEntry.isDirectory()) {
+        await walk(fullPath);
         continue;
       }
 
-      if (entry.isFile() && full.endsWith(".js")) {
-        out.push(full);
+      if (directoryEntry.isFile() && fullPath.endsWith(".js")) {
+        jsFilePaths.push(fullPath);
       }
     }
   }
 
   await walk(rootDir);
-  return out;
+  return jsFilePaths;
 }
 
 async function main() {
@@ -104,7 +104,7 @@ async function main() {
   });
 
   if (!ok) {
-    console.error("External runtime import check failed. See reports/no-external-imports.json");
+    console.error("EVAL: External runtime import check failed. See reports/no-external-imports.json");
     process.exit(1);
   }
 }

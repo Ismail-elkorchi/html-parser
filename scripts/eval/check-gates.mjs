@@ -9,17 +9,22 @@ import {
   requireExistingDecisionRecords
 } from "./util.mjs";
 
-function gate(id, name, pass, details) {
+function makeGate(id, name, pass, details) {
   return { id, name, pass, details };
 }
 
-async function loadOptionalReport(path) {
-  if (!(await fileExists(path))) return null;
-  return await readJson(path);
+async function loadOptionalReport(reportPath) {
+  if (!(await fileExists(reportPath))) return null;
+  return await readJson(reportPath);
+}
+
+function parseProfileArg() {
+  const profileArg = process.argv.find((argumentValue) => argumentValue.startsWith("--profile="));
+  return profileArg ? profileArg.split("=")[1] : "ci";
 }
 
 async function main() {
-  const profile = (process.argv.find((a) => a.startsWith("--profile=")) || "--profile=ci").split("=")[1];
+  const profile = parseProfileArg();
 
   if (!(await fileExists("evaluation.config.json"))) {
     console.error("Missing evaluation.config.json");
@@ -27,8 +32,8 @@ async function main() {
   }
 
   const config = await readJson("evaluation.config.json");
-  const prof = config.profiles?.[profile];
-  if (!prof) {
+  const profilePolicy = config.profiles?.[profile];
+  if (!profilePolicy) {
     console.error(`Unknown profile: ${profile}`);
     process.exit(1);
   }
@@ -37,24 +42,27 @@ async function main() {
     console.error("Missing package.json");
     process.exit(1);
   }
-  const pkg = JSON.parse(await readFile("package.json", "utf8"));
+  const packageManifest = JSON.parse(await readFile("package.json", "utf8"));
 
   const gates = [];
 
-  gates.push(gate("G-000", "Evaluation config exists", true, { profile }));
+  gates.push(makeGate("G-000", "Evaluation config exists", true, { profile }));
 
-  const deps = pkg.dependencies;
-  const depsIsObject = deps !== null && typeof deps === "object" && !Array.isArray(deps);
-  const depsCount = depsIsObject ? Object.keys(deps).length : -1;
-  const depsEmptyObject = depsIsObject && depsCount === 0;
-  gates.push(gate("G-010", "Zero runtime dependencies", depsEmptyObject, {
-    dependenciesType: deps === undefined ? "undefined" : typeof deps,
-    dependenciesCount: depsCount
+  const runtimeDependencies = packageManifest.dependencies;
+  const hasRuntimeDependencyObject =
+    runtimeDependencies !== null &&
+    typeof runtimeDependencies === "object" &&
+    !Array.isArray(runtimeDependencies);
+  const runtimeDependencyCount = hasRuntimeDependencyObject ? Object.keys(runtimeDependencies).length : -1;
+  const hasZeroRuntimeDependencies = hasRuntimeDependencyObject && runtimeDependencyCount === 0;
+  gates.push(makeGate("G-010", "Zero runtime dependencies", hasZeroRuntimeDependencies, {
+    dependenciesType: runtimeDependencies === undefined ? "undefined" : typeof runtimeDependencies,
+    dependenciesCount: runtimeDependencyCount
   }));
 
   const noExternalImports = await loadOptionalReport("reports/no-external-imports.json");
   gates.push(
-    gate(
+    makeGate(
       "G-012",
       "No external imports in dist/",
       Boolean(noExternalImports?.ok),
@@ -64,7 +72,7 @@ async function main() {
 
   const runtimeSelfContained = await loadOptionalReport("reports/runtime-self-contained.json");
   gates.push(
-    gate(
+    makeGate(
       "G-015",
       "Runtime self-contained",
       Boolean(runtimeSelfContained?.ok),
@@ -72,15 +80,15 @@ async function main() {
     )
   );
 
-  const esmTypeOk = pkg.type === "module";
-  const exportsStr = JSON.stringify(pkg.exports || {});
+  const esmTypeOk = packageManifest.type === "module";
+  const exportsStr = JSON.stringify(packageManifest.exports || {});
   const noRequireKeys = !exportsStr.includes('"require"');
   const esmOnly = esmTypeOk && noRequireKeys;
-  gates.push(gate("G-020", "ESM only", esmOnly, { type: pkg.type, requireKeysPresent: !noRequireKeys }));
+  gates.push(makeGate("G-020", "ESM only", esmOnly, { type: packageManifest.type, requireKeysPresent: !noRequireKeys }));
 
   const noNodeBuiltins = await loadOptionalReport("reports/no-node-builtins.json");
   gates.push(
-    gate(
+    makeGate(
       "G-030",
       "No Node builtin imports in src/",
       Boolean(noNodeBuiltins?.ok),
@@ -88,10 +96,10 @@ async function main() {
     )
   );
 
-  async function conformanceGate(gid, name, reportPath, threshold, options = {}) {
+  async function evaluateConformanceGate(gateId, gateName, reportPath, threshold, options = {}) {
     const report = await loadOptionalReport(reportPath);
     if (!report) {
-      gates.push(gate(gid, name, false, { missingReport: reportPath }));
+      gates.push(makeGate(gateId, gateName, false, { missingReport: reportPath }));
       return;
     }
 
@@ -122,7 +130,7 @@ async function main() {
       holdoutDisciplinePass;
 
     gates.push(
-      gate(gid, name, pass, {
+      makeGate(gateId, gateName, pass, {
         passRate,
         minPassRate,
         passed,
@@ -143,30 +151,36 @@ async function main() {
     );
   }
 
-  const t = config.thresholds?.conformance || {};
-  await conformanceGate("G-040", "Conformance tokenizer", "reports/tokenizer.json", t.tokenizer, {
+  const conformanceThresholds = config.thresholds?.conformance || {};
+  await evaluateConformanceGate("G-040", "Conformance tokenizer", "reports/tokenizer.json", conformanceThresholds.tokenizer, {
     enforceHoldoutDiscipline: true
   });
-  await conformanceGate("G-050", "Conformance tree construction", "reports/tree.json", t.tree, {
+  await evaluateConformanceGate("G-050", "Conformance tree construction", "reports/tree.json", conformanceThresholds.tree, {
     enforceHoldoutDiscipline: true
   });
-  await conformanceGate("G-060", "Conformance encoding", "reports/encoding.json", t.encoding, {
+  await evaluateConformanceGate("G-060", "Conformance encoding", "reports/encoding.json", conformanceThresholds.encoding, {
     enforceHoldoutDiscipline: true
   });
-  await conformanceGate("G-070", "Conformance serializer", "reports/serializer.json", t.serializer, {
-    enforceHoldoutDiscipline: true
-  });
+  await evaluateConformanceGate(
+    "G-070",
+    "Conformance serializer",
+    "reports/serializer.json",
+    conformanceThresholds.serializer,
+    {
+      enforceHoldoutDiscipline: true
+    }
+  );
 
-  const det = await loadOptionalReport("reports/determinism.json");
-  const detOk = Boolean(det?.overall?.ok);
-  gates.push(gate("G-080", "Determinism", detOk, det || { missing: true }));
+  const determinismReport = await loadOptionalReport("reports/determinism.json");
+  const determinismOk = Boolean(determinismReport?.overall?.ok);
+  gates.push(makeGate("G-080", "Determinism", determinismOk, determinismReport || { missing: true }));
 
   const streamReport = await loadOptionalReport("reports/stream.json");
-  const requireStreamReport = Boolean(prof.requireStreamReport);
+  const requireStreamReport = Boolean(profilePolicy.requireStreamReport);
   const streamOk = Boolean(streamReport?.overall?.ok);
   const streamPass = requireStreamReport ? streamOk : (streamReport ? streamOk : true);
   gates.push(
-    gate(
+    makeGate(
       "G-085",
       "Streaming invariants",
       streamPass,
@@ -177,7 +191,9 @@ async function main() {
   const budgets = await loadOptionalReport("reports/budgets.json");
   const fuzz = await loadOptionalReport("reports/fuzz.json");
   const requireBudgetsReport = Boolean(config.thresholds?.budgets?.requireBudgetsReport);
-  const requireFuzzReport = Boolean(config.thresholds?.budgets?.requireFuzzReport) && Boolean(prof.requireFuzzReport);
+  const requireFuzzReport =
+    Boolean(config.thresholds?.budgets?.requireFuzzReport) &&
+    Boolean(profilePolicy.requireFuzzReport);
 
   const budgetsOk =
     (budgets ? Boolean(budgets?.overall?.ok) : true) &&
@@ -186,7 +202,7 @@ async function main() {
   const budgetsPass = requireBudgetsReport ? Boolean(budgets?.overall?.ok) : budgetsOk;
 
   gates.push(
-    gate(
+    makeGate(
       "G-090",
       "Budgets and no hangs",
       budgetsPass,
@@ -206,24 +222,24 @@ async function main() {
 
   const smokePass =
     nodeSmokeOk &&
-    (!prof.requireDeno || denoOk) &&
-    (!prof.requireBun || bunOk) &&
-    (!prof.requireBrowserSmoke || browserOk);
+    (!profilePolicy.requireDeno || denoOk) &&
+    (!profilePolicy.requireBun || bunOk) &&
+    (!profilePolicy.requireBrowserSmoke || browserOk);
 
-  gates.push(gate("G-100", "Cross-runtime smoke", smokePass, smoke || { missing: true }));
+  gates.push(makeGate("G-100", "Cross-runtime smoke", smokePass, smoke || { missing: true }));
 
   const pack = await loadOptionalReport("reports/pack.json");
-  gates.push(gate("G-110", "Packaging sanity", Boolean(pack?.ok), pack || { missing: true }));
+  gates.push(makeGate("G-110", "Packaging sanity", Boolean(pack?.ok), pack || { missing: true }));
 
   const docs = await loadOptionalReport("reports/docs.json");
-  gates.push(gate("G-120", "Docs and dataset hygiene", Boolean(docs?.ok), docs || { missing: true }));
+  gates.push(makeGate("G-120", "Docs and dataset hygiene", Boolean(docs?.ok), docs || { missing: true }));
 
-  if (prof.requireHoldouts) {
-    await conformanceGate("R-200", "Holdout suite", "reports/holdout.json", t.holdout);
+  if (profilePolicy.requireHoldouts) {
+    await evaluateConformanceGate("R-200", "Holdout suite", "reports/holdout.json", conformanceThresholds.holdout);
   }
 
-  if (prof.requireBrowserDiff) {
-    const bd = await loadOptionalReport("reports/browser-diff.json");
+  if (profilePolicy.requireBrowserDiff) {
+    const browserDiffReport = await loadOptionalReport("reports/browser-diff.json");
     const minAgreement = config.thresholds?.browserDiff?.minAgreement ?? 0.995;
     const minEnginesPresent = config.thresholds?.browserDiff?.minEnginesPresent ?? 1;
     const minCases = config.thresholds?.browserDiff?.minCases ?? 1;
@@ -232,32 +248,34 @@ async function main() {
       ? config.thresholds.browserDiff.requiredTags
       : [];
 
-    if (!bd) {
-      gates.push(gate("R-210", "Browser differential oracle", false, { missingReport: "reports/browser-diff.json" }));
+    if (!browserDiffReport) {
+      gates.push(makeGate("R-210", "Browser differential oracle", false, { missingReport: "reports/browser-diff.json" }));
     } else {
-      const engines = bd.engines || {};
-      const present = Object.keys(engines).filter((k) => Number(engines[k]?.compared || 0) > 0);
+      const engines = browserDiffReport.engines || {};
+      const presentEngines = Object.keys(engines).filter((engineName) => Number(engines[engineName]?.compared || 0) > 0);
 
-      const agreements = present.map((k) => safeDiv(Number(engines[k]?.agreed || 0), Number(engines[k]?.compared || 0)));
-      const agg = config.scoring?.browserAgreementAggregation === "min"
-        ? (agreements.length ? Math.min(...agreements) : 0)
-        : (agreements.length ? agreements.reduce((a, b) => a + b, 0) / agreements.length : 0);
+      const agreementRatios = presentEngines.map((engineName) =>
+        safeDiv(Number(engines[engineName]?.agreed || 0), Number(engines[engineName]?.compared || 0))
+      );
+      const aggregateAgreement = config.scoring?.browserAgreementAggregation === "min"
+        ? (agreementRatios.length ? Math.min(...agreementRatios) : 0)
+        : (agreementRatios.length ? agreementRatios.reduce((sum, ratio) => sum + ratio, 0) / agreementRatios.length : 0);
 
-      const totalCases = Number(bd?.corpus?.totalCases ?? bd?.corpus?.cases ?? 0);
-      const tagCounts = bd?.coverage?.tagCounts && typeof bd.coverage.tagCounts === "object"
-        ? bd.coverage.tagCounts
+      const totalCases = Number(browserDiffReport?.corpus?.totalCases ?? browserDiffReport?.corpus?.cases ?? 0);
+      const tagCounts = browserDiffReport?.coverage?.tagCounts && typeof browserDiffReport.coverage.tagCounts === "object"
+        ? browserDiffReport.coverage.tagCounts
         : {};
       const underCoveredTags = requiredTags.filter((tag) => Number(tagCounts[tag] ?? 0) < minTagCoverage);
 
       const pass =
-        present.length >= minEnginesPresent &&
-        agg >= minAgreement &&
+        presentEngines.length >= minEnginesPresent &&
+        aggregateAgreement >= minAgreement &&
         totalCases >= minCases &&
         underCoveredTags.length === 0;
 
-      gates.push(gate("R-210", "Browser differential oracle", pass, {
-        presentEngines: present,
-        agreement: agg,
+      gates.push(makeGate("R-210", "Browser differential oracle", pass, {
+        presentEngines,
+        agreement: aggregateAgreement,
         minAgreement,
         totalCases,
         minCases,
@@ -270,12 +288,12 @@ async function main() {
 
   if (requireFuzzReport) {
     const fuzzPass = Boolean(fuzz) && Number(fuzz?.crashes || 0) === 0 && Number(fuzz?.hangs || 0) === 0;
-    gates.push(gate("R-220", "Fuzz report required", fuzzPass, fuzz || { missingReport: "reports/fuzz.json" }));
+    gates.push(makeGate("R-220", "Fuzz report required", fuzzPass, fuzz || { missingReport: "reports/fuzz.json" }));
   }
 
-  const allPass = gates.every((g) => g.pass);
+  const allPass = gates.every((gateResult) => gateResult.pass);
 
-  const out = {
+  const gatesReport = {
     suite: "gates",
     timestamp: nowIso(),
     profile,
@@ -283,15 +301,15 @@ async function main() {
     gates
   };
 
-  await writeJson("reports/gates.json", out);
+  await writeJson("reports/gates.json", gatesReport);
 
   if (!allPass) {
-    console.error("Gate failures detected. See reports/gates.json");
+    console.error("EVAL: Gate failures detected. See reports/gates.json");
     process.exit(1);
   }
 }
 
-main().catch((err) => {
-  console.error(err);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

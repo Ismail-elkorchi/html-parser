@@ -6,7 +6,7 @@ import { nowIso, writeJson } from "./util.mjs";
 
 const TMP_DIR = "tmp/runtime-self-contained";
 
-function run(command, args, options = {}) {
+function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options.cwd ?? process.cwd(),
@@ -39,9 +39,9 @@ function run(command, args, options = {}) {
   });
 }
 
-function summarizeStepResult(step, result) {
+function summarizeStepResult(stepName, result) {
   return {
-    step,
+    step: stepName,
     command: `${result.command} ${result.args.join(" ")}`.trim(),
     cwd: result.cwd,
     code: result.code,
@@ -86,7 +86,7 @@ console.log("runtime-self-contained ok");
 
 async function main() {
   const diagnostics = [];
-  let ok = false;
+  let checkPassed = false;
   let tarballName = null;
 
   try {
@@ -96,13 +96,13 @@ async function main() {
       throw new Error("package.json missing name");
     }
 
-    const buildResult = await run("npm", ["run", "build"]);
+    const buildResult = await runCommand("npm", ["run", "build"]);
     diagnostics.push(summarizeStepResult("build", buildResult));
     if (buildResult.code !== 0) {
       throw new Error("build failed");
     }
 
-    const packResult = await run("npm", ["pack", "--silent"]);
+    const packResult = await runCommand("npm", ["pack", "--silent"]);
     diagnostics.push(summarizeStepResult("pack", packResult));
     if (packResult.code !== 0) {
       throw new Error("npm pack failed");
@@ -130,7 +130,7 @@ async function main() {
       "utf8"
     );
 
-    const installResult = await run("npm", ["install", "--omit=dev", `./${tarballName}`], { cwd: TMP_DIR });
+    const installResult = await runCommand("npm", ["install", "--omit=dev", `./${tarballName}`], { cwd: TMP_DIR });
     diagnostics.push(summarizeStepResult("install", installResult));
     if (installResult.code !== 0) {
       throw new Error("production-only install failed");
@@ -138,7 +138,7 @@ async function main() {
 
     await writeFile(path.join(TMP_DIR, "smoke.mjs"), createRuntimeSmokeScript(packageName), "utf8");
 
-    const smokeResult = await run(process.execPath, ["smoke.mjs"], { cwd: TMP_DIR });
+    const smokeResult = await runCommand(process.execPath, ["smoke.mjs"], { cwd: TMP_DIR });
     diagnostics.push(summarizeStepResult("runtime-smoke", smokeResult));
     if (smokeResult.code !== 0) {
       throw new Error("runtime smoke execution failed");
@@ -152,7 +152,7 @@ async function main() {
       throw new Error("runtime smoke did not print success marker");
     }
 
-    ok = true;
+    checkPassed = true;
   } catch (error) {
     diagnostics.push({
       step: "failure",
@@ -167,14 +167,14 @@ async function main() {
   await writeJson("reports/runtime-self-contained.json", {
     suite: "runtime-self-contained",
     timestamp: nowIso(),
-    ok,
+    ok: checkPassed,
     tarball: tarballName,
     nodeVersion: process.version,
     diagnostics
   });
 
-  if (!ok) {
-    console.error("Runtime self-contained check failed. See reports/runtime-self-contained.json");
+  if (!checkPassed) {
+    console.error("EVAL: Runtime self-contained check failed. See reports/runtime-self-contained.json");
     process.exit(1);
   }
 }

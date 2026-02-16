@@ -8,6 +8,7 @@ const REQUIRED_FILES = [
   "docs/third-party.md",
   "docs/update-playbook.md",
   "docs/debt.md",
+  "docs/naming-conventions.md",
   "docs/spec-snapshots.md",
   "docs/decisions/README.md",
   "docs/acceptance-gates.md",
@@ -22,8 +23,8 @@ const REQUIRED_README_PATTERNS = [
 
 async function main() {
   const missingFiles = [];
-  for (const p of REQUIRED_FILES) {
-    if (!(await fileExists(p))) missingFiles.push(p);
+  for (const requiredFilePath of REQUIRED_FILES) {
+    if (!(await fileExists(requiredFilePath))) missingFiles.push(requiredFilePath);
   }
 
   let readme = "";
@@ -32,8 +33,8 @@ async function main() {
   }
 
   const missingReadmeSections = [];
-  for (const { name, re } of REQUIRED_README_PATTERNS) {
-    if (!re.test(readme)) missingReadmeSections.push(name);
+  for (const { name: sectionName, re: sectionPattern } of REQUIRED_README_PATTERNS) {
+    if (!sectionPattern.test(readme)) missingReadmeSections.push(sectionName);
   }
 
   const ok = missingFiles.length === 0 && missingReadmeSections.length === 0;
@@ -49,12 +50,12 @@ async function main() {
   await writeJson("reports/docs.json", report);
 
   if (!ok) {
-    console.error("Docs check failed:", report);
+    console.error("EVAL: Docs check failed:", report);
     process.exit(1);
   }
 }
 
-main().catch((err) => {
-  console.error(err);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

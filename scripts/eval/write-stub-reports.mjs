@@ -23,7 +23,7 @@ function asciiBytes(value) {
   return Array.from(value, (char) => char.charCodeAt(0));
 }
 
-function makeStream(chunks) {
+function makeReadableByteStream(chunkList) {
   const streamFactory = globalThis.ReadableStream;
   if (typeof streamFactory !== "function") {
     throw new Error("ReadableStream is not available in this runtime");
@@ -31,7 +31,7 @@ function makeStream(chunks) {
 
   return new streamFactory({
     start(controller) {
-      for (const chunkValue of chunks) {
+      for (const chunkValue of chunkList) {
         controller.enqueue(chunkValue);
       }
       controller.close();
@@ -66,47 +66,47 @@ function headingTree() {
   return tree;
 }
 
-function withBudgetCheck(checks, id, budget, execute) {
+function assertBudgetErrorSync(checks, checkId, budgetKey, executeCheck) {
   try {
-    execute();
+    executeCheck();
     checks.push({
-      id,
+      id: checkId,
       ok: false,
       expectedErrorCode: "BUDGET_EXCEEDED",
       observedErrorCode: "NONE"
     });
   } catch (error) {
-    const observed = error instanceof BudgetExceededError ? error.payload.budget : "UNEXPECTED_ERROR";
+    const observedBudgetKey = error instanceof BudgetExceededError ? error.payload.budget : "UNEXPECTED_ERROR";
     checks.push({
-      id,
-      ok: observed === budget,
-      expectedErrorCode: budget,
-      observedErrorCode: observed
+      id: checkId,
+      ok: observedBudgetKey === budgetKey,
+      expectedErrorCode: budgetKey,
+      observedErrorCode: observedBudgetKey
     });
   }
 }
 
-async function withAsyncBudgetCheck(checks, id, budget, execute) {
+async function assertBudgetErrorAsync(checks, checkId, budgetKey, executeCheck) {
   try {
-    await execute();
+    await executeCheck();
     checks.push({
-      id,
+      id: checkId,
       ok: false,
       expectedErrorCode: "BUDGET_EXCEEDED",
       observedErrorCode: "NONE"
     });
   } catch (error) {
-    const observed = error instanceof BudgetExceededError ? error.payload.budget : "UNEXPECTED_ERROR";
+    const observedBudgetKey = error instanceof BudgetExceededError ? error.payload.budget : "UNEXPECTED_ERROR";
     checks.push({
-      id,
-      ok: observed === budget,
-      expectedErrorCode: budget,
-      observedErrorCode: observed
+      id: checkId,
+      ok: observedBudgetKey === budgetKey,
+      expectedErrorCode: budgetKey,
+      observedErrorCode: observedBudgetKey
     });
   }
 }
 
-async function maybeRuntimeVersion(command, args = []) {
+async function detectRuntimeVersion(command, args = []) {
   try {
     const result = await execFileAsync(command, args, { timeout: 4000 });
     const line = (result.stdout || "").split(/\r?\n/)[0]?.trim() || "unknown";
@@ -120,31 +120,31 @@ async function writeDeterminism() {
   const cases = [];
 
   const documentHashes = [];
-  for (let i = 0; i < 5; i += 1) {
+  for (let sampleIndex = 0; sampleIndex < 5; sampleIndex += 1) {
     documentHashes.push(sha256(JSON.stringify(parse("<h1>alpha</h1>", { trace: true }))));
   }
 
   const fragmentHashes = [];
-  for (let i = 0; i < 5; i += 1) {
+  for (let sampleIndex = 0; sampleIndex < 5; sampleIndex += 1) {
     fragmentHashes.push(sha256(JSON.stringify(parseFragment("beta", "section", { includeSpans: true, trace: true }))));
   }
 
-  const docUnique = [...new Set(documentHashes)];
-  const fragUnique = [...new Set(fragmentHashes)];
+  const uniqueDocumentHashes = [...new Set(documentHashes)];
+  const uniqueFragmentHashes = [...new Set(fragmentHashes)];
 
   cases.push({
     id: "det-document-1",
-    ok: docUnique.length === 1,
+    ok: uniqueDocumentHashes.length === 1,
     hashes: {
-      node: docUnique[0] || ""
+      node: uniqueDocumentHashes[0] || ""
     }
   });
 
   cases.push({
     id: "det-fragment-1",
-    ok: fragUnique.length === 1,
+    ok: uniqueFragmentHashes.length === 1,
     hashes: {
-      node: fragUnique[0] || ""
+      node: uniqueFragmentHashes[0] || ""
     }
   });
 
@@ -162,32 +162,32 @@ async function writeDeterminism() {
 async function writeBudgets() {
   const checks = [];
 
-  withBudgetCheck(checks, "budget-max-input-bytes", "maxInputBytes", () => {
+  assertBudgetErrorSync(checks, "budget-max-input-bytes", "maxInputBytes", () => {
     parse("abcdef", { budgets: { maxInputBytes: 3 } });
   });
 
-  withBudgetCheck(checks, "budget-max-nodes", "maxNodes", () => {
+  assertBudgetErrorSync(checks, "budget-max-nodes", "maxNodes", () => {
     parse("abcdef", { budgets: { maxNodes: 2 } });
   });
 
-  withBudgetCheck(checks, "budget-max-depth", "maxDepth", () => {
+  assertBudgetErrorSync(checks, "budget-max-depth", "maxDepth", () => {
     parse("abcdef", { budgets: { maxDepth: 1 } });
   });
 
-  withBudgetCheck(checks, "budget-max-trace-events", "maxTraceEvents", () => {
+  assertBudgetErrorSync(checks, "budget-max-trace-events", "maxTraceEvents", () => {
     parse("abcdef", { trace: true, budgets: { maxTraceEvents: 2 } });
   });
 
-  withBudgetCheck(checks, "budget-max-trace-bytes", "maxTraceBytes", () => {
+  assertBudgetErrorSync(checks, "budget-max-trace-bytes", "maxTraceBytes", () => {
     parse("abcdef", { trace: true, budgets: { maxTraceBytes: 20 } });
   });
 
-  withBudgetCheck(checks, "budget-max-time-ms", "maxTimeMs", () => {
+  assertBudgetErrorSync(checks, "budget-max-time-ms", "maxTimeMs", () => {
     parse("abcdef", { budgets: { maxTimeMs: -1 } });
   });
 
-  await withAsyncBudgetCheck(checks, "budget-max-buffered-bytes", "maxBufferedBytes", async () => {
-    const stream = makeStream([new Uint8Array([0x41, 0x42, 0x43])]);
+  await assertBudgetErrorAsync(checks, "budget-max-buffered-bytes", "maxBufferedBytes", async () => {
+    const stream = makeReadableByteStream([new Uint8Array([0x41, 0x42, 0x43])]);
     await parseStream(stream, { budgets: { maxBufferedBytes: 2 } });
   });
 
@@ -213,7 +213,7 @@ async function writeStream() {
   }
 
   const fromBytes = parseBytes(bytes);
-  const fromStream = await parseStream(makeStream(chunks));
+  const fromStream = await parseStream(makeReadableByteStream(chunks));
   const fromBytesHash = sha256(JSON.stringify(fromBytes));
   const fromStreamHash = sha256(JSON.stringify(fromStream));
 
@@ -230,7 +230,7 @@ async function writeStream() {
   let observedActual = -1;
 
   try {
-    await parseStream(makeStream(tinyChunks), { budgets: { maxBufferedBytes: 16 } });
+    await parseStream(makeReadableByteStream(tinyChunks), { budgets: { maxBufferedBytes: 16 } });
   } catch (error) {
     if (error instanceof BudgetExceededError) {
       observedBudget = error.payload.budget;
@@ -257,8 +257,8 @@ async function writeStream() {
 
 async function writeSmoke() {
   const node = { ok: true, version: process.version };
-  const deno = await maybeRuntimeVersion("deno", ["--version"]);
-  const bun = await maybeRuntimeVersion("bun", ["--version"]);
+  const deno = await detectRuntimeVersion("deno", ["--version"]);
+  const bun = await detectRuntimeVersion("bun", ["--version"]);
 
   await writeJson("reports/smoke.json", {
     suite: "smoke",
@@ -273,12 +273,12 @@ async function writeSmoke() {
 }
 
 async function writeAgent() {
-  const traced = parse("agent", { trace: true, budgets: { maxTraceEvents: 20, maxTraceBytes: 4096 } });
-  const withSpans = parse("agent", { includeSpans: true });
-  const heading = headingTree();
-  const headingOutline = outline(heading);
-  const chunks = chunk(heading, { maxChars: 8, maxNodes: 2 });
-  const traceEvents = Array.isArray(traced.trace) ? traced.trace : [];
+  const tracedDocument = parse("agent", { trace: true, budgets: { maxTraceEvents: 20, maxTraceBytes: 4096 } });
+  const documentWithSpans = parse("agent", { includeSpans: true });
+  const headingDocument = headingTree();
+  const headingOutline = outline(headingDocument);
+  const chunkPlan = chunk(headingDocument, { maxChars: 8, maxNodes: 2 });
+  const traceEvents = Array.isArray(tracedDocument.trace) ? tracedDocument.trace : [];
   const requiredKinds = new Set(["decode", "token", "insertion-mode", "tree-mutation"]);
 
   const traceSchemaOk = traceEvents.every((event) => {
@@ -327,7 +327,7 @@ async function writeAgent() {
         tested: true
       },
       spans: {
-        ok: Boolean(withSpans.children[0]?.span),
+        ok: Boolean(documentWithSpans.children[0]?.span),
         tested: true
       },
       outline: {
@@ -335,7 +335,7 @@ async function writeAgent() {
         tested: true
       },
       chunk: {
-        ok: chunks.length >= 1 && chunks.every((entry) => entry.nodes > 0),
+        ok: chunkPlan.length >= 1 && chunkPlan.every((entry) => entry.nodes > 0),
         tested: true
       }
     }

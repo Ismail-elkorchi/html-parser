@@ -18,6 +18,12 @@ Run before opening a pull request:
 For release-level audits:
 - `npm run eval:release`
 
+## Naming policy
+- Follow `docs/naming-conventions.md`.
+- Use domain-first names and explicit reference frames.
+- Use truth-conditional booleans (`is*`, `has*`, `can*`).
+- Use stable log labels (`CUE:`, `ACT:`, `EVAL:`) for grep-friendly diagnostics.
+
 ## ADR discipline
 Create or update an ADR in `docs/decisions/` when changing policy-sensitive behavior:
 - ADR-001 for fixture skips

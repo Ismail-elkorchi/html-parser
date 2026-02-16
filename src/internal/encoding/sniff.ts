@@ -77,15 +77,15 @@ function canonicalizeLabel(label: string, source: "bom" | "transport" | "meta" |
 }
 
 function decodeLatin1(bytes: Uint8Array): string {
-  let out = "";
+  let decodedText = "";
   for (let index = 0; index < bytes.length; index += 1) {
     const value = bytes[index];
     if (value === undefined) {
       continue;
     }
-    out += String.fromCharCode(value);
+    decodedText += String.fromCharCode(value);
   }
-  return out;
+  return decodedText;
 }
 
 function parseMetaAttributes(tag: string): Map<string, string> {

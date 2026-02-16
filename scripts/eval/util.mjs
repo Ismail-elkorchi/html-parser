@@ -2,69 +2,69 @@ import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { createHash } from "node:crypto";
 
-export function clamp01(x) {
-  if (Number.isNaN(x)) return 0;
-  if (x < 0) return 0;
-  if (x > 1) return 1;
-  return x;
+export function clamp01(value01) {
+  if (Number.isNaN(value01)) return 0;
+  if (value01 < 0) return 0;
+  if (value01 > 1) return 1;
+  return value01;
 }
 
 export function scoreFromThresholdToPerfect(passRate, minPassRate) {
-  const p = clamp01(passRate);
-  const min = clamp01(minPassRate);
-  if (min >= 1) return p >= 1 ? 1 : 0;
-  if (p <= min) return 0;
-  if (p >= 1) return 1;
-  const denom = 1 - min;
-  if (denom <= 0) return 1;
-  return clamp01((p - min) / denom);
+  const boundedPassRate = clamp01(passRate);
+  const boundedThreshold = clamp01(minPassRate);
+  if (boundedThreshold >= 1) return boundedPassRate >= 1 ? 1 : 0;
+  if (boundedPassRate <= boundedThreshold) return 0;
+  if (boundedPassRate >= 1) return 1;
+  const thresholdSpan = 1 - boundedThreshold;
+  if (thresholdSpan <= 0) return 1;
+  return clamp01((boundedPassRate - boundedThreshold) / thresholdSpan);
 }
 
-export async function fileExists(p) {
+export async function fileExists(pathToCheck) {
   try {
-    await stat(p);
+    await stat(pathToCheck);
     return true;
   } catch {
     return false;
   }
 }
 
-export async function readJson(p) {
-  const text = await readFile(p, "utf8");
+export async function readJson(filePath) {
+  const text = await readFile(filePath, "utf8");
   try {
     return JSON.parse(text);
   } catch (err) {
-    throw new Error(`Invalid JSON in ${p}: ${err?.message || String(err)}`);
+    throw new Error(`Invalid JSON in ${filePath}: ${err?.message || String(err)}`);
   }
 }
 
-export async function writeJson(p, obj) {
-  const full = resolve(p);
-  await mkdir(dirname(full), { recursive: true });
-  const text = JSON.stringify(obj, null, 2) + "\n";
-  await writeFile(full, text, "utf8");
+export async function writeJson(filePath, jsonValue) {
+  const fullPath = resolve(filePath);
+  await mkdir(dirname(fullPath), { recursive: true });
+  const jsonText = JSON.stringify(jsonValue, null, 2) + "\n";
+  await writeFile(fullPath, jsonText, "utf8");
 }
 
-export function sha256Bytes(buf) {
-  const h = createHash("sha256");
-  h.update(buf);
-  return `sha256:${h.digest("hex")}`;
+export function sha256Bytes(bytes) {
+  const digest = createHash("sha256");
+  digest.update(bytes);
+  return `sha256:${digest.digest("hex")}`;
 }
 
 export function nowIso() {
   return new Date().toISOString();
 }
 
-export function safeDiv(a, b) {
-  if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return 0;
-  return a / b;
+export function safeDiv(numerator, denominator) {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) return 0;
+  return numerator / denominator;
 }
 
-export function geometricMean(values) {
-  const xs = values.filter((v) => Number.isFinite(v) && v > 0);
-  if (xs.length === 0) return 0;
-  const logSum = xs.reduce((acc, v) => acc + Math.log(v), 0);
-  return Math.exp(logSum / xs.length);
+export function geometricMean(sampleValues) {
+  const finitePositiveValues = sampleValues.filter((sampleValue) => Number.isFinite(sampleValue) && sampleValue > 0);
+  if (finitePositiveValues.length === 0) return 0;
+  const logSum = finitePositiveValues.reduce((sum, sampleValue) => sum + Math.log(sampleValue), 0);
+  return Math.exp(logSum / finitePositiveValues.length);
 }
 
 export function normalizeCaseCounts(report) {
@@ -77,16 +77,16 @@ export function normalizeCaseCounts(report) {
   return { passed, failed, skipped, total, executed: passed + failed };
 }
 
-export async function requireExistingDecisionRecords(skips) {
+export async function requireExistingDecisionRecords(skipEntries) {
   const missing = [];
-  for (const s of skips || []) {
-    const dr = s?.decisionRecord;
-    if (!dr || typeof dr !== "string") {
-      missing.push({ id: s?.id || "(unknown)", reason: "missing decisionRecord field" });
+  for (const skipEntry of skipEntries || []) {
+    const decisionRecordPath = skipEntry?.decisionRecord;
+    if (!decisionRecordPath || typeof decisionRecordPath !== "string") {
+      missing.push({ id: skipEntry?.id || "(unknown)", reason: "missing decisionRecord field" });
       continue;
     }
-    if (!(await fileExists(dr))) {
-      missing.push({ id: s?.id || "(unknown)", reason: `decision record not found: ${dr}` });
+    if (!(await fileExists(decisionRecordPath))) {
+      missing.push({ id: skipEntry?.id || "(unknown)", reason: `decision record not found: ${decisionRecordPath}` });
     }
   }
   return missing;

@@ -2,11 +2,16 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileExists, readJson } from "./util.mjs";
 
-async function main() {
-  const profile = (process.argv.find((a) => a.startsWith("--profile=")) || "--profile=ci").split("=")[1];
+function parseProfileArg() {
+  const profileArg = process.argv.find((argumentValue) => argumentValue.startsWith("--profile="));
+  return profileArg ? profileArg.split("=")[1] : "ci";
+}
 
-  const gates = (await fileExists("reports/gates.json")) ? await readJson("reports/gates.json") : null;
-  const score = (await fileExists("reports/score.json")) ? await readJson("reports/score.json") : null;
+async function main() {
+  const profile = parseProfileArg();
+
+  const gatesReport = (await fileExists("reports/gates.json")) ? await readJson("reports/gates.json") : null;
+  const scoreReport = (await fileExists("reports/score.json")) ? await readJson("reports/score.json") : null;
   const conformanceReports = await Promise.all(
     [
       "reports/tokenizer.json",
@@ -23,38 +28,38 @@ async function main() {
   lines.push(`Generated from JSON reports under \`reports/\`.`);
   lines.push("");
 
-  if (!gates) {
+  if (!gatesReport) {
     lines.push("## Gates");
     lines.push("");
     lines.push("- No gates report found (`reports/gates.json`).");
   } else {
     lines.push("## Gates");
     lines.push("");
-    lines.push(`Overall: **${gates.allPass ? "PASS" : "FAIL"}**`);
+    lines.push(`Overall: **${gatesReport.allPass ? "PASS" : "FAIL"}**`);
     lines.push("");
-    for (const g of gates.gates || []) {
-      lines.push(`- **${g.id}** ${g.name}: ${g.pass ? "PASS" : "FAIL"}`);
-      if (!g.pass) {
-        lines.push(`  - details: \`${JSON.stringify(g.details).slice(0, 400)}\``);
+    for (const gateResult of gatesReport.gates || []) {
+      lines.push(`- **${gateResult.id}** ${gateResult.name}: ${gateResult.pass ? "PASS" : "FAIL"}`);
+      if (!gateResult.pass) {
+        lines.push(`  - details: \`${JSON.stringify(gateResult.details).slice(0, 400)}\``);
       }
     }
   }
 
   lines.push("");
 
-  if (!score) {
+  if (!scoreReport) {
     lines.push("## Score");
     lines.push("");
     lines.push("- No score report found (`reports/score.json`).");
   } else {
     lines.push("## Score");
     lines.push("");
-    lines.push(`Total: **${score.total.toFixed(3)} / 100**`);
+    lines.push(`Total: **${scoreReport.total.toFixed(3)} / 100**`);
     lines.push("");
-    const b = score.breakdown || {};
-    for (const key of Object.keys(b)) {
-      const item = b[key];
-      lines.push(`- **${key}**: ${Number(item.score || 0).toFixed(3)}`);
+    const scoreBreakdown = scoreReport.breakdown || {};
+    for (const scoreKey of Object.keys(scoreBreakdown)) {
+      const scoreItem = scoreBreakdown[scoreKey];
+      lines.push(`- **${scoreKey}**: ${Number(scoreItem.score || 0).toFixed(3)}`);
     }
   }
 
@@ -91,14 +96,14 @@ async function main() {
   }
   lines.push("");
 
-  const out = lines.join("\n") + "\n";
+  const markdownOutput = lines.join("\n") + "\n";
   await mkdir(dirname("docs/score-report.md"), { recursive: true });
-  await writeFile("docs/score-report.md", out, "utf8");
+  await writeFile("docs/score-report.md", markdownOutput, "utf8");
 
-  console.log("Wrote docs/score-report.md");
+  console.log("EVAL: Wrote docs/score-report.md");
 }
 
-main().catch((err) => {
-  console.error(err);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

@@ -4,12 +4,14 @@ import { gunzipSync } from "node:zlib";
 import { nowIso, writeJson, fileExists, readJson } from "./util.mjs";
 
 function parseTarFileList(tarBytes) {
-  const files = [];
+  const archivedFiles = [];
   const BLOCK = 512;
   let offset = 0;
 
-  function isAllZero(buf) {
-    for (let i = 0; i < buf.length; i++) if (buf[i] !== 0) return false;
+  function isAllZero(blockBytes) {
+    for (let byteIndex = 0; byteIndex < blockBytes.length; byteIndex += 1) {
+      if (blockBytes[byteIndex] !== 0) return false;
+    }
     return true;
   }
 
@@ -25,13 +27,13 @@ function parseTarFileList(tarBytes) {
     const sizeStr = Buffer.from(sizeRaw).toString("utf8").replace(/\0.*$/, "").trim();
     const size = sizeStr ? parseInt(sizeStr, 8) : 0;
 
-    if (name) files.push(name);
+    if (name) archivedFiles.push(name);
 
     const padded = Math.ceil(size / BLOCK) * BLOCK;
     offset += padded;
   }
 
-  return files;
+  return archivedFiles;
 }
 
 async function main() {
@@ -41,19 +43,19 @@ async function main() {
     process.exit(1);
   }
 
-  const pkg = JSON.parse(await readFile("package.json", "utf8"));
-  const deps = pkg.dependencies || {};
-  const dependenciesEmpty = Object.keys(deps).length === 0;
+  const packageManifest = JSON.parse(await readFile("package.json", "utf8"));
+  const runtimeDependencies = packageManifest.dependencies || {};
+  const dependenciesEmpty = Object.keys(runtimeDependencies).length === 0;
 
-  const esmOnly = pkg.type === "module" && !JSON.stringify(pkg.exports || {}).includes('"require"');
+  const esmOnly = packageManifest.type === "module" && !JSON.stringify(packageManifest.exports || {}).includes('"require"');
 
-  const exportsOk = typeof pkg.exports === "object" || typeof pkg.exports === "string";
+  const exportsOk = typeof packageManifest.exports === "object" || typeof packageManifest.exports === "string";
 
   const config = (await fileExists("evaluation.config.json")) ? await readJson("evaluation.config.json") : null;
   const forbiddenPrefixes = config?.thresholds?.packaging?.forbiddenPaths || ["vendor/", "test/", "codex-prompts/", "scripts/"];
 
-  const res = spawnSync("npm", ["pack", "--json"], { encoding: "utf8" });
-  if (res.status !== 0) {
+  const packCommandResult = spawnSync("npm", ["pack", "--json"], { encoding: "utf8" });
+  if (packCommandResult.status !== 0) {
     const report = {
       suite: "pack",
       timestamp: nowIso(),
@@ -62,7 +64,7 @@ async function main() {
       esmOnly,
       exportsOk,
       reason: "npm pack failed",
-      stderr: res.stderr
+      stderr: packCommandResult.stderr
     };
     await writeJson("reports/pack.json", report);
     process.exit(1);
@@ -70,7 +72,7 @@ async function main() {
 
   let packInfo;
   try {
-    packInfo = JSON.parse(res.stdout);
+    packInfo = JSON.parse(packCommandResult.stdout);
   } catch {
     const report = {
       suite: "pack",
@@ -80,7 +82,7 @@ async function main() {
       esmOnly,
       exportsOk,
       reason: "npm pack --json produced invalid JSON",
-      stdout: res.stdout
+      stdout: packCommandResult.stdout
     };
     await writeJson("reports/pack.json", report);
     process.exit(1);
@@ -104,12 +106,14 @@ async function main() {
 
   const tgzBytes = await readFile(tarball);
   const tarBytes = gunzipSync(tgzBytes);
-  const files = parseTarFileList(tarBytes);
+  const archivedFiles = parseTarFileList(tarBytes);
 
-  const normalized = files.map((f) => f.replace(/^package\//, ""));
+  const normalizedPaths = archivedFiles.map((archivedPath) => archivedPath.replace(/^package\//, ""));
 
-  const forbiddenIncluded = normalized.filter((p) => forbiddenPrefixes.some((pref) => p.startsWith(pref)));
-  const thirdPartyNoticesIncluded = normalized.includes("THIRD_PARTY_NOTICES.md");
+  const forbiddenIncluded = normalizedPaths.filter((tarPath) =>
+    forbiddenPrefixes.some((forbiddenPrefix) => tarPath.startsWith(forbiddenPrefix))
+  );
+  const thirdPartyNoticesIncluded = normalizedPaths.includes("THIRD_PARTY_NOTICES.md");
 
   const ok = dependenciesEmpty && esmOnly && exportsOk && forbiddenIncluded.length === 0 && thirdPartyNoticesIncluded;
 
@@ -130,12 +134,12 @@ async function main() {
   await unlink(tarball).catch(() => {});
 
   if (!ok) {
-    console.error("Packaging check failed:", report);
+    console.error("EVAL: Packaging check failed:", report);
     process.exit(1);
   }
 }
 
-main().catch((err) => {
-  console.error(err);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });
