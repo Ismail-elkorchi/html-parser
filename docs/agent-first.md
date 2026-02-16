@@ -10,6 +10,8 @@ Agent-first behavior is measured as observable runtime and evaluation outcomes.
   - trace output is deterministic under identical input and options.
 - Span coverage for rewrite planning:
   - `captureSpans: true` exposes source spans for patch-targetable nodes.
+  - every parsed node exposes `spanProvenance` (`input` | `inferred` | `none`).
+  - patch planning rejects non-input provenance with structured `PatchPlanningError`.
 - Deterministic outline and chunk:
   - `outline(tree)` and `chunk(tree, options)` produce stable output for stable input.
 - Deterministic visible-text extraction:

@@ -86,9 +86,13 @@
 ## Span precision
 - Node and attribute spans are populated only when `captureSpans: true`.
 - Spans are source offsets from parse5 location metadata.
-- Implied nodes added by tree construction (for example inferred wrappers) may not expose spans.
+- Node span provenance is explicit on every node via `spanProvenance`:
+  - `input`: span comes from source input offsets.
+  - `inferred`: node is parser-inferred and does not have input-accurate span offsets.
+  - `none`: spans were not requested (`captureSpans: false`).
+- Patch planning accepts only `spanProvenance: "input"` targets.
 - Patch planning requires spans on targeted nodes and attribute edits require attribute spans.
-- If spans are missing or edits overlap, `computePatch` throws `PatchPlanningError` with a structured payload.
+- If spans are missing, inferred, or edits overlap, `computePatch` throws `PatchPlanningError` with a structured payload.
 
 ## Budgets contract
 - Budget violations throw `BudgetExceededError`.

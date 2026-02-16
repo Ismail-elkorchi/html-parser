@@ -28,6 +28,7 @@ import type {
   ParseError,
   ParseOptions,
   Span,
+  SpanProvenance,
   Token,
   TokenizeStreamOptions,
   TraceEvent,
@@ -66,6 +67,7 @@ export type {
   ParseError,
   ParseOptions,
   Span,
+  SpanProvenance,
   StartTagToken,
   Token,
   TokenAttribute,
@@ -222,6 +224,13 @@ function toPublicSpan(span: TreeSpan | undefined, captureSpans: boolean): Span |
   return { start: span.start, end: span.end };
 }
 
+function toSpanProvenance(span: TreeSpan | undefined, captureSpans: boolean): SpanProvenance {
+  if (!captureSpans) {
+    return "none";
+  }
+  return span ? "input" : "inferred";
+}
+
 function toAttributes(attributes: readonly TreeAttribute[], captureSpans: boolean): readonly Attribute[] {
   return attributes.map((attribute) => {
     const span = toPublicSpan(attribute.span, captureSpans);
@@ -362,37 +371,44 @@ function treeBudgetsFromParseOptions(budgets: ParseOptions["budgets"] | undefine
 function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, captureSpans: boolean): HtmlNode {
   if (node.kind === "text") {
     const span = toPublicSpan(node.span, captureSpans);
+    const spanProvenance = toSpanProvenance(node.span, captureSpans);
     return {
       id: assigner.next(),
       kind: "text",
       value: node.value,
+      spanProvenance,
       ...(span ? { span } : {})
     };
   }
 
   if (node.kind === "comment") {
     const span = toPublicSpan(node.span, captureSpans);
+    const spanProvenance = toSpanProvenance(node.span, captureSpans);
     return {
       id: assigner.next(),
       kind: "comment",
       value: node.value,
+      spanProvenance,
       ...(span ? { span } : {})
     };
   }
 
   if (node.kind === "doctype") {
     const span = toPublicSpan(node.span, captureSpans);
+    const spanProvenance = toSpanProvenance(node.span, captureSpans);
     return {
       id: assigner.next(),
       kind: "doctype",
       name: node.name,
       ...(node.publicId.length > 0 ? { publicId: node.publicId } : {}),
       ...(node.systemId.length > 0 ? { systemId: node.systemId } : {}),
+      spanProvenance,
       ...(span ? { span } : {})
     };
   }
 
   const span = toPublicSpan(node.span, captureSpans);
+  const spanProvenance = toSpanProvenance(node.span, captureSpans);
   const children = node.children.map((child) => convertTreeNode(child, assigner, captureSpans));
   const attributes = normalizeAttributes(toAttributes(node.attributes, captureSpans));
 
@@ -402,6 +418,7 @@ function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, captureSpans:
     tagName: toPublicTagName(node.name),
     attributes,
     children,
+    spanProvenance,
     ...(span ? { span } : {})
   };
 }
@@ -1342,11 +1359,17 @@ function countNodes(node: HtmlNode): number {
   return 1 + node.children.reduce((total, child) => total + countNodes(child), 0);
 }
 
-function indexNodeSpans(nodes: readonly HtmlNode[], into: Map<NodeId, Span>): void {
+interface IndexedNodeSpan {
+  readonly span?: Span;
+  readonly provenance: SpanProvenance;
+}
+
+function indexNodeSpans(nodes: readonly HtmlNode[], into: Map<NodeId, IndexedNodeSpan>): void {
   for (const node of nodes) {
-    if (node.span) {
-      into.set(node.id, node.span);
-    }
+    into.set(node.id, {
+      provenance: node.spanProvenance,
+      ...(node.span ? { span: node.span } : {})
+    });
 
     if (node.kind === "element") {
       indexNodeSpans(node.children, into);
@@ -1452,12 +1475,22 @@ function requireNode(nodeById: Map<NodeId, HtmlNode>, target: NodeId): HtmlNode 
   return node;
 }
 
-function requireNodeSpan(spanByNode: Map<NodeId, Span>, target: NodeId): Span {
-  const span = spanByNode.get(target);
-  if (!span) {
+function requireNodeSpan(spanByNode: Map<NodeId, IndexedNodeSpan>, target: NodeId): Span {
+  const indexedSpan = spanByNode.get(target);
+  if (!indexedSpan) {
     failPatchPlanning({ code: "MISSING_NODE_SPAN", target });
   }
-  return span;
+  if (indexedSpan.provenance !== "input") {
+    failPatchPlanning({
+      code: "NON_INPUT_SPAN_PROVENANCE",
+      target,
+      detail: indexedSpan.provenance
+    });
+  }
+  if (!indexedSpan.span) {
+    failPatchPlanning({ code: "MISSING_NODE_SPAN", target });
+  }
+  return indexedSpan.span;
 }
 
 function requireElementNode(nodeById: Map<NodeId, HtmlNode>, target: NodeId): Extract<HtmlNode, { kind: "element" }> {
@@ -1471,7 +1504,7 @@ function requireElementNode(nodeById: Map<NodeId, HtmlNode>, target: NodeId): Ex
 function buildSetAttrReplacement(
   originalHtml: string,
   nodeById: Map<NodeId, HtmlNode>,
-  spanByNode: Map<NodeId, Span>,
+  spanByNode: Map<NodeId, IndexedNodeSpan>,
   edit: Extract<Edit, { readonly kind: "setAttr" }>,
   sourceIndex: number
 ): PlannedReplacement {
@@ -1510,7 +1543,7 @@ function buildSetAttrReplacement(
 function buildRemoveAttrReplacement(
   originalHtml: string,
   nodeById: Map<NodeId, HtmlNode>,
-  spanByNode: Map<NodeId, Span>,
+  spanByNode: Map<NodeId, IndexedNodeSpan>,
   edit: Extract<Edit, { readonly kind: "removeAttr" }>,
   sourceIndex: number
 ): PlannedReplacement {
@@ -1552,7 +1585,7 @@ function buildRemoveAttrReplacement(
 function buildReplacement(
   originalHtml: string,
   nodeById: Map<NodeId, HtmlNode>,
-  spanByNode: Map<NodeId, Span>,
+  spanByNode: Map<NodeId, IndexedNodeSpan>,
   edit: Edit,
   sourceIndex: number
 ): PlannedReplacement {
@@ -1624,7 +1657,7 @@ export function computePatch(originalHtml: string, edits: readonly Edit[]): Patc
   }
 
   const parsed = parse(originalHtml, { captureSpans: true });
-  const spanByNode = new Map<NodeId, Span>();
+  const spanByNode = new Map<NodeId, IndexedNodeSpan>();
   const nodeById = new Map<NodeId, HtmlNode>();
   indexNodeSpans(parsed.children, spanByNode);
   indexNodes(parsed.children, nodeById);

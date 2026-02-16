@@ -36,12 +36,28 @@ test("captureSpans attaches source offsets for elements and attributes", () => {
 
   assert.ok(paragraph);
   assert.ok(paragraph.span);
+  assert.equal(paragraph.spanProvenance, "input");
   assert.equal(html.slice(paragraph.span.start, paragraph.span.end), "<p class=\"x\">Hi</p>");
 
   const classAttribute = paragraph.attributes.find((attribute) => attribute.name === "class");
   assert.ok(classAttribute);
   assert.ok(classAttribute.span);
   assert.equal(html.slice(classAttribute.span.start, classAttribute.span.end), "class=\"x\"");
+});
+
+test("implied wrappers expose inferred span provenance", () => {
+  const parsed = parse("<p>x</p>", { captureSpans: true });
+  const impliedNode = findNode(
+    parsed.children,
+    (node) =>
+      node.kind === "element" &&
+      (node.tagName === "html" || node.tagName === "body") &&
+      node.spanProvenance !== "input"
+  );
+
+  assert.ok(impliedNode);
+  assert.equal(impliedNode.spanProvenance, "inferred");
+  assert.equal(impliedNode.span, undefined);
 });
 
 test("computePatch supports deterministic structural edit plans", () => {
@@ -109,7 +125,7 @@ test("computePatch supports insertHtmlBefore with removeNode", () => {
   assert.equal(patched, "<ul><li>a</li><li>x</li></ul>");
 });
 
-test("computePatch throws structured error when target node span is missing", () => {
+test("computePatch rejects targets with non-input span provenance", () => {
   const original = "<p>x</p>";
   const parsed = parse(original, { captureSpans: true });
   const impliedNode = findNode(
@@ -117,7 +133,7 @@ test("computePatch throws structured error when target node span is missing", ()
     (node) =>
       node.kind === "element" &&
       (node.tagName === "html" || node.tagName === "body") &&
-      node.span === undefined
+      node.spanProvenance !== "input"
   );
 
   assert.ok(impliedNode);
@@ -126,7 +142,8 @@ test("computePatch throws structured error when target node span is missing", ()
     () => computePatch(original, [{ kind: "removeNode", target: impliedNode.id }]),
     (error) => {
       assert.ok(error instanceof PatchPlanningError);
-      assert.equal(error.payload.code, "MISSING_NODE_SPAN");
+      assert.equal(error.payload.code, "NON_INPUT_SPAN_PROVENANCE");
+      assert.equal(error.payload.detail, impliedNode.spanProvenance);
       return true;
     }
   );

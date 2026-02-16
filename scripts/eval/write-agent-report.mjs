@@ -147,11 +147,15 @@ function evaluateTraceFeature() {
 }
 
 function evaluateSpansFeature() {
-  const html = "<div id=\"root\">hello <span>world</span></div>";
+  const html = "<p>x</p><div id=\"root\">hello <span>world</span></div>";
   const parsed = parse(html, { captureSpans: true });
 
   const firstElement = findFirstNode(parsed.children, (node) => node.kind === "element" && node.span !== undefined);
   const firstText = findFirstNode(parsed.children, (node) => node.kind === "text");
+  const inferredNode = findFirstNode(
+    parsed.children,
+    (node) => node.kind === "element" && (node.tagName === "html" || node.tagName === "body") && node.spanProvenance !== "input"
+  );
 
   const elementSpan = firstElement?.span;
   const textSpan = firstText?.span;
@@ -164,7 +168,10 @@ function evaluateSpansFeature() {
 
   const elementSpanOk = inBounds(elementSpan);
   const textSpanOk = inBounds(textSpan);
-  const ok = elementSpanOk && textSpanOk;
+  const inputProvenanceOk = firstElement?.spanProvenance === "input" && firstText?.spanProvenance === "input";
+  const inferredProvenanceOk =
+    inferredNode !== null && inferredNode !== undefined && inferredNode.spanProvenance !== "input";
+  const ok = elementSpanOk && textSpanOk && inputProvenanceOk && inferredProvenanceOk;
 
   return {
     ok,
@@ -172,8 +179,13 @@ function evaluateSpansFeature() {
       htmlLength: html.length,
       elementSpan: elementSpan || null,
       textSpan: textSpan || null,
+      firstElementSpanProvenance: firstElement?.spanProvenance ?? null,
+      firstTextSpanProvenance: firstText?.spanProvenance ?? null,
+      inferredNodeSpanProvenance: inferredNode?.spanProvenance ?? null,
       elementSpanOk,
-      textSpanOk
+      textSpanOk,
+      inputProvenanceOk,
+      inferredProvenanceOk
     }
   };
 }
@@ -238,14 +250,16 @@ function evaluatePatchFeature() {
     (node) =>
       node.kind === "element" &&
       (node.tagName === "html" || node.tagName === "body") &&
-      node.span === undefined
+      node.spanProvenance !== "input"
   );
   if (impliedNode) {
     try {
       computePatch(source, [{ kind: "removeNode", target: impliedNode.id }]);
     } catch (error) {
       if (error instanceof PatchPlanningError) {
-        structuredErrorOk = error.payload.code === "MISSING_NODE_SPAN";
+        structuredErrorOk =
+          error.payload.code === "NON_INPUT_SPAN_PROVENANCE" &&
+          error.payload.detail === impliedNode.spanProvenance;
       }
     }
   }

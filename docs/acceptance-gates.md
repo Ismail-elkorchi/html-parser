@@ -191,6 +191,25 @@ Evidence:
 
 ---
 
+### G-089: Span provenance and patch safety
+Requirement:
+- Parsed nodes expose `spanProvenance` with values:
+  - `input`
+  - `inferred`
+  - `none`
+- Patch planning rejects non-input spans with structured `PatchPlanningError`:
+  - `code: NON_INPUT_SPAN_PROVENANCE`
+- `docs/spec.md` documents `spanProvenance`.
+- `test/control/spans-patch.test.js` validates provenance and patch rejection behavior.
+- Agent report includes:
+  - `features.spans.ok=true`
+  - `features.patch.ok=true`
+
+Evidence:
+- `reports/gates.json` gate `G-089`
+
+---
+
 ### G-090: Resource governance (budgets) works
 Requirement:
 - Budget exceed produces a structured error (not crash, not hang).
