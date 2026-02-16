@@ -5,6 +5,10 @@ These reports are read by:
 - `scripts/eval/check-gates.mjs`
 - `scripts/eval/score.mjs`
 
+## Rendered summaries
+- `reports/eval-report.md` is a derived human-readable view generated from `reports/*.json`.
+- Rendered summaries are build artifacts and are not committed.
+
 Common fields:
 - `suite`: string (e.g., "tokenizer")
 - `timestamp`: ISO string

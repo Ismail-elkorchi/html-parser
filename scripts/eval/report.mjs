@@ -97,10 +97,10 @@ async function main() {
   lines.push("");
 
   const markdownOutput = lines.join("\n") + "\n";
-  await mkdir(dirname("docs/score-report.md"), { recursive: true });
-  await writeFile("docs/score-report.md", markdownOutput, "utf8");
+  await mkdir(dirname("reports/eval-report.md"), { recursive: true });
+  await writeFile("reports/eval-report.md", markdownOutput, "utf8");
 
-  console.log("Wrote docs/score-report.md");
+  console.log("Wrote reports/eval-report.md");
 }
 
 main().catch((error) => {
