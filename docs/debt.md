@@ -4,6 +4,19 @@ Rules:
 - Every devDependency must be recorded here.
 - Every devDependency addition must have ADR-005.
 
+## Manifest alignment
+The entries below are a 1:1 ledger for `package.json` `devDependencies`:
+- `typescript@5.9.3`
+- `eslint@9.39.2`
+- `@eslint/js@9.39.2`
+- `typescript-eslint@8.55.0`
+- `eslint-plugin-import@2.32.0`
+- `eslint-plugin-boundaries@5.4.0`
+- `eslint-import-resolver-typescript@4.4.4`
+- `playwright@1.58.2`
+
+No additional dev dependency is permitted without adding a matching entry in this ledger and an ADR-005 record.
+
 ## typescript@5.9.3
 Value:
 - Strict compile-time validation and declaration emission.
