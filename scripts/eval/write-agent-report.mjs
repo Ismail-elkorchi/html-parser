@@ -58,7 +58,19 @@ function evaluateTraceFeature() {
   const distinctKinds = [...new Set(firstTrace.map((event) => event.kind))];
   const hasAtLeastThreeKinds = distinctKinds.length >= 3;
   const hasBudgetEvent = firstTrace.some((event) => event.kind === "budget");
+  const hasInsertionModeTransition = firstTrace.some((event) => event.kind === "insertionModeTransition");
   const deterministic = JSON.stringify(firstTrace) === JSON.stringify(secondTrace);
+
+  const malformed = parse("<div><span></div>", {
+    trace: true,
+    budgets: {
+      maxInputBytes: 2048,
+      maxTraceEvents: 128,
+      maxTraceBytes: 8192
+    }
+  });
+  const malformedTrace = Array.isArray(malformed.trace) ? malformed.trace : [];
+  const hasParseErrorEvent = malformedTrace.some((event) => event.kind === "parseError");
 
   let tightBudgetError = null;
   try {
@@ -83,7 +95,13 @@ function evaluateTraceFeature() {
   }
 
   const tightBudgetPass = tightBudgetError !== null;
-  const ok = hasAtLeastThreeKinds && hasBudgetEvent && deterministic && tightBudgetPass;
+  const ok =
+    hasAtLeastThreeKinds &&
+    hasBudgetEvent &&
+    hasInsertionModeTransition &&
+    hasParseErrorEvent &&
+    deterministic &&
+    tightBudgetPass;
 
   return {
     ok,
@@ -92,6 +110,8 @@ function evaluateTraceFeature() {
       distinctKinds,
       hasAtLeastThreeKinds,
       hasBudgetEvent,
+      hasInsertionModeTransition,
+      hasParseErrorEvent,
       deterministic,
       tightBudgetPass,
       tightBudgetError
