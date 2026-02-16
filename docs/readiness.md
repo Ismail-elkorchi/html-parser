@@ -10,6 +10,7 @@ Readiness is defined by evaluation gates and report evidence, not by embedded co
 ## Evidence model
 - Evaluation reports are generated under `./reports/` by test and evaluation commands.
 - Reports are build artifacts and are not committed to git.
+- A human-readable summary is generated at `reports/eval-report.md`.
 - Readiness claims must cite current report artifacts, not static numbers copied into docs.
 
 ## Required commands

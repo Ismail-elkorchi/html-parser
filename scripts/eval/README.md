@@ -21,4 +21,4 @@ Outputs:
 - reports/pack.json
 - reports/gates.json
 - reports/score.json
-- docs/score-report.md
+- reports/eval-report.md
