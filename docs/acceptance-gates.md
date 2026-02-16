@@ -206,6 +206,38 @@ Evidence:
 
 ---
 
+### G-125: Text hygiene (no hidden control characters)
+Requirement:
+- Scanned tracked files must not contain:
+  - Unicode bidirectional control characters:
+    - U+061C
+    - U+200E
+    - U+200F
+    - U+202A through U+202E
+    - U+2066 through U+2069
+  - U+0000 (NUL)
+- Scan roots:
+  - `README.md`
+  - `docs/`
+  - `src/`
+  - `scripts/`
+  - `.github/`
+  - `package.json`
+  - `tsconfig*.json`
+  - `jsr.json`
+  - `eslint.config.mjs`
+- Exclusions:
+  - `vendor/`
+  - `node_modules/`
+  - `tmp/`
+  - `dist/`
+  - `reports/`
+
+Evidence:
+- `reports/text-hygiene.json` with `ok=true`
+
+---
+
 ## Gate set: RELEASE profile (must pass)
 
 Release includes ALL CI gates plus:
