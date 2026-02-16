@@ -7,7 +7,8 @@
       "requireDeno": true,
       "requireBun": true,
       "requireBrowserSmoke": false,
-      "requireFuzzReport": false
+      "requireFuzzReport": false,
+      "requireStreamReport": true
     },
     "release": {
       "requireHoldouts": true,
@@ -15,7 +16,8 @@
       "requireDeno": true,
       "requireBun": true,
       "requireBrowserSmoke": false,
-      "requireFuzzReport": true
+      "requireFuzzReport": true,
+      "requireStreamReport": true
     }
   },
   "thresholds": {

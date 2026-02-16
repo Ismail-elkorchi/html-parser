@@ -130,6 +130,17 @@ Evidence:
 
 ---
 
+### G-085: Streaming invariants
+Requirement:
+- `reports/stream.json` must exist for CI and release profiles.
+- Stream budget checks must pass, including `maxBufferedBytes` enforcement.
+- Stream parsing over chunked transport must match `parseBytes` for equivalent byte input.
+
+Evidence:
+- `reports/stream.json`
+
+---
+
 ### G-090: Resource governance (budgets) works
 Requirement:
 - Budget exceed produces a structured error (not crash, not hang).

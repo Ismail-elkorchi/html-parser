@@ -7,6 +7,7 @@ import {
   chunk,
   outline,
   parse,
+  parseBytes,
   parseFragment,
   parseStream
 } from "../../dist/mod.js";
@@ -16,6 +17,10 @@ const execFileAsync = promisify(execFile);
 
 function sha256(value) {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
+}
+
+function asciiBytes(value) {
+  return Array.from(value, (char) => char.charCodeAt(0));
 }
 
 function makeStream(chunks) {
@@ -196,6 +201,60 @@ async function writeBudgets() {
   });
 }
 
+async function writeStream() {
+  const checks = [];
+
+  const prefix = "<meta charset=windows-1252><p>";
+  const suffix = "</p>";
+  const bytes = new Uint8Array([...asciiBytes(prefix), 0xe9, ...asciiBytes(suffix)]);
+  const chunks = [];
+  for (let offset = 0; offset < bytes.length; offset += 3) {
+    chunks.push(bytes.subarray(offset, Math.min(bytes.length, offset + 3)));
+  }
+
+  const fromBytes = parseBytes(bytes);
+  const fromStream = await parseStream(makeStream(chunks));
+  const fromBytesHash = sha256(JSON.stringify(fromBytes));
+  const fromStreamHash = sha256(JSON.stringify(fromStream));
+
+  checks.push({
+    id: "stream-many-chunks-equals-parse-bytes",
+    ok: fromStreamHash === fromBytesHash,
+    observed: { hash: fromStreamHash, chunks: chunks.length },
+    expected: { hash: fromBytesHash }
+  });
+
+  const tiny = new Uint8Array(40).fill(0x61);
+  const tinyChunks = [...tiny].map((value) => new Uint8Array([value]));
+  let observedBudget = "none";
+  let observedActual = -1;
+
+  try {
+    await parseStream(makeStream(tinyChunks), { budgets: { maxBufferedBytes: 16 } });
+  } catch (error) {
+    if (error instanceof BudgetExceededError) {
+      observedBudget = error.payload.budget;
+      observedActual = error.payload.actual;
+    }
+  }
+
+  checks.push({
+    id: "stream-max-buffered-bytes-fails-before-overrun",
+    ok: observedBudget === "maxBufferedBytes" && observedActual === 17,
+    observed: { budget: observedBudget, actual: observedActual },
+    expected: { budget: "maxBufferedBytes", actual: 17 }
+  });
+
+  await writeJson("reports/stream.json", {
+    suite: "stream",
+    timestamp: new Date().toISOString(),
+    overall: {
+      ok: checks.every((entry) => entry.ok)
+    },
+    checks
+  });
+}
+
 async function writeSmoke() {
   const node = { ok: true, version: process.version };
   const deno = await maybeRuntimeVersion("deno", ["--version"]);
@@ -247,5 +306,6 @@ async function writeAgent() {
 
 await writeDeterminism();
 await writeBudgets();
+await writeStream();
 await writeSmoke();
 await writeAgent();
