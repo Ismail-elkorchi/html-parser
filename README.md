@@ -1,40 +1,180 @@
 # html-parser
 
-Agent-first TypeScript HTML parser under strict deterministic and security policies.
+Agent-first TypeScript HTML parser with deterministic output, bounded execution, and zero runtime dependencies.
+
+`docs/spec.md` is the normative API contract. This README is operational guidance and examples.
+
+## What this library is
+- Deterministic HTML parsing and serialization for agent and automation workflows.
+- Web-API-first runtime design that runs on Node, Deno, Bun, and modern browsers.
+- Structured budgeting and trace output for bounded, explainable parsing.
+- Patch planning primitives for deterministic rewrite workflows.
+- No runtime dependencies are used by production library code.
+
+## What this library is not
+- Not a DOM implementation.
+- Not a CSS selector engine.
+- Not a sanitizer.
 
 ## Runtime compatibility
-- Node.js: LTS and current stable
-- Deno: stable
-- Bun: stable
-- Browsers: modern evergreen releases
+- Node.js: current stable and active LTS with Web Streams and TextDecoder support.
+- Deno: stable channel.
+- Bun: stable channel.
+- Browsers: modern evergreen engines.
 
-## Security and safety
-- Resource budgets are mandatory and enforced.
-- Structured failures are required for budget exhaustion.
-- Evaluation gates and reports are tracked under `docs/` and `reports/`.
+See `docs/runtime-compatibility.md` for the exact runtime API surface used by `src/`.
 
-## Runtime dependencies
-- Runtime dependencies are intentionally zero.
-- No runtime dependencies are permitted in production code.
-- `package.json` `dependencies` must remain empty.
+### Browser bundling
+The runtime uses Web APIs and ESM.
+Use a standard ESM bundler (Vite, Rollup, esbuild, webpack in ESM mode) and import from the package entrypoint.
+No Node builtin polyfills are required for runtime code.
 
-## Development workflow
-- Pull requests only.
-- Squash merge and delete branch after merge.
+## Install
+```bash
+npm install html-parser
+```
 
-## Verification commands
-- `npm run lint`
-- `npm run typecheck`
-- `npm run build`
-- `npm test`
-- `npm run eval:ci`
+## Quickstart
 
-## Release evaluation
-- `npm run eval:release` is the release gate.
-- Browser differential requires Chromium, Firefox, and WebKit.
-- CI runs release oracle on `.github/workflows/oracle.yml` (scheduled/manual) and on tag releases.
+### Parse a string
+```ts
+import { parse } from "html-parser";
 
-## Readiness docs
-- `docs/readiness.md` defines readiness using gates and report artifacts.
-- `docs/acceptance-gates.md` defines mandatory CI and release gate evidence.
-- `docs/naming-conventions.md` defines identifier and log-label naming rules.
+const tree = parse("<p>Hello</p>");
+console.log(tree.kind); // "document"
+console.log(tree.children.length);
+```
+
+### Parse bytes with encoding sniff
+```ts
+import { parseBytes } from "html-parser";
+
+const bytes = new Uint8Array([
+  0x3c, 0x6d, 0x65, 0x74, 0x61, 0x20, 0x63, 0x68, 0x61, 0x72, 0x73, 0x65, 0x74, 0x3d, 0x77, 0x69,
+  0x6e, 0x64, 0x6f, 0x77, 0x73, 0x2d, 0x31, 0x32, 0x35, 0x32, 0x3e, 0x3c, 0x70, 0x3e, 0xe9, 0x3c,
+  0x2f, 0x70, 0x3e
+]);
+
+const tree = parseBytes(bytes);
+```
+
+### Parse a stream
+```ts
+import { parseStream } from "html-parser";
+
+const stream = new ReadableStream<Uint8Array>({
+  start(controller) {
+    controller.enqueue(new TextEncoder().encode("<div>"));
+    controller.enqueue(new TextEncoder().encode("ok"));
+    controller.enqueue(new TextEncoder().encode("</div>"));
+    controller.close();
+  }
+});
+
+const tree = await parseStream(stream, {
+  budgets: {
+    maxInputBytes: 1024,
+    maxBufferedBytes: 256
+  }
+});
+```
+
+### Serialize a parsed tree
+```ts
+import { parse, serialize } from "html-parser";
+
+const tree = parse("<section><p>x</p></section>");
+const html = serialize(tree);
+```
+
+### Trace with budgets
+```ts
+import { parse } from "html-parser";
+
+const tree = parse("<table><tr><td>x</td></tr></table>", {
+  trace: true,
+  budgets: {
+    maxTraceEvents: 64,
+    maxTraceBytes: 4096
+  }
+});
+
+for (const event of tree.trace ?? []) {
+  console.log(event.kind, event.seq);
+}
+```
+
+### Compute and apply a patch plan
+```ts
+import { applyPatchPlan, computePatch, parse } from "html-parser";
+
+const originalHtml = "<p>before</p>";
+const tree = parse(originalHtml, { captureSpans: true });
+
+const paragraph = tree.children.find((node) => node.kind === "element" && node.tagName === "html");
+// In real usage, target node IDs come from your traversal logic.
+const targetNodeId = paragraph?.id ?? tree.id;
+
+const plan = computePatch(originalHtml, [
+  {
+    nodeId: targetNodeId,
+    replacementHtml: "<p>after</p>"
+  }
+]);
+
+const patchedHtml = applyPatchPlan(originalHtml, plan);
+```
+
+### Outline and chunk for agent consumption
+```ts
+import { chunk, outline, parse } from "html-parser";
+
+const tree = parse("<h1>A</h1><h2>B</h2><p>text</p>");
+const docOutline = outline(tree);
+const chunks = chunk(tree, { maxChars: 120, maxNodes: 8 });
+```
+
+## Determinism contract
+For equal input and equal options:
+- parse output structure is stable,
+- NodeId assignment order is stable,
+- serialization output is stable,
+- trace event sequence is stable when enabled under the same budgets.
+
+This makes agent retries and diff-based workflows reproducible.
+
+## Budgets contract
+Budget limits provide bounded execution for untrusted or extreme input.
+On budget exceed, the library throws `BudgetExceededError` with structured payload:
+
+```ts
+{
+  code: "BUDGET_EXCEEDED",
+  budget: "maxInputBytes" | "maxBufferedBytes" | "maxNodes" | "maxDepth" | "maxTraceEvents" | "maxTraceBytes" | "maxTimeMs",
+  limit: number,
+  actual: number
+}
+```
+
+## Security model
+- Parsing untrusted HTML is supported.
+- Parsing is not sanitization.
+- Budgets are the primary parser-side control against parsing DoS behavior.
+- If your browser use case needs sanitization, use platform sanitization mechanisms such as the Sanitizer API.
+
+## Evaluation commands
+```bash
+npm run lint
+npm run typecheck
+npm run build
+npm test
+npm run eval:ci
+npm run eval:release
+```
+
+## Additional docs
+- Normative API and behavior contract: `docs/spec.md`
+- Acceptance gates and profile requirements: `docs/acceptance-gates.md`
+- Runtime API portability mapping: `docs/runtime-compatibility.md`
+- Agent-first behavior checklist: `docs/agent-first.md`
+- Release/readiness criteria: `docs/readiness.md`
