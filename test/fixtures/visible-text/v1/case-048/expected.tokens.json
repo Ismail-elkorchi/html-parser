@@ -1,0 +1,38 @@
+[
+  {
+    "kind": "text",
+    "value": "Key"
+  },
+  {
+    "kind": "tab",
+    "value": "\t"
+  },
+  {
+    "kind": "text",
+    "value": "Value"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Host"
+  },
+  {
+    "kind": "tab",
+    "value": "\t"
+  },
+  {
+    "kind": "text",
+    "value": "api"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "backup"
+  }
+]

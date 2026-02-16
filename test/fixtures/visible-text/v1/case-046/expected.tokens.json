@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "text",
+    "value": "Diagram"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "Architecture overview"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Next section"
+  }
+]

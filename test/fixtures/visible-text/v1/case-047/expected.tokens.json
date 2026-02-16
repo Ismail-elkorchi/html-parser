@@ -1,0 +1,30 @@
+[
+  {
+    "kind": "text",
+    "value": "Install"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Configure"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Linux"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "macOS"
+  }
+]

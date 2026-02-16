@@ -1,0 +1,30 @@
+[
+  {
+    "kind": "text",
+    "value": "Command:"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "npm run build"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "npm test"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "Done"
+  }
+]
