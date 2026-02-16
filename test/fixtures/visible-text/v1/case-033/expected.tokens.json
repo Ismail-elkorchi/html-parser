@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "ab"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "fallback text"
+  }
+]
