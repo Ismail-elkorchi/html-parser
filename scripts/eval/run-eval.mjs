@@ -51,6 +51,7 @@ async function main() {
   const profile = parseProfileArg();
 
   const steps = [
+    ["clean-reports", process.execPath, ["scripts/eval/clean-reports.mjs"]],
     ["tests", "npm", ["run", "test"]],
     ["conformance", process.execPath, ["scripts/conformance/run-all.mjs"]],
     ["determinism-budgets", process.execPath, ["scripts/eval/write-stub-reports.mjs"]],

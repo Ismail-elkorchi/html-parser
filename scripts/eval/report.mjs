@@ -56,6 +56,17 @@ async function main() {
     lines.push("");
     lines.push(`Total: **${scoreReport.total.toFixed(3)} / 100**`);
     lines.push("");
+    const weightsUsed = scoreReport.weightsUsed;
+    if (weightsUsed && typeof weightsUsed === "object") {
+      lines.push(`Weights source: \`${weightsUsed.source}\``);
+      lines.push(`Weights total: \`${Number(weightsUsed.total || 0).toFixed(3)}\``);
+      lines.push("");
+      lines.push("Weights:");
+      for (const [weightKey, weightValue] of Object.entries(weightsUsed.values || {})) {
+        lines.push(`- **${weightKey}**: ${Number(weightValue).toFixed(3)}`);
+      }
+      lines.push("");
+    }
     const scoreBreakdown = scoreReport.breakdown || {};
     for (const scoreKey of Object.keys(scoreBreakdown)) {
       const scoreItem = scoreBreakdown[scoreKey];
