@@ -17,6 +17,7 @@ Naming:
 - ADR-011-... unified conformance mismatch-failure policy (supersedes staged skip records)
 - ADR-012-... multi-engine browser differential oracle policy
 - ADR-013-... strict threshold posture consolidation
+- ADR-014-... browser differential corpus size and tag coverage thresholds
 
 Minimum sections:
 - Context

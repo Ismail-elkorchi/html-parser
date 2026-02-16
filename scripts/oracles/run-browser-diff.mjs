@@ -1,13 +1,24 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { chromium, firefox, webkit } from "playwright";
 
 import { parse } from "../../dist/mod.js";
-import { writeJson } from "../eval/util.mjs";
+import { readJson, safeDiv, writeJson } from "../eval/util.mjs";
 
 const SEED = 0x5f3759df;
-const RANDOM_CASES = 96;
+const RANDOM_CASES = 64;
+const CURATED_CORPUS_PATH = new URL("./corpus/curated-v3.json", import.meta.url);
+const REQUIRED_TAGS_DEFAULT = [
+  "tokenizer/entities",
+  "adoption-agency",
+  "tables/foster-parenting",
+  "foreign-content (svg/mathml)",
+  "templates",
+  "optional-tags",
+  "comments/doctype",
+  "scripting-flag surface (document.write-like markup patterns as strings only)"
+];
 
 if (process.platform === "linux" && process.env["PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS"] === undefined) {
   process.env["PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS"] = "1";
@@ -35,15 +46,6 @@ function randomCorpus(seed, size) {
 
   return out;
 }
-
-const curated = [
-  "<!doctype html><html><body><h1>a</h1></body></html>",
-  "<div class='x' data-a=1>z</div>",
-  "<svg><foreignObject><p>q</p></foreignObject></svg>",
-  "<math><mi>x</mi><mo>+</mo><mi>y</mi></math>",
-  "<template><p>inside</p></template>",
-  "<table><tr><td>x</td></tr></table>"
-];
 
 function normalizeAttributes(attributes) {
   return [...attributes]
@@ -77,6 +79,77 @@ function normalizeLibraryNode(node) {
 function normalizeLibrary(html) {
   const tree = parse(html);
   return tree.children.map((child) => normalizeLibraryNode(child));
+}
+
+function assertUniqueCaseIds(cases) {
+  const seen = new Set();
+  for (const testCase of cases) {
+    if (seen.has(testCase.id)) {
+      throw new Error(`Duplicate browser corpus case id: ${testCase.id}`);
+    }
+    seen.add(testCase.id);
+  }
+}
+
+async function loadCuratedCorpus() {
+  const raw = JSON.parse(await readFile(CURATED_CORPUS_PATH, "utf8"));
+  const name = typeof raw.name === "string" && raw.name.length > 0 ? raw.name : "curated-v3";
+  const requiredTags = Array.isArray(raw.requiredTags) && raw.requiredTags.length > 0
+    ? raw.requiredTags.filter((tag) => typeof tag === "string" && tag.length > 0)
+    : REQUIRED_TAGS_DEFAULT;
+
+  const cases = [];
+  for (const entry of raw.cases ?? []) {
+    if (entry === null || typeof entry !== "object") {
+      continue;
+    }
+
+    const id = typeof entry.id === "string" && entry.id.length > 0 ? entry.id : "";
+    const input = typeof entry.html === "string" ? entry.html : "";
+    const tags = Array.isArray(entry.tags)
+      ? entry.tags.filter((tag) => typeof tag === "string" && tag.length > 0)
+      : [];
+
+    if (id.length === 0 || input.length === 0 || tags.length === 0) {
+      continue;
+    }
+
+    cases.push({
+      id,
+      input,
+      tags
+    });
+  }
+
+  assertUniqueCaseIds(cases);
+  return { name, requiredTags, cases };
+}
+
+async function loadThresholdPolicy() {
+  const config = await readJson("evaluation.config.json");
+  const browser = config.thresholds?.browserDiff || {};
+  const requiredTags = Array.isArray(browser.requiredTags) && browser.requiredTags.length > 0
+    ? browser.requiredTags.filter((tag) => typeof tag === "string" && tag.length > 0)
+    : REQUIRED_TAGS_DEFAULT;
+
+  return {
+    minAgreement: Number(browser.minAgreement ?? 0.995),
+    minEnginesPresent: Number(browser.minEnginesPresent ?? 1),
+    minCases: Number(browser.minCases ?? 1),
+    minTagCoverage: Number(browser.minTagCoverage ?? 0),
+    requiredTags,
+    agreementAggregation: config.scoring?.browserAgreementAggregation === "average" ? "average" : "min"
+  };
+}
+
+function buildTagCounts(requiredTags, curatedCases) {
+  const counts = Object.fromEntries(requiredTags.map((tag) => [tag, 0]));
+  for (const testCase of curatedCases) {
+    for (const tag of testCase.tags) {
+      counts[tag] = Number(counts[tag] ?? 0) + 1;
+    }
+  }
+  return counts;
 }
 
 async function writeDisagreementRecord(caseId, engine, input, local, browser) {
@@ -222,13 +295,22 @@ async function runEngine(engineName, launcher, cases) {
   };
 }
 
-const corpus = [...curated, ...randomCorpus(SEED, RANDOM_CASES)];
-const cases = corpus.map((input, index) => ({
-  id: `case-${String(index + 1).padStart(4, "0")}`,
+const thresholdPolicy = await loadThresholdPolicy();
+const curatedCorpus = await loadCuratedCorpus();
+const randomCases = randomCorpus(SEED, RANDOM_CASES).map((input, index) => ({
+  id: `random-${String(index + 1).padStart(4, "0")}`,
   input,
-  localJson: JSON.stringify(normalizeLibrary(input))
+  tags: []
+}));
+const allCorpusCases = [...curatedCorpus.cases, ...randomCases];
+assertUniqueCaseIds(allCorpusCases);
+
+const cases = allCorpusCases.map((testCase) => ({
+  ...testCase,
+  localJson: JSON.stringify(normalizeLibrary(testCase.input))
 }));
 
+const tagCounts = buildTagCounts(thresholdPolicy.requiredTags, curatedCorpus.cases);
 const engines = {
   chromium: { compared: 0, agreed: 0, disagreed: 0 },
   firefox: { compared: 0, agreed: 0, disagreed: 0 },
@@ -246,19 +328,58 @@ for (const [engineName, launcher] of [
   disagreements.push(...result.disagreements);
 }
 
-await writeJson("reports/browser-diff.json", {
+const report = {
   suite: "browser-diff",
   timestamp: new Date().toISOString(),
   corpus: {
-    name: "curated-v2",
-    seed: `0x${SEED.toString(16)}`,
-    cases: corpus.length
+    name: curatedCorpus.name,
+    totalCases: allCorpusCases.length,
+    curatedCases: curatedCorpus.cases.length,
+    randomCases: randomCases.length,
+    seed: `0x${SEED.toString(16)}`
+  },
+  coverage: {
+    tagCounts,
+    minPerTag: thresholdPolicy.minTagCoverage
   },
   engines,
   disagreements
-});
+};
 
-const summary = Object.entries(engines)
-  .map(([name, data]) => `${name}:${String(data.agreed)}/${String(data.compared)}`)
-  .join(" ");
-console.log(`Browser diff complete: ${summary}`);
+await writeJson("reports/browser-diff.json", report);
+
+const presentEngines = Object.keys(engines).filter((name) => Number(engines[name]?.compared || 0) > 0);
+const agreements = presentEngines.map((name) =>
+  safeDiv(Number(engines[name]?.agreed || 0), Number(engines[name]?.compared || 0))
+);
+const aggregateAgreement = thresholdPolicy.agreementAggregation === "min"
+  ? (agreements.length > 0 ? Math.min(...agreements) : 0)
+  : (agreements.length > 0 ? agreements.reduce((sum, value) => sum + value, 0) / agreements.length : 0);
+
+const lowCoverageTags = thresholdPolicy.requiredTags.filter(
+  (tag) => Number(tagCounts[tag] ?? 0) < thresholdPolicy.minTagCoverage
+);
+
+const failures = [];
+if (allCorpusCases.length < thresholdPolicy.minCases) {
+  failures.push(`minCases not met: ${allCorpusCases.length}/${thresholdPolicy.minCases}`);
+}
+if (presentEngines.length < thresholdPolicy.minEnginesPresent) {
+  failures.push(`minEnginesPresent not met: ${presentEngines.length}/${thresholdPolicy.minEnginesPresent}`);
+}
+if (aggregateAgreement < thresholdPolicy.minAgreement) {
+  failures.push(`minAgreement not met: ${aggregateAgreement.toFixed(6)}/${thresholdPolicy.minAgreement}`);
+}
+if (lowCoverageTags.length > 0) {
+  failures.push(`minTagCoverage not met for: ${lowCoverageTags.join(", ")}`);
+}
+
+if (failures.length > 0) {
+  console.error(`Browser differential thresholds failed: ${failures.join("; ")}`);
+  process.exit(1);
+}
+
+console.log(
+  `Browser differential complete: cases=${allCorpusCases.length}, disagreements=${disagreements.length}, `
+    + `agreement=${aggregateAgreement.toFixed(6)}`
+);
