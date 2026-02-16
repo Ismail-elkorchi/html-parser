@@ -114,6 +114,31 @@ Shape:
   "overall": { "ok": true }
 }
 
+## Stream invariants report
+File:
+- reports/stream.json
+
+Shape:
+{
+  "suite": "stream",
+  "timestamp": "...",
+  "overall": { "ok": true },
+  "checks": [
+    {
+      "id": "stream-many-chunks-equals-parse-bytes",
+      "ok": true,
+      "observed": { "hash": "sha256:..." },
+      "expected": { "hash": "sha256:..." }
+    },
+    {
+      "id": "stream-max-buffered-bytes-fails-before-overrun",
+      "ok": true,
+      "observed": { "budget": "maxBufferedBytes", "actual": 17 },
+      "expected": { "budget": "maxBufferedBytes", "actual": 17 }
+    }
+  ]
+}
+
 ## Budgets report
 File:
 - reports/budgets.json

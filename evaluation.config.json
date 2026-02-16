@@ -6,14 +6,16 @@
       "requireBrowserDiff": false,
       "requireDeno": true,
       "requireBun": true,
-      "requireBrowserSmoke": false
+      "requireBrowserSmoke": false,
+      "requireStreamReport": true
     },
     "release": {
       "requireHoldouts": true,
       "requireBrowserDiff": true,
       "requireDeno": true,
       "requireBun": true,
-      "requireBrowserSmoke": false
+      "requireBrowserSmoke": false,
+      "requireStreamReport": true
     }
   },
   "thresholds": {

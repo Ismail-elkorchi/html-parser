@@ -161,6 +161,19 @@ async function main() {
   const detOk = Boolean(det?.overall?.ok);
   gates.push(gate("G-080", "Determinism", detOk, det || { missing: true }));
 
+  const streamReport = await loadOptionalReport("reports/stream.json");
+  const requireStreamReport = Boolean(prof.requireStreamReport);
+  const streamOk = Boolean(streamReport?.overall?.ok);
+  const streamPass = requireStreamReport ? streamOk : (streamReport ? streamOk : true);
+  gates.push(
+    gate(
+      "G-085",
+      "Streaming invariants",
+      streamPass,
+      { required: requireStreamReport, stream: streamReport || { missing: true } }
+    )
+  );
+
   const budgets = await loadOptionalReport("reports/budgets.json");
   const fuzz = await loadOptionalReport("reports/fuzz.json");
   const requireBudgetsReport = Boolean(config.thresholds?.budgets?.requireBudgetsReport);
