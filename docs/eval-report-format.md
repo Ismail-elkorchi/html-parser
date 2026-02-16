@@ -21,7 +21,7 @@ Files:
 - reports/serializer.json
 - reports/holdout.json
 
-Shape:
+Shape (tokenizer/tree/encoding/serializer):
 {
   "suite": "tokenizer",
   "timestamp": "...",
@@ -30,6 +30,9 @@ Shape:
     "entitiesHash": "sha256:..."
   },
   "cases": { "passed": 0, "failed": 0, "skipped": 0, "total": 0 },
+  "holdoutExcluded": 0,
+  "holdoutRule": "hash(id) % 10 === 0",
+  "holdoutMod": 10,
   "failures": [
     {
       "id": "path/to/file#caseId",
@@ -47,9 +50,46 @@ Shape:
   ]
 }
 
+Shape (holdout aggregate):
+{
+  "suite": "holdout",
+  "timestamp": "...",
+  "holdoutRule": "hash(id) % 10 === 0",
+  "holdoutMod": 10,
+  "suites": {
+    "tokenizer": {
+      "cases": { "passed": 0, "failed": 0, "skipped": 0, "total": 0 },
+      "holdoutRule": "hash(id) % 10 === 0",
+      "holdoutMod": 10,
+      "totalSurface": 0
+    },
+    "tree": {
+      "cases": { "passed": 0, "failed": 0, "skipped": 0, "total": 0 },
+      "holdoutRule": "hash(id) % 10 === 0",
+      "holdoutMod": 10,
+      "totalSurface": 0
+    },
+    "encoding": {
+      "cases": { "passed": 0, "failed": 0, "skipped": 0, "total": 0 },
+      "holdoutRule": "hash(id) % 10 === 0",
+      "holdoutMod": 10,
+      "totalSurface": 0
+    },
+    "serializer": {
+      "cases": { "passed": 0, "failed": 0, "skipped": 0, "total": 0 },
+      "holdoutRule": "hash(id) % 10 === 0",
+      "holdoutMod": 10,
+      "totalSurface": 0
+    }
+  },
+  "cases": { "passed": 0, "failed": 0, "skipped": 0, "total": 0 },
+  "failures": []
+}
+
 Rules:
 - total = passed + failed + skipped
 - If skipped > 0, each skip MUST include an existing decisionRecord path.
+- `reports/holdout.json` MUST include per-suite breakdown for tokenizer/tree/encoding/serializer.
 
 ## Determinism report
 File:

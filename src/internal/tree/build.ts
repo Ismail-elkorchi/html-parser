@@ -21,6 +21,8 @@ const MATHML_NAMESPACE = "http://www.w3.org/1998/Math/MathML";
 
 const CONTEXT_DOCUMENT_HTML =
   "<!doctype html><html><head><title>x</title></head><body><table><tbody><tr><td></td></tr><caption></caption><colgroup></colgroup></table><frameset></frameset></body></html>";
+const CONTEXT_DOCUMENT_FRAMESET =
+  "<!doctype html><html><frameset></frameset></html>";
 
 type Parse5Attribute = {
   readonly name: string;
@@ -263,6 +265,10 @@ function createFragmentContext(fragmentContextTagName: string): Parse5Element | 
   const tagName = fragmentContextTagName.trim().toLowerCase();
   if (tagName.length === 0) {
     return null;
+  }
+
+  if (tagName === "frameset") {
+    return findElementByTagName(parse(CONTEXT_DOCUMENT_FRAMESET) as Parse5Document, tagName);
   }
 
   if (tagName === "html" || tagName === "head" || tagName === "body" || tagName === "title") {
