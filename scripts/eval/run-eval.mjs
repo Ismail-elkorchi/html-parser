@@ -60,6 +60,7 @@ async function main() {
     ["smoke-bun", "npm", ["run", "smoke:bun"]],
     ["docs", process.execPath, ["scripts/eval/check-docs.mjs"]],
     ["doc-policy", process.execPath, ["scripts/eval/check-doc-policy.mjs"]],
+    ["doc-snippets", process.execPath, ["scripts/eval/check-doc-snippets.mjs"]],
     ["text-hygiene", process.execPath, ["scripts/eval/check-text-hygiene.mjs"]],
     ["no-external-imports", process.execPath, ["scripts/eval/check-no-external-imports.mjs"]],
     ["no-node-builtins", process.execPath, ["scripts/eval/check-no-node-builtins.mjs"]],
