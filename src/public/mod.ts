@@ -233,6 +233,25 @@ function toAttributes(attributes: readonly TreeAttribute[], captureSpans: boolea
   });
 }
 
+const WHATWG_PARSE_ERRORS_SECTION_URL = "https://html.spec.whatwg.org/multipage/parsing.html#parse-errors";
+const WHATWG_PARSE_ERROR_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function normalizeParseErrorId(rawErrorCode: string): string {
+  const normalized = rawErrorCode.trim();
+  if (normalized.length === 0) {
+    return "vendor:unknown";
+  }
+  if (WHATWG_PARSE_ERROR_ID_PATTERN.test(normalized)) {
+    return normalized;
+  }
+  return `vendor:${normalized}`;
+}
+
+export function getParseErrorSpecRef(parseErrorId: string): string {
+  void parseErrorId;
+  return WHATWG_PARSE_ERRORS_SECTION_URL;
+}
+
 function toParseErrors(
   errors: readonly {
     readonly code: string;
@@ -246,8 +265,10 @@ function toParseErrors(
       typeof error.endOffset === "number" &&
       error.startOffset >= 0 &&
       error.endOffset >= error.startOffset;
+    const parseErrorId = normalizeParseErrorId(error.code);
     return {
       code: "PARSER_ERROR",
+      parseErrorId,
       message: error.code,
       ...(hasOffsets
         ? {
@@ -515,7 +536,7 @@ function parseDocumentInternal(html: string, options: ParseOptions = {}): Docume
   for (const treeError of parseErrorTrace) {
     trace = pushTrace(trace, {
       kind: "parseError",
-      parseErrorId: treeError.code,
+      parseErrorId: normalizeParseErrorId(treeError.code),
       startOffset: typeof treeError.startOffset === "number" ? treeError.startOffset : null,
       endOffset: typeof treeError.endOffset === "number" ? treeError.endOffset : null
     }, budgets);
@@ -682,7 +703,7 @@ export function parseFragment(
   for (const treeError of parseErrorTrace) {
     trace = pushTrace(trace, {
       kind: "parseError",
-      parseErrorId: treeError.code,
+      parseErrorId: normalizeParseErrorId(treeError.code),
       startOffset: typeof treeError.startOffset === "number" ? treeError.startOffset : null,
       endOffset: typeof treeError.endOffset === "number" ? treeError.endOffset : null
     }, budgets);

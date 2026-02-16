@@ -277,6 +277,65 @@ async function main() {
     )
   );
 
+  let exportedGetParseErrorSpecRef = false;
+  let parseErrorApiError = null;
+  let parseErrorIdsPresent = false;
+  let parseErrorIdsDeterministic = false;
+  let parseErrorSpecRefStable = false;
+  try {
+    const publicModule = await import(pathToFileURL(resolve("dist/mod.js")).href);
+    exportedGetParseErrorSpecRef = typeof publicModule.getParseErrorSpecRef === "function";
+
+    const malformedHtml = "<div><span></div><p></span>";
+    const firstRun = publicModule.parse(malformedHtml, { trace: true });
+    const secondRun = publicModule.parse(malformedHtml, { trace: true });
+    const firstIds = firstRun.errors.map((entry) => entry.parseErrorId);
+    const secondIds = secondRun.errors.map((entry) => entry.parseErrorId);
+    parseErrorIdsPresent = firstIds.length > 0 && firstIds.every((entry) => typeof entry === "string" && entry.length > 0);
+    parseErrorIdsDeterministic = JSON.stringify(firstIds) === JSON.stringify(secondIds);
+    parseErrorSpecRefStable =
+      exportedGetParseErrorSpecRef &&
+      firstIds.every(
+        (entry) =>
+          publicModule.getParseErrorSpecRef(entry) === "https://html.spec.whatwg.org/multipage/parsing.html#parse-errors"
+      );
+  } catch (error) {
+    parseErrorApiError = error instanceof Error ? error.message : String(error);
+  }
+
+  const parseErrorDocsExists = await fileExists("docs/parse-errors.md");
+  const parseErrorTestsExists = await fileExists("test/control/parse-errors.test.js");
+  const agentParseErrorFeaturePresent = Boolean(agentReport?.features?.parseErrorId);
+  const agentParseErrorFeatureOk = Boolean(agentReport?.features?.parseErrorId?.ok);
+  const parseErrorGatePass =
+    exportedGetParseErrorSpecRef &&
+    parseErrorIdsPresent &&
+    parseErrorIdsDeterministic &&
+    parseErrorSpecRefStable &&
+    parseErrorDocsExists &&
+    parseErrorTestsExists &&
+    agentParseErrorFeaturePresent &&
+    agentParseErrorFeatureOk;
+
+  gates.push(
+    makeGate(
+      "G-088",
+      "Parse error taxonomy contract",
+      parseErrorGatePass,
+      {
+        exportedGetParseErrorSpecRef,
+        parseErrorApiError,
+        parseErrorIdsPresent,
+        parseErrorIdsDeterministic,
+        parseErrorSpecRefStable,
+        parseErrorDocsExists,
+        parseErrorTestsExists,
+        agentParseErrorFeaturePresent,
+        agentParseErrorFeatureOk
+      }
+    )
+  );
+
   const budgets = await loadOptionalReport("reports/budgets.json");
   const fuzz = await loadOptionalReport("reports/fuzz.json");
   const requireBudgetsReport = Boolean(config.thresholds?.budgets?.requireBudgetsReport);

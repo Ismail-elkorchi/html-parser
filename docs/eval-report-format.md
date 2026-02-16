@@ -289,7 +289,8 @@ Shape:
     "outline": { "ok": true, "details": {} },
     "chunk": { "ok": true, "details": {} },
     "streamToken": { "ok": true, "details": {} },
-    "visibleText": { "ok": true, "details": {} }
+    "visibleText": { "ok": true, "details": {} },
+    "parseErrorId": { "ok": true, "details": {} }
   },
   "overall": {
     "ok": true
@@ -299,6 +300,7 @@ Shape:
 Rules:
 - `features.trace.ok` must reflect structured trace schema validation (not only non-empty trace arrays).
 - `features.visibleText.ok` must validate deterministic `visibleText` + `visibleTextTokens` behavior.
+- `features.parseErrorId.ok` must validate deterministic parse error IDs and spec-reference helper behavior.
 - `overall.ok` must be `true` for gate `G-086`.
 
 ## Packaging report

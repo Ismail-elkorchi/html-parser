@@ -7,6 +7,7 @@ import {
   findAllByAttr,
   findAllByTagName,
   findById,
+  getParseErrorSpecRef,
   outline,
   parse,
   parseFragment,
@@ -455,6 +456,34 @@ function evaluateVisibleTextFeature() {
   };
 }
 
+function evaluateParseErrorIdFeature() {
+  const malformedHtml = "<div><span></div><p></span>";
+  const firstRun = parse(malformedHtml, { trace: true });
+  const secondRun = parse(malformedHtml, { trace: true });
+
+  const firstIds = firstRun.errors.map((entry) => entry.parseErrorId);
+  const secondIds = secondRun.errors.map((entry) => entry.parseErrorId);
+  const idsPresent = firstIds.length > 0 && firstIds.every((id) => typeof id === "string" && id.length > 0);
+  const deterministic = JSON.stringify(firstIds) === JSON.stringify(secondIds);
+  const traceIds = (firstRun.trace ?? [])
+    .filter((event) => event.kind === "parseError")
+    .map((event) => event.parseErrorId);
+  const traceAligned = traceIds.every((id) => typeof id === "string" && id.length > 0);
+  const specRefs = firstIds.map((id) => getParseErrorSpecRef(id));
+  const specRefStable = specRefs.every((url) => url === "https://html.spec.whatwg.org/multipage/parsing.html#parse-errors");
+
+  return {
+    ok: idsPresent && deterministic && traceAligned && specRefStable,
+    details: {
+      count: firstIds.length,
+      firstIds,
+      deterministic,
+      traceAligned,
+      specRefStable
+    }
+  };
+}
+
 async function main() {
   const features = {
     trace: { ok: false, details: {} },
@@ -463,7 +492,8 @@ async function main() {
     outline: { ok: false, details: {} },
     chunk: { ok: false, details: {} },
     streamToken: { ok: false, details: {} },
-    visibleText: { ok: false, details: {} }
+    visibleText: { ok: false, details: {} },
+    parseErrorId: { ok: false, details: {} }
   };
 
   try {
@@ -506,6 +536,12 @@ async function main() {
     features.visibleText = evaluateVisibleTextFeature();
   } catch (error) {
     features.visibleText = { ok: false, details: { error: makeReportFailure(error) } };
+  }
+
+  try {
+    features.parseErrorId = evaluateParseErrorIdFeature();
+  } catch (error) {
+    features.parseErrorId = { ok: false, details: { error: makeReportFailure(error) } };
   }
 
   const overall = {

@@ -17,6 +17,9 @@ Agent-first behavior is measured as observable runtime and evaluation outcomes.
   - fixture snapshots under `test/fixtures/visible-text/v1/` are stable across repeated runs.
 - Structured budget failures:
   - budget limits raise `BudgetExceededError` with structured payload.
+- Parse-error taxonomy:
+  - parser errors expose deterministic `parseErrorId`.
+  - `getParseErrorSpecRef(parseErrorId)` provides a stable spec-reference URL.
 
 ## Verification surface
 - `reports/agent.json`

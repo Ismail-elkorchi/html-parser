@@ -17,6 +17,7 @@
 - `findById(tree, id)`
 - `findAllByTagName(tree, tagName)` (iterator)
 - `findAllByAttr(tree, name, value?)` (iterator)
+- `getParseErrorSpecRef(parseErrorId)`
 - `outline(tree, options)`
 - `chunk(tree, options)`
 
@@ -149,3 +150,8 @@ Stable event shapes:
   - `svg:<context>`
   - `mathml:<context>`
 - Full HTML insertion-mode parity inside foreign content is not complete in v1 and is tracked as fixture debt.
+
+## Parse-error taxonomy
+- Normative contract: `docs/parse-errors.md`.
+- `ParseError.parseErrorId` is deterministic across repeated runs for equal input/options.
+- `getParseErrorSpecRef(parseErrorId)` returns a stable parse-errors section URL.
