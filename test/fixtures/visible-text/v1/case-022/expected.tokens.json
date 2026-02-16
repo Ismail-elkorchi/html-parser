@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "text",
+    "value": "inline"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "block next"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "tail"
+  }
+]

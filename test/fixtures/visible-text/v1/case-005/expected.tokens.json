@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "Title"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Body text"
+  }
+]

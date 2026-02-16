@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "text",
+    "value": "first"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "second"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "third"
+  }
+]

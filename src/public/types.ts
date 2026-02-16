@@ -239,6 +239,38 @@ export interface ChunkOptions {
   readonly maxBytes?: number;
 }
 
+export interface VisibleTextOptions {
+  readonly skipHiddenSubtrees?: boolean;
+  readonly includeControlValues?: boolean;
+  readonly trim?: boolean;
+}
+
+export interface VisibleTextTextToken {
+  readonly kind: "text";
+  readonly value: string;
+}
+
+export interface VisibleTextLineBreakToken {
+  readonly kind: "lineBreak";
+  readonly value: "\n";
+}
+
+export interface VisibleTextParagraphBreakToken {
+  readonly kind: "paragraphBreak";
+  readonly value: "\n\n";
+}
+
+export interface VisibleTextTabToken {
+  readonly kind: "tab";
+  readonly value: "\t";
+}
+
+export type VisibleTextToken =
+  | VisibleTextTextToken
+  | VisibleTextLineBreakToken
+  | VisibleTextParagraphBreakToken
+  | VisibleTextTabToken;
+
 export interface RemoveNodeEdit {
   readonly kind: "removeNode";
   readonly target: NodeId;

@@ -12,6 +12,9 @@ Agent-first behavior is measured as observable runtime and evaluation outcomes.
   - `captureSpans: true` exposes source spans for patch-targetable nodes.
 - Deterministic outline and chunk:
   - `outline(tree)` and `chunk(tree, options)` produce stable output for stable input.
+- Deterministic visible-text extraction:
+  - `visibleText(...)` and `visibleTextTokens(...)` follow `docs/visible-text.md`.
+  - fixture snapshots under `test/fixtures/visible-text/v1/` are stable across repeated runs.
 - Structured budget failures:
   - budget limits raise `BudgetExceededError` with structured payload.
 
@@ -21,3 +24,4 @@ Agent-first behavior is measured as observable runtime and evaluation outcomes.
 - `reports/determinism.json`
 - `reports/budgets.json`
 - `reports/gates.json`
+- `test/fixtures/visible-text/v1/`

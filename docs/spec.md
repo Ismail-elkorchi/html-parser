@@ -12,6 +12,8 @@
 - `walk(tree, visitor)`
 - `walkElements(tree, visitor)`
 - `textContent(node)`
+- `visibleText(nodeOrTree, options?)`
+- `visibleTextTokens(nodeOrTree, options?)`
 - `findById(tree, id)`
 - `findAllByTagName(tree, tagName)` (iterator)
 - `findAllByAttr(tree, name, value?)` (iterator)
@@ -41,6 +43,9 @@
 - `chunk.maxChars`: `8192`
 - `chunk.maxNodes`: `256`
 - `chunk.maxBytes`: unlimited
+- `visibleText.skipHiddenSubtrees`: `true`
+- `visibleText.includeControlValues`: `true`
+- `visibleText.trim`: `true`
 
 `tokenizeStream` yields token kinds:
 - `startTag`
@@ -67,6 +72,15 @@
 - Attribute ordering is stable by input order after duplicate-name normalization.
 - For equal input + options, API output is byte-for-byte stable.
 - Traversal/search helpers iterate in deterministic pre-order document order.
+- `visibleText` and `visibleTextTokens` are stable for equal input + options.
+
+## Visible text contract
+- Normative contract: `docs/visible-text.md`.
+- Scope:
+  - deterministic text extraction for agent workflows
+  - explicit structural breaks (`br`, `p`, table row/cell, block boundaries)
+- Non-goal:
+  - browser layout-equivalent `innerText` behavior
 
 ## Span precision
 - Node and attribute spans are populated only when `captureSpans: true`.

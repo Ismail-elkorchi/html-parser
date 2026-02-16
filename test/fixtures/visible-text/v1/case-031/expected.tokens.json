@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "A"
+  },
+  {
+    "kind": "tab",
+    "value": "\t"
+  },
+  {
+    "kind": "text",
+    "value": "B"
+  }
+]
