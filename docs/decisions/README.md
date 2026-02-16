@@ -23,6 +23,7 @@ Naming:
 - ADR-017-... naming policy documentation requirement in docs gate
 - ADR-018-... package identity policy for public alpha readiness
 - ADR-019-... text hygiene gate for hidden Unicode control characters
+- ADR-020-... doc policy coherence gate for naming and log labels
 
 Minimum sections:
 - Context

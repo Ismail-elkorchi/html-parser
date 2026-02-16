@@ -351,3 +351,28 @@ Shape:
 Rules:
 - The report fails (`ok=false`) if any scanned file includes banned Unicode bidi controls or U+0000.
 - The scan surface and exclusions are defined by gate `G-125` in `docs/acceptance-gates.md`.
+
+## Doc policy report
+File:
+- reports/doc-policy.json
+
+Shape:
+{
+  "suite": "doc-policy",
+  "timestamp": "...",
+  "ok": true,
+  "canonicalPath": "docs/naming-conventions.md",
+  "referencePath": "CONTRIBUTING.md",
+  "checks": [
+    {
+      "id": "canonical-marker-singleton",
+      "ok": true
+    }
+  ],
+  "failures": []
+}
+
+Rules:
+- The canonical log label policy marker is defined in `docs/naming-conventions.md`.
+- `CONTRIBUTING.md` references the same marker and canonical path.
+- Contradictory tag-prefix policy text in `CONTRIBUTING.md` causes `ok=false`.

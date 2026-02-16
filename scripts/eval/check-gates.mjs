@@ -257,6 +257,16 @@ async function main() {
     )
   );
 
+  const docPolicy = await loadOptionalReport("reports/doc-policy.json");
+  gates.push(
+    makeGate(
+      "G-126",
+      "Doc policy coherence",
+      Boolean(docPolicy?.ok),
+      docPolicy || { missing: true }
+    )
+  );
+
   if (profilePolicy.requireHoldouts) {
     await evaluateConformanceGate("R-200", "Holdout suite", "reports/holdout.json", conformanceThresholds.holdout);
   }

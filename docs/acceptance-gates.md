@@ -238,6 +238,17 @@ Evidence:
 
 ---
 
+### G-126: Doc policy coherence
+Requirement:
+- Naming and log label policy must have one canonical statement in `docs/naming-conventions.md`.
+- `CONTRIBUTING.md` must reference the canonical statement and must not define a contradictory log label rule.
+- The canonical marker and policy reference marker must match exactly.
+
+Evidence:
+- `reports/doc-policy.json` with `ok=true`
+
+---
+
 ## Gate set: RELEASE profile (must pass)
 
 Release includes ALL CI gates plus:
