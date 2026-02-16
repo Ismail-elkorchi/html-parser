@@ -6,14 +6,16 @@
       "requireBrowserDiff": false,
       "requireDeno": true,
       "requireBun": true,
-      "requireBrowserSmoke": false
+      "requireBrowserSmoke": false,
+      "requireFuzzReport": false
     },
     "release": {
       "requireHoldouts": true,
       "requireBrowserDiff": true,
       "requireDeno": true,
       "requireBun": true,
-      "requireBrowserSmoke": false
+      "requireBrowserSmoke": false,
+      "requireFuzzReport": true
     }
   },
   "thresholds": {
@@ -49,7 +51,8 @@
     "budgets": {
       "requireBudgetsReport": true,
       "requireNoHangs": true,
-      "requireStructuredBudgetErrors": true
+      "requireStructuredBudgetErrors": true,
+      "requireFuzzReport": true
     },
     "packaging": {
       "forbiddenPaths": [
