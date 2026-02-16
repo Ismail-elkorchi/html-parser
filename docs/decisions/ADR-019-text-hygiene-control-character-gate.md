@@ -13,24 +13,30 @@ The repository also requires generated output directories and vendored corpora t
 
 - Add a required evaluation gate `G-125` for text hygiene.
 - Implement `scripts/eval/check-text-hygiene.mjs` and run it in both `ci` and `release` evaluation profiles.
-- Ban the following code points in scanned tracked files:
+- Ban the following review-evasion code points in scanned tracked files:
+  - U+00AD
+  - U+034F
+  - U+180E
+  - U+200B
+  - U+200C
+  - U+200D
+  - U+2060
+  - U+FEFF
   - U+061C
   - U+200E
   - U+200F
   - U+202A through U+202E
   - U+2066 through U+2069
   - U+0000 (NUL)
-- Scan roots:
-  - `README.md`
+- Scan first-party tracked text coverage:
   - `docs/`
   - `src/`
   - `scripts/`
+  - `test/`
+  - `tests/`
   - `.github/`
-  - `package.json`
-  - `tsconfig*.json`
-  - `jsr.json`
-  - `eslint.config.mjs`
-- Exclude:
+  - root tracked human-authored text/config files (`README.md`, `package.json`, `jsr.json`, `tsconfig*.json`, `eslint.config.mjs`, and similar root configs)
+- Exclude machine/vendor paths:
   - `vendor/`
   - `node_modules/`
   - `tmp/`
@@ -46,9 +52,9 @@ The repository also requires generated output directories and vendored corpora t
 
 ## Consequences
 
-- CI and release fail when hidden bidi controls or NUL bytes are introduced in first-party tracked text.
+- CI and release fail when banned hidden/review-evasion code points are introduced in first-party tracked text.
 - The gate output (`reports/text-hygiene.json`) provides deterministic evidence with path, code point, and index.
-- Vendored/test corpus content remains outside this gate by policy.
+- Vendored and generated artifact content remains outside this gate by policy.
 
 ## Validation plan
 

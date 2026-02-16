@@ -6,17 +6,12 @@ import { nowIso, writeJson } from "./eval-primitives.mjs";
 
 const execFileAsync = promisify(execFile);
 
-const INCLUDED_EXACT_PATHS = new Set([
-  "README.md",
-  "package.json",
-  "jsr.json",
-  "eslint.config.mjs"
-]);
-
 const INCLUDED_PREFIXES = [
   "docs/",
   "src/",
   "scripts/",
+  "test/",
+  "tests/",
   ".github/"
 ];
 
@@ -28,7 +23,8 @@ const EXCLUDED_PREFIXES = [
   "reports/"
 ];
 
-const TS_CONFIG_PATTERN = /^tsconfig[^/]*\.json$/;
+const ROOT_TEXT_FILE_PATTERN =
+  /^(?:README\.md|CONTRIBUTING\.md|SECURITY\.md|LICENSE|package(?:-lock)?\.json|jsr\.json|evaluation\.config\.json|eslint\.config\.[cm]?js|tsconfig[^/]*\.json|.*\.(?:md|json|ya?ml|toml|mjs|cjs|js|txt)|\.(?:editorconfig|gitignore|gitattributes|npmrc))$/;
 
 const BIDI_CODE_POINTS = new Set([
   0x061c,
@@ -41,12 +37,27 @@ const BIDI_RANGES = [
   [0x2066, 0x2069]
 ];
 
+const HIDDEN_FORMAT_CODE_POINTS = new Set([
+  0x00ad,
+  0x034f,
+  0x180e,
+  0x200b,
+  0x200c,
+  0x200d,
+  0x2060,
+  0xfeff
+]);
+
 function codePointToHex(codePoint) {
   return `U+${codePoint.toString(16).toUpperCase().padStart(4, "0")}`;
 }
 
 function isBannedCodePoint(codePoint) {
   if (codePoint === 0x0000) {
+    return true;
+  }
+
+  if (HIDDEN_FORMAT_CODE_POINTS.has(codePoint)) {
     return true;
   }
 
@@ -62,15 +73,15 @@ function shouldScanPath(filePath) {
     return false;
   }
 
-  if (INCLUDED_EXACT_PATHS.has(filePath)) {
-    return true;
-  }
-
   if (INCLUDED_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {
     return true;
   }
 
-  return TS_CONFIG_PATTERN.test(filePath);
+  if (!filePath.includes("/")) {
+    return ROOT_TEXT_FILE_PATTERN.test(filePath);
+  }
+
+  return false;
 }
 
 async function listTrackedPaths() {

@@ -298,7 +298,17 @@ Evidence:
 
 ### G-125: Text hygiene (no hidden control characters)
 Requirement:
+- Review-evasion characters are forbidden in tracked first-party text files.
 - Scanned tracked files must not contain:
+  - Unicode hidden format characters:
+    - U+00AD
+    - U+034F
+    - U+180E
+    - U+200B
+    - U+200C
+    - U+200D
+    - U+2060
+    - U+FEFF
   - Unicode bidirectional control characters:
     - U+061C
     - U+200E
@@ -306,16 +316,15 @@ Requirement:
     - U+202A through U+202E
     - U+2066 through U+2069
   - U+0000 (NUL)
-- Scan roots:
-  - `README.md`
+- Scan coverage:
   - `docs/`
   - `src/`
   - `scripts/`
+  - `test/`
+  - `tests/`
   - `.github/`
-  - `package.json`
-  - `tsconfig*.json`
-  - `jsr.json`
-  - `eslint.config.mjs`
+  - root tracked human-authored text and configuration files
+    - includes: `README.md`, `package.json`, `jsr.json`, `tsconfig*.json`, `eslint.config.mjs`, and similar root configs
 - Exclusions:
   - `vendor/`
   - `node_modules/`
