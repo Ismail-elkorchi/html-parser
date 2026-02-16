@@ -15,9 +15,11 @@ import type {
   ChunkOptions,
   DocumentTree,
   Edit,
+  ElementVisitor,
   FragmentTree,
   HtmlNode,
   NodeId,
+  NodeVisitor,
   Outline,
   OutlineEntry,
   PatchPlanningErrorPayload,
@@ -43,6 +45,7 @@ export type {
   DocumentTree,
   DoctypeNode,
   Edit,
+  ElementVisitor,
   EndTagToken,
   EofToken,
   ElementNode,
@@ -50,6 +53,7 @@ export type {
   HtmlNode,
   NodeId,
   NodeKind,
+  NodeVisitor,
   Outline,
   OutlineEntry,
   PatchPlanningErrorPayload,
@@ -904,7 +908,11 @@ export function serialize(tree: DocumentTree | FragmentTree | HtmlNode): string 
   return serializeNode(tree);
 }
 
-function extractText(node: HtmlNode): string {
+function textContentFromNode(node: DocumentTree | FragmentTree | HtmlNode): string {
+  if (node.kind === "document" || node.kind === "fragment") {
+    return node.children.map((child) => textContentFromNode(child)).join("");
+  }
+
   if (node.kind === "text") {
     return node.value;
   }
@@ -913,7 +921,78 @@ function extractText(node: HtmlNode): string {
     return "";
   }
 
-  return node.children.map((child) => extractText(child)).join("");
+  return node.children.map((child) => textContentFromNode(child)).join("");
+}
+
+function* iterateNodes(
+  nodes: readonly HtmlNode[],
+  depth: number
+): IterableIterator<{ readonly node: HtmlNode; readonly depth: number }> {
+  for (const node of nodes) {
+    yield { node, depth };
+    if (node.kind === "element") {
+      yield* iterateNodes(node.children, depth + 1);
+    }
+  }
+}
+
+export function walk(tree: DocumentTree | FragmentTree, visitor: NodeVisitor): void {
+  for (const entry of iterateNodes(tree.children, 0)) {
+    visitor(entry.node, entry.depth);
+  }
+}
+
+export function walkElements(tree: DocumentTree | FragmentTree, visitor: ElementVisitor): void {
+  for (const entry of iterateNodes(tree.children, 0)) {
+    if (entry.node.kind === "element") {
+      visitor(entry.node, entry.depth);
+    }
+  }
+}
+
+export function textContent(node: DocumentTree | FragmentTree | HtmlNode): string {
+  return textContentFromNode(node);
+}
+
+export function findById(tree: DocumentTree | FragmentTree, id: NodeId): HtmlNode | null {
+  for (const entry of iterateNodes(tree.children, 0)) {
+    if (entry.node.id === id) {
+      return entry.node;
+    }
+  }
+
+  return null;
+}
+
+export function* findAllByTagName(
+  tree: DocumentTree | FragmentTree,
+  tagName: string
+): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
+  const normalized = tagName.toLowerCase();
+  for (const entry of iterateNodes(tree.children, 0)) {
+    if (entry.node.kind === "element" && entry.node.tagName.toLowerCase() === normalized) {
+      yield entry.node;
+    }
+  }
+}
+
+export function* findAllByAttr(
+  tree: DocumentTree | FragmentTree,
+  name: string,
+  value?: string
+): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
+  for (const entry of iterateNodes(tree.children, 0)) {
+    if (entry.node.kind !== "element") {
+      continue;
+    }
+
+    const matched = entry.node.attributes.some(
+      (attribute) => attribute.name === name && (value === undefined || attribute.value === value)
+    );
+    if (matched) {
+      yield entry.node;
+    }
+  }
 }
 
 function collectOutlineNodes(node: HtmlNode, depth: number, entries: OutlineEntry[]): void {
@@ -927,7 +1006,7 @@ function collectOutlineNodes(node: HtmlNode, depth: number, entries: OutlineEntr
       nodeId: node.id,
       depth,
       tagName: node.tagName,
-      text: extractText(node).slice(0, 200)
+      text: textContentFromNode(node).slice(0, 200)
     });
   }
 

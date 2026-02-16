@@ -4,10 +4,16 @@ import {
   applyPatchPlan,
   chunk,
   computePatch,
+  findAllByAttr,
+  findAllByTagName,
+  findById,
   outline,
   parse,
   parseFragment,
-  tokenizeStream
+  textContent,
+  tokenizeStream,
+  walk,
+  walkElements
 } from "../../dist/mod.js";
 import { writeJson } from "./eval-primitives.mjs";
 
@@ -258,21 +264,55 @@ function evaluatePatchFeature() {
 }
 
 function evaluateOutlineFeature() {
-  const html = "<h1>Main</h1><h2>Sub</h2><p>text</p>";
+  const html = "<article id=\"a\"><h1>Main</h1><h2>Sub</h2><p data-role=\"lead\">text</p></article>";
   const firstTree = parse(html);
   const secondTree = parse(html);
   const firstOutline = outline(firstTree);
   const secondOutline = outline(secondTree);
 
+  const walkOrderA = [];
+  walk(firstTree, (node, depth) => {
+    walkOrderA.push(`${String(depth)}:${node.kind}:${node.kind === "element" ? node.tagName : ""}`);
+  });
+  const walkOrderB = [];
+  walk(secondTree, (node, depth) => {
+    walkOrderB.push(`${String(depth)}:${node.kind}:${node.kind === "element" ? node.tagName : ""}`);
+  });
+
+  const elementOrderA = [];
+  walkElements(firstTree, (node, depth) => {
+    elementOrderA.push(`${String(depth)}:${node.tagName}`);
+  });
+  const elementOrderB = [];
+  walkElements(secondTree, (node, depth) => {
+    elementOrderB.push(`${String(depth)}:${node.tagName}`);
+  });
+
+  const leadA = [...findAllByAttr(firstTree, "data-role", "lead")].map((node) => node.id);
+  const leadB = [...findAllByAttr(secondTree, "data-role", "lead")].map((node) => node.id);
+  const headingsA = [...findAllByTagName(firstTree, "h1")].map((node) => node.id);
+  const headingsB = [...findAllByTagName(secondTree, "h1")].map((node) => node.id);
+  const leadNode = leadA.length > 0 ? findById(firstTree, leadA[0]) : null;
+  const leadText = leadNode ? textContent(leadNode) : "";
+
+  const traversalDeterministic =
+    JSON.stringify(walkOrderA) === JSON.stringify(walkOrderB) &&
+    JSON.stringify(elementOrderA) === JSON.stringify(elementOrderB) &&
+    JSON.stringify(leadA) === JSON.stringify(leadB) &&
+    JSON.stringify(headingsA) === JSON.stringify(headingsB);
+
   const deterministic = JSON.stringify(firstOutline) === JSON.stringify(secondOutline);
   const hasEntries = firstOutline.entries.length > 0;
-  const ok = deterministic && hasEntries;
+  const ok = deterministic && hasEntries && traversalDeterministic && leadText === "text";
 
   return {
     ok,
     details: {
       entryCount: firstOutline.entries.length,
-      deterministic
+      deterministic,
+      traversalDeterministic,
+      leadCount: leadA.length,
+      leadText
     }
   };
 }

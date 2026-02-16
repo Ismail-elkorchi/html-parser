@@ -195,6 +195,9 @@ export interface ElementNode {
 
 export type HtmlNode = ElementNode | TextNode | CommentNode | DoctypeNode;
 
+export type NodeVisitor = (node: HtmlNode, depth: number) => void;
+export type ElementVisitor = (node: ElementNode, depth: number) => void;
+
 export interface DocumentTree {
   readonly id: NodeId;
   readonly kind: "document";
