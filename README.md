@@ -45,7 +45,7 @@ npm install @ismail-elkorchi/html-parser
 
 ### Parse a string
 ```ts
-import { parse } from "html-parser";
+import { parse } from "@ismail-elkorchi/html-parser";
 
 const tree = parse("<p>Hello</p>");
 console.log(tree.kind); // "document"
@@ -54,7 +54,7 @@ console.log(tree.children.length);
 
 ### Parse bytes with encoding sniff
 ```ts
-import { parseBytes } from "html-parser";
+import { parseBytes } from "@ismail-elkorchi/html-parser";
 
 const bytes = new Uint8Array([
   0x3c, 0x6d, 0x65, 0x74, 0x61, 0x20, 0x63, 0x68, 0x61, 0x72, 0x73, 0x65, 0x74, 0x3d, 0x77, 0x69,
@@ -67,7 +67,7 @@ const tree = parseBytes(bytes);
 
 ### Parse a stream
 ```ts
-import { parseStream } from "html-parser";
+import { parseStream } from "@ismail-elkorchi/html-parser";
 
 const stream = new ReadableStream<Uint8Array>({
   start(controller) {
@@ -88,7 +88,7 @@ const tree = await parseStream(stream, {
 
 ### Tokenize a stream
 ```ts
-import { tokenizeStream } from "html-parser";
+import { tokenizeStream } from "@ismail-elkorchi/html-parser";
 
 const stream = new ReadableStream<Uint8Array>({
   start(controller) {
@@ -106,7 +106,7 @@ for await (const token of tokenizeStream(stream, {
 
 ### Serialize a parsed tree
 ```ts
-import { parse, serialize } from "html-parser";
+import { parse, serialize } from "@ismail-elkorchi/html-parser";
 
 const tree = parse("<section><p>x</p></section>");
 const html = serialize(tree);
@@ -114,7 +114,7 @@ const html = serialize(tree);
 
 ### Trace with budgets
 ```ts
-import { parse } from "html-parser";
+import { parse } from "@ismail-elkorchi/html-parser";
 
 const tree = parse("<table><tr><td>x</td></tr></table>", {
   trace: true,
@@ -131,7 +131,7 @@ for (const event of tree.trace ?? []) {
 
 ### Compute and apply a patch plan
 ```ts
-import { applyPatchPlan, computePatch, parse } from "html-parser";
+import { applyPatchPlan, computePatch, parse } from "@ismail-elkorchi/html-parser";
 
 const originalHtml = "<p class=\"x\">before</p>";
 const tree = parse(originalHtml, { captureSpans: true });
@@ -178,7 +178,7 @@ const patchedHtml = applyPatchPlan(originalHtml, plan);
 
 ### Outline and chunk for agent consumption
 ```ts
-import { chunk, outline, parse } from "html-parser";
+import { chunk, outline, parse } from "@ismail-elkorchi/html-parser";
 
 const tree = parse("<h1>A</h1><h2>B</h2><p>text</p>");
 const docOutline = outline(tree);
@@ -194,7 +194,7 @@ import {
   parse,
   textContent,
   walkElements
-} from "html-parser";
+} from "@ismail-elkorchi/html-parser";
 
 const tree = parse("<article id=\"a\"><h1>x</h1><p data-role=\"lead\">hello</p></article>");
 
@@ -222,12 +222,12 @@ Budget limits provide bounded execution for untrusted or extreme input.
 On budget exceed, the library throws `BudgetExceededError` with structured payload:
 
 ```ts
-{
+type BudgetExceededPayload = {
   code: "BUDGET_EXCEEDED",
   budget: "maxInputBytes" | "maxBufferedBytes" | "maxNodes" | "maxDepth" | "maxTraceEvents" | "maxTraceBytes" | "maxTimeMs",
   limit: number,
   actual: number
-}
+};
 ```
 
 ## Security model

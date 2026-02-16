@@ -24,6 +24,7 @@ Naming:
 - ADR-018-... package identity policy for public alpha readiness
 - ADR-019-... text hygiene gate for hidden Unicode control characters
 - ADR-020-... doc policy coherence gate for naming and log labels
+- ADR-021-... doc TypeScript snippet compilation gate
 
 Minimum sections:
 - Context

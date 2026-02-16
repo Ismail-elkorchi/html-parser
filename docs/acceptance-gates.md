@@ -249,6 +249,18 @@ Evidence:
 
 ---
 
+### G-127: Doc TypeScript snippets compile
+Requirement:
+- TypeScript snippets from `README.md` and `docs/*.md` must compile in `noEmit` mode.
+- Snippets must use the canonical package import specifier:
+  - `@ismail-elkorchi/html-parser`
+- Snippet evaluation must compile only; it must not execute snippet code.
+
+Evidence:
+- `reports/doc-snippets.json` with `ok=true`
+
+---
+
 ## Gate set: RELEASE profile (must pass)
 
 Release includes ALL CI gates plus:

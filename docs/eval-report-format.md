@@ -376,3 +376,29 @@ Rules:
 - The canonical log label policy marker is defined in `docs/naming-conventions.md`.
 - `CONTRIBUTING.md` references the same marker and canonical path.
 - Contradictory tag-prefix policy text in `CONTRIBUTING.md` causes `ok=false`.
+
+## Doc snippets report
+File:
+- reports/doc-snippets.json
+
+Shape:
+{
+  "suite": "doc-snippets",
+  "timestamp": "...",
+  "ok": true,
+  "filesScanned": 0,
+  "snippetsChecked": 0,
+  "failures": [
+    {
+      "file": "README.md",
+      "index": 1,
+      "error": "TS2307 Cannot find module ..."
+    }
+  ]
+}
+
+Rules:
+- Scan inputs are `README.md` and `docs/*.md`.
+- Only fenced `ts`/`typescript` blocks are compiled.
+- Snippets must use canonical package import specifier `@ismail-elkorchi/html-parser`.
+- The check compiles snippets only and does not execute snippet code.

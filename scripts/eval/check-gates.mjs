@@ -267,6 +267,16 @@ async function main() {
     )
   );
 
+  const docSnippets = await loadOptionalReport("reports/doc-snippets.json");
+  gates.push(
+    makeGate(
+      "G-127",
+      "Doc TypeScript snippets compile",
+      Boolean(docSnippets?.ok),
+      docSnippets || { missing: true }
+    )
+  );
+
   if (profilePolicy.requireHoldouts) {
     await evaluateConformanceGate("R-200", "Holdout suite", "reports/holdout.json", conformanceThresholds.holdout);
   }
