@@ -56,11 +56,42 @@
   - `actual`: observed value
 
 ## Trace schema
-When `trace: true`, trace output is bounded by `budgets.maxTraceEvents`.
-Each event:
+When `trace: true`, trace output is bounded by:
+- `budgets.maxTraceEvents`
+- `budgets.maxTraceBytes`
+
+Each event is a structured object with:
 - `seq`: monotonic sequence number
-- `stage`: `decode` | `tokenize` | `tree` | `fragment` | `stream` | `serialize`
-- `detail`: stable descriptive string
+- `kind`: one of:
+  - `decode`
+  - `token`
+  - `insertion-mode`
+  - `tree-mutation`
+  - `parse-error`
+  - `budget`
+  - `stream`
+
+Stable event shapes:
+- `decode`:
+  - `source`: `input` | `sniff`
+  - `encoding`: string
+  - `sniffSource`: `input` | `bom` | `transport` | `meta` | `default`
+- `token`:
+  - `count`: number
+- `insertion-mode`:
+  - `mode`: `document-start` | `fragment-start` | `after-tree`
+- `tree-mutation`:
+  - `nodeCount`: number
+  - `errorCount`: number
+- `parse-error`:
+  - `code`: string
+- `budget`:
+  - `budget`: budget key
+  - `limit`: number | null
+  - `actual`: number
+  - `status`: `ok` | `exceeded`
+- `stream`:
+  - `bytesRead`: number
 
 ## Foreign content scope (v1)
 - Fragment parsing is namespace-aware for HTML, SVG, and MathML context tags.
