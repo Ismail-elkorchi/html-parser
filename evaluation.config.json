@@ -7,6 +7,7 @@
       "requireDeno": true,
       "requireBun": true,
       "requireBrowserSmoke": false,
+      "requireFuzzReport": false,
       "requireStreamReport": true
     },
     "release": {
@@ -15,6 +16,7 @@
       "requireDeno": true,
       "requireBun": true,
       "requireBrowserSmoke": false,
+      "requireFuzzReport": true,
       "requireStreamReport": true
     }
   },
@@ -43,7 +45,19 @@
     },
     "browserDiff": {
       "minAgreement": 0.999,
-      "minEnginesPresent": 3
+      "minEnginesPresent": 3,
+      "minCases": 500,
+      "minTagCoverage": 10,
+      "requiredTags": [
+        "tokenizer/entities",
+        "adoption-agency",
+        "tables/foster-parenting",
+        "foreign-content (svg/mathml)",
+        "templates",
+        "optional-tags",
+        "comments/doctype",
+        "scripting-flag surface (document.write-like markup patterns as strings only)"
+      ]
     },
     "determinism": {
       "requireNode": true
@@ -51,7 +65,8 @@
     "budgets": {
       "requireBudgetsReport": true,
       "requireNoHangs": true,
-      "requireStructuredBudgetErrors": true
+      "requireStructuredBudgetErrors": true,
+      "requireFuzzReport": true
     },
     "packaging": {
       "forbiddenPaths": [

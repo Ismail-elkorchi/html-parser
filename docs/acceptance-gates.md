@@ -211,9 +211,22 @@ Evidence:
 Requirement:
 - Browser differential agreement must meet strict threshold (`>= 0.999`).
 - Must include Chromium, Firefox, and WebKit (`minEnginesPresent = 3`).
+- Corpus execution surface must meet `thresholds.browserDiff.minCases` (`>= 500`).
+- Coverage discipline must meet `thresholds.browserDiff.minTagCoverage` (`>= 10`) for each required browser corpus tag.
 
 Evidence:
 - `reports/browser-diff.json`
+
+---
+
+### R-220: Fuzz report required (release)
+Requirement:
+- `reports/fuzz.json` must exist in release evaluation.
+- `crashes` must be `0`.
+- `hangs` must be `0`.
+
+Evidence:
+- `reports/fuzz.json`
 
 ---
 
