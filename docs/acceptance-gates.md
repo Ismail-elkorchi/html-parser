@@ -12,6 +12,34 @@ Artifacts pinned by:
 - `docs/spec-snapshots.md`
 - `evaluation.config.json`
 
+## Score model (profile-weighted)
+
+Evaluation runs are hermetic:
+- `scripts/eval/run-eval.mjs` executes `scripts/eval/clean-reports.mjs` before any report writer.
+- Stale report artifacts from earlier runs are removed before scoring.
+
+Evaluation scoring uses profile-specific weights from `evaluation.config.json`:
+- `profiles.ci.weights`
+- `profiles.release.weights`
+
+Each profile weight set sums to exactly `100`.
+
+CI weights (current):
+- `correctness`: 50
+- `browserDiff`: 0
+- `performance`: 20
+- `robustness`: 10
+- `agentFirst`: 15
+- `packagingTrust`: 5
+
+Release weights (current):
+- `correctness`: 40
+- `browserDiff`: 20
+- `performance`: 15
+- `robustness`: 10
+- `agentFirst`: 10
+- `packagingTrust`: 5
+
 ---
 
 ## Gate set: CI profile (must pass)

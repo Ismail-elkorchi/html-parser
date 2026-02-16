@@ -303,6 +303,43 @@ Rules:
 - `features.parseErrorId.ok` must validate deterministic parse error IDs and spec-reference helper behavior.
 - `overall.ok` must be `true` for gate `G-086`.
 
+## Score report
+File:
+- reports/score.json
+
+Shape:
+{
+  "suite": "score",
+  "timestamp": "...",
+  "profile": "ci",
+  "weightsUsed": {
+    "source": "profiles.ci.weights",
+    "values": {
+      "correctness": 50,
+      "browserDiff": 0,
+      "performance": 20,
+      "robustness": 10,
+      "agentFirst": 15,
+      "packagingTrust": 5
+    },
+    "total": 100
+  },
+  "total": 0,
+  "breakdown": {
+    "correctness": { "score": 0, "details": {} },
+    "browserDiff": { "score": 0, "details": {} },
+    "performance": { "score": 0, "details": {} },
+    "robustness": { "score": 0, "details": {} },
+    "agentFirst": { "score": 0, "details": {} },
+    "packagingTrust": { "score": 0, "details": {} }
+  }
+}
+
+Rules:
+- `weightsUsed.source` must identify which weight set was applied for the active profile.
+- `weightsUsed.total` must be exactly `100`.
+- When a component weight is `0`, that component score is fixed at `0` and does not depend on report presence.
+
 ## Packaging report
 File:
 - reports/pack.json
