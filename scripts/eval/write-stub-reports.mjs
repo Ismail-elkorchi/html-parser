@@ -11,7 +11,7 @@ import {
   parseFragment,
   parseStream
 } from "../../dist/mod.js";
-import { writeJson } from "./util.mjs";
+import { writeJson } from "./eval-primitives.mjs";
 
 const execFileAsync = promisify(execFile);
 

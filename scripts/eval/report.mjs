@@ -1,6 +1,6 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import { fileExists, readJson } from "./util.mjs";
+import { fileExists, readJson } from "./eval-primitives.mjs";
 
 function parseProfileArg() {
   const profileArg = process.argv.find((argumentValue) => argumentValue.startsWith("--profile="));
@@ -104,6 +104,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error("EVAL:", error);
   process.exit(1);
 });

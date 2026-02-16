@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readFile, unlink } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
-import { nowIso, writeJson, fileExists, readJson } from "./util.mjs";
+import { nowIso, writeJson, fileExists, readJson } from "./eval-primitives.mjs";
 
 function parseTarFileList(tarBytes) {
   const archivedFiles = [];
@@ -115,12 +115,17 @@ async function main() {
   );
   const thirdPartyNoticesIncluded = normalizedPaths.includes("THIRD_PARTY_NOTICES.md");
 
-  const ok = dependenciesEmpty && esmOnly && exportsOk && forbiddenIncluded.length === 0 && thirdPartyNoticesIncluded;
+  const isPackagingCheckPass =
+    dependenciesEmpty &&
+    esmOnly &&
+    exportsOk &&
+    forbiddenIncluded.length === 0 &&
+    thirdPartyNoticesIncluded;
 
   const report = {
     suite: "pack",
     timestamp: nowIso(),
-    ok,
+    ok: isPackagingCheckPass,
     tarball,
     dependenciesEmpty,
     esmOnly,
@@ -133,13 +138,13 @@ async function main() {
 
   await unlink(tarball).catch(() => {});
 
-  if (!ok) {
+  if (!isPackagingCheckPass) {
     console.error("EVAL: Packaging check failed:", report);
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error("EVAL:", error);
   process.exit(1);
 });

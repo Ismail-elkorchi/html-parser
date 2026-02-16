@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 
-import { fileExists, nowIso, readJson, writeJson } from "./util.mjs";
+import { fileExists, nowIso, readJson, writeJson } from "./eval-primitives.mjs";
 
 function runCommand(command, args) {
   return new Promise((resolve, reject) => {
@@ -84,26 +84,26 @@ async function main() {
   const scoreReport = (await fileExists("reports/score.json")) ? await readJson("reports/score.json") : null;
   const gatesPass = Boolean(gatesReport?.allPass);
   const stepsPass = stepResults.every((stepResult) => stepResult.ok);
-  const ok = stepsPass && gatesPass;
+  const isEvaluationPass = stepsPass && gatesPass;
 
   await writeJson("reports/eval-summary.json", {
     suite: "eval-summary",
     timestamp: nowIso(),
     profile,
-    ok,
+    ok: isEvaluationPass,
     stepsPass,
     gatesPass,
     score: Number(scoreReport?.total || 0),
     steps: stepResults
   });
 
-  if (!ok) {
+  if (!isEvaluationPass) {
     console.error("EVAL: Evaluation failed. See reports/eval-summary.json");
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error("EVAL:", error);
   process.exit(1);
 });

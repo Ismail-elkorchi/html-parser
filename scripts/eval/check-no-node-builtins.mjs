@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { builtinModules } from "node:module";
-import { nowIso, writeJson } from "./util.mjs";
+import { nowIso, writeJson } from "./eval-primitives.mjs";
 
 const SRC_DIR = "src";
 
@@ -78,24 +78,24 @@ async function main() {
     }
   }
 
-  const ok = findings.length === 0;
+  const isCheckPass = findings.length === 0;
   const report = {
     suite: "no-node-builtins",
     timestamp: nowIso(),
-    ok,
+    ok: isCheckPass,
     checkedFiles: files.length,
     findings
   };
 
   await writeJson("reports/no-node-builtins.json", report);
 
-  if (!ok) {
+  if (!isCheckPass) {
     console.error("EVAL: Node builtin usage detected in src/:", findings);
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error("EVAL:", error);
   process.exit(1);
 });

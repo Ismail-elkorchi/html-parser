@@ -7,7 +7,7 @@ import {
   safeDiv,
   scoreFromThresholdToPerfect,
   geometricMean
-} from "./util.mjs";
+} from "./eval-primitives.mjs";
 
 async function loadRequired(path) {
   if (!(await fileExists(path))) throw new Error(`Missing required report: ${path}`);
@@ -217,6 +217,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error("EVAL:", error);
   process.exit(1);
 });

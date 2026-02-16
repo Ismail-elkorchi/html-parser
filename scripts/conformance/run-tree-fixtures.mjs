@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { writeJson } from "../eval/util.mjs";
+import { writeJson } from "../eval/eval-primitives.mjs";
 import { buildTreeFromHtml, normalizeTree } from "../../dist/internal/tree/mod.js";
 
 const TREE_FILES = [
@@ -17,17 +17,17 @@ const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
 const DIVERGENCE_LIMIT = 25;
 
-function computeHoldout(id) {
+function computeHoldout(fixtureId) {
   let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (Math.imul(hash, 31) + id.charCodeAt(i)) >>> 0;
+  for (let charIndex = 0; charIndex < fixtureId.length; charIndex += 1) {
+    hash = (Math.imul(hash, 31) + fixtureId.charCodeAt(charIndex)) >>> 0;
   }
   return hash % HOLDOUT_MOD === 0;
 }
 
-function parseDatFixtureFile(content, fileName) {
+function parseDatFixtureFile(content, fixtureFilePath) {
   const lines = content.split(/\r?\n/);
-  const tests = [];
+  const parsedFixtureCases = [];
   let section = "";
   let current = null;
 
@@ -42,8 +42,8 @@ function parseDatFixtureFile(content, fileName) {
       return;
     }
 
-    tests.push({
-      id: `${fileName}#${tests.length + 1}`,
+    parsedFixtureCases.push({
+      id: `${fixtureFilePath}#${parsedFixtureCases.length + 1}`,
       data: current.data,
       expected: current.documentLines.join("\n"),
       fragmentContextTagName: current.fragmentContextTagName,
@@ -124,14 +124,14 @@ function parseDatFixtureFile(content, fileName) {
   }
 
   pushCurrent();
-  return tests;
+  return parsedFixtureCases;
 }
 
 function normalizeFixtureOutput(value) {
   return value.trimEnd();
 }
 
-async function writeDivergenceRecord(caseId, input, expected, actual) {
+async function writeDivergenceRecord(caseId, inputHtml, expectedTree, actualTree) {
   const sanitized = caseId.replace(/[^a-zA-Z0-9_-]/g, "_");
   const filePath = path.join("docs", "triage", `${sanitized}.md`);
   const body = [
@@ -141,17 +141,17 @@ async function writeDivergenceRecord(caseId, input, expected, actual) {
     "",
     "## Input",
     "```html",
-    input,
+    inputHtml,
     "```",
     "",
     "## Expected",
     "```text",
-    expected,
+    expectedTree,
     "```",
     "",
     "## Actual",
     "```text",
-    actual,
+    actualTree,
     "```"
   ].join("\n");
 
@@ -160,9 +160,9 @@ async function writeDivergenceRecord(caseId, input, expected, actual) {
 }
 
 const allTests = [];
-for (const file of TREE_FILES) {
-  const data = await readFile(file, "utf8");
-  allTests.push(...parseDatFixtureFile(data, file));
+for (const fixturePath of TREE_FILES) {
+  const fixtureData = await readFile(fixturePath, "utf8");
+  allTests.push(...parseDatFixtureFile(fixtureData, fixturePath));
 }
 
 let passed = 0;
@@ -177,7 +177,7 @@ for (const testCase of allTests) {
     continue;
   }
 
-  const built = buildTreeFromHtml(
+  const treeBuildResult = buildTreeFromHtml(
     testCase.data,
     {
       maxNodes: 4000,
@@ -191,10 +191,10 @@ for (const testCase of allTests) {
     }
   );
 
-  const actual = normalizeFixtureOutput(normalizeTree(built.document));
-  const expected = normalizeFixtureOutput(testCase.expected);
+  const actualTree = normalizeFixtureOutput(normalizeTree(treeBuildResult.document));
+  const expectedTree = normalizeFixtureOutput(testCase.expected);
 
-  if (actual === expected) {
+  if (actualTree === expectedTree) {
     passed += 1;
     continue;
   }
@@ -202,7 +202,7 @@ for (const testCase of allTests) {
   failed += 1;
 
   if (divergenceCreated < DIVERGENCE_LIMIT) {
-    await writeDivergenceRecord(testCase.id, testCase.data, expected, actual);
+    await writeDivergenceRecord(testCase.id, testCase.data, expectedTree, actualTree);
     divergenceCreated += 1;
   }
 
@@ -210,7 +210,7 @@ for (const testCase of allTests) {
     id: testCase.id,
     fragmentContextTagName: testCase.fragmentContextTagName ?? null,
     scriptingEnabled: testCase.scriptingEnabled,
-    treeErrors: built.errors.slice(0, 10)
+    treeErrors: treeBuildResult.errors.slice(0, 10)
   });
 }
 
@@ -238,8 +238,8 @@ const report = {
 await writeJson("reports/tree.json", report);
 
 if (failed > 0) {
-  console.error(`Tree fixture hard failures: ${failed}`);
+  console.error(`EVAL: Tree fixture hard failures: ${failed}`);
   process.exit(1);
 }
 
-console.log(`Tree fixtures: passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);
+console.log(`ACT: Tree fixtures passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);

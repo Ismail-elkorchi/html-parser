@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { fileExists, writeJson, nowIso } from "./util.mjs";
+import { fileExists, writeJson, nowIso } from "./eval-primitives.mjs";
 
 const REQUIRED_FILES = [
   "README.md",
@@ -37,25 +37,25 @@ async function main() {
     if (!sectionPattern.test(readme)) missingReadmeSections.push(sectionName);
   }
 
-  const ok = missingFiles.length === 0 && missingReadmeSections.length === 0;
+  const isDocsCheckPass = missingFiles.length === 0 && missingReadmeSections.length === 0;
 
   const report = {
     suite: "docs",
     timestamp: nowIso(),
-    ok,
+    ok: isDocsCheckPass,
     missingFiles,
     missingReadmeSections
   };
 
   await writeJson("reports/docs.json", report);
 
-  if (!ok) {
+  if (!isDocsCheckPass) {
     console.error("EVAL: Docs check failed:", report);
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error("EVAL:", error);
   process.exit(1);
 });

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-import { writeJson } from "../eval/util.mjs";
+import { writeJson } from "../eval/eval-primitives.mjs";
 import { tokenize } from "../../dist/internal/tokenizer/mod.js";
 
 const TOKENIZER_FILES = [
@@ -53,10 +53,10 @@ function tokenizerTokenToFixture(token) {
   return null;
 }
 
-function computeHoldout(id) {
+function computeHoldout(fixtureId) {
   let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (Math.imul(hash, 33) + id.charCodeAt(i)) >>> 0;
+  for (let charIndex = 0; charIndex < fixtureId.length; charIndex += 1) {
+    hash = (Math.imul(hash, 33) + fixtureId.charCodeAt(charIndex)) >>> 0;
   }
   return hash % HOLDOUT_MOD === 0;
 }
@@ -69,27 +69,27 @@ function normalizeTokenArray(tokens) {
 }
 
 const parsedCases = [];
-for (const path of TOKENIZER_FILES) {
-  const raw = JSON.parse(await readFile(path, "utf8"));
-  const tests = raw.tests ?? raw.xmlViolationTests ?? [];
+for (const fixturePath of TOKENIZER_FILES) {
+  const fixtureFile = JSON.parse(await readFile(fixturePath, "utf8"));
+  const tests = fixtureFile.tests ?? fixtureFile.xmlViolationTests ?? [];
 
   for (let index = 0; index < tests.length; index += 1) {
     const fixture = tests[index];
-    const fixtureId = `${path}#${index + 1}`;
+    const fixtureId = `${fixturePath}#${index + 1}`;
     const initialStates = fixture.initialStates ?? ["Data state"];
 
     for (const initialState of initialStates) {
       parsedCases.push({
         id: `${fixtureId}@${initialState}`,
         fixtureId,
-        file: path,
+        file: fixturePath,
         description: fixture.description ?? "",
         input: fixture.input ?? "",
         output: fixture.output ?? [],
         initialState,
         lastStartTag: fixture.lastStartTag,
         doubleEscaped: fixture.doubleEscaped ?? false,
-        xmlViolationMode: path.endsWith("xmlViolation.test")
+        xmlViolationMode: fixturePath.endsWith("xmlViolation.test")
       });
     }
   }
@@ -100,17 +100,17 @@ let failed = 0;
 let holdoutExcluded = 0;
 const failures = [];
 
-for (const fixture of parsedCases) {
-  if (computeHoldout(fixture.fixtureId)) {
+for (const fixtureCase of parsedCases) {
+  if (computeHoldout(fixtureCase.fixtureId)) {
     holdoutExcluded += 1;
     continue;
   }
 
-  const result = tokenize(fixture.input, {
-    initialState: fixture.initialState,
-    lastStartTag: fixture.lastStartTag,
-    doubleEscaped: fixture.doubleEscaped,
-    xmlViolationMode: fixture.xmlViolationMode,
+  const tokenizeResult = tokenize(fixtureCase.input, {
+    initialState: fixtureCase.initialState,
+    lastStartTag: fixtureCase.lastStartTag,
+    doubleEscaped: fixtureCase.doubleEscaped,
+    xmlViolationMode: fixtureCase.xmlViolationMode,
     budgets: {
       maxTextBytes: 200000,
       maxTokenBytes: 16000,
@@ -124,21 +124,21 @@ for (const fixture of parsedCases) {
     }
   });
 
-  const expected = fixture.output.map((token) => fixtureTokenToComparable(token));
-  const actual = normalizeTokenArray(result.tokens);
-  const isMatch = JSON.stringify(expected) === JSON.stringify(actual);
+  const expectedTokens = fixtureCase.output.map((token) => fixtureTokenToComparable(token));
+  const actualTokens = normalizeTokenArray(tokenizeResult.tokens);
+  const isTokenSequenceMatch = JSON.stringify(expectedTokens) === JSON.stringify(actualTokens);
 
-  if (isMatch) {
+  if (isTokenSequenceMatch) {
     passed += 1;
     continue;
   }
 
   failed += 1;
   failures.push({
-    id: fixture.id,
-    expectedPreview: expected.slice(0, 8),
-    actualPreview: actual.slice(0, 8),
-    debug: result.debug
+    id: fixtureCase.id,
+    expectedPreview: expectedTokens.slice(0, 8),
+    actualPreview: actualTokens.slice(0, 8),
+    debug: tokenizeResult.debug
   });
 }
 
@@ -166,8 +166,8 @@ const report = {
 await writeJson("reports/tokenizer.json", report);
 
 if (failed > 0) {
-  console.error(`Tokenizer conformance hard failures: ${failed}`);
+  console.error(`EVAL: Tokenizer conformance hard failures: ${failed}`);
   process.exit(1);
 }
 
-console.log(`Tokenizer fixtures: passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);
+console.log(`ACT: Tokenizer fixtures passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);

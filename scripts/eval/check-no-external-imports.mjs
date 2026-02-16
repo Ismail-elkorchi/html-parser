@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { nowIso, writeJson } from "./util.mjs";
+import { nowIso, writeJson } from "./eval-primitives.mjs";
 
 const DIST_ROOT = "dist";
 
@@ -64,7 +64,7 @@ async function findJsFiles(rootDir) {
 }
 
 async function main() {
-  let ok = true;
+  let isCheckPass = true;
   let diagnostics = null;
   const offenders = [];
 
@@ -86,30 +86,30 @@ async function main() {
       }
     }
 
-    ok = offenders.length === 0;
-    if (!ok) {
+    isCheckPass = offenders.length === 0;
+    if (!isCheckPass) {
       diagnostics = `Found ${String(offenders.length)} bare package import specifier(s) in dist`;
     }
   } catch (error) {
-    ok = false;
+    isCheckPass = false;
     diagnostics = error instanceof Error ? error.message : String(error);
   }
 
   await writeJson("reports/no-external-imports.json", {
     suite: "no-external-imports",
     timestamp: nowIso(),
-    ok,
+    ok: isCheckPass,
     offenders,
     ...(diagnostics ? { diagnostics } : {})
   });
 
-  if (!ok) {
+  if (!isCheckPass) {
     console.error("EVAL: External runtime import check failed. See reports/no-external-imports.json");
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error("EVAL:", error);
   process.exit(1);
 });

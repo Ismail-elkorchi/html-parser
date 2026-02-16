@@ -4,7 +4,7 @@ import path from "node:path";
 import { chromium, firefox, webkit } from "playwright";
 
 import { parse } from "../../dist/mod.js";
-import { readJson, safeDiv, writeJson } from "../eval/util.mjs";
+import { readJson, safeDiv, writeJson } from "../eval/eval-primitives.mjs";
 
 const SEED = 0x5f3759df;
 const RANDOM_CASES = 64;
@@ -99,15 +99,15 @@ async function loadCuratedCorpus() {
     : REQUIRED_TAGS_DEFAULT;
 
   const cases = [];
-  for (const entry of raw.cases ?? []) {
-    if (entry === null || typeof entry !== "object") {
+  for (const corpusEntry of raw.cases ?? []) {
+    if (corpusEntry === null || typeof corpusEntry !== "object") {
       continue;
     }
 
-    const caseId = typeof entry.id === "string" && entry.id.length > 0 ? entry.id : "";
-    const input = typeof entry.html === "string" ? entry.html : "";
-    const tags = Array.isArray(entry.tags)
-      ? entry.tags.filter((tag) => typeof tag === "string" && tag.length > 0)
+    const caseId = typeof corpusEntry.id === "string" && corpusEntry.id.length > 0 ? corpusEntry.id : "";
+    const input = typeof corpusEntry.html === "string" ? corpusEntry.html : "";
+    const tags = Array.isArray(corpusEntry.tags)
+      ? corpusEntry.tags.filter((tag) => typeof tag === "string" && tag.length > 0)
       : [];
 
     if (caseId.length === 0 || input.length === 0 || tags.length === 0) {
@@ -323,9 +323,9 @@ for (const [engineName, launcher] of [
   ["firefox", firefox],
   ["webkit", webkit]
 ]) {
-  const result = await runEngine(engineName, launcher, cases);
-  engines[engineName] = result.stats;
-  disagreements.push(...result.disagreements);
+  const engineRunResult = await runEngine(engineName, launcher, cases);
+  engines[engineName] = engineRunResult.stats;
+  disagreements.push(...engineRunResult.disagreements);
 }
 
 const report = {

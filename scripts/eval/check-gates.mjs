@@ -7,7 +7,7 @@ import {
   normalizeCaseCounts,
   safeDiv,
   requireExistingDecisionRecords
-} from "./util.mjs";
+} from "./eval-primitives.mjs";
 
 function makeGate(id, name, pass, details) {
   return { id, name, pass, details };
@@ -27,19 +27,19 @@ async function main() {
   const profile = parseProfileArg();
 
   if (!(await fileExists("evaluation.config.json"))) {
-    console.error("Missing evaluation.config.json");
+    console.error("EVAL: Missing evaluation.config.json");
     process.exit(1);
   }
 
   const config = await readJson("evaluation.config.json");
   const profilePolicy = config.profiles?.[profile];
   if (!profilePolicy) {
-    console.error(`Unknown profile: ${profile}`);
+    console.error(`EVAL: Unknown profile: ${profile}`);
     process.exit(1);
   }
 
   if (!(await fileExists("package.json"))) {
-    console.error("Missing package.json");
+    console.error("EVAL: Missing package.json");
     process.exit(1);
   }
   const packageManifest = JSON.parse(await readFile("package.json", "utf8"));
@@ -310,6 +310,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error("EVAL:", error);
   process.exit(1);
 });

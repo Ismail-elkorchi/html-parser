@@ -30,11 +30,11 @@ export async function fileExists(pathToCheck) {
 }
 
 export async function readJson(filePath) {
-  const text = await readFile(filePath, "utf8");
+  const jsonText = await readFile(filePath, "utf8");
   try {
-    return JSON.parse(text);
-  } catch (err) {
-    throw new Error(`Invalid JSON in ${filePath}: ${err?.message || String(err)}`);
+    return JSON.parse(jsonText);
+  } catch (error) {
+    throw new Error(`Invalid JSON in ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -68,11 +68,11 @@ export function geometricMean(sampleValues) {
 }
 
 export function normalizeCaseCounts(report) {
-  const cases = report?.cases || {};
-  const passed = Number(cases.passed || 0);
-  const failed = Number(cases.failed || 0);
-  const skipped = Number(cases.skipped || 0);
-  const total = Number(cases.total || passed + failed + skipped);
+  const caseCounts = report?.cases || {};
+  const passed = Number(caseCounts.passed || 0);
+  const failed = Number(caseCounts.failed || 0);
+  const skipped = Number(caseCounts.skipped || 0);
+  const total = Number(caseCounts.total || passed + failed + skipped);
 
   return { passed, failed, skipped, total, executed: passed + failed };
 }

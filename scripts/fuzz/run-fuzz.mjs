@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 
 import { BudgetExceededError, parse } from "../../dist/mod.js";
-import { writeJson } from "../eval/util.mjs";
+import { writeJson } from "../eval/eval-primitives.mjs";
 
 const RUNS = 600;
 const SEED = 0x9e3779b9;
@@ -311,11 +311,11 @@ await writeJson("reports/fuzz.json", {
 });
 
 if (crashes > 0) {
-  console.error(`Fuzz crashes detected: ${crashes}`);
+  console.error(`EVAL: Fuzz crashes detected: ${crashes}`);
   process.exit(1);
 }
 
 console.log(
-  `Fuzz complete: runs=${RUNS}, crashes=${crashes}, hangs=${hangs}, `
+  `ACT: Fuzz complete: runs=${RUNS}, crashes=${crashes}, hangs=${hangs}, `
     + `budgetErrors=${budgetErrors}, normalParses=${normalParses}`
 );

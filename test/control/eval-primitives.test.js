@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { scoreFromThresholdToPerfect } from "../../scripts/eval/util.mjs";
+import { scoreFromThresholdToPerfect } from "../../scripts/eval/eval-primitives.mjs";
 
 test("scoreFromThresholdToPerfect returns 1 at strict threshold", () => {
   assert.equal(scoreFromThresholdToPerfect(1, 1), 1);

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-import { writeJson } from "../eval/util.mjs";
+import { writeJson } from "../eval/eval-primitives.mjs";
 import { sniffHtmlEncoding } from "../../dist/internal/encoding/sniff.js";
 
 const ENCODING_FIXTURE_FILES = [
@@ -11,39 +11,39 @@ const ENCODING_FIXTURE_FILES = [
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
 
-function computeHoldout(id) {
+function computeHoldout(fixtureId) {
   let hash = 0;
-  for (let index = 0; index < id.length; index += 1) {
-    hash = (Math.imul(hash, 29) + id.charCodeAt(index)) >>> 0;
+  for (let charIndex = 0; charIndex < fixtureId.length; charIndex += 1) {
+    hash = (Math.imul(hash, 29) + fixtureId.charCodeAt(charIndex)) >>> 0;
   }
   return hash % HOLDOUT_MOD === 0;
 }
 
-function parseDatFixtures(text, fileName) {
+function parseDatFixtures(text, fixtureFilePath) {
   const lines = text.split(/\r?\n/);
-  const cases = [];
+  const parsedFixtureCases = [];
 
   let section = "";
-  let dataLines = [];
-  let expected = "";
+  let inputDataLines = [];
+  let expectedEncodingLabel = "";
 
   function pushCurrent() {
-    if (dataLines.length === 0 && expected.trim().length === 0) {
+    if (inputDataLines.length === 0 && expectedEncodingLabel.trim().length === 0) {
       return;
     }
 
-    if (expected.trim().length === 0) {
+    if (expectedEncodingLabel.trim().length === 0) {
       return;
     }
 
-    cases.push({
-      id: `${fileName}#${cases.length + 1}`,
-      data: dataLines.join("\n"),
-      expectedEncoding: expected.trim().toLowerCase()
+    parsedFixtureCases.push({
+      id: `${fixtureFilePath}#${parsedFixtureCases.length + 1}`,
+      data: inputDataLines.join("\n"),
+      expectedEncoding: expectedEncodingLabel.trim().toLowerCase()
     });
 
-    dataLines = [];
-    expected = "";
+    inputDataLines = [];
+    expectedEncodingLabel = "";
   }
 
   for (const line of lines) {
@@ -63,20 +63,20 @@ function parseDatFixtures(text, fileName) {
     }
 
     if (section === "data") {
-      dataLines.push(line);
+      inputDataLines.push(line);
       continue;
     }
 
     if (section === "encoding") {
-      if (expected.length > 0) {
-        expected += "\n";
+      if (expectedEncodingLabel.length > 0) {
+        expectedEncodingLabel += "\n";
       }
-      expected += line;
+      expectedEncodingLabel += line;
     }
   }
 
   pushCurrent();
-  return cases;
+  return parsedFixtureCases;
 }
 
 function normalizeExpected(label) {
@@ -95,29 +95,29 @@ let passed = 0;
 let failed = 0;
 let holdoutExcluded = 0;
 
-for (const fixture of allCases) {
-  if (computeHoldout(fixture.id)) {
+for (const fixtureCase of allCases) {
+  if (computeHoldout(fixtureCase.id)) {
     holdoutExcluded += 1;
     continue;
   }
 
-  const bytes = encoder.encode(fixture.data);
-  const result = sniffHtmlEncoding(bytes, { defaultEncoding: "windows-1252" });
+  const encodedBytes = encoder.encode(fixtureCase.data);
+  const sniffResult = sniffHtmlEncoding(encodedBytes, { defaultEncoding: "windows-1252" });
 
-  const expected = normalizeExpected(fixture.expectedEncoding);
-  const actual = result.encoding;
+  const expectedEncoding = normalizeExpected(fixtureCase.expectedEncoding);
+  const actualEncoding = sniffResult.encoding;
 
-  if (expected === actual) {
+  if (expectedEncoding === actualEncoding) {
     passed += 1;
     continue;
   }
 
   failed += 1;
   failures.push({
-    id: fixture.id,
-    expected,
-    actual,
-    source: result.source
+    id: fixtureCase.id,
+    expected: expectedEncoding,
+    actual: actualEncoding,
+    source: sniffResult.source
   });
 }
 
@@ -145,8 +145,8 @@ const report = {
 await writeJson("reports/encoding.json", report);
 
 if (failed > 0) {
-  console.error(`Encoding fixture failures: ${failed}/${allCases.length - holdoutExcluded}`);
+  console.error(`EVAL: Encoding fixture failures: ${failed}/${allCases.length - holdoutExcluded}`);
   process.exit(1);
 }
 
-console.log(`Encoding fixtures passed: ${passed}/${allCases.length - holdoutExcluded}`);
+console.log(`ACT: Encoding fixtures passed=${passed}/${allCases.length - holdoutExcluded}`);

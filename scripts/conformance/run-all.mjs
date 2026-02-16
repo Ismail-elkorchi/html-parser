@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
 import { stat } from "node:fs/promises";
 
-import { readJson, writeJson, nowIso } from "../eval/util.mjs";
+import { nowIso, readJson, writeJson } from "../eval/eval-primitives.mjs";
 
-function runNodeScript(scriptPath) {
+function actRunNodeScript(scriptPath) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [scriptPath], {
       stdio: "inherit"
@@ -20,7 +20,7 @@ function runNodeScript(scriptPath) {
   });
 }
 
-async function hasFailures(reportPath) {
+async function evalReportHasFailures(reportPath) {
   await stat(reportPath);
   const report = await readJson(reportPath);
   const failed = Number(report?.cases?.failed || 0);
@@ -28,7 +28,7 @@ async function hasFailures(reportPath) {
   return failed > 0;
 }
 
-const suites = [
+const conformanceSuites = [
   {
     id: "tokenizer",
     script: "scripts/conformance/run-tokenizer-fixtures.mjs",
@@ -57,30 +57,30 @@ const suites = [
 ];
 
 async function main() {
-  const results = [];
-  let failed = false;
+  const suiteResults = [];
+  let hasSuiteFailures = false;
 
   // ADR-006 and ADR-007 enforce mismatch-as-failure for tokenizer and tree conformance.
-  for (const suite of suites) {
+  for (const conformanceSuite of conformanceSuites) {
     const startedAt = Date.now();
     try {
-      await runNodeScript(suite.script);
-      const reportHasFailures = await hasFailures(suite.report);
+      await actRunNodeScript(conformanceSuite.script);
+      const reportHasFailures = await evalReportHasFailures(conformanceSuite.report);
       if (reportHasFailures) {
-        failed = true;
+        hasSuiteFailures = true;
       }
-      results.push({
-        id: suite.id,
+      suiteResults.push({
+        id: conformanceSuite.id,
         ok: !reportHasFailures,
-        report: suite.report,
+        report: conformanceSuite.report,
         durationMs: Date.now() - startedAt
       });
     } catch (error) {
-      failed = true;
-      results.push({
-        id: suite.id,
+      hasSuiteFailures = true;
+      suiteResults.push({
+        id: conformanceSuite.id,
         ok: false,
-        report: suite.report,
+        report: conformanceSuite.report,
         durationMs: Date.now() - startedAt,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -90,17 +90,17 @@ async function main() {
   await writeJson("reports/conformance-summary.json", {
     suite: "conformance-summary",
     timestamp: nowIso(),
-    ok: !failed,
-    suites: results
+    ok: !hasSuiteFailures,
+    suites: suiteResults
   });
 
-  if (failed) {
-    console.error("Conformance run failed. See reports/conformance-summary.json");
+  if (hasSuiteFailures) {
+    console.error("EVAL: Conformance run failed. See reports/conformance-summary.json");
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error("EVAL:", error);
   process.exit(1);
 });
