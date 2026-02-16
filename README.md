@@ -178,6 +178,29 @@ const docOutline = outline(tree);
 const chunks = chunk(tree, { maxChars: 120, maxNodes: 8 });
 ```
 
+### Traverse and extract
+```ts
+import {
+  findAllByAttr,
+  findAllByTagName,
+  findById,
+  parse,
+  textContent,
+  walkElements
+} from "html-parser";
+
+const tree = parse("<article id=\"a\"><h1>x</h1><p data-role=\"lead\">hello</p></article>");
+
+walkElements(tree, (element) => {
+  console.log(element.tagName);
+});
+
+const article = [...findAllByTagName(tree, "article")][0];
+const leadNodes = [...findAllByAttr(tree, "data-role", "lead")];
+const sameNode = article ? findById(tree, article.id) : null;
+const articleText = article ? textContent(article) : "";
+```
+
 ## Determinism contract
 For equal input and equal options:
 - parse output structure is stable,

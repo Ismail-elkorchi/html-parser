@@ -9,6 +9,12 @@
 - `serialize(tree, options)`
 - `computePatch(originalHtml, edits)`
 - `applyPatchPlan(originalHtml, plan)`
+- `walk(tree, visitor)`
+- `walkElements(tree, visitor)`
+- `textContent(node)`
+- `findById(tree, id)`
+- `findAllByTagName(tree, tagName)` (iterator)
+- `findAllByAttr(tree, name, value?)` (iterator)
 - `outline(tree, options)`
 - `chunk(tree, options)`
 
@@ -60,6 +66,7 @@
 - Node IDs are assigned with deterministic pre-order incremental numbering.
 - Attribute ordering is stable by input order after duplicate-name normalization.
 - For equal input + options, API output is byte-for-byte stable.
+- Traversal/search helpers iterate in deterministic pre-order document order.
 
 ## Span precision
 - Node and attribute spans are populated only when `captureSpans: true`.
