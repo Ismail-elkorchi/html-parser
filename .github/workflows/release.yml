@@ -51,8 +51,5 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public
 
-      - name: Publish JSR (optional)
-        if: ${{ secrets.JSR_TOKEN != '' }}
-        env:
-          JSR_TOKEN: ${{ secrets.JSR_TOKEN }}
-        run: npx -y jsr publish
+      - name: Publish JSR (OIDC)
+        run: npx jsr publish
