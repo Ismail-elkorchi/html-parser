@@ -164,6 +164,7 @@ async function main() {
   const budgets = await loadOptionalReport("reports/budgets.json");
   const fuzz = await loadOptionalReport("reports/fuzz.json");
   const requireBudgetsReport = Boolean(config.thresholds?.budgets?.requireBudgetsReport);
+  const requireFuzzReport = Boolean(config.thresholds?.budgets?.requireFuzzReport) && Boolean(prof.requireFuzzReport);
 
   const budgetsOk =
     (budgets ? Boolean(budgets?.overall?.ok) : true) &&
@@ -176,7 +177,11 @@ async function main() {
       "G-090",
       "Budgets and no hangs",
       budgetsPass,
-      { budgets: budgets || { missing: true }, fuzz: fuzz || { missing: true } }
+      {
+        budgets: budgets || { missing: true },
+        fuzz: fuzz || { missing: true },
+        requireFuzzReport
+      }
     )
   );
 
@@ -248,6 +253,11 @@ async function main() {
         underCoveredTags
       }));
     }
+  }
+
+  if (requireFuzzReport) {
+    const fuzzPass = Boolean(fuzz) && Number(fuzz?.crashes || 0) === 0 && Number(fuzz?.hangs || 0) === 0;
+    gates.push(gate("R-220", "Fuzz report required", fuzzPass, fuzz || { missingReport: "reports/fuzz.json" }));
   }
 
   const allPass = gates.every((g) => g.pass);

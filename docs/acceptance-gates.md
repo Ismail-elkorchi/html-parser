@@ -208,6 +208,17 @@ Evidence:
 
 ---
 
+### R-220: Fuzz report required (release)
+Requirement:
+- `reports/fuzz.json` must exist in release evaluation.
+- `crashes` must be `0`.
+- `hangs` must be `0`.
+
+Evidence:
+- `reports/fuzz.json`
+
+---
+
 ## Changing gates is allowed only with a decision record
 
 Any change to:

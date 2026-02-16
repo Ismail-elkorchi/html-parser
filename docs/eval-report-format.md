@@ -228,6 +228,20 @@ Shape:
   "crashes": 0,
   "hangs": 0,
   "budgetErrors": 120,
+  "outcomeDistribution": {
+    "normalParses": 880,
+    "budgetErrors": 120,
+    "crashes": 0
+  },
+  "topSlowCases": [
+    {
+      "id": "fuzz-0007",
+      "seed": "0x1234abcd",
+      "budgetProfile": "tight",
+      "elapsedMs": 8.731,
+      "outcome": "budget-error"
+    }
+  ],
   "findings": []
 }
 

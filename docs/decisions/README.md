@@ -18,6 +18,7 @@ Naming:
 - ADR-012-... multi-engine browser differential oracle policy
 - ADR-013-... strict threshold posture consolidation
 - ADR-014-... browser differential corpus size and tag coverage thresholds
+- ADR-015-... release fuzz report requirement and structured fuzz diagnostics
 
 Minimum sections:
 - Context
