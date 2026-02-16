@@ -1,5 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 
 import {
@@ -12,8 +10,6 @@ import {
   parseStream
 } from "../../dist/mod.js";
 import { writeJson } from "./eval-primitives.mjs";
-
-const execFileAsync = promisify(execFile);
 
 function sha256(value) {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
@@ -124,16 +120,6 @@ async function assertBudgetErrorAsync(checks, checkId, budgetKey, executeCheck) 
       expectedErrorCode: budgetKey,
       observedErrorCode: observedBudgetKey
     });
-  }
-}
-
-async function detectRuntimeVersion(command, args = []) {
-  try {
-    const result = await execFileAsync(command, args, { timeout: 4000 });
-    const line = (result.stdout || "").split(/\r?\n/)[0]?.trim() || "unknown";
-    return { ok: true, version: line };
-  } catch {
-    return { ok: false, pending: true };
   }
 }
 
@@ -297,23 +283,6 @@ async function writeStream() {
   });
 }
 
-async function writeSmoke() {
-  const node = { ok: true, version: process.version };
-  const deno = await detectRuntimeVersion("deno", ["--version"]);
-  const bun = await detectRuntimeVersion("bun", ["--version"]);
-
-  await writeJson("reports/smoke.json", {
-    suite: "smoke",
-    timestamp: new Date().toISOString(),
-    runtimes: {
-      node,
-      deno,
-      bun,
-      browser: { ok: false, pending: true }
-    }
-  });
-}
-
 async function writeAgent() {
   const tracedDocument = parse("agent", { trace: true, budgets: { maxTraceEvents: 20, maxTraceBytes: 4096 } });
   const documentWithSpans = parse("agent", { includeSpans: true });
@@ -392,5 +361,4 @@ async function writeAgent() {
 await writeDeterminism();
 await writeBudgets();
 await writeStream();
-await writeSmoke();
 await writeAgent();

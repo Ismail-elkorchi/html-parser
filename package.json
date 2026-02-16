@@ -37,9 +37,9 @@
     "test:browser-diff": "npm run build && node scripts/oracles/run-browser-diff.mjs",
     "test:fuzz": "npm run build && node scripts/fuzz/run-fuzz.mjs",
     "test:bench": "npm run build && node scripts/bench/run-bench.mjs",
-    "smoke:node": "npm run build && node scripts/smoke/control.mjs",
-    "smoke:deno": "deno run --allow-read scripts/smoke/control.mjs",
-    "smoke:bun": "bun run scripts/smoke/control.mjs",
+    "smoke:node": "npm run build && node scripts/smoke/control.mjs --runtime=node --report=reports/smoke-node.json",
+    "smoke:deno": "deno run --allow-read --allow-write=reports --allow-env scripts/smoke/control.mjs --runtime=deno --report=reports/smoke-deno.json",
+    "smoke:bun": "bun run scripts/smoke/control.mjs --runtime=bun --report=reports/smoke-bun.json",
     "pack:check": "node scripts/eval/pack-check.mjs",
     "eval:ci": "node scripts/eval/run-eval.mjs --profile=ci",
     "eval:release": "node scripts/eval/run-eval.mjs --profile=release"

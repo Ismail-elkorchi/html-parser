@@ -253,6 +253,11 @@ Requirement:
 - Smoke tests pass on:
   - Node (mandatory)
   - Deno and Bun (mandatory in CI and release profiles)
+- `reports/smoke.json` is derived from executed runtime smoke reports:
+  - `reports/smoke-node.json`
+  - `reports/smoke-deno.json`
+  - `reports/smoke-bun.json`
+- `reports/smoke.json.overall.ok` is `true`.
 
 Evidence:
 - `reports/smoke.json`

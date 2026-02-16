@@ -165,18 +165,49 @@ Shape:
 ## Smoke report
 File:
 - reports/smoke.json
+- reports/smoke-node.json
+- reports/smoke-deno.json
+- reports/smoke-bun.json
 
 Shape:
 {
   "suite": "smoke",
   "timestamp": "...",
   "runtimes": {
-    "node": { "ok": true, "version": "v24.x" },
-    "deno": { "ok": true, "version": "2.x" },
-    "bun":  { "ok": true, "version": "1.x" },
-    "browser": { "ok": true, "engine": "chromium" }
+    "node": {
+      "suite": "smoke-runtime",
+      "runtime": "node",
+      "timestamp": "...",
+      "ok": true,
+      "version": "v24.x",
+      "determinismHash": null
+    },
+    "deno": {
+      "suite": "smoke-runtime",
+      "runtime": "deno",
+      "timestamp": "...",
+      "ok": true,
+      "version": "2.x",
+      "determinismHash": null
+    },
+    "bun": {
+      "suite": "smoke-runtime",
+      "runtime": "bun",
+      "timestamp": "...",
+      "ok": true,
+      "version": "1.x",
+      "determinismHash": null
+    }
+  },
+  "overall": {
+    "ok": true
   }
 }
+
+Rules:
+- Runtime smoke reports are written by `scripts/smoke/control.mjs` during runtime execution.
+- `reports/smoke.json` is collected from runtime reports by `scripts/eval/collect-smoke-report.mjs`.
+- `overall.ok` is `true` only if all runtime `ok` values are `true`.
 
 ## Browser differential report
 File:
