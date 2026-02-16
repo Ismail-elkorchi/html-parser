@@ -181,6 +181,7 @@ Requirement:
   - LICENSE
   - docs/third-party.md
   - docs/update-playbook.md
+  - docs/naming-conventions.md
   - docs/decisions/README.md
 
 Evidence:

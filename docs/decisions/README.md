@@ -20,6 +20,7 @@ Naming:
 - ADR-014-... browser differential corpus size and tag coverage thresholds
 - ADR-015-... release fuzz report requirement and structured fuzz diagnostics
 - ADR-016-... streaming invariant report and CI gate requirement
+- ADR-017-... naming policy documentation requirement in docs gate
 
 Minimum sections:
 - Context

@@ -77,15 +77,15 @@ function canonicalizeLabel(label: string, source: "bom" | "transport" | "meta" |
 }
 
 function decodeLatin1(bytes: Uint8Array): string {
-  let out = "";
+  let decodedText = "";
   for (let index = 0; index < bytes.length; index += 1) {
     const value = bytes[index];
     if (value === undefined) {
       continue;
     }
-    out += String.fromCharCode(value);
+    decodedText += String.fromCharCode(value);
   }
-  return out;
+  return decodedText;
 }
 
 function parseMetaAttributes(tag: string): Map<string, string> {
@@ -155,33 +155,33 @@ function extractMetaTags(scan: string): string[] {
   let index = 0;
 
   while (index < scan.length) {
-    const lt = scan.indexOf("<", index);
-    if (lt === -1 || lt + 2 > scan.length) {
+    const tagStartIndex = scan.indexOf("<", index);
+    if (tagStartIndex === -1 || tagStartIndex + 2 > scan.length) {
       break;
     }
 
-    let cursor = lt + 1;
+    let cursor = tagStartIndex + 1;
     let quote: "\"" | "'" | null = null;
     let closed = false;
 
     while (cursor < scan.length) {
-      const ch = scan[cursor];
-      if (quote === null && (ch === "\"" || ch === "'")) {
-        quote = ch;
+      const currentChar = scan[cursor];
+      if (quote === null && (currentChar === "\"" || currentChar === "'")) {
+        quote = currentChar;
         cursor += 1;
         continue;
       }
 
-      if (quote !== null && ch === quote) {
+      if (quote !== null && currentChar === quote) {
         quote = null;
         cursor += 1;
         continue;
       }
 
-      if (quote === null && ch === ">") {
-        const tag = scan.slice(lt, cursor + 1);
-        if (/^<meta(?=[\t\n\f\r />])/i.test(tag)) {
-          tags.push(tag);
+      if (quote === null && currentChar === ">") {
+        const tagText = scan.slice(tagStartIndex, cursor + 1);
+        if (/^<meta(?=[\t\n\f\r />])/i.test(tagText)) {
+          tags.push(tagText);
         }
         index = cursor + 1;
         closed = true;

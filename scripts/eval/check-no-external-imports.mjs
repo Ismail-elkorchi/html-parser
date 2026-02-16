@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { nowIso, writeJson } from "./util.mjs";
+import { nowIso, writeJson } from "./eval-primitives.mjs";
 
 const DIST_ROOT = "dist";
 
@@ -42,29 +42,29 @@ function collectImportSpecifiers(source) {
 }
 
 async function findJsFiles(rootDir) {
-  const out = [];
+  const jsFilePaths = [];
 
-  async function walk(dir) {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        await walk(full);
+  async function walk(directoryPath) {
+    const directoryEntries = await readdir(directoryPath, { withFileTypes: true });
+    for (const directoryEntry of directoryEntries) {
+      const fullPath = path.join(directoryPath, directoryEntry.name);
+      if (directoryEntry.isDirectory()) {
+        await walk(fullPath);
         continue;
       }
 
-      if (entry.isFile() && full.endsWith(".js")) {
-        out.push(full);
+      if (directoryEntry.isFile() && fullPath.endsWith(".js")) {
+        jsFilePaths.push(fullPath);
       }
     }
   }
 
   await walk(rootDir);
-  return out;
+  return jsFilePaths;
 }
 
 async function main() {
-  let ok = true;
+  let isCheckPass = true;
   let diagnostics = null;
   const offenders = [];
 
@@ -86,24 +86,24 @@ async function main() {
       }
     }
 
-    ok = offenders.length === 0;
-    if (!ok) {
+    isCheckPass = offenders.length === 0;
+    if (!isCheckPass) {
       diagnostics = `Found ${String(offenders.length)} bare package import specifier(s) in dist`;
     }
   } catch (error) {
-    ok = false;
+    isCheckPass = false;
     diagnostics = error instanceof Error ? error.message : String(error);
   }
 
   await writeJson("reports/no-external-imports.json", {
     suite: "no-external-imports",
     timestamp: nowIso(),
-    ok,
+    ok: isCheckPass,
     offenders,
     ...(diagnostics ? { diagnostics } : {})
   });
 
-  if (!ok) {
+  if (!isCheckPass) {
     console.error("External runtime import check failed. See reports/no-external-imports.json");
     process.exit(1);
   }

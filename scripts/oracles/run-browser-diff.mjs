@@ -4,7 +4,7 @@ import path from "node:path";
 import { chromium, firefox, webkit } from "playwright";
 
 import { parse } from "../../dist/mod.js";
-import { readJson, safeDiv, writeJson } from "../eval/util.mjs";
+import { readJson, safeDiv, writeJson } from "../eval/eval-primitives.mjs";
 
 const SEED = 0x5f3759df;
 const RANDOM_CASES = 64;
@@ -30,7 +30,7 @@ function nextSeed(seed) {
 
 function randomCorpus(seed, size) {
   let state = seed >>> 0;
-  const out = [];
+  const generatedCases = [];
   const alphabet = "<>/=&'\" abcdefghijklmnopqrstuvwxyz0123456789";
 
   for (let index = 0; index < size; index += 1) {
@@ -41,10 +41,10 @@ function randomCorpus(seed, size) {
       state = nextSeed(state);
       value += alphabet[state % alphabet.length] ?? "x";
     }
-    out.push(value);
+    generatedCases.push(value);
   }
 
-  return out;
+  return generatedCases;
 }
 
 function normalizeAttributes(attributes) {
@@ -82,12 +82,12 @@ function normalizeLibrary(html) {
 }
 
 function assertUniqueCaseIds(cases) {
-  const seen = new Set();
+  const seenCaseIds = new Set();
   for (const testCase of cases) {
-    if (seen.has(testCase.id)) {
+    if (seenCaseIds.has(testCase.id)) {
       throw new Error(`Duplicate browser corpus case id: ${testCase.id}`);
     }
-    seen.add(testCase.id);
+    seenCaseIds.add(testCase.id);
   }
 }
 
@@ -99,23 +99,23 @@ async function loadCuratedCorpus() {
     : REQUIRED_TAGS_DEFAULT;
 
   const cases = [];
-  for (const entry of raw.cases ?? []) {
-    if (entry === null || typeof entry !== "object") {
+  for (const corpusEntry of raw.cases ?? []) {
+    if (corpusEntry === null || typeof corpusEntry !== "object") {
       continue;
     }
 
-    const id = typeof entry.id === "string" && entry.id.length > 0 ? entry.id : "";
-    const input = typeof entry.html === "string" ? entry.html : "";
-    const tags = Array.isArray(entry.tags)
-      ? entry.tags.filter((tag) => typeof tag === "string" && tag.length > 0)
+    const caseId = typeof corpusEntry.id === "string" && corpusEntry.id.length > 0 ? corpusEntry.id : "";
+    const input = typeof corpusEntry.html === "string" ? corpusEntry.html : "";
+    const tags = Array.isArray(corpusEntry.tags)
+      ? corpusEntry.tags.filter((tag) => typeof tag === "string" && tag.length > 0)
       : [];
 
-    if (id.length === 0 || input.length === 0 || tags.length === 0) {
+    if (caseId.length === 0 || input.length === 0 || tags.length === 0) {
       continue;
     }
 
     cases.push({
-      id,
+      id: caseId,
       input,
       tags
     });
@@ -152,31 +152,31 @@ function buildTagCounts(requiredTags, curatedCases) {
   return counts;
 }
 
-async function writeDisagreementRecord(caseId, engine, input, local, browser) {
+async function writeDisagreementRecord(caseId, engineName, inputHtml, localNormalizedJson, browserNormalizedJson) {
   const safeCase = caseId.replace(/[^a-zA-Z0-9_-]/g, "_");
-  const safeEngine = engine.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeEngine = engineName.replace(/[^a-zA-Z0-9_-]/g, "_");
   const filePath = path.join("reports", "triage", "browser-diff", safeEngine, `${safeCase}.md`);
   await mkdir(path.dirname(filePath), { recursive: true });
 
   const lines = [
     "# Browser differential disagreement",
     "",
-    `Engine: ${engine}`,
+    `Engine: ${engineName}`,
     `Case: ${caseId}`,
     "",
     "## Input",
     "```html",
-    input,
+    inputHtml,
     "```",
     "",
     "## Local normalization",
     "```json",
-    local,
+    localNormalizedJson,
     "```",
     "",
     "## Browser normalization",
     "```json",
-    browser,
+    browserNormalizedJson,
     "```"
   ];
 
@@ -184,7 +184,7 @@ async function writeDisagreementRecord(caseId, engine, input, local, browser) {
   return filePath.replaceAll(path.sep, "/");
 }
 
-async function normalizeInBrowser(page, html) {
+async function normalizeInBrowser(page, htmlInput) {
   return page.evaluate((input) => {
     const parser = new globalThis.DOMParser();
     const document = parser.parseFromString(input, "text/html");
@@ -229,10 +229,10 @@ async function normalizeInBrowser(page, html) {
     };
 
     return Array.from(document.childNodes).map((node) => normalizeNode(node));
-  }, html);
+  }, htmlInput);
 }
 
-async function runEngine(engineName, launcher, cases) {
+async function runEngine(engineName, launcher, testCases) {
   const disagreements = [];
   let compared = 0;
   let agreed = 0;
@@ -257,24 +257,30 @@ async function runEngine(engineName, launcher, cases) {
   const userAgent = await page.evaluate(() => globalThis.navigator.userAgent);
   const version = browser.version();
 
-  for (const testCase of cases) {
-    const { id, input, localJson } = testCase;
-    let browserJson;
+  for (const testCase of testCases) {
+    const { id: caseId, input: inputHtml, localJson: localNormalizedJson } = testCase;
+    let browserNormalizedJson;
     try {
-      browserJson = JSON.stringify(await normalizeInBrowser(page, input));
+      browserNormalizedJson = JSON.stringify(await normalizeInBrowser(page, inputHtml));
     } catch (error) {
-      browserJson = JSON.stringify(["error", error instanceof Error ? error.message : String(error)]);
+      browserNormalizedJson = JSON.stringify(["error", error instanceof Error ? error.message : String(error)]);
     }
 
     compared += 1;
-    if (localJson === browserJson) {
+    if (localNormalizedJson === browserNormalizedJson) {
       agreed += 1;
       continue;
     }
 
-    const triageRecord = await writeDisagreementRecord(id, engineName, input, localJson, browserJson);
+    const triageRecord = await writeDisagreementRecord(
+      caseId,
+      engineName,
+      inputHtml,
+      localNormalizedJson,
+      browserNormalizedJson
+    );
     disagreements.push({
-      id,
+      id: caseId,
       engine: engineName,
       triageRecord
     });
@@ -323,9 +329,9 @@ for (const [engineName, launcher] of [
   ["firefox", firefox],
   ["webkit", webkit]
 ]) {
-  const result = await runEngine(engineName, launcher, cases);
-  engines[engineName] = result.stats;
-  disagreements.push(...result.disagreements);
+  const engineRunResult = await runEngine(engineName, launcher, cases);
+  engines[engineName] = engineRunResult.stats;
+  disagreements.push(...engineRunResult.disagreements);
 }
 
 const report = {
@@ -348,13 +354,15 @@ const report = {
 
 await writeJson("reports/browser-diff.json", report);
 
-const presentEngines = Object.keys(engines).filter((name) => Number(engines[name]?.compared || 0) > 0);
-const agreements = presentEngines.map((name) =>
-  safeDiv(Number(engines[name]?.agreed || 0), Number(engines[name]?.compared || 0))
+const presentEngines = Object.keys(engines).filter((engineName) => Number(engines[engineName]?.compared || 0) > 0);
+const agreementRatios = presentEngines.map((engineName) =>
+  safeDiv(Number(engines[engineName]?.agreed || 0), Number(engines[engineName]?.compared || 0))
 );
 const aggregateAgreement = thresholdPolicy.agreementAggregation === "min"
-  ? (agreements.length > 0 ? Math.min(...agreements) : 0)
-  : (agreements.length > 0 ? agreements.reduce((sum, value) => sum + value, 0) / agreements.length : 0);
+  ? (agreementRatios.length > 0 ? Math.min(...agreementRatios) : 0)
+  : (agreementRatios.length > 0
+    ? agreementRatios.reduce((sum, value) => sum + value, 0) / agreementRatios.length
+    : 0);
 
 const lowCoverageTags = thresholdPolicy.requiredTags.filter(
   (tag) => Number(tagCounts[tag] ?? 0) < thresholdPolicy.minTagCoverage

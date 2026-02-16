@@ -26,43 +26,43 @@ function getInitialState(options: TokenizeOptions): TokenizerInitialState {
 }
 
 function normalizeCharacterData(value: string, input: string, options: TokenizeOptions): string {
-  let out = value;
+  let normalizedValue = value;
 
   if (options.doubleEscaped && getInitialState(options) !== "CDATA section state") {
-    out = out.replace(/\u0000/g, "\uFFFD");
-    out = out.replace(/\\u0000/g, "\\uFFFD");
+    normalizedValue = normalizedValue.replace(/\u0000/g, "\uFFFD");
+    normalizedValue = normalizedValue.replace(/\\u0000/g, "\\uFFFD");
   }
 
   if (options.xmlViolationMode) {
-    out = out.replace(/[\uFFFE\uFFFF]/g, "\uFFFD");
-    out = out.replace(/\f/g, " ");
+    normalizedValue = normalizedValue.replace(/[\uFFFE\uFFFF]/g, "\uFFFD");
+    normalizedValue = normalizedValue.replace(/\f/g, " ");
   }
 
   if (
     getInitialState(options) === "CDATA section state" &&
     options.doubleEscaped &&
     input.endsWith("]]>") &&
-    out.endsWith("]]>")
+    normalizedValue.endsWith("]]>")
   ) {
-    out = out.slice(0, -3);
+    normalizedValue = normalizedValue.slice(0, -3);
   }
 
-  return out;
+  return normalizedValue;
 }
 
 function normalizeCommentData(value: string, options: TokenizeOptions): string {
-  let out = value;
+  let normalizedValue = value;
 
   if (options.doubleEscaped) {
-    out = out.replace(/\u0000/g, "\uFFFD");
-    out = out.replace(/\\u0000/g, "\\uFFFD");
+    normalizedValue = normalizedValue.replace(/\u0000/g, "\uFFFD");
+    normalizedValue = normalizedValue.replace(/\\u0000/g, "\\uFFFD");
   }
 
   if (options.xmlViolationMode) {
-    out = out.replace(/--/g, "- -");
+    normalizedValue = normalizedValue.replace(/--/g, "- -");
   }
 
-  return out;
+  return normalizedValue;
 }
 
 function mergeAdjacentCharacterTokens(tokens: readonly HtmlToken[]): HtmlToken[] {

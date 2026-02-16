@@ -120,11 +120,11 @@ function attributesFromFixture(raw: unknown): Readonly<Record<string, string>> {
 
   if (typeof raw === "object") {
     const record = raw as Record<string, unknown>;
-    const out: Record<string, string> = {};
+    const normalizedAttributes: Record<string, string> = {};
     for (const [name, value] of Object.entries(record)) {
-      out[name] = typeof value === "string" ? value : "";
+      normalizedAttributes[name] = typeof value === "string" ? value : "";
     }
-    return Object.freeze(out);
+    return Object.freeze(normalizedAttributes);
   }
 
   return Object.freeze({});
@@ -712,17 +712,17 @@ function applyInjectMetaCharset(
     return [...tokens];
   }
 
-  const out = [...tokens];
-  for (let i = 0; i < out.length; i += 1) {
-    const token = out[i];
+  const normalizedTokens = [...tokens];
+  for (let tokenIndex = 0; tokenIndex < normalizedTokens.length; tokenIndex += 1) {
+    const token = normalizedTokens[tokenIndex];
     if (token === undefined || token.type !== "StartTag" || token.name !== "head") {
       continue;
     }
 
     let depth = 1;
-    let endIndex = i + 1;
-    while (endIndex < out.length && depth > 0) {
-      const current = out[endIndex];
+    let endIndex = tokenIndex + 1;
+    while (endIndex < normalizedTokens.length && depth > 0) {
+      const current = normalizedTokens[endIndex];
       if (current?.type === "StartTag" && current.name === "head") {
         depth += 1;
       } else if (current?.type === "EndTag" && current.name === "head") {
@@ -731,34 +731,34 @@ function applyInjectMetaCharset(
       endIndex += 1;
     }
 
-    const headEnd = Math.max(i + 1, endIndex - 1);
+    const headEnd = Math.max(tokenIndex + 1, endIndex - 1);
     let hasCharsetMeta = false;
 
-    for (let cursor = i + 1; cursor < headEnd; cursor += 1) {
-      const current = out[cursor];
+    for (let cursor = tokenIndex + 1; cursor < headEnd; cursor += 1) {
+      const current = normalizedTokens[cursor];
       if (current === undefined || (current.type !== "StartTag" && current.type !== "EmptyTag")) {
         continue;
       }
 
       const { updated, touched } = updateMetaEncoding(current, options.encoding);
-      out[cursor] = updated;
+      normalizedTokens[cursor] = updated;
       if (touched) {
         hasCharsetMeta = true;
       }
     }
 
     if (!hasCharsetMeta) {
-      out.splice(i + 1, 0, {
+      normalizedTokens.splice(tokenIndex + 1, 0, {
         type: "EmptyTag",
         namespace: "http://www.w3.org/1999/xhtml",
         name: "meta",
         attributes: [{ namespace: null, name: "charset", value: options.encoding }]
       });
-      i += 1;
+      tokenIndex += 1;
     }
   }
 
-  return out;
+  return normalizedTokens;
 }
 
 function popMatching(stack: string[], name: string): void {

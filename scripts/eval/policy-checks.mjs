@@ -9,22 +9,22 @@ const builtinSet = new Set(builtinModules.flatMap((name) => [name, `node:${name}
 
 const importPattern = /(?:import|export)\\s+(?:[^"'`]*?from\\s*)?["']([^"']+)["']|import\\(\\s*["']([^"']+)["']\\s*\\)/g;
 
-async function walk(dir) {
-  const entries = await readdir(dir, { withFileTypes: true });
-  const files = [];
+async function listSourceTypeScriptFiles(directoryPath) {
+  const directoryEntries = await readdir(directoryPath, { withFileTypes: true });
+  const sourceFilePaths = [];
 
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await walk(fullPath)));
+  for (const directoryEntry of directoryEntries) {
+    const fullPath = path.join(directoryPath, directoryEntry.name);
+    if (directoryEntry.isDirectory()) {
+      sourceFilePaths.push(...(await listSourceTypeScriptFiles(fullPath)));
       continue;
     }
-    if (entry.name.endsWith(".ts")) {
-      files.push(fullPath);
+    if (directoryEntry.name.endsWith(".ts")) {
+      sourceFilePaths.push(fullPath);
     }
   }
 
-  return files;
+  return sourceFilePaths;
 }
 
 export async function runPolicyChecks(mode) {
@@ -40,18 +40,18 @@ export async function runPolicyChecks(mode) {
     throw new Error(`Runtime dependencies are not allowed: ${dependencyNames.join(", ")}`);
   }
 
-  const tsFiles = await walk(srcRoot);
+  const sourceTypeScriptFiles = await listSourceTypeScriptFiles(srcRoot);
   const violations = [];
 
-  for (const file of tsFiles) {
-    const source = await readFile(file, "utf8");
+  for (const filePath of sourceTypeScriptFiles) {
+    const source = await readFile(filePath, "utf8");
     for (const match of source.matchAll(importPattern)) {
       const specifier = match[1] ?? match[2];
       if (!specifier) {
         continue;
       }
       if (builtinSet.has(specifier)) {
-        violations.push(`${path.relative(projectRoot, file)} -> ${specifier}`);
+        violations.push(`${path.relative(projectRoot, filePath)} -> ${specifier}`);
       }
     }
   }

@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 
 import { BudgetExceededError, parse } from "../../dist/mod.js";
-import { writeJson } from "../eval/util.mjs";
+import { writeJson } from "../eval/eval-primitives.mjs";
 
 const RUNS = 600;
 const SEED = 0x9e3779b9;
@@ -108,10 +108,10 @@ function renderAttribute(rng, index) {
 function renderOpenTag(rng, tagName, depth) {
   const attributeCount = 1 + rng.int(4);
   const attributes = [];
-  for (let i = 0; i < attributeCount; i += 1) {
-    attributes.push(renderAttribute(rng, depth + i));
+  for (let attributeIndex = 0; attributeIndex < attributeCount; attributeIndex += 1) {
+    attributes.push(renderAttribute(rng, depth + attributeIndex));
     if (rng.bool(20)) {
-      attributes.push(renderAttribute(rng, depth + i));
+      attributes.push(renderAttribute(rng, depth + attributeIndex));
     }
   }
 

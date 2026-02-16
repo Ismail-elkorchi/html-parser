@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 
-import { fileExists, nowIso, readJson, writeJson } from "./util.mjs";
+import { fileExists, nowIso, readJson, writeJson } from "./eval-primitives.mjs";
 
 function runCommand(command, args) {
   return new Promise((resolve, reject) => {
@@ -19,18 +19,18 @@ function runCommand(command, args) {
   });
 }
 
-async function runStep(id, command, args) {
+async function runStep(stepId, command, args) {
   const startedAt = Date.now();
   try {
     await runCommand(command, args);
     return {
-      id,
+      id: stepId,
       ok: true,
       durationMs: Date.now() - startedAt
     };
   } catch (error) {
     return {
-      id,
+      id: stepId,
       ok: false,
       durationMs: Date.now() - startedAt,
       error: error instanceof Error ? error.message : String(error)
@@ -74,30 +74,30 @@ async function main() {
   steps.push(["score", process.execPath, ["scripts/eval/score.mjs", `--profile=${profile}`]]);
   steps.push(["report", process.execPath, ["scripts/eval/report.mjs", `--profile=${profile}`]]);
 
-  const results = [];
-  for (const [id, command, args] of steps) {
-    const result = await runStep(id, command, args);
-    results.push(result);
+  const stepResults = [];
+  for (const [stepId, command, args] of steps) {
+    const result = await runStep(stepId, command, args);
+    stepResults.push(result);
   }
 
   const gatesReport = (await fileExists("reports/gates.json")) ? await readJson("reports/gates.json") : null;
   const scoreReport = (await fileExists("reports/score.json")) ? await readJson("reports/score.json") : null;
   const gatesPass = Boolean(gatesReport?.allPass);
-  const stepsPass = results.every((entry) => entry.ok);
-  const ok = stepsPass && gatesPass;
+  const stepsPass = stepResults.every((stepResult) => stepResult.ok);
+  const isEvaluationPass = stepsPass && gatesPass;
 
   await writeJson("reports/eval-summary.json", {
     suite: "eval-summary",
     timestamp: nowIso(),
     profile,
-    ok,
+    ok: isEvaluationPass,
     stepsPass,
     gatesPass,
     score: Number(scoreReport?.total || 0),
-    steps: results
+    steps: stepResults
   });
 
-  if (!ok) {
+  if (!isEvaluationPass) {
     console.error("Evaluation failed. See reports/eval-summary.json");
     process.exit(1);
   }

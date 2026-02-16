@@ -4,7 +4,7 @@ import { sniffHtmlEncoding } from "../../dist/internal/encoding/sniff.js";
 import { serializeFixtureTokenStream } from "../../dist/internal/serializer/mod.js";
 import { tokenize } from "../../dist/internal/tokenizer/mod.js";
 import { buildTreeFromHtml, normalizeTree } from "../../dist/internal/tree/mod.js";
-import { writeJson } from "../eval/util.mjs";
+import { writeJson } from "../eval/eval-primitives.mjs";
 
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
@@ -50,28 +50,28 @@ const SERIALIZER_FILES = [
 
 const encoder = new TextEncoder();
 
-function hashWithMultiplier(id, multiplier) {
+function hashWithMultiplier(fixtureId, multiplier) {
   let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (Math.imul(hash, multiplier) + id.charCodeAt(i)) >>> 0;
+  for (let charIndex = 0; charIndex < fixtureId.length; charIndex += 1) {
+    hash = (Math.imul(hash, multiplier) + fixtureId.charCodeAt(charIndex)) >>> 0;
   }
   return hash;
 }
 
-function isTokenizerHoldout(id) {
-  return hashWithMultiplier(id, 33) % HOLDOUT_MOD === 0;
+function isTokenizerHoldout(fixtureId) {
+  return hashWithMultiplier(fixtureId, 33) % HOLDOUT_MOD === 0;
 }
 
-function isTreeHoldout(id) {
-  return hashWithMultiplier(id, 31) % HOLDOUT_MOD === 0;
+function isTreeHoldout(fixtureId) {
+  return hashWithMultiplier(fixtureId, 31) % HOLDOUT_MOD === 0;
 }
 
-function isEncodingHoldout(id) {
-  return hashWithMultiplier(id, 29) % HOLDOUT_MOD === 0;
+function isEncodingHoldout(fixtureId) {
+  return hashWithMultiplier(fixtureId, 29) % HOLDOUT_MOD === 0;
 }
 
-function isSerializerHoldout(id) {
-  return hashWithMultiplier(id, 37) % HOLDOUT_MOD === 0;
+function isSerializerHoldout(fixtureId) {
+  return hashWithMultiplier(fixtureId, 37) % HOLDOUT_MOD === 0;
 }
 
 function fixtureTokenToComparable(token) {
@@ -112,9 +112,9 @@ function normalizeTokenArray(tokens) {
     .map((token) => fixtureTokenToComparable(token));
 }
 
-function parseTreeDatFixtureFile(content, fileName) {
+function parseTreeDatFixtureFile(content, fixtureFilePath) {
   const lines = content.split(/\r?\n/);
-  const tests = [];
+  const parsedFixtureCases = [];
   let section = "";
   let current = null;
 
@@ -129,8 +129,8 @@ function parseTreeDatFixtureFile(content, fileName) {
       return;
     }
 
-    tests.push({
-      id: `${fileName}#${tests.length + 1}`,
+    parsedFixtureCases.push({
+      id: `${fixtureFilePath}#${parsedFixtureCases.length + 1}`,
       data: current.data,
       expected: current.documentLines.join("\n"),
       fragmentContextTagName: current.fragmentContextTagName,
@@ -209,34 +209,34 @@ function parseTreeDatFixtureFile(content, fileName) {
   }
 
   pushCurrent();
-  return tests;
+  return parsedFixtureCases;
 }
 
-function parseEncodingDatFixtures(text, fileName) {
+function parseEncodingDatFixtures(text, fixtureFilePath) {
   const lines = text.split(/\r?\n/);
-  const cases = [];
+  const parsedEncodingCases = [];
 
   let section = "";
-  let dataLines = [];
-  let expected = "";
+  let inputDataLines = [];
+  let expectedEncodingLabel = "";
 
   function pushCurrent() {
-    if (dataLines.length === 0 && expected.trim().length === 0) {
+    if (inputDataLines.length === 0 && expectedEncodingLabel.trim().length === 0) {
       return;
     }
 
-    if (expected.trim().length === 0) {
+    if (expectedEncodingLabel.trim().length === 0) {
       return;
     }
 
-    cases.push({
-      id: `${fileName}#${cases.length + 1}`,
-      data: dataLines.join("\n"),
-      expectedEncoding: expected.trim().toLowerCase()
+    parsedEncodingCases.push({
+      id: `${fixtureFilePath}#${parsedEncodingCases.length + 1}`,
+      data: inputDataLines.join("\n"),
+      expectedEncoding: expectedEncodingLabel.trim().toLowerCase()
     });
 
-    dataLines = [];
-    expected = "";
+    inputDataLines = [];
+    expectedEncodingLabel = "";
   }
 
   for (const line of lines) {
@@ -256,20 +256,20 @@ function parseEncodingDatFixtures(text, fileName) {
     }
 
     if (section === "data") {
-      dataLines.push(line);
+      inputDataLines.push(line);
       continue;
     }
 
     if (section === "encoding") {
-      if (expected.length > 0) {
-        expected += "\n";
+      if (expectedEncodingLabel.length > 0) {
+        expectedEncodingLabel += "\n";
       }
-      expected += line;
+      expectedEncodingLabel += line;
     }
   }
 
   pushCurrent();
-  return cases;
+  return parsedEncodingCases;
 }
 
 function normalizeFixtureOutput(value) {
@@ -286,26 +286,26 @@ function sumCases(records) {
 
 async function runTokenizerHoldout() {
   const parsedCases = [];
-  for (const path of TOKENIZER_FILES) {
-    const raw = JSON.parse(await readFile(path, "utf8"));
-    const tests = raw.tests ?? raw.xmlViolationTests ?? [];
+  for (const fixturePath of TOKENIZER_FILES) {
+    const fixtureFile = JSON.parse(await readFile(fixturePath, "utf8"));
+    const tests = fixtureFile.tests ?? fixtureFile.xmlViolationTests ?? [];
 
     for (let index = 0; index < tests.length; index += 1) {
       const fixture = tests[index];
-      const fixtureId = `${path}#${index + 1}`;
+      const fixtureId = `${fixturePath}#${index + 1}`;
       const initialStates = fixture.initialStates ?? ["Data state"];
 
       for (const initialState of initialStates) {
         parsedCases.push({
           id: `${fixtureId}@${initialState}`,
           fixtureId,
-          file: path,
+          file: fixturePath,
           input: fixture.input ?? "",
           output: fixture.output ?? [],
           initialState,
           lastStartTag: fixture.lastStartTag,
           doubleEscaped: fixture.doubleEscaped ?? false,
-          xmlViolationMode: path.endsWith("xmlViolation.test")
+          xmlViolationMode: fixturePath.endsWith("xmlViolation.test")
         });
       }
     }
@@ -317,12 +317,12 @@ async function runTokenizerHoldout() {
   let failed = 0;
   const failures = [];
 
-  for (const fixture of selectedCases) {
-    const result = tokenize(fixture.input, {
-      initialState: fixture.initialState,
-      lastStartTag: fixture.lastStartTag,
-      doubleEscaped: fixture.doubleEscaped,
-      xmlViolationMode: fixture.xmlViolationMode,
+  for (const fixtureCase of selectedCases) {
+    const tokenizeResult = tokenize(fixtureCase.input, {
+      initialState: fixtureCase.initialState,
+      lastStartTag: fixtureCase.lastStartTag,
+      doubleEscaped: fixtureCase.doubleEscaped,
+      xmlViolationMode: fixtureCase.xmlViolationMode,
       budgets: {
         maxTextBytes: 200000,
         maxTokenBytes: 16000,
@@ -331,11 +331,11 @@ async function runTokenizerHoldout() {
       }
     });
 
-    const expected = fixture.output.map((token) => fixtureTokenToComparable(token));
-    const actual = normalizeTokenArray(result.tokens);
-    const isMatch = JSON.stringify(expected) === JSON.stringify(actual);
+    const expectedTokens = fixtureCase.output.map((token) => fixtureTokenToComparable(token));
+    const actualTokens = normalizeTokenArray(tokenizeResult.tokens);
+    const isTokenSequenceMatch = JSON.stringify(expectedTokens) === JSON.stringify(actualTokens);
 
-    if (isMatch) {
+    if (isTokenSequenceMatch) {
       passed += 1;
       continue;
     }
@@ -343,9 +343,9 @@ async function runTokenizerHoldout() {
     failed += 1;
     failures.push({
       suite: "tokenizer",
-      id: fixture.id,
-      expectedPreview: expected.slice(0, 8),
-      actualPreview: actual.slice(0, 8)
+      id: fixtureCase.id,
+      expectedPreview: expectedTokens.slice(0, 8),
+      actualPreview: actualTokens.slice(0, 8)
     });
   }
 
@@ -365,9 +365,9 @@ async function runTokenizerHoldout() {
 
 async function runTreeHoldout() {
   const allTests = [];
-  for (const file of TREE_FILES) {
-    const data = await readFile(file, "utf8");
-    allTests.push(...parseTreeDatFixtureFile(data, file));
+  for (const fixturePath of TREE_FILES) {
+    const fixtureData = await readFile(fixturePath, "utf8");
+    allTests.push(...parseTreeDatFixtureFile(fixtureData, fixturePath));
   }
 
   const selectedCases = allTests.filter((testCase) => isTreeHoldout(testCase.id));
@@ -376,7 +376,7 @@ async function runTreeHoldout() {
   const failures = [];
 
   for (const testCase of selectedCases) {
-    const built = buildTreeFromHtml(
+    const treeBuildResult = buildTreeFromHtml(
       testCase.data,
       {
         maxNodes: 4000,
@@ -390,10 +390,10 @@ async function runTreeHoldout() {
       }
     );
 
-    const actual = normalizeFixtureOutput(normalizeTree(built.document));
-    const expected = normalizeFixtureOutput(testCase.expected);
+    const actualTree = normalizeFixtureOutput(normalizeTree(treeBuildResult.document));
+    const expectedTree = normalizeFixtureOutput(testCase.expected);
 
-    if (actual === expected) {
+    if (actualTree === expectedTree) {
       passed += 1;
       continue;
     }
@@ -404,7 +404,7 @@ async function runTreeHoldout() {
       id: testCase.id,
       fragmentContextTagName: testCase.fragmentContextTagName ?? null,
       scriptingEnabled: testCase.scriptingEnabled,
-      treeErrors: built.errors.slice(0, 10)
+      treeErrors: treeBuildResult.errors.slice(0, 10)
     });
   }
 
@@ -434,11 +434,11 @@ async function runEncodingHoldout() {
   let failed = 0;
   const failures = [];
 
-  for (const fixture of selectedCases) {
-    const bytes = encoder.encode(fixture.data);
-    const result = sniffHtmlEncoding(bytes, { defaultEncoding: "windows-1252" });
+  for (const fixtureCase of selectedCases) {
+    const encodedBytes = encoder.encode(fixtureCase.data);
+    const encodingResult = sniffHtmlEncoding(encodedBytes, { defaultEncoding: "windows-1252" });
 
-    if (fixture.expectedEncoding === result.encoding) {
+    if (fixtureCase.expectedEncoding === encodingResult.encoding) {
       passed += 1;
       continue;
     }
@@ -446,10 +446,10 @@ async function runEncodingHoldout() {
     failed += 1;
     failures.push({
       suite: "encoding",
-      id: fixture.id,
-      expected: fixture.expectedEncoding,
-      actual: result.encoding,
-      source: result.source
+      id: fixtureCase.id,
+      expected: fixtureCase.expectedEncoding,
+      actual: encodingResult.encoding,
+      source: encodingResult.source
     });
   }
 
@@ -468,29 +468,29 @@ async function runEncodingHoldout() {
 }
 
 async function runSerializerHoldout() {
-  const tests = [];
-  for (const file of SERIALIZER_FILES) {
-    const raw = JSON.parse(await readFile(file, "utf8"));
-    for (let index = 0; index < (raw.tests ?? []).length; index += 1) {
-      const test = raw.tests[index];
-      tests.push({
-        id: `${file}#${index + 1}`,
-        input: test.input ?? [],
-        expected: Array.isArray(test.expected) ? String(test.expected[0] ?? "") : "",
-        options: test.options ?? {}
+  const serializerCases = [];
+  for (const fixturePath of SERIALIZER_FILES) {
+    const fixtureFile = JSON.parse(await readFile(fixturePath, "utf8"));
+    for (let caseIndex = 0; caseIndex < (fixtureFile.tests ?? []).length; caseIndex += 1) {
+      const fixtureCase = fixtureFile.tests[caseIndex];
+      serializerCases.push({
+        id: `${fixturePath}#${caseIndex + 1}`,
+        input: fixtureCase.input ?? [],
+        expected: Array.isArray(fixtureCase.expected) ? String(fixtureCase.expected[0] ?? "") : "",
+        options: fixtureCase.options ?? {}
       });
     }
   }
 
-  const selectedCases = tests.filter((fixture) => isSerializerHoldout(fixture.id));
+  const selectedCases = serializerCases.filter((fixture) => isSerializerHoldout(fixture.id));
   let passed = 0;
   let failed = 0;
   const failures = [];
 
-  for (const fixture of selectedCases) {
-    const actual = serializeFixtureTokenStream(fixture.input, fixture.options);
+  for (const fixtureCase of selectedCases) {
+    const actualOutput = serializeFixtureTokenStream(fixtureCase.input, fixtureCase.options);
 
-    if (actual === fixture.expected) {
+    if (actualOutput === fixtureCase.expected) {
       passed += 1;
       continue;
     }
@@ -498,9 +498,9 @@ async function runSerializerHoldout() {
     failed += 1;
     failures.push({
       suite: "serializer",
-      id: fixture.id,
-      expected: fixture.expected,
-      actual
+      id: fixtureCase.id,
+      expected: fixtureCase.expected,
+      actual: actualOutput
     });
   }
 
@@ -513,25 +513,30 @@ async function runSerializerHoldout() {
     },
     holdoutRule: HOLDOUT_RULE,
     holdoutMod: HOLDOUT_MOD,
-    totalSurface: tests.length,
+    totalSurface: serializerCases.length,
     failures
   };
 }
 
-const tokenizer = await runTokenizerHoldout();
-const tree = await runTreeHoldout();
-const encoding = await runEncodingHoldout();
-const serializer = await runSerializerHoldout();
+const tokenizerHoldout = await runTokenizerHoldout();
+const treeHoldout = await runTreeHoldout();
+const encodingHoldout = await runEncodingHoldout();
+const serializerHoldout = await runSerializerHoldout();
 
 const suites = {
-  tokenizer,
-  tree,
-  encoding,
-  serializer
+  tokenizer: tokenizerHoldout,
+  tree: treeHoldout,
+  encoding: encodingHoldout,
+  serializer: serializerHoldout
 };
 
-const cases = sumCases([tokenizer, tree, encoding, serializer]);
-const failures = [...tokenizer.failures, ...tree.failures, ...encoding.failures, ...serializer.failures];
+const cases = sumCases([tokenizerHoldout, treeHoldout, encodingHoldout, serializerHoldout]);
+const failures = [
+  ...tokenizerHoldout.failures,
+  ...treeHoldout.failures,
+  ...encodingHoldout.failures,
+  ...serializerHoldout.failures
+];
 
 await writeJson("reports/holdout.json", {
   suite: "holdout",
@@ -550,7 +555,7 @@ if (cases.failed > 0) {
 }
 
 console.log(
-  `Holdout fixtures: passed=${cases.passed}, failed=${cases.failed}, total=${cases.total} `
-    + `(tokenizer=${tokenizer.cases.total}, tree=${tree.cases.total}, `
-    + `encoding=${encoding.cases.total}, serializer=${serializer.cases.total})`
+  `Holdout fixtures passed=${cases.passed}, failed=${cases.failed}, total=${cases.total} `
+    + `(tokenizer=${tokenizerHoldout.cases.total}, tree=${treeHoldout.cases.total}, `
+    + `encoding=${encodingHoldout.cases.total}, serializer=${serializerHoldout.cases.total})`
 );

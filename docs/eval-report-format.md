@@ -318,3 +318,7 @@ Shape:
   "missingFiles": [],
   "missingReadmeSections": []
 }
+
+Rules:
+- `missingFiles` is validated against the docs gate required list in `scripts/eval/check-docs.mjs`.
+- The required list includes `docs/naming-conventions.md`.

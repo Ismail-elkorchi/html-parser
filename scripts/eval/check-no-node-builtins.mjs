@@ -1,38 +1,43 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { builtinModules } from "node:module";
-import { nowIso, writeJson } from "./util.mjs";
+import { nowIso, writeJson } from "./eval-primitives.mjs";
 
 const SRC_DIR = "src";
 
 // Create a set of builtin names including both `fs` and `node:fs`
 const BUILTINS = new Set(
-  builtinModules.flatMap((m) => (m.startsWith("node:") ? [m, m.slice(5)] : [m, `node:${m}`]))
+  builtinModules.flatMap((moduleName) =>
+    (moduleName.startsWith("node:")
+      ? [moduleName, moduleName.slice(5)]
+      : [moduleName, `node:${moduleName}`]))
 );
 
 async function listFiles(dir) {
-  const out = [];
-  async function walk(p) {
-    const s = await stat(p);
-    if (s.isDirectory()) {
-      const entries = await readdir(p);
-      for (const e of entries) await walk(join(p, e));
+  const collectedPaths = [];
+  async function walk(pathEntry) {
+    const pathStats = await stat(pathEntry);
+    if (pathStats.isDirectory()) {
+      const directoryEntries = await readdir(pathEntry);
+      for (const directoryEntry of directoryEntries) await walk(join(pathEntry, directoryEntry));
       return;
     }
-    if (s.isFile() && (p.endsWith(".ts") || p.endsWith(".mts") || p.endsWith(".tsx"))) out.push(p);
+    if (pathStats.isFile() && (pathEntry.endsWith(".ts") || pathEntry.endsWith(".mts") || pathEntry.endsWith(".tsx"))) {
+      collectedPaths.push(pathEntry);
+    }
   }
   await walk(dir);
-  return out;
+  return collectedPaths;
 }
 
 function extractImportSpecifiers(text) {
-  const specs = [];
-  const re1 = /\bimport\s+[^'"]*?\s+from\s+['"]([^'"]+)['"]/g;
-  const re2 = /\bimport\s+['"]([^'"]+)['"]/g;
-  let m;
-  while ((m = re1.exec(text))) specs.push(m[1]);
-  while ((m = re2.exec(text))) specs.push(m[1]);
-  return specs;
+  const importSpecifiers = [];
+  const importFromPattern = /\bimport\s+[^'"]*?\s+from\s+['"]([^'"]+)['"]/g;
+  const sideEffectImportPattern = /\bimport\s+['"]([^'"]+)['"]/g;
+  let regexMatch;
+  while ((regexMatch = importFromPattern.exec(text))) importSpecifiers.push(regexMatch[1]);
+  while ((regexMatch = sideEffectImportPattern.exec(text))) importSpecifiers.push(regexMatch[1]);
+  return importSpecifiers;
 }
 
 async function main() {
@@ -60,32 +65,37 @@ async function main() {
       findings.push({ file, kind: "require", message: "require(...) found in src runtime code" });
     }
 
-    const specs = extractImportSpecifiers(text);
-    for (const s of specs) {
-      if (BUILTINS.has(s)) {
-        findings.push({ file, kind: "builtin-import", specifier: s, message: "Node builtin import found in src runtime code" });
+    const importSpecifiers = extractImportSpecifiers(text);
+    for (const importSpecifier of importSpecifiers) {
+      if (BUILTINS.has(importSpecifier)) {
+        findings.push({
+          file,
+          kind: "builtin-import",
+          specifier: importSpecifier,
+          message: "Node builtin import found in src runtime code"
+        });
       }
     }
   }
 
-  const ok = findings.length === 0;
+  const isCheckPass = findings.length === 0;
   const report = {
     suite: "no-node-builtins",
     timestamp: nowIso(),
-    ok,
+    ok: isCheckPass,
     checkedFiles: files.length,
     findings
   };
 
   await writeJson("reports/no-node-builtins.json", report);
 
-  if (!ok) {
+  if (!isCheckPass) {
     console.error("Node builtin usage detected in src/:", findings);
     process.exit(1);
   }
 }
 
-main().catch((err) => {
-  console.error(err);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

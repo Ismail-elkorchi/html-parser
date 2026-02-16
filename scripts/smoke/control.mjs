@@ -15,7 +15,7 @@ function ensure(condition, message) {
   }
 }
 
-function makeStream(chunks) {
+function createByteStream(byteChunks) {
   const Stream = globalThis.ReadableStream;
   if (typeof Stream !== "function") {
     throw new Error("ReadableStream is unavailable in this runtime");
@@ -23,7 +23,7 @@ function makeStream(chunks) {
 
   return new Stream({
     start(controller) {
-      for (const value of chunks) {
+      for (const value of byteChunks) {
         controller.enqueue(value);
       }
       controller.close();
@@ -60,7 +60,7 @@ const sampleBytes = new Uint8Array([
 ]);
 
 const streamResult = await parseStream(
-  makeStream([sampleBytes.subarray(0, 9), sampleBytes.subarray(9, 21), sampleBytes.subarray(21)])
+  createByteStream([sampleBytes.subarray(0, 9), sampleBytes.subarray(9, 21), sampleBytes.subarray(21)])
 );
 const bytesResult = parseBytes(sampleBytes);
 ensure(
@@ -68,12 +68,12 @@ ensure(
   "parseStream output mismatch vs parseBytes"
 );
 
-const out = outline(parsed);
-ensure(out.entries.length === 0, "outline generation mismatch");
+const outlineResult = outline(parsed);
+ensure(outlineResult.entries.length === 0, "outline generation mismatch");
 
-const chunks = chunk(parsed);
-ensure(chunks.length === 1, "chunk generation mismatch");
-ensure(chunks[0]?.nodes === 5, "chunk node count mismatch");
+const chunkPlan = chunk(parsed);
+ensure(chunkPlan.length === 1, "chunk generation mismatch");
+ensure(chunkPlan[0]?.nodes === 5, "chunk node count mismatch");
 
 let budgetError = null;
 try {

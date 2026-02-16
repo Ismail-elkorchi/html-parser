@@ -7,7 +7,7 @@ import {
   safeDiv,
   scoreFromThresholdToPerfect,
   geometricMean
-} from "./util.mjs";
+} from "./eval-primitives.mjs";
 
 async function loadRequired(path) {
   if (!(await fileExists(path))) throw new Error(`Missing required report: ${path}`);
@@ -21,20 +21,24 @@ async function loadOptional(path) {
 
 function passRate(report) {
   const { passed, failed, executed } = normalizeCaseCounts(report);
-  const denom = executed === 0 ? (passed + failed) : executed;
-  return safeDiv(passed, denom);
+  const executedCaseCount = executed === 0 ? (passed + failed) : executed;
+  return safeDiv(passed, executedCaseCount);
 }
 
 function weighted(points, fraction01) {
   return points * Math.max(0, Math.min(1, fraction01));
 }
 
+function parseProfileArg() {
+  const profileArg = process.argv.find((argumentValue) => argumentValue.startsWith("--profile="));
+  return profileArg ? profileArg.split("=")[1] : "ci";
+}
+
 async function main() {
-  const profile = (process.argv.find((a) => a.startsWith("--profile=")) || "--profile=ci").split("=")[1];
+  const profile = parseProfileArg();
 
   const config = await loadRequired("evaluation.config.json");
-  const prof = config.profiles?.[profile];
-  if (!prof) throw new Error(`Unknown profile: ${profile}`);
+  if (!config.profiles?.[profile]) throw new Error(`Unknown profile: ${profile}`);
 
   const weights = config.weights || {};
 
@@ -43,50 +47,57 @@ async function main() {
   const encoding = await loadRequired("reports/encoding.json");
   const serializer = await loadRequired("reports/serializer.json");
 
-  const t = config.thresholds?.conformance || {};
-  const tokRate = passRate(tokenizer);
-  const treeRate = passRate(tree);
-  const encRate = passRate(encoding);
-  const serRate = passRate(serializer);
+  const conformanceThresholds = config.thresholds?.conformance || {};
+  const tokenizerPassRate = passRate(tokenizer);
+  const treePassRate = passRate(tree);
+  const encodingPassRate = passRate(encoding);
+  const serializerPassRate = passRate(serializer);
 
   const correctnessPoints = Number(weights.correctness || 40);
 
-  const tokPoints = correctnessPoints * (10 / 40);
+  const tokenizerPoints = correctnessPoints * (10 / 40);
   const treePoints = correctnessPoints * (15 / 40);
-  const encPoints = correctnessPoints * (7.5 / 40);
-  const serPoints = correctnessPoints * (7.5 / 40);
+  const encodingPoints = correctnessPoints * (7.5 / 40);
+  const serializerPoints = correctnessPoints * (7.5 / 40);
 
-  const tokFrac = scoreFromThresholdToPerfect(tokRate, t.tokenizer.minPassRate);
-  const treeFrac = scoreFromThresholdToPerfect(treeRate, t.tree.minPassRate);
-  const encFrac = scoreFromThresholdToPerfect(encRate, t.encoding.minPassRate);
-  const serFrac = scoreFromThresholdToPerfect(serRate, t.serializer.minPassRate);
+  const tokenizerScoreFraction =
+    scoreFromThresholdToPerfect(tokenizerPassRate, conformanceThresholds.tokenizer.minPassRate);
+  const treeScoreFraction = scoreFromThresholdToPerfect(treePassRate, conformanceThresholds.tree.minPassRate);
+  const encodingScoreFraction =
+    scoreFromThresholdToPerfect(encodingPassRate, conformanceThresholds.encoding.minPassRate);
+  const serializerScoreFraction =
+    scoreFromThresholdToPerfect(serializerPassRate, conformanceThresholds.serializer.minPassRate);
 
   const correctnessScore =
-    weighted(tokPoints, tokFrac) +
-    weighted(treePoints, treeFrac) +
-    weighted(encPoints, encFrac) +
-    weighted(serPoints, serFrac);
+    weighted(tokenizerPoints, tokenizerScoreFraction) +
+    weighted(treePoints, treeScoreFraction) +
+    weighted(encodingPoints, encodingScoreFraction) +
+    weighted(serializerPoints, serializerScoreFraction);
 
   const browserDiffPoints = Number(weights.browserDiff || 20);
-  const bd = await loadOptional("reports/browser-diff.json");
+  const browserDiffReport = await loadOptional("reports/browser-diff.json");
 
   let browserDiffScore = 0;
   let browserAgreement = null;
 
-  if (bd) {
-    const engines = bd.engines || {};
-    const present = Object.keys(engines).filter((k) => Number(engines[k]?.compared || 0) > 0);
-    const agreements = present.map((k) => safeDiv(Number(engines[k]?.agreed || 0), Number(engines[k]?.compared || 0)));
+  if (browserDiffReport) {
+    const engines = browserDiffReport.engines || {};
+    const presentEngines = Object.keys(engines).filter((engineName) => Number(engines[engineName]?.compared || 0) > 0);
+    const agreementRatios = presentEngines.map((engineName) =>
+      safeDiv(Number(engines[engineName]?.agreed || 0), Number(engines[engineName]?.compared || 0))
+    );
 
-    const agg = config.scoring?.browserAgreementAggregation === "min"
-      ? (agreements.length ? Math.min(...agreements) : 0)
-      : (agreements.length ? agreements.reduce((a, b) => a + b, 0) / agreements.length : 0);
+    const aggregateAgreement = config.scoring?.browserAgreementAggregation === "min"
+      ? (agreementRatios.length ? Math.min(...agreementRatios) : 0)
+      : (agreementRatios.length
+        ? agreementRatios.reduce((ratioSum, ratio) => ratioSum + ratio, 0) / agreementRatios.length
+        : 0);
 
-    browserAgreement = { presentEngines: present, agreement: agg };
+    browserAgreement = { presentEngines, agreement: aggregateAgreement };
 
     const minAgreement = config.thresholds?.browserDiff?.minAgreement ?? 0.995;
-    const frac = scoreFromThresholdToPerfect(agg, minAgreement);
-    browserDiffScore = weighted(browserDiffPoints, frac);
+    const agreementFraction = scoreFromThresholdToPerfect(aggregateAgreement, minAgreement);
+    browserDiffScore = weighted(browserDiffPoints, agreementFraction);
   } else {
     browserAgreement = { missing: true };
     browserDiffScore = 0;
@@ -102,28 +113,28 @@ async function main() {
     const baseline = config.performanceBaseline?.benchmarks || {};
     const ratios = [];
 
-    for (const b of bench.benchmarks || []) {
-      const base = baseline[b.name];
-      if (!base) continue;
+    for (const benchmarkEntry of bench.benchmarks || []) {
+      const baselineEntry = baseline[benchmarkEntry.name];
+      if (!baselineEntry) continue;
 
-      const thr = Number(b.mbPerSec || 0);
-      const mem = Number(b.memoryMB || 0);
-      const baseThr = Number(base.mbPerSec || 0);
-      const baseMem = Number(base.memoryMB || 0);
+      const throughputMbPerSec = Number(benchmarkEntry.mbPerSec || 0);
+      const memoryMb = Number(benchmarkEntry.memoryMB || 0);
+      const baselineThroughputMbPerSec = Number(baselineEntry.mbPerSec || 0);
+      const baselineMemoryMb = Number(baselineEntry.memoryMB || 0);
 
-      const thrRatio = safeDiv(thr, baseThr);
-      const memRatio = safeDiv(baseMem, mem);
+      const throughputRatio = safeDiv(throughputMbPerSec, baselineThroughputMbPerSec);
+      const memoryRatio = safeDiv(baselineMemoryMb, memoryMb);
 
-      ratios.push(geometricMean([thrRatio, memRatio]));
+      ratios.push(geometricMean([throughputRatio, memoryRatio]));
     }
 
-    const agg = config.scoring?.performanceAggregation === "geometricMean"
+    const aggregatePerformanceRatio = config.scoring?.performanceAggregation === "geometricMean"
       ? geometricMean(ratios)
-      : (ratios.length ? ratios.reduce((a, b) => a + b, 0) / ratios.length : 0);
+      : (ratios.length ? ratios.reduce((ratioSum, ratio) => ratioSum + ratio, 0) / ratios.length : 0);
 
-    const frac = Math.max(0, Math.min(1, agg));
-    performanceScore = weighted(perfPoints, frac);
-    performanceDetail = { benchmarksCompared: ratios.length, ratio: agg };
+    const boundedPerformanceRatio = Math.max(0, Math.min(1, aggregatePerformanceRatio));
+    performanceScore = weighted(perfPoints, boundedPerformanceRatio);
+    performanceDetail = { benchmarksCompared: ratios.length, ratio: aggregatePerformanceRatio };
   }
 
   const robustPoints = Number(weights.robustness || 10);
@@ -152,10 +163,12 @@ async function main() {
   let agentDetail = agent || { missing: true };
 
   if (agent) {
-    const f = agent.features || {};
-    const okCount = ["trace", "spans", "outline", "chunk"].filter((k) => Boolean(f?.[k]?.ok)).length;
-    const frac = okCount / 4;
-    agentScore = weighted(agentPoints, frac);
+    const agentFeatures = agent.features || {};
+    const enabledFeatureCount = ["trace", "spans", "outline", "chunk"].filter(
+      (featureName) => Boolean(agentFeatures?.[featureName]?.ok)
+    ).length;
+    const featureCoverage = enabledFeatureCount / 4;
+    agentScore = weighted(agentPoints, featureCoverage);
   }
 
   const packPoints = Number(weights.packagingTrust || 5);
@@ -181,7 +194,15 @@ async function main() {
     profile,
     total,
     breakdown: {
-      correctness: { score: correctnessScore, details: { tokRate, treeRate, encRate, serRate } },
+      correctness: {
+        score: correctnessScore,
+        details: {
+          tokenizerPassRate,
+          treePassRate,
+          encodingPassRate,
+          serializerPassRate
+        }
+      },
       browserDiff: { score: browserDiffScore, details: browserAgreement },
       performance: { score: performanceScore, details: performanceDetail },
       robustness: { score: robustnessScore, details: robustnessDetail },
@@ -195,7 +216,7 @@ async function main() {
   console.log(`Total score (${profile}): ${total.toFixed(3)}/100`);
 }
 
-main().catch((err) => {
-  console.error(err);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

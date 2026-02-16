@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { BudgetExceededError, chunk, outline, parse, parseBytes, parseStream } from "../../dist/mod.js";
 
-function makeStream(chunks) {
+function createByteStream(byteChunks) {
   const streamFactory = globalThis.ReadableStream;
   if (typeof streamFactory !== "function") {
     throw new Error("ReadableStream is unavailable in this runtime");
@@ -11,7 +11,7 @@ function makeStream(chunks) {
 
   return new streamFactory({
     start(controller) {
-      for (const value of chunks) {
+      for (const value of byteChunks) {
         controller.enqueue(value);
       }
       controller.close();
@@ -24,14 +24,14 @@ function asciiBytes(value) {
 }
 
 test("parseStream decodes deterministic output", async () => {
-  const stream = makeStream([new Uint8Array([0x61, 0x62]), new Uint8Array([0x63])]);
+  const stream = createByteStream([new Uint8Array([0x61, 0x62]), new Uint8Array([0x63])]);
   const parsed = await parseStream(stream);
   assert.equal(parsed.kind, "document");
   assert.equal(parsed.children[0]?.kind, "element");
 });
 
 test("parseStream enforces maxBufferedBytes budget", async () => {
-  const stream = makeStream([new Uint8Array([0x61, 0x62, 0x63])]);
+  const stream = createByteStream([new Uint8Array([0x61, 0x62, 0x63])]);
   await assert.rejects(
     parseStream(stream, { budgets: { maxBufferedBytes: 2 } }),
     (error) => {
@@ -44,7 +44,7 @@ test("parseStream enforces maxBufferedBytes budget", async () => {
 
 test("parseStream fails once buffered bytes exceed limit during prescan", async () => {
   const payload = new Uint8Array(40).fill(0x61);
-  const stream = makeStream([...payload].map((value) => new Uint8Array([value])));
+  const stream = createByteStream([...payload].map((value) => new Uint8Array([value])));
   await assert.rejects(
     parseStream(stream, { budgets: { maxBufferedBytes: 16 } }),
     (error) => {
@@ -61,7 +61,7 @@ test("parseStream matches parseBytes for chunked transport with sniffing", async
   const prefix = "<meta charset=windows-1252><p>";
   const suffix = "</p>";
   const bytes = new Uint8Array([...asciiBytes(prefix), 0xe9, ...asciiBytes(suffix)]);
-  const stream = makeStream([bytes.subarray(0, 7), bytes.subarray(7, 19), bytes.subarray(19)]);
+  const stream = createByteStream([bytes.subarray(0, 7), bytes.subarray(7, 19), bytes.subarray(19)]);
 
   const fromBytes = parseBytes(bytes);
   const fromStream = await parseStream(stream);
@@ -78,7 +78,7 @@ test("parseStream matches parseBytes across many deterministic chunks", async ()
   }
 
   const fromBytes = parseBytes(bytes);
-  const fromStream = await parseStream(makeStream(chunks));
+  const fromStream = await parseStream(createByteStream(chunks));
   assert.deepEqual(fromStream, fromBytes);
 });
 
