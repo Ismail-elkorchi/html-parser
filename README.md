@@ -16,6 +16,8 @@ Agent-first TypeScript HTML parser with deterministic output, bounded execution,
 - Not a CSS selector engine.
 - Not a sanitizer.
 
+See `docs/ecosystem-comparison.md` for a scope comparison against parse5, htmlparser2, cheerio, jsdom, linkedom, deno-dom, and HTMLRewriter/lol-html.
+
 ## Runtime compatibility
 - Node.js: current stable and active LTS with Web Streams and TextDecoder support.
 - Deno: stable channel.
