@@ -1,7 +1,7 @@
 # Releasing (alpha policy)
 
-This repository does not publish automatically.
-Release execution is manual and only occurs after `eval:release` passes.
+Release execution is tag-based (`v*`) in `.github/workflows/release.yml`.
+The workflow runs `eval:release` before publish steps.
 
 ## Package identity
 
@@ -29,6 +29,32 @@ Required release evidence:
 - `reports/no-external-imports.json` is `ok: true`.
 - `reports/browser-diff.json` includes chromium/firefox/webkit and meets configured agreement threshold.
 
+## JSR prerequisites
+
+JSR publishing in GitHub Actions is tokenless and uses OIDC (`id-token: write`).
+
+Before tag-based publishing:
+1. Link the JSR package to this GitHub repository in JSR settings.
+2. Confirm the release workflow identity is allowed by JSR for OIDC publish.
+3. Keep `jsr.json` package identity aligned with repository release identity.
+
+Release workflow JSR publish command:
+
+```bash
+npx jsr publish
+```
+
+## npm prerequisites
+
+Target release posture is npm Trusted Publishing (OIDC).
+
+Before enabling tag-based npm publish:
+1. Configure the npm package settings to trust this repository release workflow.
+2. Validate OIDC trusted publishing for tag-triggered releases.
+3. Confirm package visibility and access policy (`public`) in npm settings.
+
+With npm Trusted Publishing, provenance attestations are emitted automatically.
+
 ## Tagging
 
 Create and push an annotated tag after all release checks pass:
@@ -40,29 +66,13 @@ git tag -a v0.x.y -m "v0.x.y"
 git push origin v0.x.y
 ```
 
-## npm publish steps (manual)
+## Manual fallback publishing
 
-When publication is explicitly approved:
+If trusted publishing is not yet enabled, publication can be run manually after explicit approval:
+- npm: `npm publish --access public`
+- JSR: `npx jsr publish`
 
-1. Set `package.json`:
-   - `private: false`
-   - `name: @ismail-elkorchi/html-parser`
-2. Regenerate build and run the full release verification commands.
-3. Publish:
-
-```bash
-npm publish --access public
-```
-
-## JSR publish steps (manual)
-
-When publication is explicitly approved:
-
-```bash
-npx jsr publish
-```
-
-`jsr.json` must stay aligned with intended public identity and the tagged version line.
+`package.json` and `jsr.json` must stay aligned with intended public identity and tagged versioning policy.
 
 ## Third-party notices checklist
 
