@@ -8,7 +8,8 @@
       "requireBun": true,
       "requireBrowserSmoke": false,
       "requireFuzzReport": false,
-      "requireStreamReport": true
+      "requireStreamReport": true,
+      "requireAgentReport": true
     },
     "release": {
       "requireHoldouts": true,
@@ -17,7 +18,8 @@
       "requireBun": true,
       "requireBrowserSmoke": false,
       "requireFuzzReport": true,
-      "requireStreamReport": true
+      "requireStreamReport": true,
+      "requireAgentReport": true
     }
   },
   "thresholds": {

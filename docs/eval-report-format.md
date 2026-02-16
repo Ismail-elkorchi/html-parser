@@ -279,15 +279,20 @@ Shape:
   "suite": "agent",
   "timestamp": "...",
   "features": {
-    "trace": { "ok": true, "bounded": true, "tested": true },
-    "spans": { "ok": true, "tested": true },
-    "outline": { "ok": true, "tested": true },
-    "chunk": { "ok": true, "tested": true }
+    "trace": { "ok": true, "details": {} },
+    "spans": { "ok": true, "details": {} },
+    "patch": { "ok": true, "details": {} },
+    "outline": { "ok": true, "details": {} },
+    "chunk": { "ok": true, "details": {} }
+  },
+  "overall": {
+    "ok": true
   }
 }
 
 Rules:
 - `features.trace.ok` must reflect structured trace schema validation (not only non-empty trace arrays).
+- `overall.ok` must be `true` for gate `G-086`.
 
 ## Packaging report
 File:

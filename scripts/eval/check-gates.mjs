@@ -188,6 +188,19 @@ async function main() {
     )
   );
 
+  const agentReport = await loadOptionalReport("reports/agent.json");
+  const requireAgentReport = Boolean(profilePolicy.requireAgentReport);
+  const agentOk = Boolean(agentReport?.overall?.ok);
+  const agentPass = requireAgentReport ? agentOk : (agentReport ? agentOk : true);
+  gates.push(
+    makeGate(
+      "G-086",
+      "Agent feature report",
+      agentPass,
+      { required: requireAgentReport, agent: agentReport || { missing: true } }
+    )
+  );
+
   const budgets = await loadOptionalReport("reports/budgets.json");
   const fuzz = await loadOptionalReport("reports/fuzz.json");
   const requireBudgetsReport = Boolean(config.thresholds?.budgets?.requireBudgetsReport);
