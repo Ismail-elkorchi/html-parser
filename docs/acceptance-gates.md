@@ -153,6 +153,7 @@ Requirement:
   - `chunk`
   - `streamToken`
   - `visibleText`
+  - `parseErrorId`
 
 Evidence:
 - `reports/agent.json`
@@ -173,6 +174,20 @@ Requirement:
 
 Evidence:
 - `reports/gates.json` gate `G-087`
+
+---
+
+### G-088: Parse error taxonomy contract
+Requirement:
+- `getParseErrorSpecRef` export is present in the public API.
+- Parser-reported errors expose `parseErrorId` with deterministic values for identical input.
+- `getParseErrorSpecRef(parseErrorId)` returns the stable WHATWG parse-errors section URL.
+- `docs/parse-errors.md` exists.
+- `test/control/parse-errors.test.js` exists.
+- Agent report includes `features.parseErrorId.ok=true`.
+
+Evidence:
+- `reports/gates.json` gate `G-088`
 
 ---
 

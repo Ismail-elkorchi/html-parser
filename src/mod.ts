@@ -15,6 +15,7 @@ export {
   findAllByAttr,
   findAllByTagName,
   findById,
+  getParseErrorSpecRef,
   textContent,
   tokenizeStream,
   walk,

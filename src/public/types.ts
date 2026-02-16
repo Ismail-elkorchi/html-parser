@@ -20,6 +20,7 @@ export interface ParseError {
     | "UNSUPPORTED_ENCODING"
     | "INVALID_FRAGMENT_CONTEXT"
     | "PARSER_ERROR";
+  readonly parseErrorId: string;
   readonly message: string;
   readonly nodeId?: NodeId;
   readonly span?: Span;
