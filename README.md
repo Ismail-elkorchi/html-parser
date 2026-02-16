@@ -79,6 +79,24 @@ const tree = await parseStream(stream, {
 });
 ```
 
+### Tokenize a stream
+```ts
+import { tokenizeStream } from "html-parser";
+
+const stream = new ReadableStream<Uint8Array>({
+  start(controller) {
+    controller.enqueue(new TextEncoder().encode("<p>alpha</p>"));
+    controller.close();
+  }
+});
+
+for await (const token of tokenizeStream(stream, {
+  budgets: { maxInputBytes: 1024, maxBufferedBytes: 256 }
+})) {
+  console.log(token.kind);
+}
+```
+
 ### Serialize a parsed tree
 ```ts
 import { parse, serialize } from "html-parser";

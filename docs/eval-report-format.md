@@ -283,7 +283,8 @@ Shape:
     "spans": { "ok": true, "details": {} },
     "patch": { "ok": true, "details": {} },
     "outline": { "ok": true, "details": {} },
-    "chunk": { "ok": true, "details": {} }
+    "chunk": { "ok": true, "details": {} },
+    "streamToken": { "ok": true, "details": {} }
   },
   "overall": {
     "ok": true

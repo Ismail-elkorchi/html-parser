@@ -6,7 +6,8 @@ import {
   parse,
   parseStream,
   parseFragment,
-  serialize
+  serialize,
+  tokenizeStream
 } from "../../dist/mod.js";
 
 function ensure(condition, message) {
@@ -67,6 +68,12 @@ ensure(
   JSON.stringify(streamResult) === JSON.stringify(bytesResult),
   "parseStream output mismatch vs parseBytes"
 );
+
+const tokenKinds = [];
+for await (const token of tokenizeStream(createByteStream([new TextEncoder().encode("<p>smoke</p>")]))) {
+  tokenKinds.push(token.kind);
+}
+ensure(JSON.stringify(tokenKinds) === JSON.stringify(["startTag", "chars", "endTag", "eof"]), "tokenizeStream mismatch");
 
 const outlineResult = outline(parsed);
 ensure(outlineResult.entries.length === 0, "outline generation mismatch");
