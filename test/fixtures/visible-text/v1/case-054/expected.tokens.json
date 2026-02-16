@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "BeforeAfter"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Fallback text"
+  }
+]

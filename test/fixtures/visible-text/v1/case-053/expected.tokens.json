@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "text",
+    "value": "Read more"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "Extended explanation"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Tail"
+  }
+]

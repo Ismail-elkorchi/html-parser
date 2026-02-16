@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "NodeA=B"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Equation"
+  }
+]

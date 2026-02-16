@@ -75,6 +75,18 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-042`: paragraph break interactions around inline SVG content.
 - `case-043`: table cell tab boundaries with SVG/MathML cell payloads.
 - `case-044`: `noscript` subtree containing foreign content before visible paragraph text.
+- `case-045`: `nav` + `article` + `footer` block boundary extraction for link-heavy page chrome.
+- `case-046`: figure image-alt emission followed by figcaption text and trailing paragraph break.
+- `case-047`: nested list traversal preserving deterministic paragraph separation.
+- `case-048`: table header/data tabs with explicit `&lt;br&gt;` line breaks inside cells.
+- `case-049`: paragraph + `pre` adjacency preserving preformatted newlines.
+- `case-050`: linked image-alt text fusion with surrounding inline copy.
+- `case-051`: hidden input suppression with visible input/button value extraction.
+- `case-052`: `aria-hidden=\"1\"` subtree suppression in sectioned content.
+- `case-053`: details/summary linearization with deterministic line-break boundaries.
+- `case-054`: script exclusion with trailing `noscript` fallback paragraph.
+- `case-055`: template subtree exclusion with body-only visibility.
+- `case-056`: inline SVG + MathML token adjacency before paragraph boundaries.
 
 ## Determinism
 For identical input trees and options:
