@@ -109,8 +109,9 @@ async function main() {
   const normalized = files.map((f) => f.replace(/^package\//, ""));
 
   const forbiddenIncluded = normalized.filter((p) => forbiddenPrefixes.some((pref) => p.startsWith(pref)));
+  const thirdPartyNoticesIncluded = normalized.includes("THIRD_PARTY_NOTICES.md");
 
-  const ok = dependenciesEmpty && esmOnly && exportsOk && forbiddenIncluded.length === 0;
+  const ok = dependenciesEmpty && esmOnly && exportsOk && forbiddenIncluded.length === 0 && thirdPartyNoticesIncluded;
 
   const report = {
     suite: "pack",
@@ -120,7 +121,8 @@ async function main() {
     dependenciesEmpty,
     esmOnly,
     exportsOk,
-    forbiddenIncluded
+    forbiddenIncluded,
+    thirdPartyNoticesIncluded
   };
 
   await writeJson("reports/pack.json", report);

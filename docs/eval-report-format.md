@@ -199,7 +199,8 @@ Shape:
   "forbiddenIncluded": [],
   "dependenciesEmpty": true,
   "esmOnly": true,
-  "exportsOk": true
+  "exportsOk": true,
+  "thirdPartyNoticesIncluded": true
 }
 
 ## Docs report
