@@ -59,6 +59,7 @@ async function main() {
     ["smoke-deno", "npm", ["run", "smoke:deno"]],
     ["smoke-bun", "npm", ["run", "smoke:bun"]],
     ["docs", process.execPath, ["scripts/eval/check-docs.mjs"]],
+    ["text-hygiene", process.execPath, ["scripts/eval/check-text-hygiene.mjs"]],
     ["no-external-imports", process.execPath, ["scripts/eval/check-no-external-imports.mjs"]],
     ["no-node-builtins", process.execPath, ["scripts/eval/check-no-node-builtins.mjs"]],
     ["runtime-self-contained", process.execPath, ["scripts/eval/check-runtime-self-contained.mjs"]],

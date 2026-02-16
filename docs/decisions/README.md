@@ -22,6 +22,7 @@ Naming:
 - ADR-016-... streaming invariant report and CI gate requirement
 - ADR-017-... naming policy documentation requirement in docs gate
 - ADR-018-... package identity policy for public alpha readiness
+- ADR-019-... text hygiene gate for hidden Unicode control characters
 
 Minimum sections:
 - Context

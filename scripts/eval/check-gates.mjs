@@ -247,6 +247,16 @@ async function main() {
   const docs = await loadOptionalReport("reports/docs.json");
   gates.push(makeGate("G-120", "Docs and dataset hygiene", Boolean(docs?.ok), docs || { missing: true }));
 
+  const textHygiene = await loadOptionalReport("reports/text-hygiene.json");
+  gates.push(
+    makeGate(
+      "G-125",
+      "Text hygiene (no hidden control characters)",
+      Boolean(textHygiene?.ok),
+      textHygiene || { missing: true }
+    )
+  );
+
   if (profilePolicy.requireHoldouts) {
     await evaluateConformanceGate("R-200", "Holdout suite", "reports/holdout.json", conformanceThresholds.holdout);
   }

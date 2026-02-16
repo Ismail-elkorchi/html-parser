@@ -328,3 +328,26 @@ Shape:
 Rules:
 - `missingFiles` is validated against the docs gate required list in `scripts/eval/check-docs.mjs`.
 - The required list includes `docs/naming-conventions.md`.
+
+## Text hygiene report
+File:
+- reports/text-hygiene.json
+
+Shape:
+{
+  "suite": "text-hygiene",
+  "timestamp": "...",
+  "ok": true,
+  "scannedFileCount": 0,
+  "violations": [
+    {
+      "path": "docs/example.md",
+      "codePointHex": "U+202E",
+      "index": 12
+    }
+  ]
+}
+
+Rules:
+- The report fails (`ok=false`) if any scanned file includes banned Unicode bidi controls or U+0000.
+- The scan surface and exclusions are defined by gate `G-125` in `docs/acceptance-gates.md`.
