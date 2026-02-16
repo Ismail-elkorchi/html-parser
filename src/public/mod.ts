@@ -876,9 +876,12 @@ export function computePatch(originalHtml: string, edits: readonly PatchEdit[]):
 export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions = {}): Chunk[] {
   const maxChars = options.maxChars ?? 8192;
   const maxNodes = options.maxNodes ?? 256;
+  const maxBytes = options.maxBytes ?? Number.POSITIVE_INFINITY;
+  const textEncoder = new TextEncoder();
   const chunks: Chunk[] = [];
   let activeContent = "";
   let activeNodes = 0;
+  let activeBytes = 0;
   let activeNodeId: NodeId | null = null;
   let index = 0;
 
@@ -897,16 +900,19 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
     index += 1;
     activeContent = "";
     activeNodes = 0;
+    activeBytes = 0;
     activeNodeId = null;
   };
 
   for (const node of tree.children) {
     const content = serialize(node);
     const nodes = countNodes(node);
+    const bytes = textEncoder.encode(content).length;
     const nextChars = activeContent.length + content.length;
     const nextNodes = activeNodes + nodes;
+    const nextBytes = activeBytes + bytes;
 
-    if (activeNodeId !== null && (nextChars > maxChars || nextNodes > maxNodes)) {
+    if (activeNodeId !== null && (nextChars > maxChars || nextNodes > maxNodes || nextBytes > maxBytes)) {
       flush();
     }
 
@@ -916,6 +922,7 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
 
     activeContent += content;
     activeNodes += nodes;
+    activeBytes += bytes;
   }
 
   flush();

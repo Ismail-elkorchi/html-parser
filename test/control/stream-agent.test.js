@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BudgetExceededError, chunk, outline, parse, parseBytes, parseStream } from "../../dist/mod.js";
+import { BudgetExceededError, chunk, outline, parse, parseBytes, parseFragment, parseStream } from "../../dist/mod.js";
 
 function createByteStream(byteChunks) {
   const streamFactory = globalThis.ReadableStream;
@@ -91,4 +91,15 @@ test("outline and chunk stay deterministic", () => {
   const firstChunks = chunk(parsed, { maxChars: 16, maxNodes: 4 });
   const secondChunks = chunk(parsed, { maxChars: 16, maxNodes: 4 });
   assert.deepEqual(firstChunks, secondChunks);
+});
+
+test("chunk enforces maxBytes when configured", () => {
+  const fragment = parseFragment("<p>a</p><p>bb</p><p>ccc</p>", "section");
+  const chunks = chunk(fragment, { maxChars: 4096, maxNodes: 32, maxBytes: 20 });
+  const encoder = new TextEncoder();
+
+  assert.ok(chunks.length >= 1);
+  for (const item of chunks) {
+    assert.ok(encoder.encode(item.content).length <= 20);
+  }
 });

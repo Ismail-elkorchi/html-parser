@@ -141,6 +141,22 @@ Evidence:
 
 ---
 
+### G-086: Agent feature report
+Requirement:
+- `reports/agent.json` must exist for CI and release profiles.
+- `reports/agent.json.overall.ok` must be `true`.
+- Feature checks must validate deterministic behavior and boundedness for:
+  - `trace`
+  - `spans`
+  - `patch`
+  - `outline`
+  - `chunk`
+
+Evidence:
+- `reports/agent.json`
+
+---
+
 ### G-090: Resource governance (budgets) works
 Requirement:
 - Budget exceed produces a structured error (not crash, not hang).

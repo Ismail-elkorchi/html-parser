@@ -172,6 +172,7 @@ export interface Chunk {
 export interface ChunkOptions {
   readonly maxChars?: number;
   readonly maxNodes?: number;
+  readonly maxBytes?: number;
 }
 
 export interface PatchEdit {

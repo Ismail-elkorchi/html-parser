@@ -23,6 +23,9 @@
 - `budgets.maxTraceEvents`: undefined
 - `budgets.maxTraceBytes`: undefined
 - `budgets.maxTimeMs`: undefined
+- `chunk.maxChars`: `8192`
+- `chunk.maxNodes`: `256`
+- `chunk.maxBytes`: unlimited
 
 `parseBytes` decoding order:
 1) BOM detection
@@ -51,7 +54,7 @@
 - Budget violations throw `BudgetExceededError`.
 - Error payload schema:
   - `code`: `BUDGET_EXCEEDED`
-  - `budget`: `maxInputBytes` | `maxNodes` | `maxTraceEvents`
+  - `budget`: `maxInputBytes` | `maxBufferedBytes` | `maxNodes` | `maxDepth` | `maxTraceEvents` | `maxTraceBytes` | `maxTimeMs`
   - `limit`: configured threshold
   - `actual`: observed value
 
