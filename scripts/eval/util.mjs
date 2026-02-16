@@ -12,6 +12,7 @@ export function clamp01(x) {
 export function scoreFromThresholdToPerfect(passRate, minPassRate) {
   const p = clamp01(passRate);
   const min = clamp01(minPassRate);
+  if (min >= 1) return p >= 1 ? 1 : 0;
   if (p <= min) return 0;
   if (p >= 1) return 1;
   const denom = 1 - min;
