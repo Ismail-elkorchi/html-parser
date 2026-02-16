@@ -25,9 +25,9 @@ Evaluation scoring uses profile-specific weights from `evaluation.config.json`:
 Each profile weight set sums to exactly `100`.
 
 CI weights (current):
-- `correctness`: 50
+- `correctness`: 70
 - `browserDiff`: 0
-- `performance`: 20
+- `performance`: 0
 - `robustness`: 10
 - `agentFirst`: 15
 - `packagingTrust`: 5
@@ -357,6 +357,22 @@ Requirement:
 
 Evidence:
 - `reports/doc-snippets.json` with `ok=true`
+
+---
+
+### G-128: Score model coherence
+Requirement:
+- For each evaluation profile, score category weights must align with required report policy:
+  - `correctness` weight > 0 requires `requireConformanceReports=true`
+  - `agentFirst` weight > 0 requires `requireAgentReport=true`
+  - `packagingTrust` weight > 0 requires `requirePackReport=true` and `requireDocsReport=true`
+  - `robustness` weight > 0 requires `requireBudgetsReport=true`
+    - fuzz contribution policy must match scoring policy (`robustnessUsesFuzz === requireFuzzReport`)
+  - `performance` weight > 0 requires `requireBenchReport=true`
+  - `browserDiff` weight > 0 requires `requireBrowserDiff=true`
+
+Evidence:
+- `reports/gates.json` gate `G-128` with `pass=true`
 
 ---
 

@@ -535,6 +535,88 @@ async function main() {
     )
   );
 
+  const profileWeights =
+    profilePolicy.weights && typeof profilePolicy.weights === "object" && !Array.isArray(profilePolicy.weights)
+      ? profilePolicy.weights
+      : (config.weights || {});
+
+  function getWeight(weightKey) {
+    const weightValue = Number(profileWeights[weightKey] ?? 0);
+    return Number.isFinite(weightValue) ? weightValue : 0;
+  }
+
+  const scoreCoherenceChecks = [];
+  const checkScoreCoherence = (category, policyField, policyPass, extra = {}) => {
+    const weight = getWeight(category);
+    const pass = weight <= 0 ? true : policyPass;
+    scoreCoherenceChecks.push({
+      category,
+      weight,
+      policyField,
+      pass,
+      ...extra
+    });
+  };
+
+  checkScoreCoherence(
+    "correctness",
+    "requireConformanceReports",
+    Boolean(profilePolicy.requireConformanceReports)
+  );
+  checkScoreCoherence(
+    "agentFirst",
+    "requireAgentReport",
+    Boolean(profilePolicy.requireAgentReport)
+  );
+  checkScoreCoherence(
+    "packagingTrust",
+    "requirePackReport + requireDocsReport",
+    Boolean(profilePolicy.requirePackReport) && Boolean(profilePolicy.requireDocsReport),
+    {
+      requirePackReport: Boolean(profilePolicy.requirePackReport),
+      requireDocsReport: Boolean(profilePolicy.requireDocsReport)
+    }
+  );
+
+  const robustnessUsesFuzz = Boolean(profilePolicy.robustnessUsesFuzz);
+  const requireFuzzReportByPolicy = Boolean(profilePolicy.requireFuzzReport);
+  const fuzzPolicyMatchesScore = robustnessUsesFuzz === requireFuzzReportByPolicy;
+  checkScoreCoherence(
+    "robustness",
+    "requireBudgetsReport (+ fuzz policy alignment)",
+    Boolean(profilePolicy.requireBudgetsReport) && fuzzPolicyMatchesScore,
+    {
+      requireBudgetsReport: Boolean(profilePolicy.requireBudgetsReport),
+      robustnessUsesFuzz,
+      requireFuzzReport: requireFuzzReportByPolicy,
+      fuzzPolicyMatchesScore
+    }
+  );
+
+  checkScoreCoherence(
+    "performance",
+    "requireBenchReport",
+    Boolean(profilePolicy.requireBenchReport)
+  );
+  checkScoreCoherence(
+    "browserDiff",
+    "requireBrowserDiff",
+    Boolean(profilePolicy.requireBrowserDiff)
+  );
+
+  const scoreModelCoherencePass = scoreCoherenceChecks.every((entry) => entry.pass);
+  gates.push(
+    makeGate(
+      "G-128",
+      "Score model coherence",
+      scoreModelCoherencePass,
+      {
+        weights: profileWeights,
+        checks: scoreCoherenceChecks
+      }
+    )
+  );
+
   if (profilePolicy.requireHoldouts) {
     await evaluateConformanceGate("R-200", "Holdout suite", "reports/holdout.json", conformanceThresholds.holdout);
   }

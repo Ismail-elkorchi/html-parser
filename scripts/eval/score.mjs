@@ -71,7 +71,8 @@ async function main() {
   const profile = parseProfileArg();
 
   const config = await loadRequired("evaluation.config.json");
-  if (!config.profiles?.[profile]) throw new Error(`Unknown profile: ${profile}`);
+  const profilePolicy = config.profiles?.[profile];
+  if (!profilePolicy) throw new Error(`Unknown profile: ${profile}`);
 
   const resolvedWeights = resolveWeights(config, profile);
   const weights = resolvedWeights.values;
@@ -189,21 +190,25 @@ async function main() {
   let robustnessScore = 0;
   let robustnessDetail = { skippedByWeight: robustPoints === 0 };
   if (robustPoints > 0) {
-    const fuzz = await loadOptional("reports/fuzz.json");
+    const requireBudgetsReport = profilePolicy.requireBudgetsReport !== false;
+    const robustnessUsesFuzz = Boolean(profilePolicy.robustnessUsesFuzz);
     const budgets = await loadOptional("reports/budgets.json");
-    robustnessDetail = { fuzz: fuzz || { missing: true }, budgets: budgets || { missing: true } };
+    const fuzz = robustnessUsesFuzz ? await loadOptional("reports/fuzz.json") : null;
 
-    if (fuzz || budgets) {
-      const crashes = Number(fuzz?.crashes || 0);
-      const hangs = Number(fuzz?.hangs || 0);
-      const budgetsOk = budgets ? Boolean(budgets?.overall?.ok) : true;
+    const budgetsOk = requireBudgetsReport ? Boolean(budgets?.overall?.ok) : true;
+    const fuzzCrashes = Number(fuzz?.crashes || 0);
+    const fuzzHangs = Number(fuzz?.hangs || 0);
+    const fuzzOk = robustnessUsesFuzz ? Boolean(fuzz) && fuzzCrashes === 0 && fuzzHangs === 0 : true;
 
-      if (crashes > 0 || hangs > 0 || !budgetsOk) {
-        robustnessScore = 0;
-      } else {
-        robustnessScore = robustPoints;
-      }
-    }
+    robustnessScore = budgetsOk && fuzzOk ? robustPoints : 0;
+    robustnessDetail = {
+      requireBudgetsReport,
+      robustnessUsesFuzz,
+      budgets: budgets || { missing: true },
+      fuzz: robustnessUsesFuzz ? (fuzz || { missing: true }) : { skippedByPolicy: true },
+      budgetsOk,
+      fuzzOk
+    };
   }
 
   const agentPoints = Number(weights.agentFirst);
