@@ -184,9 +184,61 @@ export interface ChunkOptions {
   readonly maxBytes?: number;
 }
 
-export interface PatchEdit {
-  readonly nodeId: NodeId;
-  readonly replacementHtml: string;
+export interface RemoveNodeEdit {
+  readonly kind: "removeNode";
+  readonly target: NodeId;
+}
+
+export interface ReplaceTextEdit {
+  readonly kind: "replaceText";
+  readonly target: NodeId;
+  readonly value: string;
+}
+
+export interface SetAttrEdit {
+  readonly kind: "setAttr";
+  readonly target: NodeId;
+  readonly name: string;
+  readonly value: string;
+}
+
+export interface RemoveAttrEdit {
+  readonly kind: "removeAttr";
+  readonly target: NodeId;
+  readonly name: string;
+}
+
+export interface InsertHtmlBeforeEdit {
+  readonly kind: "insertHtmlBefore";
+  readonly target: NodeId;
+  readonly html: string;
+}
+
+export interface InsertHtmlAfterEdit {
+  readonly kind: "insertHtmlAfter";
+  readonly target: NodeId;
+  readonly html: string;
+}
+
+export type Edit =
+  | RemoveNodeEdit
+  | ReplaceTextEdit
+  | SetAttrEdit
+  | RemoveAttrEdit
+  | InsertHtmlBeforeEdit
+  | InsertHtmlAfterEdit;
+
+export interface PatchPlanningErrorPayload {
+  readonly code:
+    | "NODE_NOT_FOUND"
+    | "MISSING_NODE_SPAN"
+    | "INVALID_EDIT_TARGET"
+    | "ATTRIBUTE_NOT_FOUND"
+    | "ATTRIBUTE_SPAN_MISSING"
+    | "ELEMENT_START_TAG_NOT_FOUND"
+    | "OVERLAPPING_EDITS";
+  readonly target?: NodeId;
+  readonly detail?: string;
 }
 
 export interface PatchSliceStep {
