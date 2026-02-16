@@ -61,6 +61,21 @@ Input:
 
 `visibleText(nodeOrTree, options)` equals `visibleTextTokens(nodeOrTree, options).map((t) => t.value).join("")`.
 
+## Coverage additions
+The v1 fixture corpus includes synthetic reproductions for downstream mismatch triage patterns:
+- `case-033`: `script` exclusion with trailing `noscript` fallback text.
+- `case-034`: leading `noscript` parsed outside visible body surface.
+- `case-035`: `hidden` subtree suppression around `noscript`.
+- `case-036`: `aria-hidden="true"` subtree suppression around `noscript`.
+- `case-037`: SVG `title` + `text` adjacency without implicit separator.
+- `case-038`: SVG adjacency followed by block-level paragraph boundary.
+- `case-039`: MathML `mi/mo/mi` operator retention (`+`) in text output.
+- `case-040`: MathML adjacent `mi` nodes without implicit separator.
+- `case-041`: SVG and MathML adjacent text flow in a single inline sequence.
+- `case-042`: paragraph break interactions around inline SVG content.
+- `case-043`: table cell tab boundaries with SVG/MathML cell payloads.
+- `case-044`: `noscript` subtree containing foreign content before visible paragraph text.
+
 ## Determinism
 For identical input trees and options:
 - `visibleText` output is byte-stable.

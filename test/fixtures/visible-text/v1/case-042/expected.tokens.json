@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "text",
+    "value": "start"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "xy"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "end"
+  }
+]

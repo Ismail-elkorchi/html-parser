@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "alphabeta"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "tail"
+  }
+]

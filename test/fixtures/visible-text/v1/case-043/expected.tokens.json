@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "text",
+    "value": "row"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "a"
+  },
+  {
+    "kind": "tab",
+    "value": "\t"
+  },
+  {
+    "kind": "text",
+    "value": "b+c"
+  }
+]
