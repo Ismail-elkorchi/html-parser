@@ -496,7 +496,7 @@ function shouldOmitEndTag(token: FixtureEndTagToken, next: FixtureToken | null):
   }
 
   if (tagName === "dd") {
-    return nextName === "dt" || nextName === "dd" || nextName === "dl" || next?.type === "EndTag";
+    return nextName === "dt" || nextName === "dd" || nextName === "dl" || next?.type === "EndTag" || next === null;
   }
 
   if (tagName === "p") {
