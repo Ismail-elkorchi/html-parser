@@ -78,7 +78,10 @@
       ]
     },
     "determinism": {
-      "requireNode": true
+      "requireNode": true,
+      "requireDeno": true,
+      "requireBun": true,
+      "requireCrossRuntime": true
     },
     "budgets": {
       "requireBudgetsReport": true,

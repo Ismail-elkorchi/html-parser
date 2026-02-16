@@ -103,20 +103,33 @@ Shape:
 {
   "suite": "determinism",
   "timestamp": "...",
+  "runtimes": {
+    "node": { "hash": "8f..." },
+    "deno": { "hash": "8f..." },
+    "bun": { "hash": "8f..." }
+  },
+  "crossRuntime": {
+    "ok": true
+  },
   "cases": [
     {
-      "id": "det-001",
+      "id": "det-document-1",
       "ok": true,
       "hashes": {
-        "node": "sha256:....",
-        "deno": "sha256:....",
-        "bun": "sha256:....",
-        "browser": "sha256:...."
+        "node": "sha256:...."
       }
     }
   ],
-  "overall": { "ok": true }
+  "overall": {
+    "ok": true,
+    "strategy": "deterministic pre-order incremental NodeId assignment"
+  }
 }
+
+Rules:
+- `runtimes.node.hash`, `runtimes.deno.hash`, and `runtimes.bun.hash` must be present.
+- `crossRuntime.ok` is `true` only when all runtime hashes are present and identical.
+- `overall.ok` must include within-runtime determinism and cross-runtime agreement.
 
 ## Stream invariants report
 File:
@@ -180,7 +193,7 @@ Shape:
       "timestamp": "...",
       "ok": true,
       "version": "v24.x",
-      "determinismHash": null
+      "determinismHash": "8f..."
     },
     "deno": {
       "suite": "smoke-runtime",
@@ -188,7 +201,7 @@ Shape:
       "timestamp": "...",
       "ok": true,
       "version": "2.x",
-      "determinismHash": null
+      "determinismHash": "8f..."
     },
     "bun": {
       "suite": "smoke-runtime",
@@ -196,7 +209,7 @@ Shape:
       "timestamp": "...",
       "ok": true,
       "version": "1.x",
-      "determinismHash": null
+      "determinismHash": "8f..."
     }
   },
   "overall": {
@@ -208,6 +221,7 @@ Rules:
 - Runtime smoke reports are written by `scripts/smoke/control.mjs` during runtime execution.
 - `reports/smoke.json` is collected from runtime reports by `scripts/eval/collect-smoke-report.mjs`.
 - `overall.ok` is `true` only if all runtime `ok` values are `true`.
+- `determinismHash` is a runtime-produced SHA-256 hex digest of the canonical parse payload.
 
 ## Browser differential report
 File:
