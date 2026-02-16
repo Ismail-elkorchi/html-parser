@@ -182,6 +182,11 @@ Release includes ALL CI gates plus:
 
 ### R-200: Holdout suite executed and passes
 Requirement:
+- Holdout execution covers all conformance suites:
+  - tokenizer
+  - tree
+  - encoding
+  - serializer
 - Holdout pass rate must meet strict threshold (`1.0`).
 - Holdout skips must be `0`.
 
