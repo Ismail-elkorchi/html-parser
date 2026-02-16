@@ -132,26 +132,52 @@ function enforceBudget(
 }
 
 function eventSize(event: TraceEvent): number {
-  return event.detail.length + event.stage.length + 24;
+  return JSON.stringify(event).length;
 }
+
+type TraceEventInput =
+  TraceEvent extends infer Event
+    ? Event extends { readonly seq: number }
+      ? Omit<Event, "seq">
+      : never
+    : never;
 
 function pushTrace(
   trace: TraceEvent[] | undefined,
-  stage: TraceEvent["stage"],
-  detail: string,
+  event: TraceEventInput,
   budgets: ParseOptions["budgets"] | undefined
 ): TraceEvent[] | undefined {
   if (!trace) {
     return undefined;
   }
 
-  const next = [...trace, { seq: trace.length + 1, stage, detail }];
+  const nextEvent = {
+    seq: trace.length + 1,
+    ...event
+  } as TraceEvent;
+  const next = [...trace, nextEvent];
   enforceBudget("maxTraceEvents", budgets?.maxTraceEvents, next.length);
 
   const bytes = next.reduce((total, item) => total + eventSize(item), 0);
   enforceBudget("maxTraceBytes", budgets?.maxTraceBytes, bytes);
 
   return next;
+}
+
+function pushBudgetTrace(
+  trace: TraceEvent[] | undefined,
+  budget: BudgetExceededPayload["budget"],
+  limit: number | undefined,
+  actual: number,
+  budgets: ParseOptions["budgets"] | undefined
+): TraceEvent[] | undefined {
+  return pushTrace(trace, {
+    kind: "budget",
+    budget,
+    limit: limit ?? null,
+    actual,
+    status: limit === undefined || actual <= limit ? "ok" : "exceeded"
+  }, budgets);
 }
 
 function toPublicSpan(span: TreeSpan | undefined, captureSpans: boolean): Span | undefined {
@@ -298,21 +324,29 @@ function parseDocumentInternal(html: string, options: ParseOptions = {}): Docume
   let trace: TraceEvent[] | undefined = options.trace ? [] : undefined;
 
   enforceBudget("maxInputBytes", budgets?.maxInputBytes, html.length);
-  trace = pushTrace(trace, "decode", "input:string", budgets);
+  trace = pushTrace(trace, {
+    kind: "decode",
+    source: "input",
+    encoding: "utf-8",
+    sniffSource: "input"
+  }, budgets);
+  trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, html.length, budgets);
 
   const tokenizerBudgets = tokenizerBudgetsFromParseOptions(budgets);
   const tokenized = tokenizerBudgets ? tokenize(html, { budgets: tokenizerBudgets }) : tokenize(html);
 
-  trace = pushTrace(trace, "tokenize", `tokens:${String(tokenized.tokens.length)}`, budgets);
+  trace = pushTrace(trace, {
+    kind: "token",
+    count: tokenized.tokens.length
+  }, budgets);
+  trace = pushTrace(trace, {
+    kind: "insertion-mode",
+    mode: "document-start"
+  }, budgets);
 
   const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets), {
     captureSpans
   });
-
-  trace = pushTrace(trace, "tree", `tree-errors:${String(built.errors.length)}`, budgets);
-  for (const treeError of built.errors.slice(0, 3)) {
-    trace = pushTrace(trace, "tree", `parse-error:${treeError.code}`, budgets);
-  }
 
   const children = built.document.children.map((node) => convertTreeNode(node, assigner, captureSpans));
   const metrics = collectMetrics(children);
@@ -320,7 +354,26 @@ function parseDocumentInternal(html: string, options: ParseOptions = {}): Docume
 
   enforceBudget("maxNodes", budgets?.maxNodes, totalNodes);
   enforceBudget("maxDepth", budgets?.maxDepth, metrics.maxDepth);
-  enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
+  const elapsedMs = Date.now() - startedAt;
+  enforceBudget("maxTimeMs", budgets?.maxTimeMs, elapsedMs);
+
+  trace = pushTrace(trace, {
+    kind: "tree-mutation",
+    nodeCount: totalNodes,
+    errorCount: built.errors.length
+  }, budgets);
+  trace = pushTrace(trace, {
+    kind: "insertion-mode",
+    mode: "after-tree"
+  }, budgets);
+  for (const treeError of built.errors.slice(0, 3)) {
+    trace = pushTrace(trace, {
+      kind: "parse-error",
+      code: treeError.code
+    }, budgets);
+  }
+  trace = pushBudgetTrace(trace, "maxNodes", budgets?.maxNodes, totalNodes, budgets);
+  trace = pushBudgetTrace(trace, "maxDepth", budgets?.maxDepth, metrics.maxDepth, budgets);
 
   const errors = toParseErrors(built.errors.map((entry) => entry.code));
 
@@ -354,8 +407,12 @@ export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): Docum
 
   const withDecodeTrace = pushTrace(
     [...parsed.trace],
-    "decode",
-    `sniff:${decoded.sniff.source}:${decoded.sniff.encoding}`,
+    {
+      kind: "decode",
+      source: "sniff",
+      encoding: decoded.sniff.encoding,
+      sniffSource: decoded.sniff.source
+    },
     options.budgets
   );
 
@@ -389,22 +446,30 @@ export function parseFragment(
   const fragmentId = assigner.next();
   let trace: TraceEvent[] | undefined = options.trace ? [] : undefined;
 
-  trace = pushTrace(trace, "fragment", `context:${normalizedContext}`, budgets);
+  trace = pushTrace(trace, {
+    kind: "decode",
+    source: "input",
+    encoding: "utf-8",
+    sniffSource: "input"
+  }, budgets);
+  trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, html.length, budgets);
+  trace = pushTrace(trace, {
+    kind: "insertion-mode",
+    mode: "fragment-start"
+  }, budgets);
 
   const tokenizerBudgets = tokenizerBudgetsFromParseOptions(budgets);
   const tokenized = tokenizerBudgets ? tokenize(html, { budgets: tokenizerBudgets }) : tokenize(html);
 
-  trace = pushTrace(trace, "tokenize", `tokens:${String(tokenized.tokens.length)}`, budgets);
+  trace = pushTrace(trace, {
+    kind: "token",
+    count: tokenized.tokens.length
+  }, budgets);
 
   const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets), {
     fragmentContextTagName: normalizedContext,
     captureSpans
   });
-
-  trace = pushTrace(trace, "tree", `tree-errors:${String(built.errors.length)}`, budgets);
-  for (const treeError of built.errors.slice(0, 3)) {
-    trace = pushTrace(trace, "tree", `parse-error:${treeError.code}`, budgets);
-  }
 
   const children = built.document.children.map((node) => convertTreeNode(node, assigner, captureSpans));
   const metrics = collectMetrics(children);
@@ -412,7 +477,26 @@ export function parseFragment(
 
   enforceBudget("maxNodes", budgets?.maxNodes, totalNodes);
   enforceBudget("maxDepth", budgets?.maxDepth, metrics.maxDepth);
-  enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
+  const elapsedMs = Date.now() - startedAt;
+  enforceBudget("maxTimeMs", budgets?.maxTimeMs, elapsedMs);
+
+  trace = pushTrace(trace, {
+    kind: "tree-mutation",
+    nodeCount: totalNodes,
+    errorCount: built.errors.length
+  }, budgets);
+  trace = pushTrace(trace, {
+    kind: "insertion-mode",
+    mode: "after-tree"
+  }, budgets);
+  for (const treeError of built.errors.slice(0, 3)) {
+    trace = pushTrace(trace, {
+      kind: "parse-error",
+      code: treeError.code
+    }, budgets);
+  }
+  trace = pushBudgetTrace(trace, "maxNodes", budgets?.maxNodes, totalNodes, budgets);
+  trace = pushBudgetTrace(trace, "maxDepth", budgets?.maxDepth, metrics.maxDepth, budgets);
 
   const errors = toParseErrors(built.errors.map((entry) => entry.code));
 
@@ -436,6 +520,7 @@ export async function parseStream(
   let total = 0;
   const pendingChunks: Uint8Array[] = [];
   let pendingBytes = 0;
+  let maxBufferedObserved = 0;
   let sniff: { encoding: string; source: "bom" | "transport" | "meta" | "default" } | null = null;
   let decoder: TextDecoder | undefined;
   const decodedParts: string[] = [];
@@ -476,6 +561,7 @@ export async function parseStream(
     if (!sniff) {
       pendingChunks.push(chunkValue);
       pendingBytes += chunkValue.byteLength;
+      maxBufferedObserved = Math.max(maxBufferedObserved, pendingBytes);
       enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, pendingBytes);
 
       if (pendingBytes < STREAM_ENCODING_PRESCAN_BYTES) {
@@ -494,6 +580,7 @@ export async function parseStream(
       continue;
     }
 
+    maxBufferedObserved = Math.max(maxBufferedObserved, chunkValue.byteLength);
     enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, chunkValue.byteLength);
     if (!decoder) {
       throw new Error("stream decoder unavailable");
@@ -530,8 +617,17 @@ export async function parseStream(
   }
 
   let trace = [...parsed.trace];
-  trace = pushTrace(trace, "decode", `sniff:${sniff.source}:${sniff.encoding}`, budgets) ?? trace;
-  trace = pushTrace(trace, "stream", `stream-read-complete:${String(total)}`, budgets) ?? trace;
+  trace = pushTrace(trace, {
+    kind: "decode",
+    source: "sniff",
+    encoding: sniff.encoding,
+    sniffSource: sniff.source
+  }, budgets) ?? trace;
+  trace = pushTrace(trace, {
+    kind: "stream",
+    bytesRead: total
+  }, budgets) ?? trace;
+  trace = pushBudgetTrace(trace, "maxBufferedBytes", budgets?.maxBufferedBytes, maxBufferedObserved, budgets) ?? trace;
 
   return {
     ...parsed,

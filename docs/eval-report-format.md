@@ -226,6 +226,9 @@ Shape:
   }
 }
 
+Rules:
+- `features.trace.ok` must reflect structured trace schema validation (not only non-empty trace arrays).
+
 ## Packaging report
 File:
 - reports/pack.json

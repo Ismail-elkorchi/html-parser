@@ -219,14 +219,52 @@ async function writeAgent() {
   const heading = headingTree();
   const headingOutline = outline(heading);
   const chunks = chunk(heading, { maxChars: 8, maxNodes: 2 });
+  const traceEvents = Array.isArray(traced.trace) ? traced.trace : [];
+  const requiredKinds = new Set(["decode", "token", "insertion-mode", "tree-mutation"]);
+
+  const traceSchemaOk = traceEvents.every((event) => {
+    if (event === null || typeof event !== "object") {
+      return false;
+    }
+    if (typeof event.seq !== "number" || event.seq < 1 || typeof event.kind !== "string") {
+      return false;
+    }
+
+    if (event.kind === "decode") {
+      return typeof event.source === "string" && typeof event.encoding === "string" && typeof event.sniffSource === "string";
+    }
+    if (event.kind === "token") {
+      return typeof event.count === "number";
+    }
+    if (event.kind === "insertion-mode") {
+      return typeof event.mode === "string";
+    }
+    if (event.kind === "tree-mutation") {
+      return typeof event.nodeCount === "number" && typeof event.errorCount === "number";
+    }
+    if (event.kind === "parse-error") {
+      return typeof event.code === "string";
+    }
+    if (event.kind === "budget") {
+      return typeof event.budget === "string" && typeof event.actual === "number";
+    }
+    if (event.kind === "stream") {
+      return typeof event.bytesRead === "number";
+    }
+
+    return false;
+  });
+
+  const traceKinds = new Set(traceEvents.map((event) => event.kind));
+  const traceKindsOk = [...requiredKinds].every((kind) => traceKinds.has(kind));
 
   await writeJson("reports/agent.json", {
     suite: "agent",
     timestamp: new Date().toISOString(),
     features: {
       trace: {
-        ok: Array.isArray(traced.trace) && traced.trace.length > 0,
-        bounded: true,
+        ok: traceEvents.length > 0 && traceSchemaOk && traceKindsOk,
+        bounded: traceEvents.length <= 20,
         tested: true
       },
       spans: {

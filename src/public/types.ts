@@ -43,11 +43,62 @@ export interface ParseOptions {
   readonly budgets?: BudgetOptions;
 }
 
-export interface TraceEvent {
+export interface TraceDecodeEvent {
   readonly seq: number;
-  readonly stage: "decode" | "tokenize" | "tree" | "fragment" | "stream" | "serialize";
-  readonly detail: string;
+  readonly kind: "decode";
+  readonly source: "input" | "sniff";
+  readonly encoding: string;
+  readonly sniffSource: "input" | "bom" | "transport" | "meta" | "default";
 }
+
+export interface TraceTokenEvent {
+  readonly seq: number;
+  readonly kind: "token";
+  readonly count: number;
+}
+
+export interface TraceInsertionModeEvent {
+  readonly seq: number;
+  readonly kind: "insertion-mode";
+  readonly mode: "document-start" | "fragment-start" | "after-tree";
+}
+
+export interface TraceTreeMutationEvent {
+  readonly seq: number;
+  readonly kind: "tree-mutation";
+  readonly nodeCount: number;
+  readonly errorCount: number;
+}
+
+export interface TraceParseErrorEvent {
+  readonly seq: number;
+  readonly kind: "parse-error";
+  readonly code: string;
+}
+
+export interface TraceBudgetEvent {
+  readonly seq: number;
+  readonly kind: "budget";
+  readonly budget: BudgetExceededPayload["budget"];
+  readonly limit: number | null;
+  readonly actual: number;
+  readonly status: "ok" | "exceeded";
+}
+
+export interface TraceStreamEvent {
+  readonly seq: number;
+  readonly kind: "stream";
+  readonly bytesRead: number;
+}
+
+export type TraceEvent =
+  | TraceDecodeEvent
+  | TraceTokenEvent
+  | TraceInsertionModeEvent
+  | TraceTreeMutationEvent
+  | TraceParseErrorEvent
+  | TraceBudgetEvent
+  | TraceStreamEvent;
 
 export interface TextNode {
   readonly id: NodeId;
