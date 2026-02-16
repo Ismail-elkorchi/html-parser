@@ -6,11 +6,17 @@ Rules:
 
 Naming:
 - ADR-000-template.md (do not edit)
-- ADR-001-... fixture skip decisions
-- ADR-002-... gate/threshold changes
-- ADR-003-... oracle choice and normalization rules
+- ADR-001-... historical fixture skip records and templates
+- ADR-002-... gate and threshold policy changes
+- ADR-003-... historical oracle choice and normalization records
 - ADR-004-... dataset updates (fixtures, entities)
 - ADR-005-... dev dependency additions
+- ADR-006/007/008-... conformance mismatch hard-failure policy by suite
+- ADR-009-... strict gate enforcement
+- ADR-010-... runtime source vendoring policy
+- ADR-011-... unified conformance mismatch-failure policy (supersedes staged skip records)
+- ADR-012-... multi-engine browser differential oracle policy
+- ADR-013-... strict threshold posture consolidation
 
 Minimum sections:
 - Context
