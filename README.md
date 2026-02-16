@@ -31,9 +31,14 @@ The runtime uses Web APIs and ESM.
 Use a standard ESM bundler (Vite, Rollup, esbuild, webpack in ESM mode) and import from the package entrypoint.
 No Node builtin polyfills are required for runtime code.
 
-## Install
+## Install status
+- npm publication is disabled while alpha hardening is active (`private: true`).
+- Intended public package identity: `@ismail-elkorchi/html-parser`.
+- Local development can consume the package via workspace/path installs until publish is enabled.
+
+## Install (post-publish target)
 ```bash
-npm install html-parser
+npm install @ismail-elkorchi/html-parser
 ```
 
 ## Quickstart
@@ -247,3 +252,4 @@ npm run eval:release
 - Runtime API portability mapping: `docs/runtime-compatibility.md`
 - Agent-first behavior checklist: `docs/agent-first.md`
 - Release/readiness criteria: `docs/readiness.md`
+- Release execution runbook: `docs/releasing.md`
