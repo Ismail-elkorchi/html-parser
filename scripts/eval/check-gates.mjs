@@ -174,8 +174,52 @@ async function main() {
   );
 
   const determinismReport = await loadOptionalReport("reports/determinism.json");
-  const determinismOk = Boolean(determinismReport?.overall?.ok);
-  gates.push(makeGate("G-080", "Determinism", determinismOk, determinismReport || { missing: true }));
+  const determinismThreshold = config.thresholds?.determinism || {};
+  const requireNodeDeterminism = Boolean(determinismThreshold.requireNode);
+  const requireDenoDeterminism = Boolean(determinismThreshold.requireDeno);
+  const requireBunDeterminism = Boolean(determinismThreshold.requireBun);
+  const requireCrossRuntimeDeterminism = Boolean(determinismThreshold.requireCrossRuntime);
+
+  const nodeDeterminismHash = determinismReport?.runtimes?.node?.hash;
+  const denoDeterminismHash = determinismReport?.runtimes?.deno?.hash;
+  const bunDeterminismHash = determinismReport?.runtimes?.bun?.hash;
+
+  const nodeDeterminismPresent = typeof nodeDeterminismHash === "string" && nodeDeterminismHash.length > 0;
+  const denoDeterminismPresent = typeof denoDeterminismHash === "string" && denoDeterminismHash.length > 0;
+  const bunDeterminismPresent = typeof bunDeterminismHash === "string" && bunDeterminismHash.length > 0;
+  const crossRuntimeDeterminismOk = Boolean(determinismReport?.crossRuntime?.ok);
+
+  const determinismOk =
+    Boolean(determinismReport?.overall?.ok) &&
+    (!requireNodeDeterminism || nodeDeterminismPresent) &&
+    (!requireDenoDeterminism || denoDeterminismPresent) &&
+    (!requireBunDeterminism || bunDeterminismPresent) &&
+    (!requireCrossRuntimeDeterminism || crossRuntimeDeterminismOk);
+
+  gates.push(
+    makeGate(
+      "G-080",
+      "Determinism",
+      determinismOk,
+      determinismReport
+        ? {
+            ...determinismReport,
+            required: {
+              node: requireNodeDeterminism,
+              deno: requireDenoDeterminism,
+              bun: requireBunDeterminism,
+              crossRuntime: requireCrossRuntimeDeterminism
+            },
+            present: {
+              node: nodeDeterminismPresent,
+              deno: denoDeterminismPresent,
+              bun: bunDeterminismPresent,
+              crossRuntime: crossRuntimeDeterminismOk
+            }
+          }
+        : { missing: true }
+    )
+  );
 
   const streamReport = await loadOptionalReport("reports/stream.json");
   const requireStreamReport = Boolean(profilePolicy.requireStreamReport);

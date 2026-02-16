@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 
 import {
   BudgetExceededError,
@@ -155,12 +156,51 @@ async function writeDeterminism() {
     }
   });
 
+  async function readRuntimeSmokeReport(path) {
+    try {
+      const raw = await readFile(path, "utf8");
+      return JSON.parse(raw);
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  const smokeNode = await readRuntimeSmokeReport("reports/smoke-node.json");
+  const smokeDeno = await readRuntimeSmokeReport("reports/smoke-deno.json");
+  const smokeBun = await readRuntimeSmokeReport("reports/smoke-bun.json");
+
+  const runtimes = {
+    node: {
+      hash: typeof smokeNode?.determinismHash === "string" ? smokeNode.determinismHash : null
+    },
+    deno: {
+      hash: typeof smokeDeno?.determinismHash === "string" ? smokeDeno.determinismHash : null
+    },
+    bun: {
+      hash: typeof smokeBun?.determinismHash === "string" ? smokeBun.determinismHash : null
+    }
+  };
+
+  const runtimeHashes = Object.values(runtimes)
+    .map((runtimeReport) => runtimeReport.hash)
+    .filter((hashValue) => typeof hashValue === "string");
+  const crossRuntimeOk =
+    runtimeHashes.length === 3 &&
+    runtimeHashes.every((hashValue) => hashValue === runtimeHashes[0]);
+
   await writeJson("reports/determinism.json", {
     suite: "determinism",
     timestamp: new Date().toISOString(),
+    runtimes,
+    crossRuntime: {
+      ok: crossRuntimeOk
+    },
     cases,
     overall: {
-      ok: cases.every((entry) => entry.ok),
+      ok: cases.every((entry) => entry.ok) && crossRuntimeOk,
       strategy: "deterministic pre-order incremental NodeId assignment"
     }
   });

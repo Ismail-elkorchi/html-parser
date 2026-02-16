@@ -68,6 +68,108 @@ function runtimeVersion(runtime) {
   return String(globalThis.Bun?.version || "unknown");
 }
 
+function ensureWebCrypto() {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new Error("WebCrypto subtle API is unavailable in this runtime");
+  }
+  return subtle;
+}
+
+function toHex(bytes) {
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(value) {
+  const subtle = ensureWebCrypto();
+  const payload = new TextEncoder().encode(value);
+  const digest = await subtle.digest("SHA-256", payload);
+  return toHex(new Uint8Array(digest));
+}
+
+function normalizeSpan(spanValue) {
+  if (!spanValue || typeof spanValue !== "object") {
+    return null;
+  }
+  const normalized = {};
+  if (typeof spanValue.start === "number") {
+    normalized.start = spanValue.start;
+  }
+  if (typeof spanValue.end === "number") {
+    normalized.end = spanValue.end;
+  }
+  return Object.keys(normalized).length === 0 ? null : normalized;
+}
+
+function normalizeAttribute(attribute) {
+  const normalized = {
+    name: String(attribute.name || ""),
+    value: String(attribute.value || "")
+  };
+  if (attribute.span) {
+    normalized.span = normalizeSpan(attribute.span);
+  }
+  return normalized;
+}
+
+function normalizeNode(node) {
+  const normalized = {
+    id: Number(node.id),
+    kind: String(node.kind || "")
+  };
+
+  if (typeof node.tagName === "string") {
+    normalized.tagName = node.tagName;
+  }
+  if (typeof node.value === "string") {
+    normalized.value = node.value;
+  }
+  if (Array.isArray(node.attributes)) {
+    normalized.attributes = node.attributes.map((attribute) => normalizeAttribute(attribute));
+  }
+  if (node.span) {
+    normalized.span = normalizeSpan(node.span);
+  }
+  if (typeof node.spanProvenance === "string") {
+    normalized.spanProvenance = node.spanProvenance;
+  }
+  if (Array.isArray(node.children)) {
+    normalized.children = node.children.map((childNode) => normalizeNode(childNode));
+  }
+
+  return normalized;
+}
+
+function normalizeParseError(parseError) {
+  const normalized = {
+    parseErrorId: String(parseError.parseErrorId || "")
+  };
+  if (typeof parseError.message === "string") {
+    normalized.message = parseError.message;
+  }
+  if (typeof parseError.offset === "number") {
+    normalized.offset = parseError.offset;
+  }
+  if (typeof parseError.nodeId === "number") {
+    normalized.nodeId = parseError.nodeId;
+  }
+  return normalized;
+}
+
+async function computeDeterminismHash() {
+  const deterministicInput = "<!doctype html><title>x</title><body><p a='1'>txt<span></p></body>";
+  const parsed = parse(deterministicInput, {
+    includeSpans: true
+  });
+
+  const canonicalPayload = {
+    node: normalizeNode(parsed),
+    parseErrors: Array.isArray(parsed.errors) ? parsed.errors.map((entry) => normalizeParseError(entry)) : []
+  };
+
+  return sha256Hex(JSON.stringify(canonicalPayload));
+}
+
 async function writeReport(reportPath, payload) {
   const absoluteReportPath = resolve(reportPath);
   await mkdir(dirname(absoluteReportPath), { recursive: true });
@@ -161,8 +263,10 @@ async function main() {
   const timestamp = new Date().toISOString();
 
   let failure = null;
+  let determinismHash = null;
   try {
     await runSmokeAssertions();
+    determinismHash = await computeDeterminismHash();
   } catch (error) {
     failure = error;
   }
@@ -174,7 +278,7 @@ async function main() {
       timestamp,
       ok: failure === null,
       version: runtimeVersion(runtime),
-      determinismHash: null,
+      determinismHash,
       ...(failure
         ? { failure: failure instanceof Error ? failure.message : String(failure) }
         : {})

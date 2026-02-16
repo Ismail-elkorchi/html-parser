@@ -151,7 +151,12 @@ Evidence:
 
 ### G-080: Determinism
 Requirement:
-- Determinism checks pass in Node (mandatory).
+- Determinism checks pass within runtime and across runtimes.
+- `reports/determinism.json.runtimes.node.hash` must exist.
+- `reports/determinism.json.runtimes.deno.hash` must exist.
+- `reports/determinism.json.runtimes.bun.hash` must exist.
+- `reports/determinism.json.crossRuntime.ok` must be `true`.
+- `reports/determinism.json.overall.ok` must be `true`.
 
 Evidence:
 - `reports/determinism.json`
