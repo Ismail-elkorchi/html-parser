@@ -100,10 +100,10 @@ async function main() {
   await mkdir(dirname("docs/score-report.md"), { recursive: true });
   await writeFile("docs/score-report.md", markdownOutput, "utf8");
 
-  console.log("EVAL: Wrote docs/score-report.md");
+  console.log("Wrote docs/score-report.md");
 }
 
 main().catch((error) => {
-  console.error("EVAL:", error);
+  console.error(error);
   process.exit(1);
 });

@@ -145,8 +145,8 @@ const report = {
 await writeJson("reports/encoding.json", report);
 
 if (failed > 0) {
-  console.error(`EVAL: Encoding fixture failures: ${failed}/${allCases.length - holdoutExcluded}`);
+  console.error(`Encoding fixture failures: ${failed}/${allCases.length - holdoutExcluded}`);
   process.exit(1);
 }
 
-console.log(`ACT: Encoding fixtures passed=${passed}/${allCases.length - holdoutExcluded}`);
+console.log(`Encoding fixtures passed=${passed}/${allCases.length - holdoutExcluded}`);

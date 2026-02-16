@@ -104,12 +104,12 @@ async function main() {
   });
 
   if (!isCheckPass) {
-    console.error("EVAL: External runtime import check failed. See reports/no-external-imports.json");
+    console.error("External runtime import check failed. See reports/no-external-imports.json");
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error("EVAL:", error);
+  console.error(error);
   process.exit(1);
 });

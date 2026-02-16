@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { nowIso, writeJson } from "./eval-primitives.mjs";
 
-const RUNTIME_SELF_CONTAINED_TMP_DIR = "tmp/runtime-self-contained";
+const RUNTIME_SELF_CONTAINED_WORK_DIR = "tmp/runtime-self-contained";
 
 function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -117,31 +117,31 @@ async function main() {
       throw new Error("npm pack did not produce a tarball filename");
     }
 
-    await rm(RUNTIME_SELF_CONTAINED_TMP_DIR, { recursive: true, force: true });
-    await mkdir(RUNTIME_SELF_CONTAINED_TMP_DIR, { recursive: true });
+    await rm(RUNTIME_SELF_CONTAINED_WORK_DIR, { recursive: true, force: true });
+    await mkdir(RUNTIME_SELF_CONTAINED_WORK_DIR, { recursive: true });
 
     const tarballSource = path.join(process.cwd(), tarballName);
-    const tarballTarget = path.join(process.cwd(), RUNTIME_SELF_CONTAINED_TMP_DIR, tarballName);
+    const tarballTarget = path.join(process.cwd(), RUNTIME_SELF_CONTAINED_WORK_DIR, tarballName);
     await copyFile(tarballSource, tarballTarget);
 
     await writeFile(
-      path.join(RUNTIME_SELF_CONTAINED_TMP_DIR, "package.json"),
+      path.join(RUNTIME_SELF_CONTAINED_WORK_DIR, "package.json"),
       `${JSON.stringify({ name: "runtime-self-contained-check", private: true, type: "module" }, null, 2)}\n`,
       "utf8"
     );
 
     const installResult = await runCommand("npm", ["install", "--omit=dev", `./${tarballName}`], {
-      cwd: RUNTIME_SELF_CONTAINED_TMP_DIR
+      cwd: RUNTIME_SELF_CONTAINED_WORK_DIR
     });
     diagnostics.push(summarizeStepResult("install", installResult));
     if (installResult.code !== 0) {
       throw new Error("production-only install failed");
     }
 
-    await writeFile(path.join(RUNTIME_SELF_CONTAINED_TMP_DIR, "smoke.mjs"), createRuntimeSmokeScript(packageName), "utf8");
+    await writeFile(path.join(RUNTIME_SELF_CONTAINED_WORK_DIR, "smoke.mjs"), createRuntimeSmokeScript(packageName), "utf8");
 
     const smokeResult = await runCommand(process.execPath, ["smoke.mjs"], {
-      cwd: RUNTIME_SELF_CONTAINED_TMP_DIR
+      cwd: RUNTIME_SELF_CONTAINED_WORK_DIR
     });
     diagnostics.push(summarizeStepResult("runtime-smoke", smokeResult));
     if (smokeResult.code !== 0) {
@@ -178,12 +178,12 @@ async function main() {
   });
 
   if (!checkPassed) {
-    console.error("EVAL: Runtime self-contained check failed. See reports/runtime-self-contained.json");
+    console.error("Runtime self-contained check failed. See reports/runtime-self-contained.json");
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error("EVAL:", error);
+  console.error(error);
   process.exit(1);
 });

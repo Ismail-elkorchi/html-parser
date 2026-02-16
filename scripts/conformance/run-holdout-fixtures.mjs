@@ -550,12 +550,12 @@ await writeJson("reports/holdout.json", {
 });
 
 if (cases.failed > 0) {
-  console.error(`EVAL: Holdout hard failures: ${cases.failed}`);
+  console.error(`Holdout hard failures: ${cases.failed}`);
   process.exit(1);
 }
 
 console.log(
-  `ACT: Holdout fixtures passed=${cases.passed}, failed=${cases.failed}, total=${cases.total} `
+  `Holdout fixtures passed=${cases.passed}, failed=${cases.failed}, total=${cases.total} `
     + `(tokenizer=${tokenizerHoldout.cases.total}, tree=${treeHoldout.cases.total}, `
     + `encoding=${encodingHoldout.cases.total}, serializer=${serializerHoldout.cases.total})`
 );

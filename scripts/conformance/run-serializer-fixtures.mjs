@@ -85,8 +85,8 @@ const report = {
 await writeJson("reports/serializer.json", report);
 
 if (failed > 0) {
-  console.error(`EVAL: Serializer fixture hard failures: ${failed}`);
+  console.error(`Serializer fixture hard failures: ${failed}`);
   process.exit(1);
 }
 
-console.log(`ACT: Serializer fixtures passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);
+console.log(`Serializer fixtures passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);

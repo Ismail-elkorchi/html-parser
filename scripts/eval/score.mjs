@@ -213,10 +213,10 @@ async function main() {
 
   await writeJson("reports/score.json", scoreReport);
 
-  console.log(`EVAL: Total score (${profile}): ${total.toFixed(3)}/100`);
+  console.log(`Total score (${profile}): ${total.toFixed(3)}/100`);
 }
 
 main().catch((error) => {
-  console.error("EVAL:", error);
+  console.error(error);
   process.exit(1);
 });

@@ -139,12 +139,12 @@ async function main() {
   await unlink(tarball).catch(() => {});
 
   if (!isPackagingCheckPass) {
-    console.error("EVAL: Packaging check failed:", report);
+    console.error("Packaging check failed:", report);
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error("EVAL:", error);
+  console.error(error);
   process.exit(1);
 });

@@ -85,4 +85,4 @@ try {
 ensure(budgetError instanceof BudgetExceededError, "expected BudgetExceededError");
 ensure(budgetError.payload.code === "BUDGET_EXCEEDED", "expected structured budget code");
 
-console.log("ACT: control smoke passed");
+console.log("control smoke passed");

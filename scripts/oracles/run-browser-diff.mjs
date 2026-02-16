@@ -258,23 +258,29 @@ async function runEngine(engineName, launcher, testCases) {
   const version = browser.version();
 
   for (const testCase of testCases) {
-    const { id, input, localJson } = testCase;
-    let browserJson;
+    const { id: caseId, input: inputHtml, localJson: localNormalizedJson } = testCase;
+    let browserNormalizedJson;
     try {
-      browserJson = JSON.stringify(await normalizeInBrowser(page, input));
+      browserNormalizedJson = JSON.stringify(await normalizeInBrowser(page, inputHtml));
     } catch (error) {
-      browserJson = JSON.stringify(["error", error instanceof Error ? error.message : String(error)]);
+      browserNormalizedJson = JSON.stringify(["error", error instanceof Error ? error.message : String(error)]);
     }
 
     compared += 1;
-    if (localJson === browserJson) {
+    if (localNormalizedJson === browserNormalizedJson) {
       agreed += 1;
       continue;
     }
 
-    const triageRecord = await writeDisagreementRecord(id, engineName, input, localJson, browserJson);
+    const triageRecord = await writeDisagreementRecord(
+      caseId,
+      engineName,
+      inputHtml,
+      localNormalizedJson,
+      browserNormalizedJson
+    );
     disagreements.push({
-      id,
+      id: caseId,
       engine: engineName,
       triageRecord
     });
@@ -377,11 +383,11 @@ if (lowCoverageTags.length > 0) {
 }
 
 if (failures.length > 0) {
-  console.error(`EVAL: Browser differential thresholds failed: ${failures.join("; ")}`);
+  console.error(`Browser differential thresholds failed: ${failures.join("; ")}`);
   process.exit(1);
 }
 
 console.log(
-  `EVAL: Browser differential complete: cases=${allCorpusCases.length}, disagreements=${disagreements.length}, `
+  `Browser differential complete: cases=${allCorpusCases.length}, disagreements=${disagreements.length}, `
     + `agreement=${aggregateAgreement.toFixed(6)}`
 );

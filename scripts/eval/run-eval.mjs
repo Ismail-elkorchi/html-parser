@@ -98,12 +98,12 @@ async function main() {
   });
 
   if (!isEvaluationPass) {
-    console.error("EVAL: Evaluation failed. See reports/eval-summary.json");
+    console.error("Evaluation failed. See reports/eval-summary.json");
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error("EVAL:", error);
+  console.error(error);
   process.exit(1);
 });

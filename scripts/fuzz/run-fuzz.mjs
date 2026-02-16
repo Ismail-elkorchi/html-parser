@@ -108,10 +108,10 @@ function renderAttribute(rng, index) {
 function renderOpenTag(rng, tagName, depth) {
   const attributeCount = 1 + rng.int(4);
   const attributes = [];
-  for (let i = 0; i < attributeCount; i += 1) {
-    attributes.push(renderAttribute(rng, depth + i));
+  for (let attributeIndex = 0; attributeIndex < attributeCount; attributeIndex += 1) {
+    attributes.push(renderAttribute(rng, depth + attributeIndex));
     if (rng.bool(20)) {
-      attributes.push(renderAttribute(rng, depth + i));
+      attributes.push(renderAttribute(rng, depth + attributeIndex));
     }
   }
 
@@ -311,11 +311,11 @@ await writeJson("reports/fuzz.json", {
 });
 
 if (crashes > 0) {
-  console.error(`EVAL: Fuzz crashes detected: ${crashes}`);
+  console.error(`Fuzz crashes detected: ${crashes}`);
   process.exit(1);
 }
 
 console.log(
-  `ACT: Fuzz complete: runs=${RUNS}, crashes=${crashes}, hangs=${hangs}, `
+  `Fuzz complete: runs=${RUNS}, crashes=${crashes}, hangs=${hangs}, `
     + `budgetErrors=${budgetErrors}, normalParses=${normalParses}`
 );

@@ -9,8 +9,8 @@ import {
   requireExistingDecisionRecords
 } from "./eval-primitives.mjs";
 
-function makeGate(id, name, pass, details) {
-  return { id, name, pass, details };
+function makeGate(gateId, gateName, gatePass, gateDetails) {
+  return { id: gateId, name: gateName, pass: gatePass, details: gateDetails };
 }
 
 async function loadOptionalReport(reportPath) {
@@ -27,19 +27,19 @@ async function main() {
   const profile = parseProfileArg();
 
   if (!(await fileExists("evaluation.config.json"))) {
-    console.error("EVAL: Missing evaluation.config.json");
+    console.error("Missing evaluation.config.json");
     process.exit(1);
   }
 
   const config = await readJson("evaluation.config.json");
   const profilePolicy = config.profiles?.[profile];
   if (!profilePolicy) {
-    console.error(`EVAL: Unknown profile: ${profile}`);
+    console.error(`Unknown profile: ${profile}`);
     process.exit(1);
   }
 
   if (!(await fileExists("package.json"))) {
-    console.error("EVAL: Missing package.json");
+    console.error("Missing package.json");
     process.exit(1);
   }
   const packageManifest = JSON.parse(await readFile("package.json", "utf8"));
@@ -304,12 +304,12 @@ async function main() {
   await writeJson("reports/gates.json", gatesReport);
 
   if (!allPass) {
-    console.error("EVAL: Gate failures detected. See reports/gates.json");
+    console.error("Gate failures detected. See reports/gates.json");
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error("EVAL:", error);
+  console.error(error);
   process.exit(1);
 });

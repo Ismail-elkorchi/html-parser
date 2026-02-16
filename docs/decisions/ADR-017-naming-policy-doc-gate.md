@@ -21,7 +21,7 @@ Without a required naming policy document, naming quality drifts across scripts 
   - ontology-first casing rules
   - cue/action/evaluation naming arc
   - explicit frame-of-reference terms
-  - stable `CUE:`, `ACT:`, `EVAL:` log labels
+  - stable, domain-specific log messages without tag prefixes
 
 ## Alternatives considered
 

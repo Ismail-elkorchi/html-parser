@@ -11,7 +11,7 @@ function runBenchmark(benchmarkName, htmlSource, iterations) {
 
   const startMem = process.memoryUsage().heapUsed;
   const started = performance.now();
-  for (let i = 0; i < iterations; i += 1) {
+  for (let iterationIndex = 0; iterationIndex < iterations; iterationIndex += 1) {
     parse(htmlSource);
   }
   const elapsedMs = performance.now() - started;
@@ -44,4 +44,4 @@ await writeJson("reports/bench.json", {
   benchmarks
 });
 
-console.log("ACT: Bench complete:", benchmarks.map((entry) => `${entry.name}=${entry.mbPerSec}MB/s`).join(", "));
+console.log("Bench complete:", benchmarks.map((entry) => `${entry.name}=${entry.mbPerSec}MB/s`).join(", "));

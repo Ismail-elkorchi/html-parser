@@ -238,8 +238,8 @@ const report = {
 await writeJson("reports/tree.json", report);
 
 if (failed > 0) {
-  console.error(`EVAL: Tree fixture hard failures: ${failed}`);
+  console.error(`Tree fixture hard failures: ${failed}`);
   process.exit(1);
 }
 
-console.log(`ACT: Tree fixtures passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);
+console.log(`Tree fixtures passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);

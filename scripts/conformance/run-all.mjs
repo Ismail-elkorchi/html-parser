@@ -95,12 +95,12 @@ async function main() {
   });
 
   if (hasSuiteFailures) {
-    console.error("EVAL: Conformance run failed. See reports/conformance-summary.json");
+    console.error("Conformance run failed. See reports/conformance-summary.json");
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error("EVAL:", error);
+  console.error(error);
   process.exit(1);
 });

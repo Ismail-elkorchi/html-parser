@@ -90,12 +90,12 @@ async function main() {
   await writeJson("reports/no-node-builtins.json", report);
 
   if (!isCheckPass) {
-    console.error("EVAL: Node builtin usage detected in src/:", findings);
+    console.error("Node builtin usage detected in src/:", findings);
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error("EVAL:", error);
+  console.error(error);
   process.exit(1);
 });

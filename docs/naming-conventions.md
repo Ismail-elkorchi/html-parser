@@ -40,8 +40,8 @@ Names in this repository are part of the verification surface. A name must encod
 ## Prompt and log labels
 - Prompt labels use plain anchors:
   - `Instruction:`, `Context:`, `Constraints:`, `Output:`.
-- Log labels use stable prefixes for grep:
-  - `CUE:`, `ACT:`, `EVAL:`.
+- Log messages use stable domain phrasing:
+  - avoid synthetic uppercase tag prefixes.
 
 ## Greppability and taxonomy
 - Use ASCII-only identifiers and stable stems.

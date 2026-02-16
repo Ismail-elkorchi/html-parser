@@ -50,12 +50,12 @@ async function main() {
   await writeJson("reports/docs.json", report);
 
   if (!isDocsCheckPass) {
-    console.error("EVAL: Docs check failed:", report);
+    console.error("Docs check failed:", report);
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error("EVAL:", error);
+  console.error(error);
   process.exit(1);
 });

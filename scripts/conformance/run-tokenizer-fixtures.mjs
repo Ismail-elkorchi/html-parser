@@ -166,8 +166,8 @@ const report = {
 await writeJson("reports/tokenizer.json", report);
 
 if (failed > 0) {
-  console.error(`EVAL: Tokenizer conformance hard failures: ${failed}`);
+  console.error(`Tokenizer conformance hard failures: ${failed}`);
   process.exit(1);
 }
 
-console.log(`ACT: Tokenizer fixtures passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);
+console.log(`Tokenizer fixtures passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);
