@@ -20,6 +20,8 @@ export interface TreeBuildOptions {
   readonly fragmentContextTagName?: string;
   readonly scriptingEnabled?: boolean;
   readonly captureSpans?: boolean;
+  readonly onParseError?: (error: TreeBuilderError) => void;
+  readonly onInsertionModeTransition?: (transition: TreeInsertionModeTransition) => void;
 }
 
 export interface TreeNodeDocument {
@@ -64,6 +66,17 @@ export type TreeNode =
 export interface TreeBuilderError {
   readonly code: string;
   readonly tokenIndex: number;
+  readonly startOffset?: number;
+  readonly endOffset?: number;
+}
+
+export interface TreeInsertionModeTransition {
+  readonly fromMode: string;
+  readonly toMode: string;
+  readonly tokenType: string | null;
+  readonly tokenTagName: string | null;
+  readonly tokenStartOffset: number | null;
+  readonly tokenEndOffset: number | null;
 }
 
 export interface TreeBuildResult {

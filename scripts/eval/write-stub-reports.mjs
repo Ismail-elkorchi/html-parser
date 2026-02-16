@@ -279,7 +279,7 @@ async function writeAgent() {
   const headingOutline = outline(headingDocument);
   const chunkPlan = chunk(headingDocument, { maxChars: 8, maxNodes: 2 });
   const traceEvents = Array.isArray(tracedDocument.trace) ? tracedDocument.trace : [];
-  const requiredKinds = new Set(["decode", "token", "insertion-mode", "tree-mutation"]);
+  const requiredKinds = new Set(["decode", "token", "insertionModeTransition", "tree-mutation"]);
 
   const traceSchemaOk = traceEvents.every((event) => {
     if (event === null || typeof event !== "object") {
@@ -295,14 +295,19 @@ async function writeAgent() {
     if (event.kind === "token") {
       return typeof event.count === "number";
     }
-    if (event.kind === "insertion-mode") {
-      return typeof event.mode === "string";
+    if (event.kind === "insertionModeTransition") {
+      return (
+        typeof event.fromMode === "string" &&
+        typeof event.toMode === "string" &&
+        event.tokenContext !== null &&
+        typeof event.tokenContext === "object"
+      );
     }
     if (event.kind === "tree-mutation") {
       return typeof event.nodeCount === "number" && typeof event.errorCount === "number";
     }
-    if (event.kind === "parse-error") {
-      return typeof event.code === "string";
+    if (event.kind === "parseError") {
+      return typeof event.parseErrorId === "string";
     }
     if (event.kind === "budget") {
       return typeof event.budget === "string" && typeof event.actual === "number";

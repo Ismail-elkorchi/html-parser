@@ -15,7 +15,7 @@ test("trace emits structured events across tokenization and tree phases", () => 
   assert.ok(Array.isArray(traced.trace));
   assert.ok((traced.trace?.length ?? 0) > 0);
 
-  const requiredKinds = new Set(["decode", "token", "insertion-mode", "tree-mutation"]);
+  const requiredKinds = new Set(["decode", "token", "insertionModeTransition", "tree-mutation"]);
   const seenKinds = new Set();
   let previousSeq = 0;
 
@@ -32,16 +32,20 @@ test("trace emits structured events across tokenization and tree phases", () => 
     } else if (event.kind === "token") {
       assert.ok(typeof event.count === "number");
       assert.ok(event.count >= 0);
-    } else if (event.kind === "insertion-mode") {
-      assert.ok(typeof event.mode === "string");
+    } else if (event.kind === "insertionModeTransition") {
+      assert.ok(typeof event.fromMode === "string");
+      assert.ok(typeof event.toMode === "string");
+      assert.ok(event.tokenContext && typeof event.tokenContext === "object");
+      assert.ok(typeof event.tokenContext.type === "string" || event.tokenContext.type === null);
     } else if (event.kind === "tree-mutation") {
       assert.ok(typeof event.nodeCount === "number");
       assert.ok(typeof event.errorCount === "number");
     } else if (event.kind === "budget") {
       assert.ok(typeof event.budget === "string");
       assert.ok(typeof event.actual === "number");
-    } else if (event.kind === "parse-error") {
-      assert.ok(typeof event.code === "string");
+    } else if (event.kind === "parseError") {
+      assert.ok(typeof event.parseErrorId === "string");
+      assert.ok(typeof event.startOffset === "number" || event.startOffset === null);
     } else if (event.kind === "stream") {
       assert.ok(typeof event.bytesRead === "number");
     } else {
@@ -51,6 +55,22 @@ test("trace emits structured events across tokenization and tree phases", () => 
 
   for (const kind of requiredKinds) {
     assert.ok(seenKinds.has(kind));
+  }
+});
+
+test("trace includes parseError events for malformed input", () => {
+  const traced = parse("<div><span></div>", {
+    trace: true,
+    budgets: {
+      maxTraceEvents: 128,
+      maxTraceBytes: 32768
+    }
+  });
+
+  const parseErrorEvents = (traced.trace ?? []).filter((entry) => entry.kind === "parseError");
+  assert.ok(parseErrorEvents.length >= 1);
+  for (const event of parseErrorEvents) {
+    assert.ok(typeof event.parseErrorId === "string");
   }
 });
 

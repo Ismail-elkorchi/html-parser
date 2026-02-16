@@ -54,7 +54,38 @@ const defaultParserOptions = {
     sourceCodeLocationInfo: false,
     treeAdapter: defaultTreeAdapter,
     onParseError: null,
+    onInsertionModeTransition: null,
 };
+function insertionModeName(mode) {
+    if (typeof mode !== 'number') {
+        return String(mode);
+    }
+    const modeName = InsertionMode[mode];
+    return typeof modeName === 'string' ? modeName : String(mode);
+}
+function summarizeTokenContext(token) {
+    var _a, _b;
+    if (!token || typeof token !== 'object') {
+        return {
+            tokenType: null,
+            tokenTagName: null,
+            tokenStartOffset: null,
+            tokenEndOffset: null,
+        };
+    }
+    const tokenType = typeof token.type === 'number'
+        ? ((TokenType[token.type]) !== null && (TokenType[token.type]) !== void 0 ? TokenType[token.type] : String(token.type))
+        : null;
+    const tokenTagName = typeof token.tagName === 'string' ? token.tagName : null;
+    const tokenStartOffset = typeof ((_a = token.location) === null || _a === void 0 ? void 0 : _a.startOffset) === 'number' ? token.location.startOffset : null;
+    const tokenEndOffset = typeof ((_b = token.location) === null || _b === void 0 ? void 0 : _b.endOffset) === 'number' ? token.location.endOffset : null;
+    return {
+        tokenType,
+        tokenTagName,
+        tokenStartOffset,
+        tokenEndOffset,
+    };
+}
 //Parser
 export class Parser {
     constructor(options, document, 
@@ -99,9 +130,13 @@ export class Parser {
         };
         this.treeAdapter = this.options.treeAdapter;
         this.onParseError = this.options.onParseError;
+        this.onInsertionModeTransition = this.options.onInsertionModeTransition;
         // Always enable location info if we report parse errors.
         if (this.onParseError) {
             this.options.sourceCodeLocationInfo = true;
+        }
+        if (this.onInsertionModeTransition) {
+            this._instrumentInsertionModeTransitions();
         }
         this.document = document !== null && document !== void 0 ? document : this.treeAdapter.createDocument();
         this.tokenizer = new Tokenizer(this.options, this);
@@ -161,6 +196,33 @@ export class Parser {
             endOffset: beforeToken ? loc.startOffset : loc.endOffset,
         };
         this.onParseError(err);
+    }
+    /** @internal */
+    _instrumentInsertionModeTransitions() {
+        const transitionHandler = this.onInsertionModeTransition;
+        if (!transitionHandler) {
+            return;
+        }
+        let activeInsertionMode = this.insertionMode;
+        Object.defineProperty(this, 'insertionMode', {
+            configurable: true,
+            enumerable: true,
+            get() {
+                return activeInsertionMode;
+            },
+            set: (nextMode) => {
+                const previousMode = activeInsertionMode;
+                activeInsertionMode = nextMode;
+                if (previousMode === nextMode) {
+                    return;
+                }
+                transitionHandler({
+                    fromMode: insertionModeName(previousMode),
+                    toMode: insertionModeName(nextMode),
+                    ...summarizeTokenContext(this.currentToken),
+                });
+            },
+        });
     }
     //Stack events
     /** @internal */

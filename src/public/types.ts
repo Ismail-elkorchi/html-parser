@@ -57,10 +57,17 @@ export interface TraceTokenEvent {
   readonly count: number;
 }
 
-export interface TraceInsertionModeEvent {
+export interface TraceInsertionModeTransitionEvent {
   readonly seq: number;
-  readonly kind: "insertion-mode";
-  readonly mode: "document-start" | "fragment-start" | "after-tree";
+  readonly kind: "insertionModeTransition";
+  readonly fromMode: string;
+  readonly toMode: string;
+  readonly tokenContext: {
+    readonly type: string | null;
+    readonly tagName: string | null;
+    readonly startOffset: number | null;
+    readonly endOffset: number | null;
+  };
 }
 
 export interface TraceTreeMutationEvent {
@@ -72,8 +79,10 @@ export interface TraceTreeMutationEvent {
 
 export interface TraceParseErrorEvent {
   readonly seq: number;
-  readonly kind: "parse-error";
-  readonly code: string;
+  readonly kind: "parseError";
+  readonly parseErrorId: string;
+  readonly startOffset: number | null;
+  readonly endOffset: number | null;
 }
 
 export interface TraceBudgetEvent {
@@ -94,7 +103,7 @@ export interface TraceStreamEvent {
 export type TraceEvent =
   | TraceDecodeEvent
   | TraceTokenEvent
-  | TraceInsertionModeEvent
+  | TraceInsertionModeTransitionEvent
   | TraceTreeMutationEvent
   | TraceParseErrorEvent
   | TraceBudgetEvent

@@ -8,7 +8,19 @@ import { Tokenizer as RawTokenizer, TokenizerMode as RawTokenizerMode } from "./
 type ParseOptions = {
   readonly scriptingEnabled?: boolean;
   readonly sourceCodeLocationInfo?: boolean;
-  readonly onParseError?: (error: { readonly code: string; readonly startOffset: number }) => void;
+  readonly onParseError?: (error: {
+    readonly code: string;
+    readonly startOffset: number;
+    readonly endOffset?: number;
+  }) => void;
+  readonly onInsertionModeTransition?: (transition: {
+    readonly fromMode: string;
+    readonly toMode: string;
+    readonly tokenType: string | null;
+    readonly tokenTagName: string | null;
+    readonly tokenStartOffset: number | null;
+    readonly tokenEndOffset: number | null;
+  }) => void;
 };
 
 type ParserFacade = {

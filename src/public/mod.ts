@@ -199,11 +199,32 @@ function toAttributes(attributes: readonly TreeAttribute[], captureSpans: boolea
   });
 }
 
-function toParseErrors(codes: readonly string[]): readonly ParseError[] {
-  return codes.map((code) => ({
-    code: "PARSER_ERROR",
-    message: code
-  }));
+function toParseErrors(
+  errors: readonly {
+    readonly code: string;
+    readonly startOffset?: number;
+    readonly endOffset?: number;
+  }[]
+): readonly ParseError[] {
+  return errors.map((error) => {
+    const hasOffsets =
+      typeof error.startOffset === "number" &&
+      typeof error.endOffset === "number" &&
+      error.startOffset >= 0 &&
+      error.endOffset >= error.startOffset;
+    return {
+      code: "PARSER_ERROR",
+      message: error.code,
+      ...(hasOffsets
+        ? {
+            span: {
+              start: error.startOffset,
+              end: error.endOffset
+            }
+          }
+        : {})
+    };
+  });
 }
 
 function tokenizerBudgetsFromParseOptions(
@@ -339,13 +360,44 @@ function parseDocumentInternal(html: string, options: ParseOptions = {}): Docume
     kind: "token",
     count: tokenized.tokens.length
   }, budgets);
-  trace = pushTrace(trace, {
-    kind: "insertion-mode",
-    mode: "document-start"
-  }, budgets);
+
+  const insertionModeTransitions: {
+    readonly fromMode: string;
+    readonly toMode: string;
+    readonly tokenType: string | null;
+    readonly tokenTagName: string | null;
+    readonly tokenStartOffset: number | null;
+    readonly tokenEndOffset: number | null;
+  }[] = [];
+  const parseErrorTrace: {
+    readonly code: string;
+    readonly startOffset?: number;
+    readonly endOffset?: number;
+  }[] = [];
 
   const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets), {
-    captureSpans
+    captureSpans,
+    ...(trace
+      ? {
+          onInsertionModeTransition(transition: {
+            readonly fromMode: string;
+            readonly toMode: string;
+            readonly tokenType: string | null;
+            readonly tokenTagName: string | null;
+            readonly tokenStartOffset: number | null;
+            readonly tokenEndOffset: number | null;
+          }): void {
+            insertionModeTransitions.push(transition);
+          },
+          onParseError(error: {
+            readonly code: string;
+            readonly startOffset?: number;
+            readonly endOffset?: number;
+          }): void {
+            parseErrorTrace.push(error);
+          }
+        }
+      : {})
   });
 
   const children = built.document.children.map((node) => convertTreeNode(node, assigner, captureSpans));
@@ -362,20 +414,33 @@ function parseDocumentInternal(html: string, options: ParseOptions = {}): Docume
     nodeCount: totalNodes,
     errorCount: built.errors.length
   }, budgets);
-  trace = pushTrace(trace, {
-    kind: "insertion-mode",
-    mode: "after-tree"
-  }, budgets);
-  for (const treeError of built.errors.slice(0, 3)) {
+
+  for (const transition of insertionModeTransitions) {
     trace = pushTrace(trace, {
-      kind: "parse-error",
-      code: treeError.code
+      kind: "insertionModeTransition",
+      fromMode: transition.fromMode,
+      toMode: transition.toMode,
+      tokenContext: {
+        type: transition.tokenType,
+        tagName: transition.tokenTagName,
+        startOffset: transition.tokenStartOffset,
+        endOffset: transition.tokenEndOffset
+      }
+    }, budgets);
+  }
+
+  for (const treeError of parseErrorTrace) {
+    trace = pushTrace(trace, {
+      kind: "parseError",
+      parseErrorId: treeError.code,
+      startOffset: typeof treeError.startOffset === "number" ? treeError.startOffset : null,
+      endOffset: typeof treeError.endOffset === "number" ? treeError.endOffset : null
     }, budgets);
   }
   trace = pushBudgetTrace(trace, "maxNodes", budgets?.maxNodes, totalNodes, budgets);
   trace = pushBudgetTrace(trace, "maxDepth", budgets?.maxDepth, metrics.maxDepth, budgets);
 
-  const errors = toParseErrors(built.errors.map((entry) => entry.code));
+  const errors = toParseErrors(built.errors);
 
   return {
     id: documentId,
@@ -453,10 +518,6 @@ export function parseFragment(
     sniffSource: "input"
   }, budgets);
   trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, html.length, budgets);
-  trace = pushTrace(trace, {
-    kind: "insertion-mode",
-    mode: "fragment-start"
-  }, budgets);
 
   const tokenizerBudgets = tokenizerBudgetsFromParseOptions(budgets);
   const tokenized = tokenizerBudgets ? tokenize(html, { budgets: tokenizerBudgets }) : tokenize(html);
@@ -466,9 +527,44 @@ export function parseFragment(
     count: tokenized.tokens.length
   }, budgets);
 
+  const insertionModeTransitions: {
+    readonly fromMode: string;
+    readonly toMode: string;
+    readonly tokenType: string | null;
+    readonly tokenTagName: string | null;
+    readonly tokenStartOffset: number | null;
+    readonly tokenEndOffset: number | null;
+  }[] = [];
+  const parseErrorTrace: {
+    readonly code: string;
+    readonly startOffset?: number;
+    readonly endOffset?: number;
+  }[] = [];
+
   const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets), {
     fragmentContextTagName: normalizedContext,
-    captureSpans
+    captureSpans,
+    ...(trace
+      ? {
+          onInsertionModeTransition(transition: {
+            readonly fromMode: string;
+            readonly toMode: string;
+            readonly tokenType: string | null;
+            readonly tokenTagName: string | null;
+            readonly tokenStartOffset: number | null;
+            readonly tokenEndOffset: number | null;
+          }): void {
+            insertionModeTransitions.push(transition);
+          },
+          onParseError(error: {
+            readonly code: string;
+            readonly startOffset?: number;
+            readonly endOffset?: number;
+          }): void {
+            parseErrorTrace.push(error);
+          }
+        }
+      : {})
   });
 
   const children = built.document.children.map((node) => convertTreeNode(node, assigner, captureSpans));
@@ -485,20 +581,33 @@ export function parseFragment(
     nodeCount: totalNodes,
     errorCount: built.errors.length
   }, budgets);
-  trace = pushTrace(trace, {
-    kind: "insertion-mode",
-    mode: "after-tree"
-  }, budgets);
-  for (const treeError of built.errors.slice(0, 3)) {
+
+  for (const transition of insertionModeTransitions) {
     trace = pushTrace(trace, {
-      kind: "parse-error",
-      code: treeError.code
+      kind: "insertionModeTransition",
+      fromMode: transition.fromMode,
+      toMode: transition.toMode,
+      tokenContext: {
+        type: transition.tokenType,
+        tagName: transition.tokenTagName,
+        startOffset: transition.tokenStartOffset,
+        endOffset: transition.tokenEndOffset
+      }
+    }, budgets);
+  }
+
+  for (const treeError of parseErrorTrace) {
+    trace = pushTrace(trace, {
+      kind: "parseError",
+      parseErrorId: treeError.code,
+      startOffset: typeof treeError.startOffset === "number" ? treeError.startOffset : null,
+      endOffset: typeof treeError.endOffset === "number" ? treeError.endOffset : null
     }, budgets);
   }
   trace = pushBudgetTrace(trace, "maxNodes", budgets?.maxNodes, totalNodes, budgets);
   trace = pushBudgetTrace(trace, "maxDepth", budgets?.maxDepth, metrics.maxDepth, budgets);
 
-  const errors = toParseErrors(built.errors.map((entry) => entry.code));
+  const errors = toParseErrors(built.errors);
 
   return {
     id: fragmentId,

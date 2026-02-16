@@ -68,9 +68,9 @@ Each event is a structured object with:
 - `kind`: one of:
   - `decode`
   - `token`
-  - `insertion-mode`
+  - `insertionModeTransition`
   - `tree-mutation`
-  - `parse-error`
+  - `parseError`
   - `budget`
   - `stream`
 
@@ -81,13 +81,21 @@ Stable event shapes:
   - `sniffSource`: `input` | `bom` | `transport` | `meta` | `default`
 - `token`:
   - `count`: number
-- `insertion-mode`:
-  - `mode`: `document-start` | `fragment-start` | `after-tree`
+- `insertionModeTransition`:
+  - `fromMode`: parser insertion mode before transition
+  - `toMode`: parser insertion mode after transition
+  - `tokenContext`:
+    - `type`: parser token type summary or `null`
+    - `tagName`: token tag name when available, otherwise `null`
+    - `startOffset`: source offset when available, otherwise `null`
+    - `endOffset`: source offset when available, otherwise `null`
 - `tree-mutation`:
   - `nodeCount`: number
   - `errorCount`: number
-- `parse-error`:
-  - `code`: string
+- `parseError`:
+  - `parseErrorId`: parser error identifier string
+  - `startOffset`: number | null
+  - `endOffset`: number | null
 - `budget`:
   - `budget`: budget key
   - `limit`: number | null

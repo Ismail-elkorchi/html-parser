@@ -95,6 +95,25 @@ function pushError(errors: TreeBuilderError[], code: string, tokenIndex = 0): vo
   errors.push({ code, tokenIndex });
 }
 
+function pushParseError(
+  errors: TreeBuilderError[],
+  error: {
+    readonly code: string;
+    readonly startOffset?: number;
+    readonly endOffset?: number;
+  }
+): TreeBuilderError {
+  const startOffset = typeof error.startOffset === "number" ? error.startOffset : 0;
+  const next: TreeBuilderError = {
+    code: error.code,
+    tokenIndex: startOffset,
+    ...(typeof error.startOffset === "number" ? { startOffset: error.startOffset } : {}),
+    ...(typeof error.endOffset === "number" ? { endOffset: error.endOffset } : {})
+  };
+  errors.push(next);
+  return next;
+}
+
 function enforceTreeBudgets(depth: number, state: BuildState, tokenIndex: number): void {
   const maxDepth = state.budgets?.maxDepth;
   if (maxDepth !== undefined && depth > maxDepth) {
@@ -369,10 +388,26 @@ function parseTree(
   const parseOptions = {
     scriptingEnabled: options.scriptingEnabled ?? true,
     sourceCodeLocationInfo: options.captureSpans ?? false,
-    onParseError(error: { readonly code: string; readonly startOffset: number }): void {
-      pushError(errors, error.code, error.startOffset);
+    onParseError(error: { readonly code: string; readonly startOffset?: number; readonly endOffset?: number }): void {
+      const normalized = pushParseError(errors, error);
+      options.onParseError?.(normalized);
     }
   };
+
+  if (options.onInsertionModeTransition) {
+    Object.assign(parseOptions, {
+      onInsertionModeTransition(transition: {
+        readonly fromMode: string;
+        readonly toMode: string;
+        readonly tokenType: string | null;
+        readonly tokenTagName: string | null;
+        readonly tokenStartOffset: number | null;
+        readonly tokenEndOffset: number | null;
+      }): void {
+        options.onInsertionModeTransition?.(transition);
+      }
+    });
+  }
 
   if (options.fragmentContextTagName !== undefined) {
     const context = createFragmentContext(options.fragmentContextTagName);
