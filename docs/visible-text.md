@@ -29,8 +29,8 @@ Input:
   - the element has `aria-hidden="true"` (also accepts empty and `"1"` as true)
 
 ## Structural break rules
-- `<br>` contributes a line break (`\n`).
-- `<p>` contributes a paragraph break (`\n\n`) after paragraph content.
+- `&lt;br&gt;` contributes a line break (`\n`).
+- `&lt;p&gt;` contributes a paragraph break (`\n\n`) after paragraph content.
 - Table rows (`tr`) contribute line breaks.
 - Table cells (`td`/`th`) are separated with a tab (`\t`) within each row.
 - Block break tags are treated as structural boundaries:
@@ -48,9 +48,9 @@ Input:
   - output is trimmed when `trim=true`.
 
 ## Attribute-derived text
-- `<img alt="...">` contributes non-empty `alt`.
-- `<input>` contributes non-empty `value`, except `type="hidden"`.
-- `<button>` contributes `value` when present; otherwise text children contribute.
+- `&lt;img alt="..."&gt;` contributes non-empty `alt`.
+- `&lt;input&gt;` contributes non-empty `value`, except `type="hidden"`.
+- `&lt;button&gt;` contributes `value` when present; otherwise text children contribute.
 
 ## Token contract
 `visibleTextTokens` emits a stable ordered union:
