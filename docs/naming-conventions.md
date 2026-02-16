@@ -38,10 +38,12 @@ Names in this repository are part of the verification surface. A name must encod
   - Avoid `configObj`, `dataList`, `helper`.
 
 ## Prompt and log labels
+Canonical policy marker: LOG_LABEL_POLICY=DOMAIN_PHRASES_NO_TAG_PREFIX
+
 - Prompt labels use plain anchors:
   - `Instruction:`, `Context:`, `Constraints:`, `Output:`.
-- Log messages use stable domain phrasing:
-  - avoid synthetic uppercase tag prefixes.
+- Log messages use stable domain-first phrasing with explicit field keys.
+- Uppercase tag prefixes (`CUE:`, `ACT:`, `EVAL:`) are prohibited.
 
 ## Greppability and taxonomy
 - Use ASCII-only identifiers and stable stems.
