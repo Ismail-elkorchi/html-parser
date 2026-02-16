@@ -114,6 +114,31 @@ Shape:
   "overall": { "ok": true }
 }
 
+## Stream invariants report
+File:
+- reports/stream.json
+
+Shape:
+{
+  "suite": "stream",
+  "timestamp": "...",
+  "overall": { "ok": true },
+  "checks": [
+    {
+      "id": "stream-many-chunks-equals-parse-bytes",
+      "ok": true,
+      "observed": { "hash": "sha256:..." },
+      "expected": { "hash": "sha256:..." }
+    },
+    {
+      "id": "stream-max-buffered-bytes-fails-before-overrun",
+      "ok": true,
+      "observed": { "budget": "maxBufferedBytes", "actual": 17 },
+      "expected": { "budget": "maxBufferedBytes", "actual": 17 }
+    }
+  ]
+}
+
 ## Budgets report
 File:
 - reports/budgets.json
@@ -157,7 +182,26 @@ Shape:
 {
   "suite": "browser-diff",
   "timestamp": "...",
-  "corpus": { "name": "curated-v2", "seed": "0x5f3759df", "cases": 102 },
+  "corpus": {
+    "name": "curated-v3",
+    "totalCases": 560,
+    "curatedCases": 560,
+    "randomCases": 64,
+    "seed": "0x5f3759df"
+  },
+  "coverage": {
+    "tagCounts": {
+      "tokenizer/entities": 70,
+      "adoption-agency": 70,
+      "tables/foster-parenting": 70,
+      "foreign-content (svg/mathml)": 70,
+      "templates": 70,
+      "optional-tags": 70,
+      "comments/doctype": 70,
+      "scripting-flag surface (document.write-like markup patterns as strings only)": 70
+    },
+    "minPerTag": 10
+  },
   "engines": {
     "chromium": {
       "compared": 0,
@@ -194,6 +238,8 @@ Rules:
 - Browser differential executes real engines (`chromium`, `firefox`, `webkit`) through Playwright.
 - Release evidence requires multi-engine execution; chromium-only fallback is not valid release evidence.
 - If an engine cannot launch, that engine entry may include `error`, and release gate must fail when required engine presence is not met.
+- Disagreement entries use deterministic case IDs from curated and random corpus sets.
+- The browser-diff command may fail only when configured browser thresholds are not met (engine presence, agreement, corpus size, tag coverage).
 
 ## Fuzz report (recommended)
 File:
@@ -207,6 +253,20 @@ Shape:
   "crashes": 0,
   "hangs": 0,
   "budgetErrors": 120,
+  "outcomeDistribution": {
+    "normalParses": 880,
+    "budgetErrors": 120,
+    "crashes": 0
+  },
+  "topSlowCases": [
+    {
+      "id": "fuzz-0007",
+      "seed": "0x1234abcd",
+      "budgetProfile": "tight",
+      "elapsedMs": 8.731,
+      "outcome": "budget-error"
+    }
+  ],
   "findings": []
 }
 

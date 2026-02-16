@@ -42,6 +42,21 @@ test("parseStream enforces maxBufferedBytes budget", async () => {
   );
 });
 
+test("parseStream fails once buffered bytes exceed limit during prescan", async () => {
+  const payload = new Uint8Array(40).fill(0x61);
+  const stream = makeStream([...payload].map((value) => new Uint8Array([value])));
+  await assert.rejects(
+    parseStream(stream, { budgets: { maxBufferedBytes: 16 } }),
+    (error) => {
+      assert.ok(error instanceof BudgetExceededError);
+      assert.equal(error.payload.budget, "maxBufferedBytes");
+      assert.equal(error.payload.limit, 16);
+      assert.equal(error.payload.actual, 17);
+      return true;
+    }
+  );
+});
+
 test("parseStream matches parseBytes for chunked transport with sniffing", async () => {
   const prefix = "<meta charset=windows-1252><p>";
   const suffix = "</p>";
@@ -51,6 +66,19 @@ test("parseStream matches parseBytes for chunked transport with sniffing", async
   const fromBytes = parseBytes(bytes);
   const fromStream = await parseStream(stream);
 
+  assert.deepEqual(fromStream, fromBytes);
+});
+
+test("parseStream matches parseBytes across many deterministic chunks", async () => {
+  const html = "<!doctype html><table><tr><td>a</td></tr>outside<tr><td>b</td></tr></table>";
+  const bytes = new TextEncoder().encode(html);
+  const chunks = [];
+  for (let offset = 0; offset < bytes.length; offset += 2) {
+    chunks.push(bytes.subarray(offset, Math.min(bytes.length, offset + 2)));
+  }
+
+  const fromBytes = parseBytes(bytes);
+  const fromStream = await parseStream(makeStream(chunks));
   assert.deepEqual(fromStream, fromBytes);
 });
 

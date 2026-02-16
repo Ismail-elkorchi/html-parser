@@ -161,9 +161,23 @@ async function main() {
   const detOk = Boolean(det?.overall?.ok);
   gates.push(gate("G-080", "Determinism", detOk, det || { missing: true }));
 
+  const streamReport = await loadOptionalReport("reports/stream.json");
+  const requireStreamReport = Boolean(prof.requireStreamReport);
+  const streamOk = Boolean(streamReport?.overall?.ok);
+  const streamPass = requireStreamReport ? streamOk : (streamReport ? streamOk : true);
+  gates.push(
+    gate(
+      "G-085",
+      "Streaming invariants",
+      streamPass,
+      { required: requireStreamReport, stream: streamReport || { missing: true } }
+    )
+  );
+
   const budgets = await loadOptionalReport("reports/budgets.json");
   const fuzz = await loadOptionalReport("reports/fuzz.json");
   const requireBudgetsReport = Boolean(config.thresholds?.budgets?.requireBudgetsReport);
+  const requireFuzzReport = Boolean(config.thresholds?.budgets?.requireFuzzReport) && Boolean(prof.requireFuzzReport);
 
   const budgetsOk =
     (budgets ? Boolean(budgets?.overall?.ok) : true) &&
@@ -176,7 +190,11 @@ async function main() {
       "G-090",
       "Budgets and no hangs",
       budgetsPass,
-      { budgets: budgets || { missing: true }, fuzz: fuzz || { missing: true } }
+      {
+        budgets: budgets || { missing: true },
+        fuzz: fuzz || { missing: true },
+        requireFuzzReport
+      }
     )
   );
 
@@ -208,6 +226,11 @@ async function main() {
     const bd = await loadOptionalReport("reports/browser-diff.json");
     const minAgreement = config.thresholds?.browserDiff?.minAgreement ?? 0.995;
     const minEnginesPresent = config.thresholds?.browserDiff?.minEnginesPresent ?? 1;
+    const minCases = config.thresholds?.browserDiff?.minCases ?? 1;
+    const minTagCoverage = config.thresholds?.browserDiff?.minTagCoverage ?? 0;
+    const requiredTags = Array.isArray(config.thresholds?.browserDiff?.requiredTags)
+      ? config.thresholds.browserDiff.requiredTags
+      : [];
 
     if (!bd) {
       gates.push(gate("R-210", "Browser differential oracle", false, { missingReport: "reports/browser-diff.json" }));
@@ -220,10 +243,34 @@ async function main() {
         ? (agreements.length ? Math.min(...agreements) : 0)
         : (agreements.length ? agreements.reduce((a, b) => a + b, 0) / agreements.length : 0);
 
-      const pass = present.length >= minEnginesPresent && agg >= minAgreement;
+      const totalCases = Number(bd?.corpus?.totalCases ?? bd?.corpus?.cases ?? 0);
+      const tagCounts = bd?.coverage?.tagCounts && typeof bd.coverage.tagCounts === "object"
+        ? bd.coverage.tagCounts
+        : {};
+      const underCoveredTags = requiredTags.filter((tag) => Number(tagCounts[tag] ?? 0) < minTagCoverage);
 
-      gates.push(gate("R-210", "Browser differential oracle", pass, { presentEngines: present, agreement: agg, minAgreement }));
+      const pass =
+        present.length >= minEnginesPresent &&
+        agg >= minAgreement &&
+        totalCases >= minCases &&
+        underCoveredTags.length === 0;
+
+      gates.push(gate("R-210", "Browser differential oracle", pass, {
+        presentEngines: present,
+        agreement: agg,
+        minAgreement,
+        totalCases,
+        minCases,
+        minTagCoverage,
+        requiredTags,
+        underCoveredTags
+      }));
     }
+  }
+
+  if (requireFuzzReport) {
+    const fuzzPass = Boolean(fuzz) && Number(fuzz?.crashes || 0) === 0 && Number(fuzz?.hangs || 0) === 0;
+    gates.push(gate("R-220", "Fuzz report required", fuzzPass, fuzz || { missingReport: "reports/fuzz.json" }));
   }
 
   const allPass = gates.every((g) => g.pass);

@@ -130,6 +130,17 @@ Evidence:
 
 ---
 
+### G-085: Streaming invariants
+Requirement:
+- `reports/stream.json` must exist for CI and release profiles.
+- Stream budget checks must pass, including `maxBufferedBytes` enforcement.
+- Stream parsing over chunked transport must match `parseBytes` for equivalent byte input.
+
+Evidence:
+- `reports/stream.json`
+
+---
+
 ### G-090: Resource governance (budgets) works
 Requirement:
 - Budget exceed produces a structured error (not crash, not hang).
@@ -200,9 +211,22 @@ Evidence:
 Requirement:
 - Browser differential agreement must meet strict threshold (`>= 0.999`).
 - Must include Chromium, Firefox, and WebKit (`minEnginesPresent = 3`).
+- Corpus execution surface must meet `thresholds.browserDiff.minCases` (`>= 500`).
+- Coverage discipline must meet `thresholds.browserDiff.minTagCoverage` (`>= 10`) for each required browser corpus tag.
 
 Evidence:
 - `reports/browser-diff.json`
+
+---
+
+### R-220: Fuzz report required (release)
+Requirement:
+- `reports/fuzz.json` must exist in release evaluation.
+- `crashes` must be `0`.
+- `hangs` must be `0`.
+
+Evidence:
+- `reports/fuzz.json`
 
 ---
 
