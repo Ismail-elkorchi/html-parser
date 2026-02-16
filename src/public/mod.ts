@@ -1,5 +1,5 @@
 import { decodeHtmlBytes, sniffHtmlEncoding } from "../internal/encoding/mod.js";
-import { tokenize, type TokenizerBudgets } from "../internal/tokenizer/mod.js";
+import { tokenize, type HtmlToken, type TokenizerBudgets } from "../internal/tokenizer/mod.js";
 import {
   buildTreeFromHtml,
   type TreeAttribute,
@@ -26,6 +26,8 @@ import type {
   ParseError,
   ParseOptions,
   Span,
+  Token,
+  TokenizeStreamOptions,
   TraceEvent
 } from "./types.js";
 
@@ -33,12 +35,16 @@ export type {
   Attribute,
   BudgetOptions,
   BudgetExceededPayload,
+  CharsToken,
   Chunk,
   ChunkOptions,
   CommentNode,
+  DoctypeToken,
   DocumentTree,
   DoctypeNode,
   Edit,
+  EndTagToken,
+  EofToken,
   ElementNode,
   FragmentTree,
   HtmlNode,
@@ -54,6 +60,10 @@ export type {
   ParseError,
   ParseOptions,
   Span,
+  StartTagToken,
+  Token,
+  TokenAttribute,
+  TokenizeStreamOptions,
   TextNode,
   TraceEvent
 } from "./types.js";
@@ -256,6 +266,55 @@ function tokenizerBudgetsFromParseOptions(
   };
 
   return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function toToken(token: HtmlToken): Token {
+  if (token.type === "StartTag") {
+    const attributes = Object.entries(token.attributes).map(([name, value]) =>
+      Object.freeze({ name, value })
+    );
+    return Object.freeze({
+      kind: "startTag",
+      name: token.name,
+      attributes: Object.freeze(attributes),
+      selfClosing: token.selfClosing
+    });
+  }
+
+  if (token.type === "EndTag") {
+    return Object.freeze({
+      kind: "endTag",
+      name: token.name
+    });
+  }
+
+  if (token.type === "Character") {
+    return Object.freeze({
+      kind: "chars",
+      value: token.data
+    });
+  }
+
+  if (token.type === "Comment") {
+    return Object.freeze({
+      kind: "comment",
+      value: token.data
+    });
+  }
+
+  if (token.type === "Doctype") {
+    return Object.freeze({
+      kind: "doctype",
+      name: token.name,
+      publicId: token.publicId,
+      systemId: token.systemId,
+      forceQuirks: token.forceQuirks
+    });
+  }
+
+  return Object.freeze({
+    kind: "eof"
+  });
 }
 
 function treeBudgetsFromParseOptions(budgets: ParseOptions["budgets"] | undefined): TreeBudgets | undefined {
@@ -635,10 +694,17 @@ export function parseFragment(
   };
 }
 
-export async function parseStream(
+interface StreamDecodeResult {
+  readonly text: string;
+  readonly sniff: { encoding: string; source: "bom" | "transport" | "meta" | "default" };
+  readonly totalBytes: number;
+  readonly maxBufferedObserved: number;
+}
+
+async function decodeStreamToText(
   stream: ReadableStream<Uint8Array>,
-  options: ParseOptions = {}
-): Promise<DocumentTree> {
+  options: { readonly transportEncodingLabel?: string; readonly budgets?: ParseOptions["budgets"] }
+): Promise<StreamDecodeResult> {
   const startedAt = Date.now();
   const budgets = options.budgets;
   const reader = stream.getReader();
@@ -736,7 +802,34 @@ export async function parseStream(
     decodedParts.push(decodedTail);
   }
 
-  const parsed = parse(decodedParts.join(""), options);
+  return {
+    text: decodedParts.join(""),
+    sniff,
+    totalBytes: total,
+    maxBufferedObserved
+  };
+}
+
+export async function* tokenizeStream(
+  stream: ReadableStream<Uint8Array>,
+  options: TokenizeStreamOptions = {}
+): AsyncIterable<Token> {
+  const decoded = await decodeStreamToText(stream, options);
+  const tokenizerBudgets = tokenizerBudgetsFromParseOptions(options.budgets);
+  const tokenized = tokenizerBudgets ? tokenize(decoded.text, { budgets: tokenizerBudgets }) : tokenize(decoded.text);
+
+  for (const token of tokenized.tokens) {
+    yield toToken(token);
+  }
+}
+
+export async function parseStream(
+  stream: ReadableStream<Uint8Array>,
+  options: ParseOptions = {}
+): Promise<DocumentTree> {
+  const budgets = options.budgets;
+  const decoded = await decodeStreamToText(stream, options);
+  const parsed = parse(decoded.text, options);
   if (!parsed.trace) {
     return parsed;
   }
@@ -745,14 +838,20 @@ export async function parseStream(
   trace = pushTrace(trace, {
     kind: "decode",
     source: "sniff",
-    encoding: sniff.encoding,
-    sniffSource: sniff.source
+    encoding: decoded.sniff.encoding,
+    sniffSource: decoded.sniff.source
   }, budgets) ?? trace;
   trace = pushTrace(trace, {
     kind: "stream",
-    bytesRead: total
+    bytesRead: decoded.totalBytes
   }, budgets) ?? trace;
-  trace = pushBudgetTrace(trace, "maxBufferedBytes", budgets?.maxBufferedBytes, maxBufferedObserved, budgets) ?? trace;
+  trace = pushBudgetTrace(
+    trace,
+    "maxBufferedBytes",
+    budgets?.maxBufferedBytes,
+    decoded.maxBufferedObserved,
+    budgets
+  ) ?? trace;
 
   return {
     ...parsed,

@@ -164,10 +164,10 @@ async function main() {
 
   if (agent) {
     const agentFeatures = agent.features || {};
-    const enabledFeatureCount = ["trace", "spans", "patch", "outline", "chunk"].filter(
+    const enabledFeatureCount = ["trace", "spans", "patch", "outline", "chunk", "streamToken"].filter(
       (featureName) => Boolean(agentFeatures?.[featureName]?.ok)
     ).length;
-    const featureCoverage = enabledFeatureCount / 5;
+    const featureCoverage = enabledFeatureCount / 6;
     agentScore = weighted(agentPoints, featureCoverage);
   }
 

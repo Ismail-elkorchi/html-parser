@@ -151,6 +151,7 @@ Requirement:
   - `patch`
   - `outline`
   - `chunk`
+  - `streamToken`
 
 Evidence:
 - `reports/agent.json`

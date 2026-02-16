@@ -43,6 +43,58 @@ export interface ParseOptions {
   readonly budgets?: BudgetOptions;
 }
 
+export interface TokenizeStreamOptions {
+  readonly transportEncodingLabel?: string;
+  readonly budgets?: BudgetOptions;
+}
+
+export interface TokenAttribute {
+  readonly name: string;
+  readonly value: string;
+}
+
+export interface StartTagToken {
+  readonly kind: "startTag";
+  readonly name: string;
+  readonly attributes: readonly TokenAttribute[];
+  readonly selfClosing: boolean;
+}
+
+export interface EndTagToken {
+  readonly kind: "endTag";
+  readonly name: string;
+}
+
+export interface CharsToken {
+  readonly kind: "chars";
+  readonly value: string;
+}
+
+export interface CommentToken {
+  readonly kind: "comment";
+  readonly value: string;
+}
+
+export interface DoctypeToken {
+  readonly kind: "doctype";
+  readonly name: string;
+  readonly publicId: string | null;
+  readonly systemId: string | null;
+  readonly forceQuirks: boolean;
+}
+
+export interface EofToken {
+  readonly kind: "eof";
+}
+
+export type Token =
+  | StartTagToken
+  | EndTagToken
+  | CharsToken
+  | CommentToken
+  | DoctypeToken
+  | EofToken;
+
 export interface TraceDecodeEvent {
   readonly seq: number;
   readonly kind: "decode";

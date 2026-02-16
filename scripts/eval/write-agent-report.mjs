@@ -6,7 +6,8 @@ import {
   computePatch,
   outline,
   parse,
-  parseFragment
+  parseFragment,
+  tokenizeStream
 } from "../../dist/mod.js";
 import { writeJson } from "./eval-primitives.mjs";
 
@@ -38,6 +39,22 @@ function findFirstNode(nodes, predicate) {
 
 function textBytes(value) {
   return new TextEncoder().encode(value).length;
+}
+
+function createByteStream(chunks) {
+  const Stream = globalThis.ReadableStream;
+  if (typeof Stream !== "function") {
+    throw new Error("ReadableStream is unavailable in this runtime");
+  }
+
+  return new Stream({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(chunk);
+      }
+      controller.close();
+    }
+  });
 }
 
 function evaluateTraceFeature() {
@@ -291,13 +308,80 @@ function evaluateChunkFeature() {
   };
 }
 
+async function collectStreamTokens(chunks, options = {}) {
+  const tokens = [];
+  for await (const token of tokenizeStream(createByteStream(chunks), options)) {
+    tokens.push(token);
+  }
+  return tokens;
+}
+
+async function captureTokenBudgetFailure(chunks, options) {
+  try {
+    await collectStreamTokens(chunks, options);
+    return null;
+  } catch (error) {
+    if (error instanceof BudgetExceededError) {
+      return {
+        budget: error.payload.budget,
+        limit: error.payload.limit,
+        actual: error.payload.actual
+      };
+    }
+    throw error;
+  }
+}
+
+async function evaluateStreamTokenFeature() {
+  const encoder = new TextEncoder();
+  const chunks = [encoder.encode("<p>"), encoder.encode("alpha"), encoder.encode("</p>")];
+
+  const firstRun = await collectStreamTokens(chunks, {
+    budgets: { maxInputBytes: 1024, maxBufferedBytes: 256 }
+  });
+  const secondRun = await collectStreamTokens(chunks, {
+    budgets: { maxInputBytes: 1024, maxBufferedBytes: 256 }
+  });
+
+  const deterministic = JSON.stringify(firstRun) === JSON.stringify(secondRun);
+  const kinds = firstRun.map((token) => token.kind);
+  const hasRequiredKinds = ["startTag", "chars", "endTag", "eof"].every((kind) => kinds.includes(kind));
+
+  const tightChunks = [new Uint8Array(32).fill(0x61)];
+  const firstBudgetFailure = await captureTokenBudgetFailure(tightChunks, {
+    budgets: { maxInputBytes: 1024, maxBufferedBytes: 16 }
+  });
+  const secondBudgetFailure = await captureTokenBudgetFailure(tightChunks, {
+    budgets: { maxInputBytes: 1024, maxBufferedBytes: 16 }
+  });
+
+  const budgetFailureOk = firstBudgetFailure?.budget === "maxBufferedBytes";
+  const deterministicBudgetFailure =
+    JSON.stringify(firstBudgetFailure) === JSON.stringify(secondBudgetFailure);
+
+  const ok = deterministic && hasRequiredKinds && budgetFailureOk && deterministicBudgetFailure;
+  return {
+    ok,
+    details: {
+      tokenCount: firstRun.length,
+      kinds,
+      hasRequiredKinds,
+      deterministic,
+      budgetFailureOk,
+      deterministicBudgetFailure,
+      firstBudgetFailure
+    }
+  };
+}
+
 async function main() {
   const features = {
     trace: { ok: false, details: {} },
     spans: { ok: false, details: {} },
     patch: { ok: false, details: {} },
     outline: { ok: false, details: {} },
-    chunk: { ok: false, details: {} }
+    chunk: { ok: false, details: {} },
+    streamToken: { ok: false, details: {} }
   };
 
   try {
@@ -328,6 +412,12 @@ async function main() {
     features.chunk = evaluateChunkFeature();
   } catch (error) {
     features.chunk = { ok: false, details: { error: makeReportFailure(error) } };
+  }
+
+  try {
+    features.streamToken = await evaluateStreamTokenFeature();
+  } catch (error) {
+    features.streamToken = { ok: false, details: { error: makeReportFailure(error) } };
   }
 
   const overall = {

@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BudgetExceededError, chunk, outline, parse, parseBytes, parseFragment, parseStream } from "../../dist/mod.js";
+import {
+  BudgetExceededError,
+  chunk,
+  outline,
+  parse,
+  parseBytes,
+  parseFragment,
+  parseStream,
+  tokenizeStream
+} from "../../dist/mod.js";
 
 function createByteStream(byteChunks) {
   const streamFactory = globalThis.ReadableStream;
@@ -17,6 +26,27 @@ function createByteStream(byteChunks) {
       controller.close();
     }
   });
+}
+
+function createPullCountStream(byteChunks, pullCounter) {
+  const streamFactory = globalThis.ReadableStream;
+  if (typeof streamFactory !== "function") {
+    throw new Error("ReadableStream is unavailable in this runtime");
+  }
+
+  let offset = 0;
+  return new streamFactory({
+    pull(controller) {
+      pullCounter.count += 1;
+      const value = byteChunks[offset];
+      offset += 1;
+      if (value === undefined) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(value);
+    }
+  }, { highWaterMark: 0 });
 }
 
 function asciiBytes(value) {
@@ -80,6 +110,46 @@ test("parseStream matches parseBytes across many deterministic chunks", async ()
   const fromBytes = parseBytes(bytes);
   const fromStream = await parseStream(createByteStream(chunks));
   assert.deepEqual(fromStream, fromBytes);
+});
+
+test("parseStream aborts before extra pulls when maxInputBytes is exceeded", async () => {
+  const pullCounter = { count: 0 };
+  const stream = createPullCountStream(
+    [new Uint8Array(4).fill(0x61), new Uint8Array(4).fill(0x62), new Uint8Array(4).fill(0x63)],
+    pullCounter
+  );
+
+  await assert.rejects(
+    parseStream(stream, { budgets: { maxInputBytes: 6, maxBufferedBytes: 64 } }),
+    (error) => {
+      assert.ok(error instanceof BudgetExceededError);
+      assert.equal(error.payload.budget, "maxInputBytes");
+      return true;
+    }
+  );
+
+  assert.equal(pullCounter.count, 2);
+});
+
+test("tokenizeStream yields deterministic token sequence", async () => {
+  const encoder = new TextEncoder();
+  const chunks = [encoder.encode("<p>"), encoder.encode("alpha"), encoder.encode("</p>")];
+
+  const collect = async () => {
+    const tokens = [];
+    for await (const token of tokenizeStream(createByteStream(chunks))) {
+      tokens.push(token);
+    }
+    return tokens;
+  };
+
+  const first = await collect();
+  const second = await collect();
+  assert.deepEqual(first, second);
+  assert.deepEqual(
+    first.map((entry) => entry.kind),
+    ["startTag", "chars", "endTag", "eof"]
+  );
 });
 
 test("outline and chunk stay deterministic", () => {

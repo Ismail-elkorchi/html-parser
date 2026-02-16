@@ -5,6 +5,7 @@
 - `parseBytes(bytes, options)`
 - `parseFragment(html, contextTagName, options)`
 - `parseStream(stream, options)`
+- `tokenizeStream(stream, options)`
 - `serialize(tree, options)`
 - `computePatch(originalHtml, edits)`
 - `applyPatchPlan(originalHtml, plan)`
@@ -34,6 +35,14 @@
 - `chunk.maxChars`: `8192`
 - `chunk.maxNodes`: `256`
 - `chunk.maxBytes`: unlimited
+
+`tokenizeStream` yields token kinds:
+- `startTag`
+- `endTag`
+- `chars`
+- `comment`
+- `doctype`
+- `eof`
 
 `parseBytes` decoding order:
 1) BOM detection

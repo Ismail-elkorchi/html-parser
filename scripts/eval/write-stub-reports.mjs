@@ -39,6 +39,27 @@ function makeReadableByteStream(chunkList) {
   });
 }
 
+function makePullCountStream(chunkList, pullCounter) {
+  const streamFactory = globalThis.ReadableStream;
+  if (typeof streamFactory !== "function") {
+    throw new Error("ReadableStream is not available in this runtime");
+  }
+
+  let offset = 0;
+  return new streamFactory({
+    pull(controller) {
+      pullCounter.count += 1;
+      const chunkValue = chunkList[offset];
+      offset += 1;
+      if (chunkValue === undefined) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(chunkValue);
+    }
+  }, { highWaterMark: 0 });
+}
+
 function headingTree() {
   const tree = {
     id: 100,
@@ -243,6 +264,27 @@ async function writeStream() {
     ok: observedBudget === "maxBufferedBytes" && observedActual === 17,
     observed: { budget: observedBudget, actual: observedActual },
     expected: { budget: "maxBufferedBytes", actual: 17 }
+  });
+
+  const pullCounter = { count: 0 };
+  const inputBudgetChunks = [new Uint8Array(4).fill(0x61), new Uint8Array(4).fill(0x62), new Uint8Array(4).fill(0x63)];
+  let inputBudgetError = "none";
+  try {
+    await parseStream(
+      makePullCountStream(inputBudgetChunks, pullCounter),
+      { budgets: { maxInputBytes: 6, maxBufferedBytes: 64 } }
+    );
+  } catch (error) {
+    if (error instanceof BudgetExceededError) {
+      inputBudgetError = error.payload.budget;
+    }
+  }
+
+  checks.push({
+    id: "stream-max-input-bytes-aborts-before-extra-pulls",
+    ok: inputBudgetError === "maxInputBytes" && pullCounter.count === 2,
+    observed: { budget: inputBudgetError, pulls: pullCounter.count },
+    expected: { budget: "maxInputBytes", pulls: 2 }
   });
 
   await writeJson("reports/stream.json", {
