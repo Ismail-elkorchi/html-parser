@@ -87,6 +87,10 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-054`: script exclusion with trailing `noscript` fallback paragraph.
 - `case-055`: template subtree exclusion with body-only visibility.
 - `case-056`: inline SVG + MathML token adjacency before paragraph boundaries.
+- `case-057`: `head` metadata/link/canonical suppression with body text-only output.
+- `case-058`: linked image without `alt` does not emit placeholder text.
+- `case-059`: `aria-hidden=\"true\"` suppression for foreign-content icon subtrees.
+- `case-060`: `head` preload/script suppression plus hidden-input exclusion with visible input value.
 
 ## Determinism
 For identical input trees and options:
