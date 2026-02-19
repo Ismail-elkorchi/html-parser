@@ -49,6 +49,10 @@ function parseProfileArg() {
 
 async function main() {
   const profile = parseProfileArg();
+  const config = (await fileExists("evaluation.config.json"))
+    ? await readJson("evaluation.config.json")
+    : null;
+  const profilePolicy = config?.profiles?.[profile] || {};
 
   const steps = [
     ["clean-reports", process.execPath, ["scripts/eval/clean-reports.mjs"]],
@@ -73,7 +77,12 @@ async function main() {
   if (profile === "release") {
     steps.push(["browser-diff", "npm", ["run", "test:browser-diff"]]);
     steps.push(["fuzz", "npm", ["run", "test:fuzz"]]);
-    steps.push(["bench", "npm", ["run", "test:bench"]]);
+    if (profilePolicy.requireBenchStability) {
+      const runCount = Number(profilePolicy.benchStabilityRuns ?? 9);
+      steps.push(["bench-stability", "npm", ["run", "test:bench:stability", "--", `--runs=${String(runCount)}`]]);
+    } else {
+      steps.push(["bench", "npm", ["run", "test:bench"]]);
+    }
   }
 
   steps.push(["gates", process.execPath, ["scripts/eval/check-gates.mjs", `--profile=${profile}`]]);

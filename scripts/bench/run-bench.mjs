@@ -9,19 +9,35 @@ const LARGE_SAMPLE = "<section><article><h2>x</h2><p>payload</p></article></sect
 function runBenchmark(benchmarkName, htmlSource, iterations) {
   parse(htmlSource);
 
-  const startMem = process.memoryUsage().heapUsed;
+  if (typeof globalThis.gc === "function") {
+    globalThis.gc();
+  }
+
+  const startHeapUsed = process.memoryUsage().heapUsed;
+  let peakHeapUsed = startHeapUsed;
   const started = performance.now();
   for (let iterationIndex = 0; iterationIndex < iterations; iterationIndex += 1) {
     parse(htmlSource);
+    const heapUsed = process.memoryUsage().heapUsed;
+    if (heapUsed > peakHeapUsed) {
+      peakHeapUsed = heapUsed;
+    }
   }
   const elapsedMs = performance.now() - started;
-  const endMem = process.memoryUsage().heapUsed;
+
+  if (typeof globalThis.gc === "function") {
+    globalThis.gc();
+  }
+  const retainedHeapUsed = process.memoryUsage().heapUsed;
 
   const totalBytes = htmlSource.length * iterations;
   const totalMB = totalBytes / (1024 * 1024);
   const seconds = elapsedMs / 1000;
   const mbPerSec = seconds > 0 ? totalMB / seconds : 0;
-  const memoryMB = Math.max(0, endMem - startMem) / (1024 * 1024);
+  const memoryMB = retainedHeapUsed / (1024 * 1024);
+  const memoryBaselineMB = startHeapUsed / (1024 * 1024);
+  const memoryPeakMB = peakHeapUsed / (1024 * 1024);
+  const memoryRetainedMB = retainedHeapUsed / (1024 * 1024);
 
   return {
     name: benchmarkName,
@@ -29,7 +45,11 @@ function runBenchmark(benchmarkName, htmlSource, iterations) {
     iterations,
     elapsedMs: Number(elapsedMs.toFixed(3)),
     mbPerSec: Number(mbPerSec.toFixed(3)),
-    memoryMB: Number(memoryMB.toFixed(3))
+    memoryMB: Number(memoryMB.toFixed(3)),
+    memoryBaselineMB: Number(memoryBaselineMB.toFixed(3)),
+    memoryPeakMB: Number(memoryPeakMB.toFixed(3)),
+    memoryRetainedMB: Number(memoryRetainedMB.toFixed(3)),
+    memoryMethod: "postGcHeapUsed"
   };
 }
 

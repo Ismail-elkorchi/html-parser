@@ -280,6 +280,23 @@ Evidence:
 
 ---
 
+### G-115: Performance stability evidence
+Requirement:
+- If profile requires benchmark stability (`requireBenchStability=true`):
+  - `reports/bench-stability.json` must exist.
+  - `runs` must be >= `benchStabilityRuns`.
+  - Per benchmark:
+    - throughput `robustSpreadFraction` must be <= `thresholds.performanceStability.maxThroughputRobustSpreadFraction`
+    - memory `robustSpreadFraction` must be <= `thresholds.performanceStability.maxMemoryRobustSpreadFraction`
+    - throughput median ratio (vs `performanceBaseline`) must be >= `thresholds.performanceStability.minThroughputMedianRatio`
+    - memory median ratio (vs `performanceBaseline`) must be <= `thresholds.performanceStability.maxMemoryMedianRatio`
+
+Evidence:
+- `reports/bench-stability.json`
+- `reports/gates.json` gate `G-115`
+
+---
+
 ### G-120: Documentation + dataset hygiene
 Requirement:
 - Required files exist:
@@ -369,6 +386,7 @@ Requirement:
   - `robustness` weight > 0 requires `requireBudgetsReport=true`
     - fuzz contribution policy must match scoring policy (`robustnessUsesFuzz === requireFuzzReport`)
   - `performance` weight > 0 requires `requireBenchReport=true`
+    - and when enabled, `requireBenchStability=true` must have passing `G-115`
   - `browserDiff` weight > 0 requires `requireBrowserDiff=true`
 
 Evidence:

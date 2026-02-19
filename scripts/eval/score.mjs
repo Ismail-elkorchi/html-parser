@@ -67,6 +67,26 @@ function resolveWeights(config, profile) {
   };
 }
 
+function performanceRatiosFromBenchmarkEntries(benchmarkEntries, baseline) {
+  const ratios = [];
+
+  for (const benchmarkEntry of benchmarkEntries) {
+    const baselineEntry = baseline[benchmarkEntry.name];
+    if (!baselineEntry) continue;
+
+    const throughputMbPerSec = Number(benchmarkEntry.mbPerSec || 0);
+    const memoryMb = Number(benchmarkEntry.memoryMB || 0);
+    const baselineThroughputMbPerSec = Number(baselineEntry.mbPerSec || 0);
+    const baselineMemoryMb = Number(baselineEntry.memoryMB || 0);
+
+    const throughputRatio = safeDiv(throughputMbPerSec, baselineThroughputMbPerSec);
+    const memoryRatio = safeDiv(baselineMemoryMb, memoryMb);
+    ratios.push(geometricMean([throughputRatio, memoryRatio]));
+  }
+
+  return ratios;
+}
+
 async function main() {
   const profile = parseProfileArg();
 
@@ -155,26 +175,29 @@ async function main() {
   let performanceScore = 0;
   let performanceDetail = { skippedByWeight: perfPoints === 0 };
   if (perfPoints > 0) {
+    const baseline = config.performanceBaseline?.benchmarks || {};
     const bench = await loadOptional("reports/bench.json");
+    const benchStability = await loadOptional("reports/bench-stability.json");
+    const requireBenchStability = Boolean(profilePolicy.requireBenchStability);
     performanceDetail = { missing: true };
-    if (bench) {
-      const baseline = config.performanceBaseline?.benchmarks || {};
-      const ratios = [];
+    let benchmarkEntries = [];
+    let source = "bench.single";
+    let runs = null;
 
-      for (const benchmarkEntry of bench.benchmarks || []) {
-        const baselineEntry = baseline[benchmarkEntry.name];
-        if (!baselineEntry) continue;
+    if (requireBenchStability && benchStability) {
+      source = "bench-stability.median";
+      runs = Number(benchStability.runs ?? 0);
+      benchmarkEntries = Object.entries(benchStability.benchmarks || {}).map(([name, entry]) => ({
+        name,
+        mbPerSec: Number(entry?.mbPerSec?.median ?? 0),
+        memoryMB: Number(entry?.memoryMB?.median ?? 0)
+      }));
+    } else if (!requireBenchStability && bench) {
+      benchmarkEntries = bench.benchmarks || [];
+    }
 
-        const throughputMbPerSec = Number(benchmarkEntry.mbPerSec || 0);
-        const memoryMb = Number(benchmarkEntry.memoryMB || 0);
-        const baselineThroughputMbPerSec = Number(baselineEntry.mbPerSec || 0);
-        const baselineMemoryMb = Number(baselineEntry.memoryMB || 0);
-
-        const throughputRatio = safeDiv(throughputMbPerSec, baselineThroughputMbPerSec);
-        const memoryRatio = safeDiv(baselineMemoryMb, memoryMb);
-
-        ratios.push(geometricMean([throughputRatio, memoryRatio]));
-      }
+    if (benchmarkEntries.length > 0) {
+      const ratios = performanceRatiosFromBenchmarkEntries(benchmarkEntries, baseline);
 
       const aggregatePerformanceRatio = config.scoring?.performanceAggregation === "geometricMean"
         ? geometricMean(ratios)
@@ -182,7 +205,12 @@ async function main() {
 
       const boundedPerformanceRatio = Math.max(0, Math.min(1, aggregatePerformanceRatio));
       performanceScore = weighted(perfPoints, boundedPerformanceRatio);
-      performanceDetail = { benchmarksCompared: ratios.length, ratio: aggregatePerformanceRatio };
+      performanceDetail = {
+        source,
+        ...(runs !== null ? { runs } : {}),
+        benchmarksCompared: ratios.length,
+        ratio: aggregatePerformanceRatio
+      };
     }
   }
 

@@ -25,6 +25,7 @@ Naming:
 - ADR-019-... text hygiene gate for hidden Unicode control characters
 - ADR-020-... doc policy coherence gate for naming and log labels
 - ADR-021-... doc TypeScript snippet compilation gate
+- ADR-022-... performance stability baseline calibration and release gate
 
 Minimum sections:
 - Context
