@@ -502,6 +502,96 @@ async function main() {
   const pack = await loadOptionalReport("reports/pack.json");
   gates.push(makeGate("G-110", "Packaging sanity", Boolean(pack?.ok), pack || { missing: true }));
 
+  const requireBenchStability = Boolean(profilePolicy.requireBenchStability);
+  const benchStabilityReport = await loadOptionalReport("reports/bench-stability.json");
+  const benchmarkStabilityThresholds = config.thresholds?.performanceStability || {};
+  const benchmarkBaseline = config.performanceBaseline?.benchmarks || {};
+  const minBenchStabilityRuns = Number(profilePolicy.benchStabilityRuns ?? 9);
+
+  let benchStabilityPass = true;
+  const benchStabilityDetails = {
+    required: requireBenchStability,
+    minRuns: minBenchStabilityRuns,
+    thresholds: benchmarkStabilityThresholds,
+    report: benchStabilityReport || { missing: true },
+    failures: []
+  };
+
+  if (requireBenchStability) {
+    if (!benchStabilityReport) {
+      benchStabilityPass = false;
+      benchStabilityDetails.failures.push("Missing reports/bench-stability.json");
+    } else {
+      const runCount = Number(benchStabilityReport.runs ?? 0);
+      if (runCount < minBenchStabilityRuns) {
+        benchStabilityPass = false;
+        benchStabilityDetails.failures.push(
+          `bench-stability runs ${String(runCount)} < required ${String(minBenchStabilityRuns)}`
+        );
+      }
+
+      const stabilityEntries = Object.entries(benchStabilityReport.benchmarks || {});
+      if (stabilityEntries.length === 0) {
+        benchStabilityPass = false;
+        benchStabilityDetails.failures.push("bench-stability report has no benchmarks");
+      }
+
+      for (const [benchmarkName, benchmarkEntry] of stabilityEntries) {
+        const throughputSpread = Number(benchmarkEntry?.mbPerSec?.robustSpreadFraction ?? Number.POSITIVE_INFINITY);
+        const memorySpread = Number(benchmarkEntry?.memoryMB?.robustSpreadFraction ?? Number.POSITIVE_INFINITY);
+        const throughputMedian = Number(benchmarkEntry?.mbPerSec?.median ?? 0);
+        const memoryMedian = Number(benchmarkEntry?.memoryMB?.median ?? Number.POSITIVE_INFINITY);
+        const baselineEntry = benchmarkBaseline?.[benchmarkName] || {};
+        const baselineThroughput = Number(baselineEntry?.mbPerSec ?? 0);
+        const baselineMemory = Number(baselineEntry?.memoryMB ?? 0);
+        const throughputMedianRatio = baselineThroughput > 0 ? throughputMedian / baselineThroughput : Number.NaN;
+        const memoryMedianRatio = baselineMemory > 0 ? memoryMedian / baselineMemory : Number.NaN;
+        const maxThroughputSpreadFraction = Number(
+          benchmarkStabilityThresholds.maxThroughputRobustSpreadFraction ?? Number.POSITIVE_INFINITY
+        );
+        const maxMemorySpreadFraction = Number(
+          benchmarkStabilityThresholds.maxMemoryRobustSpreadFraction ?? Number.POSITIVE_INFINITY
+        );
+        const minThroughputMedianRatio = Number(
+          benchmarkStabilityThresholds.minThroughputMedianRatio ?? 0
+        );
+        const maxMemoryMedianRatio = Number(
+          benchmarkStabilityThresholds.maxMemoryMedianRatio ?? Number.POSITIVE_INFINITY
+        );
+
+        if (throughputSpread > maxThroughputSpreadFraction) {
+          benchStabilityPass = false;
+          benchStabilityDetails.failures.push(
+            `${benchmarkName} throughput robustSpreadFraction ${throughputSpread.toFixed(6)} > ${maxThroughputSpreadFraction}`
+          );
+        }
+
+        if (memorySpread > maxMemorySpreadFraction) {
+          benchStabilityPass = false;
+          benchStabilityDetails.failures.push(
+            `${benchmarkName} memory robustSpreadFraction ${memorySpread.toFixed(6)} > ${maxMemorySpreadFraction}`
+          );
+        }
+
+        if (!Number.isFinite(throughputMedianRatio) || throughputMedianRatio < minThroughputMedianRatio) {
+          benchStabilityPass = false;
+          benchStabilityDetails.failures.push(
+            `${benchmarkName} throughput median ratio ${Number.isFinite(throughputMedianRatio) ? throughputMedianRatio.toFixed(6) : "NaN"} < ${minThroughputMedianRatio}`
+          );
+        }
+
+        if (!Number.isFinite(memoryMedianRatio) || memoryMedianRatio > maxMemoryMedianRatio) {
+          benchStabilityPass = false;
+          benchStabilityDetails.failures.push(
+            `${benchmarkName} memory median ratio ${Number.isFinite(memoryMedianRatio) ? memoryMedianRatio.toFixed(6) : "NaN"} > ${maxMemoryMedianRatio}`
+          );
+        }
+      }
+    }
+  }
+
+  gates.push(makeGate("G-115", "Performance stability evidence", benchStabilityPass, benchStabilityDetails));
+
   const docs = await loadOptionalReport("reports/docs.json");
   gates.push(makeGate("G-120", "Docs and dataset hygiene", Boolean(docs?.ok), docs || { missing: true }));
 
@@ -595,8 +685,13 @@ async function main() {
 
   checkScoreCoherence(
     "performance",
-    "requireBenchReport",
-    Boolean(profilePolicy.requireBenchReport)
+    "requireBenchReport (+ bench-stability policy)",
+    Boolean(profilePolicy.requireBenchReport) && (!requireBenchStability || benchStabilityPass),
+    {
+      requireBenchReport: Boolean(profilePolicy.requireBenchReport),
+      requireBenchStability,
+      benchStabilityPass
+    }
   );
   checkScoreCoherence(
     "browserDiff",

@@ -319,6 +319,65 @@ Shape:
   "findings": []
 }
 
+## Benchmark reports
+Files:
+- reports/bench.json
+- reports/bench-stability.json
+
+Shape (`reports/bench.json`):
+{
+  "suite": "bench",
+  "timestamp": "...",
+  "benchmarks": [
+    {
+      "name": "parse-medium",
+      "inputBytes": 17400,
+      "iterations": 400,
+      "elapsedMs": 0,
+      "mbPerSec": 0,
+      "memoryMB": 0,
+      "memoryMethod": "postGcHeapUsed"
+    }
+  ]
+}
+
+Shape (`reports/bench-stability.json`):
+{
+  "suite": "bench-stability",
+  "timestamp": "...",
+  "runs": 9,
+  "warmupsPerRun": 1,
+  "runIsolation": "subprocess-per-run",
+  "benchmarks": {
+    "parse-medium": {
+      "mbPerSec": {
+        "values": [0],
+        "min": 0,
+        "max": 0,
+        "median": 0,
+        "p10": 0,
+        "p90": 0,
+        "spreadFraction": 0,
+        "robustSpreadFraction": 0
+      },
+      "memoryMB": {
+        "values": [0],
+        "min": 0,
+        "max": 0,
+        "median": 0,
+        "p10": 0,
+        "p90": 0,
+        "spreadFraction": 0,
+        "robustSpreadFraction": 0
+      }
+    }
+  }
+}
+
+Rules:
+- When `requireBenchStability=true` for a profile, release scoring uses `bench-stability` medians.
+- `reports/gates.json` gate `G-115` validates spread and median-ratio thresholds.
+
 ## Agent feature report
 File:
 - reports/agent.json
@@ -360,9 +419,9 @@ Shape:
   "weightsUsed": {
     "source": "profiles.ci.weights",
     "values": {
-      "correctness": 50,
+      "correctness": 70,
       "browserDiff": 0,
-      "performance": 20,
+      "performance": 0,
       "robustness": 10,
       "agentFirst": 15,
       "packagingTrust": 5
@@ -384,6 +443,9 @@ Rules:
 - `weightsUsed.source` must identify which weight set was applied for the active profile.
 - `weightsUsed.total` must be exactly `100`.
 - When a component weight is `0`, that component score is fixed at `0` and does not depend on report presence.
+- `breakdown.performance.details.source` indicates whether scoring used:
+  - `bench.single`
+  - `bench-stability.median`
 
 ## Packaging report
 File:
