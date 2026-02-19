@@ -24,6 +24,8 @@ Input:
   - `script`
   - `style`
   - `template`
+- `noscript` fallback handling:
+  - when `noscript` is parsed as a single raw-text node containing markup, the raw text is reparsed as a fragment and extracted with the same visible-text rules.
 - Subtrees are skipped when:
   - the element has `hidden`
   - the element has `aria-hidden="true"` (also accepts empty and `"1"` as true)
@@ -91,6 +93,9 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-058`: linked image without `alt` does not emit placeholder text.
 - `case-059`: `aria-hidden=\"true\"` suppression for foreign-content icon subtrees.
 - `case-060`: `head` preload/script suppression plus hidden-input exclusion with visible input value.
+- `case-061`: challenge-page style `noscript` fallback markup extraction.
+- `case-062`: `noscript` raw markup reparse with nested `style` suppression.
+- `case-063`: `noscript` raw markup reparse preserving `&lt;br&gt;`, table row, and cell boundaries.
 
 ## Determinism
 For identical input trees and options:
