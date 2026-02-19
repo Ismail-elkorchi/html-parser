@@ -1071,6 +1071,37 @@ function appendVisibleText(parts: string[], value: string): void {
   parts.push(value);
 }
 
+function collectNoscriptRawMarkup(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  parts: string[],
+  options: Required<VisibleTextOptions>,
+  preserveWhitespace: boolean
+): boolean {
+  if (node.tagName.toLowerCase() !== "noscript") {
+    return false;
+  }
+
+  if (node.children.length !== 1) {
+    return false;
+  }
+
+  const onlyChild = node.children[0];
+  if (!onlyChild || onlyChild.kind !== "text") {
+    return false;
+  }
+
+  const rawMarkup = onlyChild.value;
+  if (!rawMarkup.includes("<") || !rawMarkup.includes(">")) {
+    return false;
+  }
+
+  const fallbackFragment = parseFragment(rawMarkup, "body");
+  for (const child of fallbackFragment.children) {
+    collectVisibleTextFromNode(child, parts, options, preserveWhitespace);
+  }
+  return true;
+}
+
 function collectVisibleTextFromNode(
   node: HtmlNode,
   parts: string[],
@@ -1092,6 +1123,10 @@ function collectVisibleTextFromNode(
 
   const tagName = node.tagName.toLowerCase();
   if (VISIBLE_TEXT_SKIP_TAGS.has(tagName)) {
+    return;
+  }
+
+  if (collectNoscriptRawMarkup(node, parts, options, preserveWhitespace)) {
     return;
   }
 
