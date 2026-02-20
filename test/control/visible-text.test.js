@@ -73,3 +73,30 @@ test("budget errors remain structured on pathological depth input", () => {
   assert.equal(typeof observed.actual, "number");
   assert.ok(observed.actual > observed.limit);
 });
+
+test("visibleText optional accessible-name fallback is opt-in", () => {
+  const html = [
+    "<main>",
+    "<a href=\"/docs\" aria-label=\"Docs\"></a> ",
+    "<button title=\"Run\"></button> ",
+    "<input type=\"button\" aria-label=\"Submit\">",
+    "</main>"
+  ].join("");
+
+  const parsed = parse(html);
+  const baseline = visibleText(parsed);
+  const variant = visibleText(parsed, {
+    includeAccessibleNameFallback: true
+  });
+
+  assert.equal(baseline, "");
+  assert.equal(variant, "Docs Run Submit");
+});
+
+test("accessible-name fallback uses aria-label before title", () => {
+  const parsed = parse("<a href=\"/x\" aria-label=\"Primary\" title=\"Secondary\"></a>");
+  const value = visibleText(parsed, {
+    includeAccessibleNameFallback: true
+  });
+  assert.equal(value, "Primary");
+});

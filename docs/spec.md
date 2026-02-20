@@ -46,6 +46,7 @@
 - `chunk.maxBytes`: unlimited
 - `visibleText.skipHiddenSubtrees`: `true`
 - `visibleText.includeControlValues`: `true`
+- `visibleText.includeAccessibleNameFallback`: `false`
 - `visibleText.trim`: `true`
 
 `tokenizeStream` yields token kinds:

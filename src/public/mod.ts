@@ -998,9 +998,16 @@ const VISIBLE_TEXT_BLOCK_BREAK_TAGS = new Set([
   "ul"
 ]);
 
+const VISIBLE_TEXT_ACCESSIBLE_NAME_TAGS = new Set([
+  "a",
+  "button",
+  "input"
+]);
+
 const DEFAULT_VISIBLE_TEXT_OPTIONS: Required<VisibleTextOptions> = Object.freeze({
   skipHiddenSubtrees: true,
   includeControlValues: true,
+  includeAccessibleNameFallback: false,
   trim: true
 });
 
@@ -1049,6 +1056,33 @@ function shouldSkipHiddenSubtree(
     return true;
   }
   return normalizeBooleanAttribute(attributeValue(node, "aria-hidden"));
+}
+
+function nonEmptyAttributeValue(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  name: string
+): string | undefined {
+  const value = attributeValue(node, name);
+  if (value === undefined) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function accessibleNameFallback(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  options: Required<VisibleTextOptions>
+): string | undefined {
+  if (!options.includeAccessibleNameFallback) {
+    return undefined;
+  }
+  const tagName = node.tagName.toLowerCase();
+  if (!VISIBLE_TEXT_ACCESSIBLE_NAME_TAGS.has(tagName)) {
+    return undefined;
+  }
+
+  return nonEmptyAttributeValue(node, "aria-label") ?? nonEmptyAttributeValue(node, "title");
 }
 
 function normalizeVisibleTextOutput(value: string, options: Required<VisibleTextOptions>): string {
@@ -1122,6 +1156,7 @@ function collectVisibleTextFromNode(
   }
 
   const tagName = node.tagName.toLowerCase();
+  const fallbackName = accessibleNameFallback(node, options);
   if (VISIBLE_TEXT_SKIP_TAGS.has(tagName)) {
     return;
   }
@@ -1149,6 +1184,10 @@ function collectVisibleTextFromNode(
       const value = attributeValue(node, "value");
       if (value && value.length > 0) {
         appendVisibleText(parts, normalizeVisibleTextSegment(value, false));
+        return;
+      }
+      if (fallbackName) {
+        appendVisibleText(parts, normalizeVisibleTextSegment(fallbackName, false));
       }
     }
     return;
@@ -1161,6 +1200,11 @@ function collectVisibleTextFromNode(
       return;
     }
   }
+
+  const fallbackPartCountBefore =
+    fallbackName && (tagName === "a" || tagName === "button")
+      ? parts.length
+      : null;
 
   if (tagName === "tr") {
     appendVisibleText(parts, "\n");
@@ -1197,6 +1241,10 @@ function collectVisibleTextFromNode(
   }
   for (const child of node.children) {
     collectVisibleTextFromNode(child, parts, options, childPreserveWhitespace);
+  }
+  if (fallbackPartCountBefore !== null && parts.length === fallbackPartCountBefore) {
+    appendVisibleText(parts, normalizeVisibleTextSegment(fallbackName ?? "", false));
+    return;
   }
   if (tagName === "p") {
     appendVisibleText(parts, "\n\n");
