@@ -33,7 +33,10 @@ import type {
   TokenizeStreamOptions,
   TraceEvent,
   VisibleTextOptions,
-  VisibleTextToken
+  VisibleTextToken,
+  VisibleTextTokenSourceNodeKind,
+  VisibleTextTokenSourceRole,
+  VisibleTextTokenWithProvenance
 } from "./types.js";
 
 export type {
@@ -75,7 +78,10 @@ export type {
   TextNode,
   TraceEvent,
   VisibleTextOptions,
-  VisibleTextToken
+  VisibleTextToken,
+  VisibleTextTokenSourceNodeKind,
+  VisibleTextTokenSourceRole,
+  VisibleTextTokenWithProvenance
 } from "./types.js";
 
 const VOID_ELEMENTS = new Set([
@@ -1095,18 +1101,70 @@ function normalizeVisibleTextOutput(value: string, options: Required<VisibleText
   return output;
 }
 
-function appendVisibleText(parts: string[], value: string): void {
+interface VisibleTextSourceMeta {
+  readonly sourceNodeId: NodeId | null;
+  readonly sourceNodeKind: VisibleTextTokenSourceNodeKind;
+  readonly sourceRole: VisibleTextTokenSourceRole;
+}
+
+interface VisibleTextSourceChunk extends VisibleTextSourceMeta {
+  readonly value: string;
+}
+
+interface VisibleTextSourceChar extends VisibleTextSourceMeta {
+  readonly char: string;
+}
+
+const DEFAULT_VISIBLE_TEXT_SOURCE: VisibleTextSourceMeta = Object.freeze({
+  sourceNodeId: null,
+  sourceNodeKind: "document",
+  sourceRole: "text-node"
+});
+
+function sourceMetaFromNode(
+  node: HtmlNode | DocumentTree | FragmentTree,
+  sourceRole: VisibleTextTokenSourceRole
+): VisibleTextSourceMeta {
+  if (node.kind === "document" || node.kind === "fragment") {
+    return {
+      sourceNodeId: node.id,
+      sourceNodeKind: node.kind,
+      sourceRole
+    };
+  }
+  return {
+    sourceNodeId: node.id,
+    sourceNodeKind: node.kind,
+    sourceRole
+  };
+}
+
+function appendVisibleText(
+  parts: string[],
+  value: string,
+  sourceChunks?: VisibleTextSourceChunk[],
+  sourceMeta: VisibleTextSourceMeta = DEFAULT_VISIBLE_TEXT_SOURCE
+): void {
   if (value.length === 0) {
     return;
   }
   parts.push(value);
+  if (sourceChunks) {
+    sourceChunks.push({
+      value,
+      sourceNodeId: sourceMeta.sourceNodeId,
+      sourceNodeKind: sourceMeta.sourceNodeKind,
+      sourceRole: sourceMeta.sourceRole
+    });
+  }
 }
 
 function collectNoscriptRawMarkup(
   node: Extract<HtmlNode, { kind: "element" }>,
   parts: string[],
   options: Required<VisibleTextOptions>,
-  preserveWhitespace: boolean
+  preserveWhitespace: boolean,
+  sourceChunks?: VisibleTextSourceChunk[]
 ): boolean {
   if (node.tagName.toLowerCase() !== "noscript") {
     return false;
@@ -1128,7 +1186,7 @@ function collectNoscriptRawMarkup(
 
   const fallbackFragment = parseFragment(rawMarkup, "body");
   for (const child of fallbackFragment.children) {
-    collectVisibleTextFromNode(child, parts, options, preserveWhitespace);
+    collectVisibleTextFromNode(child, parts, options, preserveWhitespace, sourceChunks, "noscript-fallback");
   }
   return true;
 }
@@ -1137,10 +1195,17 @@ function collectVisibleTextFromNode(
   node: HtmlNode,
   parts: string[],
   options: Required<VisibleTextOptions>,
-  preserveWhitespace: boolean
+  preserveWhitespace: boolean,
+  sourceChunks?: VisibleTextSourceChunk[],
+  sourceRoleOverride: VisibleTextTokenSourceRole | null = null
 ): void {
   if (node.kind === "text") {
-    appendVisibleText(parts, normalizeVisibleTextSegment(node.value, preserveWhitespace));
+    appendVisibleText(
+      parts,
+      normalizeVisibleTextSegment(node.value, preserveWhitespace),
+      sourceChunks,
+      sourceMetaFromNode(node, sourceRoleOverride ?? "text-node")
+    );
     return;
   }
 
@@ -1158,19 +1223,24 @@ function collectVisibleTextFromNode(
     return;
   }
 
-  if (collectNoscriptRawMarkup(node, parts, options, preserveWhitespace)) {
+  if (collectNoscriptRawMarkup(node, parts, options, preserveWhitespace, sourceChunks)) {
     return;
   }
 
   if (tagName === "br") {
-    appendVisibleText(parts, "\n");
+    appendVisibleText(parts, "\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
     return;
   }
 
   if (tagName === "img" && options.includeControlValues) {
     const alt = attributeValue(node, "alt");
     if (alt && alt.length > 0) {
-      appendVisibleText(parts, normalizeVisibleTextSegment(alt, false));
+      appendVisibleText(
+        parts,
+        normalizeVisibleTextSegment(alt, false),
+        sourceChunks,
+        sourceMetaFromNode(node, sourceRoleOverride ?? "img-alt")
+      );
     }
     return;
   }
@@ -1180,11 +1250,21 @@ function collectVisibleTextFromNode(
     if (type !== "hidden") {
       const value = attributeValue(node, "value");
       if (value && value.length > 0) {
-        appendVisibleText(parts, normalizeVisibleTextSegment(value, false));
+        appendVisibleText(
+          parts,
+          normalizeVisibleTextSegment(value, false),
+          sourceChunks,
+          sourceMetaFromNode(node, sourceRoleOverride ?? "input-value")
+        );
         return;
       }
       if (fallbackName) {
-        appendVisibleText(parts, normalizeVisibleTextSegment(fallbackName, false));
+        appendVisibleText(
+          parts,
+          normalizeVisibleTextSegment(fallbackName, false),
+          sourceChunks,
+          sourceMetaFromNode(node, sourceRoleOverride ?? "input-aria-label")
+        );
       }
     }
     return;
@@ -1193,35 +1273,40 @@ function collectVisibleTextFromNode(
   if (tagName === "button" && options.includeControlValues) {
     const value = attributeValue(node, "value");
     if (value && value.length > 0) {
-      appendVisibleText(parts, normalizeVisibleTextSegment(value, false));
+      appendVisibleText(
+        parts,
+        normalizeVisibleTextSegment(value, false),
+        sourceChunks,
+        sourceMetaFromNode(node, sourceRoleOverride ?? "button-value")
+      );
       return;
     }
   }
 
   if (tagName === "tr") {
-    appendVisibleText(parts, "\n");
+    appendVisibleText(parts, "\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
     let seenTableCell = false;
     for (const child of node.children) {
       if (child.kind === "element") {
         const childTagName = child.tagName.toLowerCase();
         if (childTagName === "td" || childTagName === "th") {
           if (seenTableCell) {
-            appendVisibleText(parts, "\t");
+            appendVisibleText(parts, "\t", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
           }
-          collectVisibleTextFromNode(child, parts, options, preserveWhitespace);
+          collectVisibleTextFromNode(child, parts, options, preserveWhitespace, sourceChunks, sourceRoleOverride);
           seenTableCell = true;
           continue;
         }
       }
-      collectVisibleTextFromNode(child, parts, options, preserveWhitespace);
+      collectVisibleTextFromNode(child, parts, options, preserveWhitespace, sourceChunks, sourceRoleOverride);
     }
-    appendVisibleText(parts, "\n");
+    appendVisibleText(parts, "\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
     return;
   }
 
   if (tagName === "td" || tagName === "th") {
     for (const child of node.children) {
-      collectVisibleTextFromNode(child, parts, options, preserveWhitespace);
+      collectVisibleTextFromNode(child, parts, options, preserveWhitespace, sourceChunks, sourceRoleOverride);
     }
     return;
   }
@@ -1229,17 +1314,17 @@ function collectVisibleTextFromNode(
   const childPreserveWhitespace = preserveWhitespace || tagName === "pre" || tagName === "textarea";
   const blockBreakBefore = tagName === "p" || VISIBLE_TEXT_BLOCK_BREAK_TAGS.has(tagName);
   if (blockBreakBefore) {
-    appendVisibleText(parts, "\n");
+    appendVisibleText(parts, "\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
   }
   for (const child of node.children) {
-    collectVisibleTextFromNode(child, parts, options, childPreserveWhitespace);
+    collectVisibleTextFromNode(child, parts, options, childPreserveWhitespace, sourceChunks, sourceRoleOverride);
   }
   if (tagName === "p") {
-    appendVisibleText(parts, "\n\n");
+    appendVisibleText(parts, "\n\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
     return;
   }
   if (blockBreakBefore) {
-    appendVisibleText(parts, "\n");
+    appendVisibleText(parts, "\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
   }
 }
 
@@ -1256,6 +1341,182 @@ function collectVisibleText(
     collectVisibleTextFromNode(nodeOrTree, parts, options, false);
   }
   return normalizeVisibleTextOutput(parts.join(""), options);
+}
+
+function collectVisibleTextWithSourceChunks(
+  nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
+  options: Required<VisibleTextOptions>
+): { readonly output: string; readonly sourceChunks: readonly VisibleTextSourceChunk[] } {
+  const parts: string[] = [];
+  const sourceChunks: VisibleTextSourceChunk[] = [];
+  if (nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment") {
+    for (const child of nodeOrTree.children) {
+      collectVisibleTextFromNode(child, parts, options, false, sourceChunks);
+    }
+  } else {
+    collectVisibleTextFromNode(nodeOrTree, parts, options, false, sourceChunks);
+  }
+  return {
+    output: normalizeVisibleTextOutput(parts.join(""), options),
+    sourceChunks
+  };
+}
+
+function sourceChunksToChars(chunks: readonly VisibleTextSourceChunk[]): VisibleTextSourceChar[] {
+  const chars: VisibleTextSourceChar[] = [];
+  for (const chunk of chunks) {
+    for (const char of chunk.value) {
+      chars.push({
+        char,
+        sourceNodeId: chunk.sourceNodeId,
+        sourceNodeKind: chunk.sourceNodeKind,
+        sourceRole: chunk.sourceRole
+      });
+    }
+  }
+  return chars;
+}
+
+function isSpaceTabFormFeed(char: string): boolean {
+  return char === " " || char === "\t" || char === "\f";
+}
+
+function collapseSourceChars(
+  chars: readonly VisibleTextSourceChar[],
+  predicate: (char: string) => boolean,
+  limit: number
+): VisibleTextSourceChar[] {
+  const result: VisibleTextSourceChar[] = [];
+  let runCount = 0;
+  for (const entry of chars) {
+    if (predicate(entry.char)) {
+      runCount += 1;
+      if (runCount <= limit) {
+        result.push(entry);
+      }
+      continue;
+    }
+    runCount = 0;
+    result.push(entry);
+  }
+  return result;
+}
+
+function normalizeSourceChars(
+  sourceChars: readonly VisibleTextSourceChar[],
+  options: Required<VisibleTextOptions>
+): VisibleTextSourceChar[] {
+  const removeSpaceBeforeNewline: VisibleTextSourceChar[] = [];
+  for (const entry of sourceChars) {
+    if (entry.char === "\n") {
+      while (
+        removeSpaceBeforeNewline.length > 0 &&
+        isSpaceTabFormFeed(removeSpaceBeforeNewline[removeSpaceBeforeNewline.length - 1]?.char ?? "")
+      ) {
+        removeSpaceBeforeNewline.pop();
+      }
+    }
+    removeSpaceBeforeNewline.push(entry);
+  }
+
+  const removeSpaceAfterNewline: VisibleTextSourceChar[] = [];
+  for (const entry of removeSpaceBeforeNewline) {
+    const previous = removeSpaceAfterNewline[removeSpaceAfterNewline.length - 1];
+    if (previous?.char === "\n" && isSpaceTabFormFeed(entry.char)) {
+      continue;
+    }
+    removeSpaceAfterNewline.push(entry);
+  }
+
+  const collapsedNewlines = collapseSourceChars(removeSpaceAfterNewline, (char) => char === "\n", 2);
+  const collapsedSpaces = collapseSourceChars(collapsedNewlines, (char) => char === " ", 1);
+  const collapsedTabs = collapseSourceChars(collapsedSpaces, (char) => char === "\t", 1);
+
+  if (!options.trim || collapsedTabs.length === 0) {
+    return collapsedTabs;
+  }
+
+  let start = 0;
+  let end = collapsedTabs.length;
+  while (start < end && /\s/.test(collapsedTabs[start]?.char ?? "")) {
+    start += 1;
+  }
+  while (end > start && /\s/.test(collapsedTabs[end - 1]?.char ?? "")) {
+    end -= 1;
+  }
+  return collapsedTabs.slice(start, end);
+}
+
+function sameSource(
+  left: VisibleTextSourceChar,
+  right: VisibleTextSourceChar
+): boolean {
+  return left.sourceNodeId === right.sourceNodeId
+    && left.sourceNodeKind === right.sourceNodeKind
+    && left.sourceRole === right.sourceRole;
+}
+
+function provenanceToken(
+  kind: VisibleTextTokenWithProvenance["kind"],
+  value: string,
+  source: VisibleTextSourceChar
+): VisibleTextTokenWithProvenance {
+  return Object.freeze({
+    kind,
+    value,
+    sourceNodeId: source.sourceNodeId,
+    sourceNodeKind: source.sourceNodeKind,
+    sourceRole: source.sourceRole
+  }) as VisibleTextTokenWithProvenance;
+}
+
+function tokenizeVisibleTextWithSourceChars(
+  chars: readonly VisibleTextSourceChar[]
+): readonly VisibleTextTokenWithProvenance[] {
+  const tokens: VisibleTextTokenWithProvenance[] = [];
+  let cursor = 0;
+
+  while (cursor < chars.length) {
+    const current = chars[cursor];
+    if (!current) {
+      break;
+    }
+
+    if (current.char === "\n" && chars[cursor + 1]?.char === "\n") {
+      tokens.push(provenanceToken("paragraphBreak", "\n\n", current));
+      cursor += 2;
+      continue;
+    }
+
+    if (current.char === "\n") {
+      tokens.push(provenanceToken("lineBreak", "\n", current));
+      cursor += 1;
+      continue;
+    }
+
+    if (current.char === "\t") {
+      tokens.push(provenanceToken("tab", "\t", current));
+      cursor += 1;
+      continue;
+    }
+
+    let value = "";
+    const source = current;
+    while (cursor < chars.length) {
+      const entry = chars[cursor];
+      if (!entry || entry.char === "\n" || entry.char === "\t") {
+        break;
+      }
+      if (!sameSource(source, entry)) {
+        break;
+      }
+      value += entry.char;
+      cursor += 1;
+    }
+    tokens.push(provenanceToken("text", value, source));
+  }
+
+  return Object.freeze(tokens);
 }
 
 function tokenizeVisibleText(value: string): readonly VisibleTextToken[] {
@@ -1320,6 +1581,37 @@ export function visibleTextTokens(
 ): readonly VisibleTextToken[] {
   const output = visibleText(nodeOrTree, options);
   return tokenizeVisibleText(output);
+}
+
+export function visibleTextTokensWithProvenance(
+  nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
+  options: VisibleTextOptions = {}
+): readonly VisibleTextTokenWithProvenance[] {
+  const resolvedOptions: Required<VisibleTextOptions> = {
+    ...DEFAULT_VISIBLE_TEXT_OPTIONS,
+    ...options
+  };
+  const { output, sourceChunks } = collectVisibleTextWithSourceChunks(nodeOrTree, resolvedOptions);
+  const normalizedSourceChars = normalizeSourceChars(sourceChunksToChars(sourceChunks), resolvedOptions);
+  const normalizedOutput = normalizedSourceChars.map((entry) => entry.char).join("");
+
+  if (normalizedOutput !== output) {
+    const fallbackSource: VisibleTextSourceChar = {
+      char: "",
+      sourceNodeId: null,
+      sourceNodeKind: "document",
+      sourceRole: "text-node"
+    };
+    return Object.freeze(
+      tokenizeVisibleText(output).map((token) => provenanceToken(
+        token.kind,
+        token.value,
+        token.kind === "text" ? fallbackSource : { ...fallbackSource, sourceRole: "structure-break" }
+      ))
+    );
+  }
+
+  return tokenizeVisibleTextWithSourceChars(normalizedSourceChars);
 }
 
 function* iterateNodes(

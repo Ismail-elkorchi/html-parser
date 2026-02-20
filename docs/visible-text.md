@@ -5,6 +5,7 @@ This document defines the deterministic text extraction contract for coding-agen
 API:
 - `visibleText(nodeOrTree, options?) -> string`
 - `visibleTextTokens(nodeOrTree, options?) -> ReadonlyArray<VisibleTextToken>`
+- `visibleTextTokensWithProvenance(nodeOrTree, options?) -> ReadonlyArray<VisibleTextTokenWithProvenance>`
 
 Input:
 - `DocumentTree`
@@ -76,6 +77,23 @@ Fallback fixture coverage (`test/fixtures/visible-text-fallback/v1`) includes:
 - `{ kind: "tab", value: "\t" }`
 
 `visibleText(nodeOrTree, options)` equals `visibleTextTokens(nodeOrTree, options).map((t) => t.value).join("")`.
+
+## Provenance tokens
+`visibleTextTokensWithProvenance` emits deterministic tokens with source metadata:
+- `sourceNodeId`: originating node id when available, otherwise `null`
+- `sourceNodeKind`: one of `document | fragment | element | text | comment | doctype`
+- `sourceRole`: one of:
+  - `text-node`
+  - `img-alt`
+  - `input-value`
+  - `input-aria-label`
+  - `button-value`
+  - `structure-break`
+  - `noscript-fallback`
+
+Contract:
+- `visibleTextTokensWithProvenance(...).map((t) => t.value).join("") === visibleText(...)`
+- token order and source metadata are deterministic for equal input and options.
 
 ## Coverage additions
 The v1 fixture corpus includes synthetic reproductions for downstream mismatch triage patterns:

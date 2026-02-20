@@ -12,6 +12,7 @@ export {
   serialize,
   visibleText,
   visibleTextTokens,
+  visibleTextTokensWithProvenance,
   findAllByAttr,
   findAllByTagName,
   findById,
@@ -55,5 +56,8 @@ export {
   type TextNode,
   type TraceEvent,
   type VisibleTextOptions,
-  type VisibleTextToken
+  type VisibleTextToken,
+  type VisibleTextTokenSourceNodeKind,
+  type VisibleTextTokenSourceRole,
+  type VisibleTextTokenWithProvenance
 } from "./public/mod.js";
