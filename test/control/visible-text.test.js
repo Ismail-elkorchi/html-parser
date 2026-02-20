@@ -6,9 +6,18 @@ import test from "node:test";
 import { BudgetExceededError, parse, visibleText, visibleTextTokens } from "../../dist/mod.js";
 
 const FIXTURE_ROOT = "test/fixtures/visible-text/v1";
+const FALLBACK_FIXTURE_ROOT = "test/fixtures/visible-text-fallback/v1";
 
 async function loadFixtureIds() {
   const entries = await readdir(FIXTURE_ROOT, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+async function loadFallbackFixtureIds() {
+  const entries = await readdir(FALLBACK_FIXTURE_ROOT, { withFileTypes: true });
   return entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -45,6 +54,40 @@ test("visibleText and visibleTextTokens match fixture snapshots", async () => {
   }
 });
 
+test("visibleText fallback fixture corpus remains deterministic", async () => {
+  const fixtureIds = await loadFallbackFixtureIds();
+  assert.ok(fixtureIds.length >= 12);
+  for (const fixtureId of fixtureIds) {
+    const fixtureDir = join(FALLBACK_FIXTURE_ROOT, fixtureId);
+    const [inputHtml, expectedDefaultText, expectedFallbackText, expectedFallbackTokensText] = await Promise.all([
+      readFile(join(fixtureDir, "input.html"), "utf8"),
+      readFile(join(fixtureDir, "expected.default.txt"), "utf8"),
+      readFile(join(fixtureDir, "expected.fallback.txt"), "utf8"),
+      readFile(join(fixtureDir, "expected.fallback.tokens.json"), "utf8")
+    ]);
+
+    const parsed = parse(inputHtml, { captureSpans: true });
+    const expectedDefaultVisibleText = expectedDefaultText.replace(/\n$/, "");
+    const expectedFallbackVisibleText = expectedFallbackText.replace(/\n$/, "");
+    const defaultValue = visibleText(parsed);
+    const fallbackValue = visibleText(parsed, {
+      includeAccessibleNameFallback: true
+    });
+    assert.equal(defaultValue, expectedDefaultVisibleText, `fallback default mismatch: ${fixtureId}`);
+    assert.equal(fallbackValue, expectedFallbackVisibleText, `fallback variant mismatch: ${fixtureId}`);
+
+    const firstTokens = visibleTextTokens(parsed, {
+      includeAccessibleNameFallback: true
+    });
+    const secondTokens = visibleTextTokens(parsed, {
+      includeAccessibleNameFallback: true
+    });
+    const expectedTokens = JSON.parse(expectedFallbackTokensText);
+    assert.deepEqual(firstTokens, expectedTokens, `fallback tokens mismatch: ${fixtureId}`);
+    assert.deepEqual(secondTokens, expectedTokens, `fallback deterministic tokens mismatch: ${fixtureId}`);
+  }
+});
+
 test("budget errors remain structured on pathological depth input", () => {
   const depth = 180;
   const open = "<div>".repeat(depth);
@@ -78,7 +121,7 @@ test("visibleText optional accessible-name fallback is opt-in", () => {
   const html = [
     "<main>",
     "<a href=\"/docs\" aria-label=\"Docs\"></a> ",
-    "<button title=\"Run\"></button> ",
+    "<button aria-label=\"Run\"></button> ",
     "<input type=\"button\" aria-label=\"Submit\">",
     "</main>"
   ].join("");
@@ -90,13 +133,20 @@ test("visibleText optional accessible-name fallback is opt-in", () => {
   });
 
   assert.equal(baseline, "");
-  assert.equal(variant, "Docs Run Submit");
+  assert.equal(variant, "Submit");
 });
 
-test("accessible-name fallback uses aria-label before title", () => {
-  const parsed = parse("<a href=\"/x\" aria-label=\"Primary\" title=\"Secondary\"></a>");
+test("accessible-name fallback applies to input aria-label only", () => {
+  const parsed = parse([
+    "<main>",
+    "<a href=\"/x\" aria-label=\"Primary\" title=\"Secondary\"></a>",
+    "<button aria-label=\"Action\" title=\"Ignored\"></button>",
+    "<input type=\"button\" aria-label=\"Input label\" title=\"Input title\">",
+    "<input type=\"button\" title=\"Title only\">",
+    "</main>"
+  ].join(""));
   const value = visibleText(parsed, {
     includeAccessibleNameFallback: true
   });
-  assert.equal(value, "Primary");
+  assert.equal(value, "Input label");
 });

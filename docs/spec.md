@@ -81,6 +81,7 @@
 - Scope:
   - deterministic text extraction for agent workflows
   - explicit structural breaks (`br`, `p`, table row/cell, block boundaries)
+  - optional accessible-name fallback limited to `input[aria-label]` when enabled
 - Non-goal:
   - browser layout-equivalent `innerText` behavior
 
