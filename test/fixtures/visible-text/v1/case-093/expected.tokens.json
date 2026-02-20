@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "Press Enter or Space to select."
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Then choose a node region."
+  }
+]

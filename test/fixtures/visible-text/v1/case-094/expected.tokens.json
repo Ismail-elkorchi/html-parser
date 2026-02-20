@@ -1,0 +1,46 @@
+[
+  {
+    "kind": "text",
+    "value": "Status"
+  },
+  {
+    "kind": "tab",
+    "value": "\t"
+  },
+  {
+    "kind": "text",
+    "value": "Latest action"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Waiting for review"
+  },
+  {
+    "kind": "tab",
+    "value": "\t"
+  },
+  {
+    "kind": "text",
+    "value": "View"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Sent in for review"
+  },
+  {
+    "kind": "tab",
+    "value": "\t"
+  },
+  {
+    "kind": "text",
+    "value": "Open"
+  }
+]
