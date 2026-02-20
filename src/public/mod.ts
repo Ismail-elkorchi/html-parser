@@ -998,12 +998,6 @@ const VISIBLE_TEXT_BLOCK_BREAK_TAGS = new Set([
   "ul"
 ]);
 
-const VISIBLE_TEXT_ACCESSIBLE_NAME_TAGS = new Set([
-  "a",
-  "button",
-  "input"
-]);
-
 const DEFAULT_VISIBLE_TEXT_OPTIONS: Required<VisibleTextOptions> = Object.freeze({
   skipHiddenSubtrees: true,
   includeControlValues: true,
@@ -1078,11 +1072,14 @@ function accessibleNameFallback(
     return undefined;
   }
   const tagName = node.tagName.toLowerCase();
-  if (!VISIBLE_TEXT_ACCESSIBLE_NAME_TAGS.has(tagName)) {
+  if (tagName !== "input") {
     return undefined;
   }
-
-  return nonEmptyAttributeValue(node, "aria-label") ?? nonEmptyAttributeValue(node, "title");
+  const type = (attributeValue(node, "type") ?? "text").trim().toLowerCase();
+  if (type === "hidden") {
+    return undefined;
+  }
+  return nonEmptyAttributeValue(node, "aria-label");
 }
 
 function normalizeVisibleTextOutput(value: string, options: Required<VisibleTextOptions>): string {
@@ -1201,11 +1198,6 @@ function collectVisibleTextFromNode(
     }
   }
 
-  const fallbackPartCountBefore =
-    fallbackName && (tagName === "a" || tagName === "button")
-      ? parts.length
-      : null;
-
   if (tagName === "tr") {
     appendVisibleText(parts, "\n");
     let seenTableCell = false;
@@ -1241,10 +1233,6 @@ function collectVisibleTextFromNode(
   }
   for (const child of node.children) {
     collectVisibleTextFromNode(child, parts, options, childPreserveWhitespace);
-  }
-  if (fallbackPartCountBefore !== null && parts.length === fallbackPartCountBefore) {
-    appendVisibleText(parts, normalizeVisibleTextSegment(fallbackName ?? "", false));
-    return;
   }
   if (tagName === "p") {
     appendVisibleText(parts, "\n\n");

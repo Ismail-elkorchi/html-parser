@@ -56,9 +56,17 @@ Input:
 - `&lt;button&gt;` contributes `value` when present; otherwise text children contribute.
 - Accessible-name fallback (optional):
   - enabled only when `includeAccessibleNameFallback=true`
-  - applies to unlabeled `a`, `button`, and `input` controls
-  - uses `aria-label` first, then `title`
-  - fallback emits only when the node has no emitted visible text from existing rules
+  - applies only to `input` elements
+  - uses only non-empty `aria-label`
+  - ignores `title` for fallback emission
+  - does not emit fallback text for `a` or `button`
+
+Fallback fixture coverage (`test/fixtures/visible-text-fallback/v1`) includes:
+- anchor/button fallback non-emission
+- input `aria-label` fallback emission
+- hidden and `aria-hidden` subtree suppression with fallback enabled
+- `input value` precedence over fallback
+- mixed-control deterministic output with fallback enabled
 
 ## Token contract
 `visibleTextTokens` emits a stable ordered union:
