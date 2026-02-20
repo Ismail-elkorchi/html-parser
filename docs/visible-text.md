@@ -14,6 +14,7 @@ Input:
 ## Options and defaults
 - `skipHiddenSubtrees`: `true`
 - `includeControlValues`: `true`
+- `includeAccessibleNameFallback`: `false`
 - `trim`: `true`
 
 ## Node contribution rules
@@ -53,6 +54,11 @@ Input:
 - `&lt;img alt="..."&gt;` contributes non-empty `alt`.
 - `&lt;input&gt;` contributes non-empty `value`, except `type="hidden"`.
 - `&lt;button&gt;` contributes `value` when present; otherwise text children contribute.
+- Accessible-name fallback (optional):
+  - enabled only when `includeAccessibleNameFallback=true`
+  - applies to unlabeled `a`, `button`, and `input` controls
+  - uses `aria-label` first, then `title`
+  - fallback emits only when the node has no emitted visible text from existing rules
 
 ## Token contract
 `visibleTextTokens` emits a stable ordered union:

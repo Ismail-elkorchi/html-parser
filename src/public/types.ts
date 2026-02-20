@@ -249,6 +249,7 @@ export interface ChunkOptions {
 export interface VisibleTextOptions {
   readonly skipHiddenSubtrees?: boolean;
   readonly includeControlValues?: boolean;
+  readonly includeAccessibleNameFallback?: boolean;
   readonly trim?: boolean;
 }
 
