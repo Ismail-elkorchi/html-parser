@@ -108,6 +108,18 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-073`: challenge-style `noscript` fallback with nested `iframe` emits only visible message text.
 - `case-074`: head-only metadata/script/style suppression with body control-value extraction.
 - `case-075`: link-heavy inline navigation text extraction without renderer list markers.
+- `case-076`: dense inline language-link clusters preserve deterministic adjacency semantics.
+- `case-077`: list-based language switcher extraction keeps per-item paragraph boundaries.
+- `case-078`: mixed heading + inline language toggles before block heading content.
+- `case-079`: icon-only link with image `alt` plus adjacent inline nav link sequence.
+- `case-080`: icon-without-alt suppression plus footer block-boundary extraction.
+- `case-081`: nested nav and aside regions with deterministic inline adjacency and block breaks.
+- `case-082`: form-control extraction with label text + input/button value precedence.
+- `case-083`: `aria-hidden` language switcher suppression with visible public navigation.
+- `case-084`: iframe fallback text retention followed by paragraph boundary extraction.
+- `case-085`: button value precedence and icon-alt contribution in adjacent controls.
+- `case-086`: canonical/alternate link metadata in body remains non-visible.
+- `case-087`: punctuation-separated inline nav rails stay deterministic.
 
 ## Determinism
 For identical input trees and options:
