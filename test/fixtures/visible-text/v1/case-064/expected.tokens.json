@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "Alpha"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Omega"
+  }
+]
