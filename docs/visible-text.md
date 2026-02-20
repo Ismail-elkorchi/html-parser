@@ -96,6 +96,18 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-061`: challenge-page style `noscript` fallback markup extraction.
 - `case-062`: `noscript` raw markup reparse with nested `style` suppression.
 - `case-063`: `noscript` raw markup reparse preserving `&lt;br&gt;`, table row, and cell boundaries.
+- `case-064`: empty `iframe` with `src` does not emit renderer placeholder text.
+- `case-065`: `iframe` fallback text contributes when explicit fallback nodes exist.
+- `case-066`: `meta http-equiv="refresh"` and `title` inside `head` remain non-visible.
+- `case-067`: alternate/canonical `link` metadata remains non-visible while body nav text extracts.
+- `case-068`: button content with icon-only image emits button text and no image placeholder.
+- `case-069`: button `value` takes precedence over child text for control-value extraction.
+- `case-070`: `aria-hidden=""` subtree suppression keeps only visible sibling content.
+- `case-071`: `hidden` subtree suppression with sectioned page chrome.
+- `case-072`: hidden subtree suppresses nested `iframe` fallback text.
+- `case-073`: challenge-style `noscript` fallback with nested `iframe` emits only visible message text.
+- `case-074`: head-only metadata/script/style suppression with body control-value extraction.
+- `case-075`: link-heavy inline navigation text extraction without renderer list markers.
 
 ## Determinism
 For identical input trees and options:
