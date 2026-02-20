@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "First item"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Second item"
+  }
+]

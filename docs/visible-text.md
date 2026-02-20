@@ -164,6 +164,12 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-097`: `noscript` fallback reparse keeps visible fallback prose while suppressing nested style payloads.
 - `case-098`: icon-link `alt` contribution composes with adjacent rail separators and inline navigation labels.
 - `case-099`: reference-link numeric ordering remains deterministic for dense nav rails.
+- `case-100`: inline text-node continuity across nested formatting tags.
+- `case-101`: hidden input suppression with visible submit control value extraction.
+- `case-102`: button `value` extraction for unlabeled controls.
+- `case-103`: deterministic `noscript` fallback extraction in visible body flow.
+- `case-104`: anchor text extraction excludes oracle-only link index chrome (`[1]`, `[2]` markers).
+- `case-105`: ordered-list extraction preserves item text only; no synthetic ordinal marker emission.
 
 ## Determinism
 For identical input trees and options:
