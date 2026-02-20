@@ -3,7 +3,13 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { BudgetExceededError, parse, visibleText, visibleTextTokens } from "../../dist/mod.js";
+import {
+  BudgetExceededError,
+  parse,
+  visibleText,
+  visibleTextTokens,
+  visibleTextTokensWithProvenance
+} from "../../dist/mod.js";
 
 const FIXTURE_ROOT = "test/fixtures/visible-text/v1";
 const FALLBACK_FIXTURE_ROOT = "test/fixtures/visible-text-fallback/v1";
@@ -149,4 +155,18 @@ test("accessible-name fallback applies to input aria-label only", () => {
     includeAccessibleNameFallback: true
   });
   assert.equal(value, "Input label");
+});
+
+test("visibleTextTokensWithProvenance is deterministic and reconstructs visible text", () => {
+  const parsedA = parse("<main><p>A <img alt=\"B\"></p><table><tr><td>x</td><td>y</td></tr></table></main>");
+  const parsedB = parse("<main><p>A <img alt=\"B\"></p><table><tr><td>x</td><td>y</td></tr></table></main>");
+  const provenanceA = visibleTextTokensWithProvenance(parsedA);
+  const provenanceB = visibleTextTokensWithProvenance(parsedB);
+  const text = visibleText(parsedA);
+
+  assert.deepEqual(provenanceA, provenanceB);
+  assert.equal(provenanceA.map((entry) => entry.value).join(""), text);
+  assert.ok(provenanceA.every((entry) => typeof entry.sourceNodeKind === "string"));
+  assert.ok(provenanceA.every((entry) => typeof entry.sourceRole === "string"));
+  assert.ok(provenanceA.some((entry) => entry.sourceNodeId !== null));
 });

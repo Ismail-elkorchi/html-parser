@@ -253,6 +253,23 @@ export interface VisibleTextOptions {
   readonly trim?: boolean;
 }
 
+export type VisibleTextTokenSourceRole =
+  | "text-node"
+  | "img-alt"
+  | "input-value"
+  | "input-aria-label"
+  | "button-value"
+  | "structure-break"
+  | "noscript-fallback";
+
+export type VisibleTextTokenSourceNodeKind = NodeKind | "document" | "fragment";
+
+export interface VisibleTextTokenProvenance {
+  readonly sourceNodeId: NodeId | null;
+  readonly sourceNodeKind: VisibleTextTokenSourceNodeKind;
+  readonly sourceRole: VisibleTextTokenSourceRole;
+}
+
 export interface VisibleTextTextToken {
   readonly kind: "text";
   readonly value: string;
@@ -278,6 +295,12 @@ export type VisibleTextToken =
   | VisibleTextLineBreakToken
   | VisibleTextParagraphBreakToken
   | VisibleTextTabToken;
+
+export type VisibleTextTokenWithProvenance =
+  | (VisibleTextTextToken & VisibleTextTokenProvenance)
+  | (VisibleTextLineBreakToken & VisibleTextTokenProvenance)
+  | (VisibleTextParagraphBreakToken & VisibleTextTokenProvenance)
+  | (VisibleTextTabToken & VisibleTextTokenProvenance);
 
 export interface RemoveNodeEdit {
   readonly kind: "removeNode";

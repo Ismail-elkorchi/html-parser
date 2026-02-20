@@ -15,6 +15,7 @@ import {
   tokenizeStream,
   visibleText,
   visibleTextTokens,
+  visibleTextTokensWithProvenance,
   walk,
   walkElements
 } from "../../dist/mod.js";
@@ -440,32 +441,50 @@ function evaluateVisibleTextFeature() {
   const textB = visibleText(treeB);
   const tokensA = visibleTextTokens(treeA);
   const tokensB = visibleTextTokens(treeB);
+  const provenanceTokensA = visibleTextTokensWithProvenance(treeA);
+  const provenanceTokensB = visibleTextTokensWithProvenance(treeB);
 
   const deterministicText = textA === textB;
   const deterministicTokens = JSON.stringify(tokensA) === JSON.stringify(tokensB);
+  const deterministicProvenanceTokens = JSON.stringify(provenanceTokensA) === JSON.stringify(provenanceTokensB);
   const tokenJoinStable = tokensA.map((entry) => entry.value).join("") === textA;
+  const provenanceTokenJoinStable = provenanceTokensA.map((entry) => entry.value).join("") === textA;
   const hasStructureTokens = tokensA.some((entry) => entry.kind === "paragraphBreak")
     && tokensA.some((entry) => entry.kind === "tab");
   const hasTextToken = tokensA.some((entry) => entry.kind === "text");
   const expectedTermsPresent = textA.includes("A") && textA.includes("B") && textA.includes("x") && textA.includes("y");
+  const provenanceFieldsPresent = provenanceTokensA.every((entry) =>
+    typeof entry.sourceNodeKind === "string"
+    && typeof entry.sourceRole === "string"
+  );
+  const hasNodeBackedProvenance = provenanceTokensA.some((entry) => entry.sourceNodeId !== null);
 
   return {
     ok:
       deterministicText &&
       deterministicTokens &&
+      deterministicProvenanceTokens &&
       tokenJoinStable &&
+      provenanceTokenJoinStable &&
       hasStructureTokens &&
       hasTextToken &&
-      expectedTermsPresent,
+      expectedTermsPresent &&
+      provenanceFieldsPresent &&
+      hasNodeBackedProvenance,
     details: {
       text: textA,
       tokenCount: tokensA.length,
+      provenanceTokenCount: provenanceTokensA.length,
       deterministicText,
       deterministicTokens,
+      deterministicProvenanceTokens,
       tokenJoinStable,
+      provenanceTokenJoinStable,
       hasStructureTokens,
       hasTextToken,
-      expectedTermsPresent
+      expectedTermsPresent,
+      provenanceFieldsPresent,
+      hasNodeBackedProvenance
     }
   };
 }
