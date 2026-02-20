@@ -120,6 +120,18 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-085`: button value precedence and icon-alt contribution in adjacent controls.
 - `case-086`: canonical/alternate link metadata in body remains non-visible.
 - `case-087`: punctuation-separated inline nav rails stay deterministic.
+- `case-088`: status-review phrasing in document lifecycle sections remains deterministic across nested headings.
+- `case-089`: button value extraction remains explicit; aria-label-only buttons do not emit synthetic text.
+- `case-090`: media-link icon handling distinguishes empty `alt` from explicit `alt`, plus button value controls.
+- `case-091`: numbered table-of-contents rails preserve numeric tokens and heading flow.
+- `case-092`: anchor elements without text content remain non-emitting even with `aria-label`/`title` attributes.
+- `case-093`: keyboard-hint text extraction keeps visible instructions while suppressing `aria-hidden` duplicates.
+- `case-094`: table row/tab boundaries stay deterministic when status cells mix button values and button text.
+- `case-095`: language-switcher extraction excludes hidden mega-menu branches while keeping visible locales.
+- `case-096`: explicit prose and control values are emitted without inferring CSS background-image metadata.
+- `case-097`: `noscript` fallback reparse keeps visible fallback prose while suppressing nested style payloads.
+- `case-098`: icon-link `alt` contribution composes with adjacent rail separators and inline navigation labels.
+- `case-099`: reference-link numeric ordering remains deterministic for dense nav rails.
 
 ## Determinism
 For identical input trees and options:

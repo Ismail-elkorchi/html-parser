@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "text",
+    "value": "Cloud service overview"
+  },
+  {
+    "kind": "paragraphBreak",
+    "value": "\n\n"
+  },
+  {
+    "kind": "text",
+    "value": "Read report"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "Background image alternate text is not emitted unless represented as text nodes."
+  }
+]

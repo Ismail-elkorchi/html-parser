@@ -1,0 +1,4 @@
+Cloud service overview
+
+Read report
+Background image alternate text is not emitted unless represented as text nodes.
