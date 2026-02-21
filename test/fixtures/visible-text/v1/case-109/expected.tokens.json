@@ -1,7 +1,7 @@
 [
   {
     "kind": "text",
-    "value": "go"
+    "value": "Logo"
   },
   {
     "kind": "lineBreak",
@@ -9,6 +9,6 @@
   },
   {
     "kind": "text",
-    "value": "banner"
+    "value": "end"
   }
 ]

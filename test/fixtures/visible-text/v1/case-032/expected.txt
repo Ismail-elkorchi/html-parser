@@ -1,2 +1,2 @@
-v1go
+go
 banner

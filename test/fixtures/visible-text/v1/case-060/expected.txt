@@ -1,1 +1,1 @@
-Visible runtime text shown
+Visible runtime text

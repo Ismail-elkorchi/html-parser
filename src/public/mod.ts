@@ -972,7 +972,8 @@ function textContentFromNode(node: DocumentTree | FragmentTree | HtmlNode): stri
   return node.children.map((child) => textContentFromNode(child)).join("");
 }
 
-const VISIBLE_TEXT_SKIP_TAGS = new Set(["head", "script", "style", "template"]);
+const VISIBLE_TEXT_SKIP_TAGS = new Set(["head", "script", "style", "template", "title", "optgroup", "option"]);
+const VISIBLE_TEXT_INPUT_VALUE_TAG_TYPES = new Set(["button", "submit", "reset"]);
 const VISIBLE_TEXT_BLOCK_BREAK_TAGS = new Set([
   "address",
   "article",
@@ -1054,6 +1055,17 @@ function shouldSkipHiddenSubtree(
   }
   if (attributeValue(node, "hidden") !== undefined) {
     return true;
+  }
+  const inlineStyle = attributeValue(node, "style");
+  if (inlineStyle) {
+    const normalizedStyle = inlineStyle.toLowerCase().replace(/\s+/g, "");
+    if (
+      normalizedStyle.includes("display:none")
+      || normalizedStyle.includes("visibility:hidden")
+      || normalizedStyle.includes("content-visibility:hidden")
+    ) {
+      return true;
+    }
   }
   return normalizeBooleanAttribute(attributeValue(node, "aria-hidden"));
 }
@@ -1249,7 +1261,7 @@ function collectVisibleTextFromNode(
     const type = (attributeValue(node, "type") ?? "text").toLowerCase();
     if (type !== "hidden") {
       const value = attributeValue(node, "value");
-      if (value && value.length > 0) {
+      if (VISIBLE_TEXT_INPUT_VALUE_TAG_TYPES.has(type) && value && value.length > 0) {
         appendVisibleText(
           parts,
           normalizeVisibleTextSegment(value, false),
@@ -1267,6 +1279,10 @@ function collectVisibleTextFromNode(
         );
       }
     }
+    return;
+  }
+
+  if (tagName === "select") {
     return;
   }
 

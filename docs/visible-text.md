@@ -26,10 +26,14 @@ Input:
   - `script`
   - `style`
   - `template`
+  - `title`
+  - `optgroup`
+  - `option`
 - `noscript` fallback handling:
   - when `noscript` is parsed as a single raw-text node containing markup, the raw text is reparsed as a fragment and extracted with the same visible-text rules.
 - Subtrees are skipped when:
   - the element has `hidden`
+  - the element has inline `style` containing `display:none`, `visibility:hidden`, or `content-visibility:hidden`
   - the element has `aria-hidden="true"` (also accepts empty and `"1"` as true)
 
 ## Structural break rules
@@ -53,7 +57,7 @@ Input:
 
 ## Attribute-derived text
 - `&lt;img alt="..."&gt;` contributes non-empty `alt`.
-- `&lt;input&gt;` contributes non-empty `value`, except `type="hidden"`.
+- `&lt;input&gt;` contributes non-empty `value` only for `type="button"`, `type="submit"`, and `type="reset"` (never for `type="hidden"`).
 - `&lt;button&gt;` contributes `value` when present; otherwise text children contribute.
 - Accessible-name fallback (optional):
   - enabled only when `includeAccessibleNameFallback=true`
@@ -66,7 +70,7 @@ Fallback fixture coverage (`test/fixtures/visible-text-fallback/v1`) includes:
 - anchor/button fallback non-emission
 - input `aria-label` fallback emission
 - hidden and `aria-hidden` subtree suppression with fallback enabled
-- `input value` precedence over fallback
+- eligible input `value` precedence over fallback (`type=button|submit|reset`)
 - mixed-control deterministic output with fallback enabled
 
 ## Token contract
@@ -101,12 +105,12 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-034`: leading `noscript` parsed outside visible body surface.
 - `case-035`: `hidden` subtree suppression around `noscript`.
 - `case-036`: `aria-hidden="true"` subtree suppression around `noscript`.
-- `case-037`: SVG `title` + `text` adjacency without implicit separator.
-- `case-038`: SVG adjacency followed by block-level paragraph boundary.
+- `case-037`: SVG `title` metadata suppression while preserving SVG `text`.
+- `case-038`: SVG `title` suppression followed by block-level paragraph boundary.
 - `case-039`: MathML `mi/mo/mi` operator retention (`+`) in text output.
 - `case-040`: MathML adjacent `mi` nodes without implicit separator.
 - `case-041`: SVG and MathML adjacent text flow in a single inline sequence.
-- `case-042`: paragraph break interactions around inline SVG content.
+- `case-042`: paragraph break interactions around inline SVG content with SVG `title` suppression.
 - `case-043`: table cell tab boundaries with SVG/MathML cell payloads.
 - `case-044`: `noscript` subtree containing foreign content before visible paragraph text.
 - `case-045`: `nav` + `article` + `footer` block boundary extraction for link-heavy page chrome.
@@ -115,7 +119,7 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-048`: table header/data tabs with explicit `&lt;br&gt;` line breaks inside cells.
 - `case-049`: paragraph + `pre` adjacency preserving preformatted newlines.
 - `case-050`: linked image-alt text fusion with surrounding inline copy.
-- `case-051`: hidden input suppression with visible input/button value extraction.
+- `case-051`: hidden input suppression with button-value extraction; text-input values remain non-visible.
 - `case-052`: `aria-hidden=\"1\"` subtree suppression in sectioned content.
 - `case-053`: details/summary linearization with deterministic line-break boundaries.
 - `case-054`: script exclusion with trailing `noscript` fallback paragraph.
@@ -124,7 +128,7 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-057`: `head` metadata/link/canonical suppression with body text-only output.
 - `case-058`: linked image without `alt` does not emit placeholder text.
 - `case-059`: `aria-hidden=\"true\"` suppression for foreign-content icon subtrees.
-- `case-060`: `head` preload/script suppression plus hidden-input exclusion with visible input value.
+- `case-060`: `head` preload/script suppression plus hidden-input exclusion with non-button input values non-visible.
 - `case-061`: challenge-page style `noscript` fallback markup extraction.
 - `case-062`: `noscript` raw markup reparse with nested `style` suppression.
 - `case-063`: `noscript` raw markup reparse preserving `&lt;br&gt;`, table row, and cell boundaries.
@@ -138,7 +142,7 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-071`: `hidden` subtree suppression with sectioned page chrome.
 - `case-072`: hidden subtree suppresses nested `iframe` fallback text.
 - `case-073`: challenge-style `noscript` fallback with nested `iframe` emits only visible message text.
-- `case-074`: head-only metadata/script/style suppression with body control-value extraction.
+- `case-074`: head-only metadata/script/style suppression with image-alt extraction and non-button input suppression.
 - `case-075`: link-heavy inline navigation text extraction without renderer list markers.
 - `case-076`: dense inline language-link clusters preserve deterministic adjacency semantics.
 - `case-077`: list-based language switcher extraction keeps per-item paragraph boundaries.
@@ -146,7 +150,7 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-079`: icon-only link with image `alt` plus adjacent inline nav link sequence.
 - `case-080`: icon-without-alt suppression plus footer block-boundary extraction.
 - `case-081`: nested nav and aside regions with deterministic inline adjacency and block breaks.
-- `case-082`: form-control extraction with label text + input/button value precedence.
+- `case-082`: form-control extraction with label text plus button-value extraction only.
 - `case-083`: `aria-hidden` language switcher suppression with visible public navigation.
 - `case-084`: iframe fallback text retention followed by paragraph boundary extraction.
 - `case-085`: button value precedence and icon-alt contribution in adjacent controls.
@@ -170,6 +174,13 @@ The v1 fixture corpus includes synthetic reproductions for downstream mismatch t
 - `case-103`: deterministic `noscript` fallback extraction in visible body flow.
 - `case-104`: anchor text extraction excludes oracle-only link index chrome (`[1]`, `[2]` markers).
 - `case-105`: ordered-list extraction preserves item text only; no synthetic ordinal marker emission.
+- `case-106`: image `alt` contribution preceding paragraph text with deterministic line boundary.
+- `case-107`: select/option controls remain non-visible while adjacent prose stays visible.
+- `case-108`: selected-option labels remain non-visible; surrounding paragraph extraction remains stable.
+- `case-109`: SVG `title` metadata remains non-visible while SVG `text` contributes.
+- `case-110`: detached `option` nodes remain non-visible.
+- `case-111`: inline `display:none` subtree suppression.
+- `case-112`: inline `visibility:hidden` subtree suppression.
 
 ## Determinism
 For identical input trees and options:
