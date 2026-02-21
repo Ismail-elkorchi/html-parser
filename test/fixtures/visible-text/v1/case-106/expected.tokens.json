@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "text",
+    "value": "brand logo"
+  },
+  {
+    "kind": "lineBreak",
+    "value": "\n"
+  },
+  {
+    "kind": "text",
+    "value": "end"
+  }
+]
