@@ -26,6 +26,7 @@
     "fmt": "eslint . --fix --max-warnings=0",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "build": "tsc -p tsconfig.build.json && node scripts/build/copy-vendor.mjs",
+    "prepare": "npm run build",
     "test": "npm run test:control",
     "test:control": "npm run build && node --test test/control/**/*.test.js tests/control/**/*.test.js && node scripts/eval/write-stub-reports.mjs",
     "test:conformance": "node scripts/conformance/run-all.mjs",
