@@ -396,6 +396,17 @@ Evidence:
 
 ---
 
+### G-129: Require-flag producer coherence
+Requirement:
+- Every `require*` flag in the active profile must be recognized by the evaluator.
+- For each `require*` flag set to `true`, all mapped producer reports must exist in `reports/`.
+- Unknown `require*` flags are treated as configuration errors.
+
+Evidence:
+- `reports/gates.json` gate `G-129` with `pass=true`
+
+---
+
 ## Gate set: RELEASE profile (must pass)
 
 Release includes ALL CI gates plus:

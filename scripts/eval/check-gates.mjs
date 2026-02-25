@@ -712,6 +712,53 @@ async function main() {
     )
   );
 
+  const requireFlagReportMap = {
+    requireHoldouts: ["reports/holdout.json"],
+    requireBrowserDiff: ["reports/browser-diff.json"],
+    requireDeno: ["reports/smoke.json"],
+    requireBun: ["reports/smoke.json"],
+    requireBrowserSmoke: ["reports/smoke.json"],
+    requireFuzzReport: ["reports/fuzz.json"],
+    requireStreamReport: ["reports/stream.json"],
+    requireAgentReport: ["reports/agent.json"],
+    requireConformanceReports: [
+      "reports/tokenizer.json",
+      "reports/tree.json",
+      "reports/encoding.json",
+      "reports/serializer.json"
+    ],
+    requirePackReport: ["reports/pack.json"],
+    requireDocsReport: ["reports/docs.json"],
+    requireBudgetsReport: ["reports/budgets.json"],
+    requireBenchReport: ["reports/bench.json"],
+    requireBenchStability: ["reports/bench-stability.json"]
+  };
+
+  const profileRequireFlags = Object.keys(profilePolicy).filter((key) => key.startsWith("require"));
+  const unknownRequireFlags = profileRequireFlags.filter((key) => !(key in requireFlagReportMap));
+  const missingProducerReports = [];
+
+  for (const requireFlag of profileRequireFlags) {
+    if (!profilePolicy[requireFlag]) {
+      continue;
+    }
+    const mappedReports = requireFlagReportMap[requireFlag] || [];
+    for (const reportPath of mappedReports) {
+      if (!(await fileExists(reportPath))) {
+        missingProducerReports.push({ requireFlag, reportPath });
+      }
+    }
+  }
+
+  const requireFlagCoherencePass = unknownRequireFlags.length === 0 && missingProducerReports.length === 0;
+  gates.push(
+    makeGate("G-129", "Require-flag producer coherence", requireFlagCoherencePass, {
+      profileRequireFlags,
+      unknownRequireFlags,
+      missingProducerReports
+    })
+  );
+
   if (profilePolicy.requireHoldouts) {
     await evaluateConformanceGate("R-200", "Holdout suite", "reports/holdout.json", conformanceThresholds.holdout);
   }
