@@ -181,6 +181,7 @@ File:
 - reports/smoke-node.json
 - reports/smoke-deno.json
 - reports/smoke-bun.json
+- reports/smoke-browser.json (optional unless profile policy requires browser smoke)
 
 Shape:
 {
@@ -210,6 +211,15 @@ Shape:
       "ok": true,
       "version": "1.x",
       "determinismHash": "8f..."
+    },
+    "browser": {
+      "suite": "smoke-runtime",
+      "runtime": "browser",
+      "timestamp": "...",
+      "ok": true,
+      "version": "138.0.0.0",
+      "hash": "8f...",
+      "determinismHash": "8f..."
     }
   },
   "overall": {
@@ -219,8 +229,9 @@ Shape:
 
 Rules:
 - Runtime smoke reports are written by `scripts/smoke/control.mjs` during runtime execution.
+- Browser runtime smoke report is written by `scripts/smoke/browser-smoke.mjs`.
 - `reports/smoke.json` is collected from runtime reports by `scripts/eval/collect-smoke-report.mjs`.
-- `overall.ok` is `true` only if all runtime `ok` values are `true`.
+- `overall.ok` is `true` only if required runtime `ok` values are `true`.
 - `determinismHash` is a runtime-produced SHA-256 hex digest of the canonical parse payload.
 
 ## Browser differential report
