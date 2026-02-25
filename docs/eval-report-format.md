@@ -181,7 +181,7 @@ File:
 - reports/smoke-node.json
 - reports/smoke-deno.json
 - reports/smoke-bun.json
-- reports/smoke-browser.json (optional unless profile policy requires browser smoke)
+- reports/smoke-browser.json
 
 Shape:
 {

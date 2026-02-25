@@ -6,7 +6,7 @@ const RUNTIME_REPORTS = [
   { name: "node", path: "reports/smoke-node.json", required: true },
   { name: "deno", path: "reports/smoke-deno.json", required: true },
   { name: "bun", path: "reports/smoke-bun.json", required: true },
-  { name: "browser", path: "reports/smoke-browser.json", required: false }
+  { name: "browser", path: "reports/smoke-browser.json", required: true }
 ];
 
 async function readRuntimeReport(path) {
