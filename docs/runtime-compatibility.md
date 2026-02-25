@@ -14,6 +14,7 @@ This document lists the runtime Web APIs required by library code under `src/`.
 - Deno runtime provides Web Streams and Encoding APIs.
 - Bun runtime provides Web Streams and Encoding APIs.
 - Modern evergreen browsers provide these APIs natively.
+- Browser runtime smoke is enforced through `G-100` with `reports/smoke-browser.json`.
 
 ## Packaging implications
 - Runtime code is ESM only.
