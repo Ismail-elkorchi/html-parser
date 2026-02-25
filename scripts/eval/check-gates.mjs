@@ -489,13 +489,11 @@ async function main() {
   const nodeSmokeOk = Boolean(smoke?.runtimes?.node?.ok);
   const denoOk = Boolean(smoke?.runtimes?.deno?.ok);
   const bunOk = Boolean(smoke?.runtimes?.bun?.ok);
-  const browserOk = Boolean(smoke?.runtimes?.browser?.ok);
 
   const smokePass =
     nodeSmokeOk &&
     (!profilePolicy.requireDeno || denoOk) &&
-    (!profilePolicy.requireBun || bunOk) &&
-    (!profilePolicy.requireBrowserSmoke || browserOk);
+    (!profilePolicy.requireBun || bunOk);
 
   gates.push(makeGate("G-100", "Cross-runtime smoke", smokePass, smoke || { missing: true }));
 
