@@ -64,7 +64,6 @@ async function findJsFiles(rootDir) {
 }
 
 async function main() {
-  let isCheckPass = true;
   let diagnostics = null;
   const offenders = [];
 
@@ -86,14 +85,13 @@ async function main() {
       }
     }
 
-    isCheckPass = offenders.length === 0;
-    if (!isCheckPass) {
+    if (offenders.length > 0) {
       diagnostics = `Found ${String(offenders.length)} bare package import specifier(s) in dist`;
     }
   } catch (error) {
-    isCheckPass = false;
     diagnostics = error instanceof Error ? error.message : String(error);
   }
+  const isCheckPass = diagnostics === null;
 
   await writeJson("reports/no-external-imports.json", {
     suite: "no-external-imports",

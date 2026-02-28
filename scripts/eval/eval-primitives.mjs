@@ -15,9 +15,7 @@ export function scoreFromThresholdToPerfect(passRate, minPassRate) {
   if (boundedThreshold >= 1) return boundedPassRate >= 1 ? 1 : 0;
   if (boundedPassRate <= boundedThreshold) return 0;
   if (boundedPassRate >= 1) return 1;
-  const thresholdSpan = 1 - boundedThreshold;
-  if (thresholdSpan <= 0) return 1;
-  return clamp01((boundedPassRate - boundedThreshold) / thresholdSpan);
+  return clamp01((boundedPassRate - boundedThreshold) / (1 - boundedThreshold));
 }
 
 export async function fileExists(pathToCheck) {
