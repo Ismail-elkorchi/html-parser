@@ -17,11 +17,11 @@ This repository uses pull-request-only delivery.
 - `deno`
 - `bun`
 - `dependency-review`
-- `codeql-analyze`
+- `codeql-security-extended`
 
 These map to the CI jobs in `.github/workflows/ci.yml`.
 `dependency-review` is defined in `.github/workflows/dependency-review.yml`.
-`codeql-analyze` is defined in `.github/workflows/codeql.yml`.
+`codeql-security-extended` is defined in `.github/workflows/codeql.yml`.
 `node` includes `npm run eval:ci` enforcement.
 
 ## Oracle workflow
@@ -38,7 +38,7 @@ Payload applied:
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": ["node", "deno", "bun", "dependency-review", "codeql-analyze"]
+    "contexts": ["node", "deno", "bun", "dependency-review", "codeql-security-extended"]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": {
@@ -63,3 +63,4 @@ Payload applied:
 - Use grouped version updates with `open-pull-requests-limit: 1` per ecosystem.
 - Keep npm updates weekly and GitHub Actions updates monthly.
 - Treat Dependabot security updates as a separate channel from version updates.
+- Dependabot security updates are enabled in repository settings.
