@@ -158,7 +158,9 @@ export class Parser {
         };
         //NOTE: use a <template> element as the fragment context if no context element was provided,
         //so we will parse in a "forgiving" manner
-        fragmentContext !== null && fragmentContext !== void 0 ? fragmentContext : (fragmentContext = opts.treeAdapter.createElement(TN.TEMPLATE, NS.HTML, []));
+        if (fragmentContext === null || fragmentContext === void 0) {
+            fragmentContext = opts.treeAdapter.createElement(TN.TEMPLATE, NS.HTML, []);
+        }
         //NOTE: create a fake element which will be used as the `document` for fragment parsing.
         //This is important for jsdom, where a new `document` cannot be created. This led to
         //fragment parsing messing with the main `document`.

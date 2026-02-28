@@ -27,3 +27,13 @@ If values differ, keep the GitHub Security UI value and document the mismatch in
 - Include code-scanning review outcome for changed files.
 - For every dismissal, include reason and evidence.
 - If an alert remains open, link the tracking issue or decision record.
+
+## Scorecard policy classes
+
+Handle policy-class Scorecard findings with repo controls, not source rewrites:
+
+- `VulnerabilitiesID`: upgrade or override affected dependency versions and re-run audit.
+- `TokenPermissionsID`: use least-privilege `permissions` in workflows.
+- `SecurityPolicyID`: keep `SECURITY.md` actionable with direct reporting guidance.
+
+Findings driven by repository age or solo review policy (`MaintainedID`, `CodeReviewID`) are tracked as governance signals and do not indicate parser-runtime defects.
