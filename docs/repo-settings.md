@@ -63,3 +63,4 @@ Payload applied:
 - Use grouped version updates with `open-pull-requests-limit: 1` per ecosystem.
 - Keep npm updates weekly and GitHub Actions updates monthly.
 - Treat Dependabot security updates as a separate channel from version updates.
+- Dependabot security updates are enabled in repository settings.
