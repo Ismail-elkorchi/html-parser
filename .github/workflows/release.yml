@@ -48,12 +48,20 @@ jobs:
       - name: Evaluate release profile
         run: npm run eval:release
 
-      - name: Publish npm (optional)
-        if: ${{ env.NPM_TOKEN != '' }}
+      - name: Publish policy (explicit)
+        run: |
+          echo "Registry publish requires:"
+          echo "1) tag ref (v*)"
+          echo "2) repository variable ENABLE_REGISTRY_PUBLISH=true"
+          echo "3) registry credentials/trust configuration"
+
+      - name: Publish npm (gated)
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && vars.ENABLE_REGISTRY_PUBLISH == 'true' && secrets.NPM_TOKEN != '' }}
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
         run: npm publish --provenance --access public
 
-      - name: Publish JSR (OIDC)
+      - name: Publish JSR (gated OIDC)
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && vars.ENABLE_REGISTRY_PUBLISH == 'true' }}
         run: npx jsr publish
