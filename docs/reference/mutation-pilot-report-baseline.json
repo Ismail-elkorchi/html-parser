@@ -1,0 +1,43 @@
+{
+  "schema": "mutation-pilot/v1",
+  "generatedAt": "2026-03-03T12:49:47.334Z",
+  "config": "scripts/mutation/pilot-config-baseline.json",
+  "targetFile": "dist/internal/encoding/sniff.js",
+  "testCommand": [
+    "node",
+    "--test",
+    "test/control/encoding-sniff-baseline.js"
+  ],
+  "mutants": [
+    {
+      "id": "alias-windows1252",
+      "description": "Disable latin1/latin-1/us-ascii alias mapping to windows-1252.",
+      "status": "survived",
+      "testExitCode": 0
+    },
+    {
+      "id": "meta-utf16-fallback",
+      "description": "Disable canonical UTF-16 to UTF-8 fallback after TextDecoder label normalization.",
+      "status": "survived",
+      "testExitCode": 0
+    },
+    {
+      "id": "strip-comments-disabled",
+      "description": "Disable HTML comment stripping during prescan.",
+      "status": "survived",
+      "testExitCode": 0
+    },
+    {
+      "id": "bom-utf8-disabled",
+      "description": "Disable UTF-8 BOM detection branch.",
+      "status": "killed",
+      "testExitCode": 1
+    }
+  ],
+  "totals": {
+    "total": 4,
+    "killed": 1,
+    "survived": 3,
+    "invalid": 0
+  }
+}

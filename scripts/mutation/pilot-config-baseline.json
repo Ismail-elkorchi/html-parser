@@ -1,0 +1,30 @@
+{
+  "targetFile": "dist/internal/encoding/sniff.js",
+  "testCommand": ["node", "--test", "test/control/encoding-sniff-baseline.js"],
+  "mutants": [
+    {
+      "id": "alias-windows1252",
+      "description": "Disable latin1/latin-1/us-ascii alias mapping to windows-1252.",
+      "search": "if (WINDOWS_1252_ALIASES.has(normalized)) {",
+      "replace": "if (false && WINDOWS_1252_ALIASES.has(normalized)) {"
+    },
+    {
+      "id": "meta-utf16-fallback",
+      "description": "Disable canonical UTF-16 to UTF-8 fallback after TextDecoder label normalization.",
+      "search": "if ((source === \"meta\" || source === \"transport\") && encoding.startsWith(\"utf-16\")) {",
+      "replace": "if (false && (source === \"meta\" || source === \"transport\") && encoding.startsWith(\"utf-16\")) {"
+    },
+    {
+      "id": "strip-comments-disabled",
+      "description": "Disable HTML comment stripping during prescan.",
+      "search": "const scan = stripHtmlComments(decodeLatin1(bytes.subarray(0, scanSize)));",
+      "replace": "const scan = decodeLatin1(bytes.subarray(0, scanSize));"
+    },
+    {
+      "id": "bom-utf8-disabled",
+      "description": "Disable UTF-8 BOM detection branch.",
+      "search": "if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {",
+      "replace": "if (false && bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {"
+    }
+  ]
+}

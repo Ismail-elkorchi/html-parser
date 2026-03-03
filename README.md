@@ -256,7 +256,7 @@ npm run eval:release
 ## Docs map
 - Entry index: `docs/index.md`
 - Tutorial: `docs/tutorial/first-parse.md`
-- How-to: `docs/how-to/release-validation.md`
+- How-to: `docs/how-to/release-validation.md`, `docs/how-to/mutation-pilot.md`
 - Reference: `docs/reference/api-overview.md`
 - Explanation: `docs/explanation/architecture-and-tradeoffs.md`
 
