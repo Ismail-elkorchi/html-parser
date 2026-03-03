@@ -7,6 +7,7 @@ This is the entry page for `html-parser` documentation.
 
 ## How-to
 - [Release validation checklist](./how-to/release-validation.md)
+- [Mutation pilot workflow](./how-to/mutation-pilot.md)
 
 ## Reference
 - [API overview](./reference/api-overview.md)

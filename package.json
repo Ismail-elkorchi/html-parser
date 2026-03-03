@@ -46,13 +46,14 @@
     "smoke:browser": "npm run build && node scripts/smoke/browser-smoke.mjs --report=reports/smoke-browser.json",
     "deps:freshness": "npm outdated || true",
     "pack:check": "node scripts/eval/pack-check.mjs",
+    "mutation:pilot": "npm run build && node scripts/mutation/run-pilot.mjs --config=scripts/mutation/pilot-config.json --out=docs/reference/mutation-pilot-report.json",
     "eval:ci": "node scripts/eval/run-eval.mjs --profile=ci",
     "eval:release": "node scripts/eval/run-eval.mjs --profile=release"
   },
-  "dependencies": {},
   "overrides": {
     "ajv": "6.14.0"
   },
+  "dependencies": {},
   "devDependencies": {
     "@eslint/js": "9.39.3",
     "eslint": "9.39.3",
