@@ -1,6 +1,6 @@
 # Documentation Index
 
-This is the entry page for `html-parser` documentation.
+Use this page to choose the right documentation path quickly.
 
 ## Tutorial
 - [First parse walkthrough](./tutorial/first-parse.md)
@@ -11,6 +11,7 @@ This is the entry page for `html-parser` documentation.
 
 ## Reference
 - [API overview](./reference/api-overview.md)
+- [Options and budgets](./reference/options.md)
 - [Specification contract](./spec.md)
 - [Acceptance gates](./acceptance-gates.md)
 - [Evaluation report format](./eval-report-format.md)
@@ -20,8 +21,3 @@ This is the entry page for `html-parser` documentation.
 - [Architecture and tradeoffs](./explanation/architecture-and-tradeoffs.md)
 - [Ecosystem comparison](./ecosystem-comparison.md)
 - [Visible text rationale](./visible-text.md)
-
-## Project policy and operations
-- [Security triage](./security-triage.md)
-- [Releasing](./releasing.md)
-- [Third-party datasets](./third-party.md)
