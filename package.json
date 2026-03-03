@@ -44,6 +44,7 @@
     "smoke:deno": "deno run --allow-read --allow-write=reports --allow-env scripts/smoke/control.mjs --runtime=deno --report=reports/smoke-deno.json",
     "smoke:bun": "bun run scripts/smoke/control.mjs --runtime=bun --report=reports/smoke-bun.json",
     "smoke:browser": "npm run build && node scripts/smoke/browser-smoke.mjs --report=reports/smoke-browser.json",
+    "smoke:all": "npm run smoke:node && npm run smoke:deno && npm run smoke:bun",
     "deps:freshness": "npm outdated || true",
     "pack:check": "node scripts/eval/pack-check.mjs",
     "mutation:pilot": "npm run build && node scripts/mutation/run-pilot.mjs --config=scripts/mutation/pilot-config.json --out=docs/reference/mutation-pilot-report.json",
