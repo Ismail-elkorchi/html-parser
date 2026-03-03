@@ -88,6 +88,32 @@ If trusted publishing is not yet enabled, publication can be run manually after 
 
 `package.json` and `jsr.json` must stay aligned with intended public identity and tagged versioning policy.
 
+## 0.1.0 dry-run evidence snapshot (March 3, 2026)
+
+Dry-runs:
+- `npm pack --dry-run --json`: pass
+- `npm publish --dry-run --json --access public`: pass
+- `npx -y jsr publish --dry-run --allow-dirty`: pass
+
+Canary packed-artifact check:
+- packed artifact extracted and imported from `dist/mod.js`
+- parse/serialize canary (`<p>ok</p>`) passes
+
+Manual artifact sample review:
+- required entries present: `package.json`, `dist/mod.js`, `dist/mod.d.ts`, `THIRD_PARTY_NOTICES.md`
+- forbidden content absent: `scripts/`, `test*/`, `docs/`, `reports/`
+
+Automation freshness evidence:
+- Release Audit: failure (run `22622280777`)  
+  <https://github.com/Ismail-elkorchi/html-parser/actions/runs/22622280777>
+- Runtime Latest (Non-blocking): success (run `22622280770`)  
+  <https://github.com/Ismail-elkorchi/html-parser/actions/runs/22622280770>
+
+Residual risk from latest release-audit run:
+- workflow currently evaluates release profile without Deno/Bun toolchain setup
+- workflow checkout path does not provide required html5lib fixture files for conformance scoring
+- release-audit lane must be hardened before `0.1.0` go/no-go can be marked green
+
 ## Third-party notices checklist
 
 Before publishing, confirm `THIRD_PARTY_NOTICES.md` includes:
