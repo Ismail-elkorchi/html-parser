@@ -15,7 +15,7 @@ Attribution notes:
 - Upstream fixture corpus maintained by html5lib contributors.
 Update procedure:
 - Update submodule to a specific commit on a dedicated branch.
-- Record new commit in `docs/spec-snapshots.md`.
+- Record the pinned commit in the internal control snapshot ledger.
 - Create ADR-004 for the dataset update.
 Verification procedure (commands):
 - `git submodule status`
@@ -40,7 +40,7 @@ Attribution notes:
 Update procedure:
 - Fetch the latest `entities.json` into `vendor/whatwg/entities.json`.
 - Regenerate `src/internal/entities.ts`.
-- Recompute and record sha256 in `docs/spec-snapshots.md`.
+- Recompute and record sha256 in the internal control snapshot ledger.
 - Create ADR-004 for the dataset update.
 Verification procedure (commands):
 - `sha256sum vendor/whatwg/entities.json`

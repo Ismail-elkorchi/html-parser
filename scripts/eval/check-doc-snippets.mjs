@@ -51,14 +51,25 @@ function collectImportSpecifiers(codeText) {
   return importSpecifiers;
 }
 
-async function listMarkdownFiles() {
-  const files = ["README.md"];
-  const docsEntries = await readdir("docs", { withFileTypes: true });
-  for (const docsEntry of docsEntries) {
-    if (docsEntry.isFile() && docsEntry.name.endsWith(".md")) {
-      files.push(`docs/${docsEntry.name}`);
+async function collectMarkdownFrom(directoryPath) {
+  const files = [];
+  const entries = await readdir(directoryPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = `${directoryPath}/${entry.name}`;
+    if (entry.isDirectory()) {
+      files.push(...await collectMarkdownFrom(entryPath));
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith(".md")) {
+      files.push(entryPath);
     }
   }
+  return files;
+}
+
+async function listMarkdownFiles() {
+  const files = ["README.md"];
+  files.push(...await collectMarkdownFrom("docs"));
   return files.sort();
 }
 

@@ -11,7 +11,7 @@ Release profile requires a browser differential report. The project currently ru
   - local normalization: `JSON.stringify(parse(input))`
   - browser-like normalization: `DOMParser` when available, otherwise deterministic local fallback
 - Record results under engine key `chromium` in `reports/browser-diff.json`.
-- Persist disagreement triage records under `docs/triage/` when normalization diverges.
+- Persist disagreement triage records in the internal control divergence ledger when normalization diverges.
 
 ## Alternatives considered
 - Requiring Playwright immediately (adds substantial dev toolchain cost).

@@ -133,7 +133,7 @@ function normalizeFixtureOutput(value) {
 
 async function writeDivergenceRecord(caseId, inputHtml, expectedTree, actualTree) {
   const sanitized = caseId.replace(/[^a-zA-Z0-9_-]/g, "_");
-  const filePath = path.join("docs", "triage", `${sanitized}.md`);
+  const filePath = path.join("reports", "triage", "tree", `${sanitized}.md`);
   const body = [
     "# Tree divergence",
     "",

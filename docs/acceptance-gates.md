@@ -9,7 +9,7 @@ Profiles:
 - `release`: release enforcement (holdouts required, browser diff required)
 
 Artifacts pinned by:
-- `docs/spec-snapshots.md`
+- internal control snapshot ledger (workbench private control)
 - `evaluation.config.json`
 
 ## Score model (profile-weighted)
