@@ -1,8 +1,15 @@
 {
   "name": "@ismail-elkorchi/html-parser",
   "version": "0.1.0",
-  "private": true,
-  "description": "Policy and tooling baseline for an agent-first TypeScript HTML parser.",
+  "description": "Deterministic HTML parser for Node, Deno, Bun, and modern browsers.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ismail-elkorchi/html-parser.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "packageManager": "npm@11.10.0",
   "engines": {
@@ -19,6 +26,8 @@
   },
   "files": [
     "dist",
+    "README.md",
+    "LICENSE",
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
@@ -45,6 +54,9 @@
     "smoke:bun": "bun run scripts/smoke/control.mjs --runtime=bun --report=reports/smoke-bun.json",
     "smoke:browser": "npm run build && node scripts/smoke/browser-smoke.mjs --report=reports/smoke-browser.json",
     "smoke:all": "npm run smoke:node && npm run smoke:deno && npm run smoke:bun",
+    "check:fast": "npm run lint && npm run typecheck && npm run test:control && npm run examples:run",
+    "docs:lint:jsr": "deno doc --lint --sloppy-imports jsr/mod.ts",
+    "docs:test:jsr": "deno test --doc --no-check --sloppy-imports jsr/mod.ts",
     "deps:freshness": "npm outdated || true",
     "pack:check": "node scripts/eval/pack-check.mjs",
     "mutation:pilot": "npm run build && node scripts/mutation/run-pilot.mjs --config=scripts/mutation/pilot-config.json --out=docs/reference/mutation-pilot-report.json",
