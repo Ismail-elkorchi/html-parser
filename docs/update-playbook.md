@@ -11,7 +11,7 @@ Procedure:
 3) Regenerate derived files:
    - regenerate `src/internal/entities.ts` from `vendor/whatwg/entities.json`
 4) Update records:
-   - `docs/spec-snapshots.md`
+   - internal control snapshot ledger
    - `docs/third-party.md`
    - `THIRD_PARTY_NOTICES.md` if source/license text changes
 5) Run verification commands:
@@ -22,6 +22,6 @@ Procedure:
    - `npm run eval:ci`
    - `npm run eval:release`
 6) If behavior changes:
-   - add/update divergence records in `docs/triage/`
+   - add/update divergence records in the internal control divergence ledger
    - choose ADR-003 for oracle/normalization changes or ADR-002 for gate/threshold changes
 7) Do not ship if the release profile fails.

@@ -9,7 +9,7 @@ The current tree builder includes deterministic baseline handling but does not y
 ## Decision
 - Execute non-holdout tree-construction fixtures deterministically.
 - Record parity mismatches as skips linked to this ADR.
-- Emit divergence records in `docs/triage/` for representative failures.
+- Emit divergence records in the internal control divergence ledger for representative failures.
 
 ## Alternatives considered
 - Hard-failing all mismatches (halts staged integration).

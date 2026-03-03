@@ -52,6 +52,12 @@ console.log(tree.kind); // "document"
 console.log(tree.children.length);
 ```
 
+Run the executable examples bundle:
+
+```bash
+npm run examples:run
+```
+
 ### Parse bytes with encoding sniff
 ```ts
 import { parseBytes } from "@ismail-elkorchi/html-parser";
@@ -242,9 +248,17 @@ npm run lint
 npm run typecheck
 npm run build
 npm test
+npm run examples:run
 npm run eval:ci
 npm run eval:release
 ```
+
+## Docs map
+- Entry index: `docs/index.md`
+- Tutorial: `docs/tutorial/first-parse.md`
+- How-to: `docs/how-to/release-validation.md`
+- Reference: `docs/reference/api-overview.md`
+- Explanation: `docs/explanation/architecture-and-tradeoffs.md`
 
 ## Additional docs
 - Normative API and behavior contract: `docs/spec.md`
