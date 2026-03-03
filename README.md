@@ -8,7 +8,11 @@ Deterministic HTML parsing for automation pipelines that need stable, auditable 
 npm install @ismail-elkorchi/html-parser
 ```
 
-```ts
+```bash
+deno add jsr:@ismail-elkorchi/html-parser
+```
+
+```txt
 import { parse } from "jsr:@ismail-elkorchi/html-parser";
 ```
 
@@ -75,6 +79,17 @@ npm run examples:run
 ## Security Note
 
 Parsing is not sanitization. If you render untrusted HTML, apply an explicit sanitization step before output, storage, or UI rendering. See [SECURITY.md](./SECURITY.md).
+
+## Runtime Compatibility
+
+- Node.js (current LTS and current stable)
+- Deno (stable)
+- Bun (stable)
+- Modern evergreen browsers (smoke-tested)
+
+## Dependencies
+
+No runtime dependencies are used by production parser code.
 
 ## Release Validation
 
