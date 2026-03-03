@@ -9,6 +9,13 @@ The workflow runs `eval:release` before publish steps.
 - Intended public JSR package name: `@ismail-elkorchi/html-parser`
 - Versioning policy: `0.x` until parser/evaluation hardening exits alpha posture.
 
+## Registry ownership status (March 3, 2026)
+
+- npm: `npm view @ismail-elkorchi/html-parser` returns `404` (package not claimed/published yet).
+- JSR: `jsr info @ismail-elkorchi/html-parser` returns `404` (package not claimed/published yet).
+
+Publish steps stay gated until registry ownership is confirmed.
+
 ## Local release verification
 
 Run from a clean `main` checkout:
@@ -54,6 +61,13 @@ Before enabling tag-based npm publish:
 3. Confirm package visibility and access policy (`public`) in npm settings.
 
 With npm Trusted Publishing, provenance attestations are emitted automatically.
+
+## Release workflow publish gate
+
+Tag release workflow publish steps only run when all conditions are true:
+1. `github.ref` is a tag (`refs/tags/v*`)
+2. repository variable `ENABLE_REGISTRY_PUBLISH` is set to `true`
+3. required registry credentials/trust are configured (`NPM_TOKEN` for npm fallback; OIDC trust for JSR)
 
 ## Tagging
 
