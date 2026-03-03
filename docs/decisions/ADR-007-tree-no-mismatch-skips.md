@@ -19,5 +19,5 @@ That policy reduced signal quality and allowed parser regressions to pass CI.
 ## Consequences
 
 - CI now blocks on any tree mismatch outside holdout.
-- Divergence triage artifacts remain available under `docs/triage/` for debugging.
+- Divergence triage artifacts remain available in the internal control divergence ledger for debugging.
 - The previous staged-skip policy in `ADR-001-tree-construction-conformance-skips.md` is superseded by this decision.

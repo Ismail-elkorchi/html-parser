@@ -42,7 +42,7 @@ Shape (tokenizer/tree/encoding/serializer):
       "id": "path/to/file#caseId",
       "message": "brief",
       "repro": { "input": "...", "options": { } },
-      "triageRecord": "docs/triage/....md"
+      "triageRecord": "internal-control/triage-record-id"
     }
   ],
   "skips": [
@@ -289,7 +289,7 @@ Shape:
     {
       "id": "case-0001",
       "engine": "chromium",
-      "triageRecord": "docs/triage/....md"
+      "triageRecord": "internal-control/triage-record-id"
     }
   ]
 }
