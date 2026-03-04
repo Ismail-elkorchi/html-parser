@@ -33,7 +33,6 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          registry-url: https://registry.npmjs.org
 
       - name: Setup Deno
         uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2
@@ -183,13 +182,17 @@ jobs:
           name: publish-${{ steps.meta.outputs.version }}
           path: publish-artifacts/
 
-      - name: Clear npm auth token for trusted publish
-        run: npm config delete //registry.npmjs.org/:_authToken || true
+      - name: Ensure tokenless npm auth for OIDC publish
+        run: |
+          unset NODE_AUTH_TOKEN
+          npm config delete //registry.npmjs.org/:_authToken || true
 
       - name: Publish npm (trusted publishing)
         env:
           NPM_CONFIG_PROVENANCE: true
-        run: npm publish --provenance --access public
+        run: |
+          unset NODE_AUTH_TOKEN
+          npm publish --provenance --access public
 
       - name: Publish JSR
         run: npx -y jsr publish --allow-dirty --provenance
