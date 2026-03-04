@@ -99,3 +99,7 @@ npm run eval:release
 npm run docs:lint:jsr
 npm run docs:test:jsr
 ```
+
+## Release Trigger
+
+See [RELEASING.md](./RELEASING.md) for required secrets, trigger methods, and post-publish checks.
