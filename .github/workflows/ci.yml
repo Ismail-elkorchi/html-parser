@@ -43,6 +43,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Docblocks required
+        run: npm run docs:required
+
       - name: Build
         run: npm run build
 

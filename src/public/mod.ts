@@ -100,7 +100,10 @@ const VOID_ELEMENTS = new Set([
   "track",
   "wbr"
 ]);
-const STREAM_ENCODING_PRESCAN_BYTES = 16_384;
+const STREAM_ENCODING_PRESCAN_BYTES = 16_384;/**
+ * Represents a structured public error for `BudgetExceededError` failure cases.
+ */
+
 
 export class BudgetExceededError extends Error {
   readonly payload: BudgetExceededPayload;
@@ -112,7 +115,10 @@ export class BudgetExceededError extends Error {
     this.name = "BudgetExceededError";
     this.payload = payload;
   }
-}
+}/**
+ * Represents a structured public error for `PatchPlanningError` failure cases.
+ */
+
 
 export class PatchPlanningError extends Error {
   readonly payload: PatchPlanningErrorPayload;
@@ -260,7 +266,10 @@ function normalizeParseErrorId(rawErrorCode: string): string {
     return normalized;
   }
   return `vendor:${normalized}`;
-}
+}/**
+ * Returns deterministic public metadata for `getParseErrorSpecRef`.
+ */
+
 
 export function getParseErrorSpecRef(parseErrorId: string): string {
   void parseErrorId;
@@ -576,11 +585,17 @@ function parseDocumentInternal(html: string, options: ParseOptions = {}): Docume
     errors,
     ...(trace ? { trace } : {})
   };
-}
+}/**
+ * Parses input deterministically for the `parse` public API.
+ */
+
 
 export function parse(html: string, options: ParseOptions = {}): DocumentTree {
   return parseDocumentInternal(html, options);
-}
+}/**
+ * Parses input deterministically for the `parseBytes` public API.
+ */
+
 
 export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): DocumentTree {
   enforceBudget("maxInputBytes", options.budgets?.maxInputBytes, bytes.byteLength);
@@ -616,7 +631,10 @@ export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): Docum
     ...parsed,
     trace: withDecodeTrace
   };
-}
+}/**
+ * Parses input deterministically for the `parseFragment` public API.
+ */
+
 
 export function parseFragment(
   html: string,
@@ -860,7 +878,10 @@ async function decodeStreamToText(
     totalBytes: total,
     maxBufferedObserved
   };
-}
+}/**
+ * Tokenizes input deterministically for the `tokenizeStream` public API.
+ */
+
 
 export async function* tokenizeStream(
   stream: ReadableStream<Uint8Array>,
@@ -873,7 +894,10 @@ export async function* tokenizeStream(
   for (const token of tokenized.tokens) {
     yield toToken(token);
   }
-}
+}/**
+ * Parses input deterministically for the `parseStream` public API.
+ */
+
 
 export async function parseStream(
   stream: ReadableStream<Uint8Array>,
@@ -946,7 +970,10 @@ function serializeNode(node: HtmlNode): string {
 
   const body = node.children.map((child) => serializeNode(child)).join("");
   return `${open}${body}</${node.tagName}>`;
-}
+}/**
+ * Serializes data deterministically for the `serialize` public API.
+ */
+
 
 export function serialize(tree: DocumentTree | FragmentTree | HtmlNode): string {
   if (tree.kind === "document" || tree.kind === "fragment") {
@@ -1581,7 +1608,10 @@ function tokenizeVisibleText(value: string): readonly VisibleTextToken[] {
 
   flushText();
   return Object.freeze(tokens);
-}
+}/**
+ * Provides deterministic public behavior for `visibleText`.
+ */
+
 
 export function visibleText(nodeOrTree: DocumentTree | FragmentTree | HtmlNode, options: VisibleTextOptions = {}): string {
   const resolvedOptions: Required<VisibleTextOptions> = {
@@ -1589,7 +1619,10 @@ export function visibleText(nodeOrTree: DocumentTree | FragmentTree | HtmlNode, 
     ...options
   };
   return collectVisibleText(nodeOrTree, resolvedOptions);
-}
+}/**
+ * Provides deterministic public behavior for `visibleTextTokens`.
+ */
+
 
 export function visibleTextTokens(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
@@ -1597,7 +1630,10 @@ export function visibleTextTokens(
 ): readonly VisibleTextToken[] {
   const output = visibleText(nodeOrTree, options);
   return tokenizeVisibleText(output);
-}
+}/**
+ * Provides deterministic public behavior for `visibleTextTokensWithProvenance`.
+ */
+
 
 export function visibleTextTokensWithProvenance(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
@@ -1640,13 +1676,19 @@ function* iterateNodes(
       yield* iterateNodes(node.children, depth + 1);
     }
   }
-}
+}/**
+ * Traverses parsed data deterministically for the `walk` public API.
+ */
+
 
 export function walk(tree: DocumentTree | FragmentTree, visitor: NodeVisitor): void {
   for (const entry of iterateNodes(tree.children, 0)) {
     visitor(entry.node, entry.depth);
   }
-}
+}/**
+ * Traverses parsed data deterministically for the `walkElements` public API.
+ */
+
 
 export function walkElements(tree: DocumentTree | FragmentTree, visitor: ElementVisitor): void {
   for (const entry of iterateNodes(tree.children, 0)) {
@@ -1654,11 +1696,17 @@ export function walkElements(tree: DocumentTree | FragmentTree, visitor: Element
       visitor(entry.node, entry.depth);
     }
   }
-}
+}/**
+ * Provides deterministic public behavior for `textContent`.
+ */
+
 
 export function textContent(node: DocumentTree | FragmentTree | HtmlNode): string {
   return textContentFromNode(node);
-}
+}/**
+ * Traverses parsed data deterministically for the `findById` public API.
+ */
+
 
 export function findById(tree: DocumentTree | FragmentTree, id: NodeId): HtmlNode | null {
   for (const entry of iterateNodes(tree.children, 0)) {
@@ -1668,7 +1716,10 @@ export function findById(tree: DocumentTree | FragmentTree, id: NodeId): HtmlNod
   }
 
   return null;
-}
+}/**
+ * Traverses parsed data deterministically for the `findAllByTagName` public API.
+ */
+
 
 export function* findAllByTagName(
   tree: DocumentTree | FragmentTree,
@@ -1680,7 +1731,10 @@ export function* findAllByTagName(
       yield entry.node;
     }
   }
-}
+}/**
+ * Traverses parsed data deterministically for the `findAllByAttr` public API.
+ */
+
 
 export function* findAllByAttr(
   tree: DocumentTree | FragmentTree,
@@ -1719,7 +1773,10 @@ function collectOutlineNodes(node: HtmlNode, depth: number, entries: OutlineEntr
   for (const child of node.children) {
     collectOutlineNodes(child, depth + 1, entries);
   }
-}
+}/**
+ * Provides deterministic public behavior for `outline`.
+ */
+
 
 export function outline(tree: DocumentTree | FragmentTree): Outline {
   const entries: OutlineEntry[] = [];
@@ -1807,7 +1864,10 @@ function findAttributeInsertOffset(originalHtml: string, closeIndex: number, tag
   }
 
   return closeIndex;
-}
+}/**
+ * Provides deterministic public behavior for `applyPatchPlan`.
+ */
+
 
 export function applyPatchPlan(originalHtml: string, plan: PatchPlan): string {
   let cursor = 0;
@@ -2021,7 +2081,10 @@ function buildReplacement(
     end: span.end,
     replacementHtml: edit.html
   };
-}
+}/**
+ * Computes deterministic public output for `computePatch`.
+ */
+
 
 export function computePatch(originalHtml: string, edits: readonly Edit[]): PatchPlan {
   if (edits.length === 0) {
@@ -2108,7 +2171,10 @@ export function computePatch(originalHtml: string, edits: readonly Edit[]): Patc
     steps: frozenSteps,
     result
   });
-}
+}/**
+ * Provides deterministic public behavior for `chunk`.
+ */
+
 
 export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions = {}): Chunk[] {
   const maxChars = options.maxChars ?? 8192;

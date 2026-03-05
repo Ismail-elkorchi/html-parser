@@ -10,6 +10,7 @@
     "test/**",
     "tests/**",
     "reports/**",
-    "tmp/**"
+    "tmp/**",
+    "scripts/**"
   ]
 }
