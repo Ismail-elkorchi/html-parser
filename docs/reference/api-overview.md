@@ -1,40 +1,42 @@
 # API Overview
 
-All exported runtime entrypoints from `src/public/mod.ts`.
+## JSR Surface
 
-## Error classes
-- `BudgetExceededError`
-- `PatchPlanningError`
+JSR exports are defined by [`jsr/mod.ts`](../../jsr/mod.ts).
 
-## Parsing and encoding
-- `getParseErrorSpecRef(parseErrorId)`
+Primary JSR runtime exports:
 - `parse(input, options?)`
 - `parseBytes(input, options?)`
-- `parseFragment(input, contextTagName?, options?)`
-- `tokenizeStream(stream, options?)`
+- `parseFragment(input, contextTagName, options?)`
 - `parseStream(stream, options?)`
-- `serialize(treeOrNode)`
+- `serialize(input)`
+- `visibleText(input, options?)`
+- `tokenizeStream(stream, options?)`
 
-## Text extraction
-- `visibleText(nodeOrTree, options?)`
-- `visibleTextTokens(nodeOrTree, options?)`
-- `visibleTextTokensWithProvenance(nodeOrTree, options?)`
+Primary JSR type exports:
+- `ParseBudgets`, `ParseOptions`, `TokenizeStreamOptions`
+- `DocumentTree`, `FragmentTree`, `HtmlNode`, `ParseError`
+- `VisibleTextOptions`, `SerializableHtml`, `VisibleTextInput`, `HtmlToken`
 
-## Traversal helpers
-- `walk(nodeOrTree, visitor)`
-- `walkElements(nodeOrTree, visitor)`
-- `textContent(nodeOrTree)`
-- `findById(nodeOrTree, id)`
-- `findAllByTagName(nodeOrTree, tagName)`
-- `findAllByAttr(nodeOrTree, name, value?)`
-- `outline(nodeOrTree)`
-- `chunk(nodeOrTree, options?)`
+## Node/npm Surface
 
-## Patch planning
-- `applyPatchPlan(originalHtml, plan)`
-- `computePatch(originalHtml, edits)`
-- Node span metadata includes `spanProvenance` (`input`, `inferred`, or `none`) when spans are enabled.
+Node/npm type surface is shipped from `dist/mod.d.ts` (source: `src/public/mod.ts`).
 
-## Related reference pages
+In addition to JSR exports, Node/npm includes:
+- `visibleTextTokens(...)`
+- `visibleTextTokensWithProvenance(...)`
+- `BudgetExceededError`, `PatchPlanningError`, `getParseErrorSpecRef(parseErrorId)`
+- traversal/search helpers (`walk`, `walkElements`, `findById`, `findAllByTagName`, `findAllByAttr`, `textContent`)
+- structural helpers (`outline`, `chunk`)
+- patch planning helpers (`computePatch`, `applyPatchPlan`)
+
+## JSR Surface vs Node Surface
+
+- JSR is intentionally slimmer for Deno/JSR consumers.
+- Node/npm exposes the broader authoring and transformation surface.
+- Both surfaces share the same parse model and option types where names overlap.
+
+## Related
 - [Options](./options.md)
+- [Data model](./data-model.md)
 - [Error model](./error-model.md)

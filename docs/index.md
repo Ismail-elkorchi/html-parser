@@ -14,6 +14,7 @@
 ## Reference
 - [API overview](./reference/api-overview.md)
 - [Options](./reference/options.md)
+- [Data model](./reference/data-model.md)
 - [Error model](./reference/error-model.md)
 
 ## Explanation
