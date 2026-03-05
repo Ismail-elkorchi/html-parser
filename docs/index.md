@@ -21,3 +21,5 @@ Use this page to choose the right documentation path quickly.
 - [Architecture and tradeoffs](./explanation/architecture-and-tradeoffs.md)
 - [Ecosystem comparison](./ecosystem-comparison.md)
 - [Visible text rationale](./visible-text.md)
+- [Design constraints and non-goals](./explanation/design-constraints-and-non-goals.md)
+- [v0.1.1 CI failure postmortem](./explanation/ci-failure-postmortem-v0.1.1.md)
