@@ -1,63 +1,81 @@
-# Options Reference
+# Options
 
-## `parse(input, options?)`
+## Parse APIs (`parse`, `parseBytes`, `parseFragment`, `parseStream`)
 
-### `options.captureSpans`
+### `captureSpans`
 - Type: `boolean`
 - Default: `false`
-- Enables source span metadata on emitted nodes.
+- Includes source spans on nodes and attributes.
 
-### `options.trace`
+### `includeSpans`
 - Type: `boolean`
 - Default: `false`
-- Emits parser trace events for diagnostics and replay checks.
+- Backward-compatible alias for `captureSpans`.
 
-### `options.budgets`
-- Type: `object`
-- Enforces deterministic execution limits.
+### `trace`
+- Type: `boolean`
+- Default: `false`
+- Adds structured trace events for decode/token/parse/budget stages.
 
-Budget keys:
-- `maxInputBytes`: maximum accepted input bytes.
-- `maxBufferedBytes`: maximum buffered stream bytes.
-- `maxNodes`: maximum emitted node count.
-- `maxDepth`: maximum tree depth.
-- `maxAttributesPerElement`: element attribute upper bound.
-- `maxTraceEvents`: maximum emitted trace events.
-- `maxTraceBytes`: serialized trace byte ceiling.
+### `transportEncodingLabel`
+- Type: `string`
+- Default: unset
+- Optional transport hint used by byte parsing paths.
 
-Exceeding a limit throws `BudgetExceededError`.
-
-## `parseBytes(input, options?)`
-
-Same options as `parse`, with encoding sniffing before tokenization.
-
-## `parseStream(stream, options?)`
-
-Same options as `parse`, with explicit stream buffering control through `budgets.maxBufferedBytes`.
+### `budgets`
+- Type: `ParseBudgets`
+- Default: all limits unset (no budget enforcement unless specified)
+- Supported keys:
+  - `maxInputBytes`
+  - `maxBufferedBytes` (stream decode)
+  - `maxNodes`
+  - `maxDepth`
+  - `maxTraceEvents`
+  - `maxTraceBytes`
+  - `maxTimeMs`
 
 ## `tokenizeStream(stream, options?)`
 
+### `options.transportEncodingLabel`
+- Type: `string`
+- Default: unset
+
 ### `options.budgets`
-- `maxInputBytes`
-- `maxBufferedBytes`
+- Type: `ParseBudgets`
+- Relevant keys: `maxInputBytes`, `maxBufferedBytes`, `maxTimeMs`
 
 ## `visibleText(nodeOrTree, options?)`
 
-### `options.preserveLineBreaks`
+### `skipHiddenSubtrees`
 - Type: `boolean`
 - Default: `true`
-- Keeps deterministic line-break boundaries in extracted text.
+- Skips hidden subtree content (`hidden`, `aria-hidden`, etc.).
 
-### `options.collapseWhitespace`
+### `includeControlValues`
 - Type: `boolean`
 - Default: `true`
-- Collapses repeated whitespace in non-preformatted contexts.
+- Includes values from controls like `input` and `textarea`.
 
-## `computePatch(originalHtml, edits)`
+### `includeAccessibleNameFallback`
+- Type: `boolean`
+- Default: `false`
+- Opt-in fallback for specific accessibility-name sources.
 
-Deterministic patch planning over parsed structure. Throws `PatchPlanningError` for invalid targets or unsupported edit sequences.
+### `trim`
+- Type: `boolean`
+- Default: `true`
+- Trims final extracted output.
+
+## Node/npm-only patch APIs
+
+### `computePatch(originalHtml, edits)`
+- Generates deterministic patch steps over input spans.
+- Throws `PatchPlanningError` for invalid targets or non-input spans.
+
+### `applyPatchPlan(originalHtml, plan)`
+- Applies a computed patch plan to produce final HTML.
 
 ## Related
-
 - [API overview](./api-overview.md)
-- [Acceptance gates](../acceptance-gates.md)
+- [Data model](./data-model.md)
+- [Error model](./error-model.md)

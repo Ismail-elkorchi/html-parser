@@ -19,14 +19,12 @@ For release-level audits:
 - `npm run eval:release`
 
 ## Naming policy
-- Follow `docs/naming-conventions.md`.
 - Use domain-first names and explicit reference frames.
 - Use truth-conditional booleans (`is*`, `has*`, `can*`).
-- Policy reference marker: LOG_LABEL_POLICY=DOMAIN_PHRASES_NO_TAG_PREFIX (canonical: docs/naming-conventions.md).
 - Use stable, domain-first log phrasing for grep-friendly diagnostics.
 
 ## ADR discipline
-Create or update an ADR in `docs/decisions/` when changing policy-sensitive behavior:
+Record major contributor-policy decisions in pull requests and keep rationale near the changed code:
 - ADR-001 for fixture skips
 - ADR-002 for gate or threshold changes
 - ADR-003 for oracle or normalization rules
@@ -34,3 +32,7 @@ Create or update an ADR in `docs/decisions/` when changing policy-sensitive beha
 - ADR-005 for dev dependency additions
 
 Every PR that touches one of these areas must link the ADR in its body.
+
+## Maintainer docs
+
+- [Maintainer index](./docs/maintainers/index.md)

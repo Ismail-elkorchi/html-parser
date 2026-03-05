@@ -1,6 +1,20 @@
 # @ismail-elkorchi/html-parser
 
-Deterministic HTML parsing for automation pipelines that need stable, auditable output across Node, Deno, Bun, and modern browsers.
+Deterministic HTML parsing for automation workflows that need stable output across Node, Deno, Bun, and modern browsers.
+
+No runtime dependencies: this package ships with zero runtime dependencies.
+
+## When To Use
+
+- You need deterministic parse and serialize output.
+- You need explicit resource budgets for untrusted input.
+- You need consistent behavior across Node, Deno, Bun, and browser smoke paths.
+
+## When Not To Use
+
+- You need HTML sanitization.
+- You need a full browser engine with script execution.
+- You need DOM mutation semantics beyond deterministic parse utilities.
 
 ## Install
 
@@ -12,94 +26,88 @@ npm install @ismail-elkorchi/html-parser
 deno add jsr:@ismail-elkorchi/html-parser
 ```
 
+## Import
+
+```ts
+import { parse } from "@ismail-elkorchi/html-parser";
+```
+
 ```txt
 import { parse } from "jsr:@ismail-elkorchi/html-parser";
 ```
 
-## Success Path
+## Copy/Paste Examples
+
+### Example 1: Parse a document
 
 ```ts
-import { parse, parseStream, serialize, visibleText } from "@ismail-elkorchi/html-parser";
+import { parse } from "@ismail-elkorchi/html-parser";
 
-const input = [
-  "<article>",
-  "  <h1>Release Notes</h1>",
-  "  <p>Deterministic output matters.</p>",
-  "</article>"
-].join("\n");
+const tree = parse("<main><h1>Hello</h1></main>");
+console.log(tree.kind);
+```
 
-const parsed = parse(input, {
-  budgets: {
-    maxInputBytes: 4096,
-    maxNodes: 256,
-    maxDepth: 32
-  }
-});
+### Example 2: Parse streaming bytes
+
+```ts
+import { parseStream } from "@ismail-elkorchi/html-parser";
 
 const stream = new ReadableStream({
   start(controller) {
-    controller.enqueue(new TextEncoder().encode("<section><p>"));
-    controller.enqueue(new TextEncoder().encode("stream path"));
-    controller.enqueue(new TextEncoder().encode("</p></section>"));
+    controller.enqueue(new TextEncoder().encode("<p>streamed</p>"));
     controller.close();
   }
 });
 
-const streamed = await parseStream(stream, {
-  budgets: { maxInputBytes: 4096, maxBufferedBytes: 256, maxNodes: 256 }
-});
-
-console.log(visibleText(parsed).trim());
-console.log(serialize(streamed));
+const tree = await parseStream(stream, { budgets: { maxInputBytes: 4096, maxBufferedBytes: 512 } });
+console.log(tree.kind);
 ```
 
-Runnable examples:
+### Example 3: Extract visible text
+
+```ts
+import { parse, visibleText } from "@ismail-elkorchi/html-parser";
+
+const tree = parse("<article><h1>Title</h1><p>Hello world.</p></article>");
+console.log(visibleText(tree).trim());
+```
+
+### Example 4: Compute and apply a patch plan
+
+```ts
+import { applyPatchPlan, computePatch } from "@ismail-elkorchi/html-parser";
+
+const plan = computePatch("<p>Draft</p>", []);
+const patched = applyPatchPlan("<p>Draft</p>", plan);
+console.log(patched);
+```
+
+Run packaged examples:
 
 ```bash
 npm run examples:run
 ```
 
-## API and Options
+## Compatibility
 
-- [Options and budget reference](./docs/reference/options.md)
-- [Documentation index](./docs/index.md)
+Runtime compatibility matrix:
 
-## When To Use
+| Runtime | Status |
+| --- | --- |
+| Node.js | Supported |
+| Deno | Supported |
+| Bun | Supported |
+| Browser (evergreen) | Supported |
 
-- You need deterministic parse/serialize behavior for repeatable automation.
-- You need bounded parse execution using explicit budget controls.
-- You need the same runtime behavior across Node, Deno, Bun, and browser smoke paths.
+## Security and Safety Notes
 
-## When Not To Use
+Parsing is not sanitization. For untrusted input:
+- set strict budgets,
+- handle `BudgetExceededError` explicitly,
+- sanitize separately before rendering.
 
-- You need sanitization for untrusted HTML rendering.
-- You need full browser runtime semantics.
-- You need dynamic script execution in parsed content.
+## Documentation
 
-## Security Note
-
-Parsing is not sanitization. If you render untrusted HTML, apply an explicit sanitization step before output, storage, or UI rendering. See [SECURITY.md](./SECURITY.md).
-
-## Runtime Compatibility
-
-- Node.js (current LTS and current stable)
-- Deno (stable)
-- Bun (stable)
-- Modern evergreen browsers (smoke-tested)
-
-## Dependencies
-
-No runtime dependencies are used by production parser code.
-
-## Release Validation
-
-```bash
-npm run check:fast
-npm run eval:release
-npm run docs:lint:jsr
-npm run docs:test:jsr
-```
-
-## Release Trigger
-
-See [RELEASING.md](./RELEASING.md) for required secrets, trigger methods, and post-publish checks.
+- [Docs index](./docs/index.md)
+- [First parse success tutorial](./docs/tutorial/first-parse.md)
+- [Options reference](./docs/reference/options.md)

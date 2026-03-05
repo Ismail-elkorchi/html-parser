@@ -1,23 +1,23 @@
-# Documentation Index
+# HTML Parser Docs
 
-Use this page to choose the right documentation path quickly.
+`@ismail-elkorchi/html-parser` provides deterministic HTML parsing with bounded resource controls.
 
 ## Tutorial
-- [First parse walkthrough](./tutorial/first-parse.md)
+- [First parse success](./tutorial/first-parse.md)
 
 ## How-to
-- [Release validation checklist](./how-to/release-validation.md)
-- [Mutation pilot workflow](./how-to/mutation-pilot.md)
+- [Parse fragments](./how-to/parse-fragments.md)
+- [Parse streaming input](./how-to/parse-streaming-input.md)
+- [Extract text safely](./how-to/extract-text-safely.md)
+- [Tune parser budgets](./how-to/tune-parser-budgets.md)
 
 ## Reference
 - [API overview](./reference/api-overview.md)
-- [Options and budgets](./reference/options.md)
-- [Specification contract](./spec.md)
-- [Acceptance gates](./acceptance-gates.md)
-- [Evaluation report format](./eval-report-format.md)
-- [Runtime compatibility](./runtime-compatibility.md)
+- [Options](./reference/options.md)
+- [Data model](./reference/data-model.md)
+- [Error model](./reference/error-model.md)
 
 ## Explanation
-- [Architecture and tradeoffs](./explanation/architecture-and-tradeoffs.md)
-- [Ecosystem comparison](./ecosystem-comparison.md)
-- [Visible text rationale](./visible-text.md)
+- [Design constraints](./explanation/design-constraints.md)
+- [Security posture](./explanation/security-posture.md)
+- [Performance characteristics](./explanation/performance-characteristics.md)

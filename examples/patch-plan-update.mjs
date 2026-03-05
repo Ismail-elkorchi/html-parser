@@ -1,5 +1,7 @@
 /**
- * Demonstrates deterministic patch planning and replay over HTML source.
+ * What it does: computes an edit patch plan and reapplies it to HTML source.
+ * Expected output: prints "patch-plan-update ok" with updated class/text assertions passing.
+ * Constraints: requires span-aware parsing and deterministic node targeting by id.
  * Run: npm run build && node examples/patch-plan-update.mjs
  */
 import { computePatch, parse, serialize } from "../dist/mod.js";

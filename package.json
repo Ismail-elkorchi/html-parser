@@ -59,7 +59,7 @@
     "docs:test:jsr": "deno test --doc --no-check --sloppy-imports jsr/mod.ts",
     "deps:freshness": "npm outdated || true",
     "pack:check": "node scripts/eval/pack-check.mjs",
-    "mutation:pilot": "npm run build && node scripts/mutation/run-pilot.mjs --config=scripts/mutation/pilot-config.json --out=docs/reference/mutation-pilot-report.json",
+    "mutation:pilot": "npm run build && node scripts/mutation/run-pilot.mjs --config=scripts/mutation/pilot-config.json --out=docs/maintainers/mutation-pilot-report.json",
     "eval:ci": "node scripts/eval/run-eval.mjs --profile=ci",
     "eval:release": "node scripts/eval/run-eval.mjs --profile=release"
   },

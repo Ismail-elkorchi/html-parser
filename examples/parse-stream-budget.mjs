@@ -1,5 +1,7 @@
 /**
- * Demonstrates stream parsing with explicit parse budgets.
+ * What it does: parses streamed HTML chunks with explicit budget limits.
+ * Expected output: prints "parse-stream-budget ok" and a positive serialized length.
+ * Constraints: requires a successful `npm run build` so `dist/mod.js` exists.
  * Run: npm run build && node examples/parse-stream-budget.mjs
  */
 import { parseStream, serialize } from "../dist/mod.js";

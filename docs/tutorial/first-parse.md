@@ -1,42 +1,59 @@
-# First Parse Walkthrough
+# First Parse Success
 
-This tutorial shows the minimum flow to parse HTML, extract text, and serialize output.
+This tutorial gets you from install to deterministic parse output in under five minutes.
 
-## 1. Parse HTML
+## Step 1: Parse HTML
 
 ```ts
 import { parse } from "@ismail-elkorchi/html-parser";
 
 const tree = parse("<article><h1>Hello</h1><p>World</p></article>");
 console.log(tree.kind);
+console.log(tree.children.length);
 ```
 
-## 2. Extract visible text
+Expected output:
+
+```txt
+document
+1
+```
+
+## Step 2: Extract visible text
 
 ```ts
 import { parse, visibleText } from "@ismail-elkorchi/html-parser";
 
 const tree = parse("<article><h1>Hello</h1><p>World</p></article>");
-
-const text = visibleText(tree);
-console.log(text);
+console.log(visibleText(tree).trim());
 ```
 
-## 3. Serialize deterministic output
+Expected output:
+
+```txt
+Hello World
+```
+
+## Step 3: Serialize normalized output
 
 ```ts
 import { parse, serialize } from "@ismail-elkorchi/html-parser";
 
-const tree = parse("<article><h1>Hello</h1><p>World</p></article>");
-
-const html = serialize(tree);
-console.log(html);
+const tree = parse("<main><p>Stable</p></main>");
+console.log(serialize(tree));
 ```
 
-## 4. Run the bundled examples
+Expected output:
+
+```txt
+<main><p>Stable</p></main>
+```
+
+## Step 4: Run bundled examples
 
 ```bash
 npm run examples:run
 ```
 
-If `examples:run` passes, your local install can execute the same paths used in CI/evaluation profiles.
+What you get:
+- End-to-end confirmation that package examples run against your local build.

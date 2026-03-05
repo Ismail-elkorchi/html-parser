@@ -258,7 +258,9 @@ async function main() {
     visibleTextApiError = error instanceof Error ? error.message : String(error);
   }
 
-  const visibleTextDocsExists = await fileExists("docs/visible-text.md");
+  const visibleTextDocsExists =
+    (await fileExists("docs/how-to/extract-visible-text.md"))
+    || (await fileExists("docs/how-to/extract-text-safely.md"));
   const visibleTextTestsExists = await fileExists("test/control/visible-text.test.js");
 
   const fixtureRoot = "test/fixtures/visible-text/v1";
@@ -347,7 +349,7 @@ async function main() {
     parseErrorApiError = error instanceof Error ? error.message : String(error);
   }
 
-  const parseErrorDocsExists = await fileExists("docs/parse-errors.md");
+  const parseErrorDocsExists = await fileExists("docs/reference/error-model.md");
   const parseErrorTestsExists = await fileExists("test/control/parse-errors.test.js");
   const agentParseErrorFeaturePresent = Boolean(agentReport?.features?.parseErrorId);
   const agentParseErrorFeatureOk = Boolean(agentReport?.features?.parseErrorId?.ok);
@@ -429,7 +431,7 @@ async function main() {
     spanProvenanceApiError = error instanceof Error ? error.message : String(error);
   }
 
-  const specMarkdown = await readFile("docs/spec.md", "utf8");
+  const specMarkdown = await readFile("docs/reference/api-overview.md", "utf8");
   const spanProvenanceDocumented = specMarkdown.includes("spanProvenance");
   const spansPatchTestsExist = await fileExists("test/control/spans-patch.test.js");
   const spanProvenanceGatePass =

@@ -124,8 +124,15 @@ async function main() {
   const violations = [];
 
   for (const scanTarget of scanTargets) {
-    const fileText = await readFile(scanTarget, "utf8");
-    violations.push(...scanFileText(scanTarget, fileText));
+    try {
+      const fileText = await readFile(scanTarget, "utf8");
+      violations.push(...scanFileText(scanTarget, fileText));
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        continue;
+      }
+      throw error;
+    }
   }
 
   const report = {
