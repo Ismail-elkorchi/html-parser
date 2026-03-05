@@ -6,10 +6,10 @@
 - [First parse success](./tutorial/first-parse.md)
 
 ## How-to
-- [Parse untrusted input safely](./how-to/parse-untrusted-input.md)
+- [Parse fragments](./how-to/parse-fragments.md)
 - [Parse streaming input](./how-to/parse-streaming-input.md)
-- [Extract visible text](./how-to/extract-visible-text.md)
-- [Apply structural patches](./how-to/apply-structural-patches.md)
+- [Extract text safely](./how-to/extract-text-safely.md)
+- [Tune parser budgets](./how-to/tune-parser-budgets.md)
 
 ## Reference
 - [API overview](./reference/api-overview.md)

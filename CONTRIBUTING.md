@@ -32,3 +32,7 @@ Record major contributor-policy decisions in pull requests and keep rationale ne
 - ADR-005 for dev dependency additions
 
 Every PR that touches one of these areas must link the ADR in its body.
+
+## Maintainer docs
+
+- [Maintainer index](./docs/maintainers/index.md)

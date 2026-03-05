@@ -19,7 +19,8 @@ const REQUIRED_DOCS_ROOT = new Set([
   "tutorial",
   "how-to",
   "reference",
-  "explanation"
+  "explanation",
+  "maintainers"
 ]);
 
 const REQUIRED_README_PATTERNS = [

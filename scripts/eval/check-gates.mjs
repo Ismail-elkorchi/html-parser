@@ -258,7 +258,9 @@ async function main() {
     visibleTextApiError = error instanceof Error ? error.message : String(error);
   }
 
-  const visibleTextDocsExists = await fileExists("docs/how-to/extract-visible-text.md");
+  const visibleTextDocsExists =
+    (await fileExists("docs/how-to/extract-visible-text.md"))
+    || (await fileExists("docs/how-to/extract-text-safely.md"));
   const visibleTextTestsExists = await fileExists("test/control/visible-text.test.js");
 
   const fixtureRoot = "test/fixtures/visible-text/v1";

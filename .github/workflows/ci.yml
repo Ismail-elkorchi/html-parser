@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "23 3 * * 1"
 
 permissions:
   contents: read
@@ -51,7 +53,16 @@ jobs:
         run: npm test
 
       - name: Evaluate CI profile
+        if: github.event_name != 'pull_request'
         run: npm run eval:ci
+
+      - name: Upload eval reports
+        if: github.event_name != 'pull_request' && always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: eval-reports-node
+          if-no-files-found: warn
+          path: reports/**
 
   deno:
     runs-on: ubuntu-latest
