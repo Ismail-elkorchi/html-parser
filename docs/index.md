@@ -12,6 +12,7 @@
 - [Tune parser budgets](./how-to/tune-parser-budgets.md)
 
 ## Reference
+- [Releasing reference](./reference/releasing.md)
 - [API overview](./reference/api-overview.md)
 - [Options](./reference/options.md)
 - [Data model](./reference/data-model.md)
