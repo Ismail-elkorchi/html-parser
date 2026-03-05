@@ -29,6 +29,7 @@ In addition to JSR exports, Node/npm includes:
 - traversal/search helpers (`walk`, `walkElements`, `findById`, `findAllByTagName`, `findAllByAttr`, `textContent`)
 - structural helpers (`outline`, `chunk`)
 - patch planning helpers (`computePatch`, `applyPatchPlan`)
+- span metadata fields including `spanProvenance` on parsed nodes when spans are enabled
 
 ## JSR Surface vs Node Surface
 
