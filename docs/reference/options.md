@@ -1,39 +1,29 @@
-# Options Reference
+# Options
 
-## `parse(input, options?)`
+## `parse`, `parseBytes`, `parseFragment`, `parseStream`
 
-### `options.captureSpans`
+### `captureSpans`
 - Type: `boolean`
 - Default: `false`
-- Enables source span metadata on emitted nodes.
+- Adds source-range spans to emitted nodes and attributes.
 
-### `options.trace`
+### `trace`
 - Type: `boolean`
 - Default: `false`
-- Emits parser trace events for diagnostics and replay checks.
+- Enables structured trace events for diagnostics.
 
-### `options.budgets`
+### `budgets`
 - Type: `object`
-- Enforces deterministic execution limits.
+- Purpose: upper-bounds resource usage.
 
-Budget keys:
-- `maxInputBytes`: maximum accepted input bytes.
-- `maxBufferedBytes`: maximum buffered stream bytes.
-- `maxNodes`: maximum emitted node count.
-- `maxDepth`: maximum tree depth.
-- `maxAttributesPerElement`: element attribute upper bound.
-- `maxTraceEvents`: maximum emitted trace events.
-- `maxTraceBytes`: serialized trace byte ceiling.
-
-Exceeding a limit throws `BudgetExceededError`.
-
-## `parseBytes(input, options?)`
-
-Same options as `parse`, with encoding sniffing before tokenization.
-
-## `parseStream(stream, options?)`
-
-Same options as `parse`, with explicit stream buffering control through `budgets.maxBufferedBytes`.
+Supported budget keys:
+- `maxInputBytes`
+- `maxBufferedBytes` (streaming)
+- `maxNodes`
+- `maxDepth`
+- `maxAttributesPerElement`
+- `maxTraceEvents`
+- `maxTraceBytes`
 
 ## `tokenizeStream(stream, options?)`
 
@@ -43,21 +33,23 @@ Same options as `parse`, with explicit stream buffering control through `budgets
 
 ## `visibleText(nodeOrTree, options?)`
 
-### `options.preserveLineBreaks`
+### `preserveLineBreaks`
 - Type: `boolean`
 - Default: `true`
-- Keeps deterministic line-break boundaries in extracted text.
 
-### `options.collapseWhitespace`
+### `collapseWhitespace`
 - Type: `boolean`
 - Default: `true`
-- Collapses repeated whitespace in non-preformatted contexts.
 
-## `computePatch(originalHtml, edits)`
+## Patch APIs
 
-Deterministic patch planning over parsed structure. Throws `PatchPlanningError` for invalid targets or unsupported edit sequences.
+### `computePatch(originalHtml, edits)`
+- Generates a deterministic patch plan.
+- Throws `PatchPlanningError` for invalid targets or unsupported edits.
+
+### `applyPatchPlan(originalHtml, plan)`
+- Applies a previously computed patch plan.
 
 ## Related
-
 - [API overview](./api-overview.md)
-- [Acceptance gates](../acceptance-gates.md)
+- [Error model](./error-model.md)

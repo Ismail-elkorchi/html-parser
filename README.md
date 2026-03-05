@@ -1,18 +1,20 @@
 # @ismail-elkorchi/html-parser
 
-Deterministic HTML parsing for automation pipelines that need stable, auditable output across Node, Deno, Bun, and modern browsers.
+Deterministic HTML parsing for automation workflows that need stable output across Node, Deno, Bun, and modern browsers.
+
+No runtime dependencies: this package ships with zero runtime dependencies.
 
 ## When To Use
 
-- You need deterministic parse/serialize behavior for repeatable automation.
-- You need bounded parse execution using explicit budget controls.
-- You need the same runtime behavior across Node, Deno, Bun, and browser smoke paths.
+- You need deterministic parse and serialize output.
+- You need explicit resource budgets for untrusted input.
+- You need consistent behavior across Node, Deno, Bun, and browser smoke paths.
 
 ## When Not To Use
 
-- You need sanitization for untrusted HTML rendering.
-- You need full browser runtime semantics.
-- You need dynamic script execution in parsed content.
+- You need HTML sanitization.
+- You need a full browser engine with script execution.
+- You need DOM mutation semantics beyond deterministic parse utilities.
 
 ## Install
 
@@ -24,95 +26,90 @@ npm install @ismail-elkorchi/html-parser
 deno add jsr:@ismail-elkorchi/html-parser
 ```
 
-## Quickstart
+## Import
 
 ```ts
-import { parse, parseStream, serialize, visibleText } from "@ismail-elkorchi/html-parser";
+import { parse } from "@ismail-elkorchi/html-parser";
+```
 
-const input = [
-  "<article>",
-  "  <h1>Release Notes</h1>",
-  "  <p>Deterministic output matters.</p>",
-  "</article>"
-].join("\n");
+```txt
+import { parse } from "jsr:@ismail-elkorchi/html-parser";
+```
 
-const parsed = parse(input, {
-  budgets: {
-    maxInputBytes: 4096,
-    maxNodes: 256,
-    maxDepth: 32
-  }
-});
+## Copy/Paste Examples
+
+### Example 1: Parse a document
+
+```ts
+import { parse } from "@ismail-elkorchi/html-parser";
+
+const tree = parse("<main><h1>Hello</h1></main>");
+console.log(tree.kind);
+```
+
+### Example 2: Parse streaming bytes
+
+```ts
+import { parseStream } from "@ismail-elkorchi/html-parser";
 
 const stream = new ReadableStream({
   start(controller) {
-    controller.enqueue(new TextEncoder().encode("<section><p>"));
-    controller.enqueue(new TextEncoder().encode("stream path"));
-    controller.enqueue(new TextEncoder().encode("</p></section>"));
+    controller.enqueue(new TextEncoder().encode("<p>streamed</p>"));
     controller.close();
   }
 });
 
-const streamed = await parseStream(stream, {
-  budgets: { maxInputBytes: 4096, maxBufferedBytes: 256, maxNodes: 256 }
-});
-
-console.log(visibleText(parsed).trim());
-console.log(serialize(streamed));
+const tree = await parseStream(stream, { budgets: { maxInputBytes: 4096, maxBufferedBytes: 512 } });
+console.log(tree.kind);
 ```
 
-Runnable examples:
+### Example 3: Extract visible text
+
+```ts
+import { parse, visibleText } from "@ismail-elkorchi/html-parser";
+
+const tree = parse("<article><h1>Title</h1><p>Hello world.</p></article>");
+console.log(visibleText(tree).trim());
+```
+
+### Example 4: Compute and apply a patch plan
+
+```ts
+import { applyPatchPlan, computePatch } from "@ismail-elkorchi/html-parser";
+
+const plan = computePatch("<p>Draft</p>", []);
+const patched = applyPatchPlan("<p>Draft</p>", plan);
+console.log(patched);
+```
+
+Run packaged examples:
 
 ```bash
 npm run examples:run
 ```
 
-## Options and Config Reference
+## Compatibility
 
-- [Options and budget reference](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/reference/options.md)
-- [API overview](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/reference/api-overview.md)
+Runtime compatibility matrix:
 
-## Error Handling and Gotchas
+| Runtime | Status |
+| --- | --- |
+| Node.js | Supported |
+| Deno | Supported |
+| Bun | Supported |
+| Browser (evergreen) | Supported |
 
-- Treat `BudgetExceededError` as an expected failure mode for untrusted or oversized input.
-- Use `parseFragment()` when your input is intentionally partial HTML.
-- `visibleText()` is for extraction and auditing, not security sanitization.
-- Browser behavior can differ from full engine semantics by design; validate against your policy requirements.
+## Security and Safety Notes
 
-## Compatibility Matrix
+Parsing is not sanitization. For untrusted input:
+- set strict budgets,
+- handle `BudgetExceededError` explicitly,
+- sanitize separately before rendering.
 
-| Runtime | Status | Notes |
-| --- | --- | --- |
-| Node.js | ✅ | CI + smoke coverage |
-| Deno | ✅ | CI + smoke coverage |
-| Bun | ✅ | CI + smoke coverage |
-| Browser (evergreen) | ✅ | Smoke-tested behavior |
+## Docs Map
 
-## Security Notes
-
-Parsing is not sanitization. If you render untrusted HTML, apply an explicit sanitization step before output, storage, or UI rendering. See [SECURITY.md](https://github.com/Ismail-elkorchi/html-parser/blob/main/SECURITY.md).
-
-## Design Constraints / Non-goals
-
-- Determinism and bounded execution are prioritized over browser-engine parity.
-- The package does not execute scripts or emulate DOM side effects.
-- The package does not enforce content policy or sanitization rules.
-
-## Documentation Map
-
+- [Docs index](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/index.md)
 - [Tutorial](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/tutorial/first-parse.md)
 - [How-to guides](https://github.com/Ismail-elkorchi/html-parser/tree/main/docs/how-to)
 - [Reference](https://github.com/Ismail-elkorchi/html-parser/tree/main/docs/reference)
 - [Explanation](https://github.com/Ismail-elkorchi/html-parser/tree/main/docs/explanation)
-
-## Release Validation
-
-```bash
-npm run check:fast
-npm run docs:lint:jsr
-npm run docs:test:jsr
-npm run examples:run
-npm pack --dry-run
-```
-
-Release workflow details: [RELEASING.md](https://github.com/Ismail-elkorchi/html-parser/blob/main/RELEASING.md)

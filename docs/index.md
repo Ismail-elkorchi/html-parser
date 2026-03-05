@@ -1,25 +1,22 @@
-# Documentation Index
+# HTML Parser Docs
 
-Use this page to choose the right documentation path quickly.
+`@ismail-elkorchi/html-parser` provides deterministic HTML parsing with bounded resource controls.
 
 ## Tutorial
-- [First parse walkthrough](./tutorial/first-parse.md)
+- [First parse success](./tutorial/first-parse.md)
 
 ## How-to
-- [Release validation checklist](./how-to/release-validation.md)
-- [Mutation pilot workflow](./how-to/mutation-pilot.md)
+- [Parse untrusted input safely](./how-to/parse-untrusted-input.md)
+- [Parse streaming input](./how-to/parse-streaming-input.md)
+- [Extract visible text](./how-to/extract-visible-text.md)
+- [Apply structural patches](./how-to/apply-structural-patches.md)
 
 ## Reference
 - [API overview](./reference/api-overview.md)
-- [Options and budgets](./reference/options.md)
-- [Specification contract](./spec.md)
-- [Acceptance gates](./acceptance-gates.md)
-- [Evaluation report format](./eval-report-format.md)
-- [Runtime compatibility](./runtime-compatibility.md)
+- [Options](./reference/options.md)
+- [Error model](./reference/error-model.md)
 
 ## Explanation
-- [Architecture and tradeoffs](./explanation/architecture-and-tradeoffs.md)
-- [Ecosystem comparison](./ecosystem-comparison.md)
-- [Visible text rationale](./visible-text.md)
-- [Design constraints and non-goals](./explanation/design-constraints-and-non-goals.md)
-- [v0.1.1 CI failure postmortem](./explanation/ci-failure-postmortem-v0.1.1.md)
+- [Design constraints](./explanation/design-constraints.md)
+- [Security posture](./explanation/security-posture.md)
+- [Performance characteristics](./explanation/performance-characteristics.md)

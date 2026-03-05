@@ -1,33 +1,40 @@
 # API Overview
 
-This page tracks exported public functions from `src/public/mod.ts`.
+All exported runtime entrypoints from `src/public/mod.ts`.
+
+## Error classes
+- `BudgetExceededError`
+- `PatchPlanningError`
 
 ## Parsing and encoding
-- `parse`
-- `parseBytes`
-- `parseFragment`
-- `parseStream`
-- `tokenizeStream`
-- `getParseErrorSpecRef`
+- `getParseErrorSpecRef(parseErrorId)`
+- `parse(input, options?)`
+- `parseBytes(input, options?)`
+- `parseFragment(input, contextTagName?, options?)`
+- `tokenizeStream(stream, options?)`
+- `parseStream(stream, options?)`
+- `serialize(treeOrNode)`
 
-## Traversal and extraction
-- `walk`
-- `walkElements`
-- `textContent`
-- `findById`
-- `findAllByTagName`
-- `findAllByAttr`
-- `outline`
-- `chunk`
+## Text extraction
+- `visibleText(nodeOrTree, options?)`
+- `visibleTextTokens(nodeOrTree, options?)`
+- `visibleTextTokensWithProvenance(nodeOrTree, options?)`
 
-## Text and serialization
-- `visibleText`
-- `visibleTextTokens`
-- `visibleTextTokensWithProvenance`
-- `serialize`
+## Traversal helpers
+- `walk(nodeOrTree, visitor)`
+- `walkElements(nodeOrTree, visitor)`
+- `textContent(nodeOrTree)`
+- `findById(nodeOrTree, id)`
+- `findAllByTagName(nodeOrTree, tagName)`
+- `findAllByAttr(nodeOrTree, name, value?)`
+- `outline(nodeOrTree)`
+- `chunk(nodeOrTree, options?)`
 
 ## Patch planning
-- `computePatch`
-- `applyPatchPlan`
+- `applyPatchPlan(originalHtml, plan)`
+- `computePatch(originalHtml, edits)`
+- Node span metadata includes `spanProvenance` (`input`, `inferred`, or `none`) when spans are enabled.
 
-For full behavioral and type contracts, see [`docs/spec.md`](../spec.md).
+## Related reference pages
+- [Options](./options.md)
+- [Error model](./error-model.md)
