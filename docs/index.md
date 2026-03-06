@@ -1,6 +1,6 @@
 # HTML Parser Docs
 
-`@ismail-elkorchi/html-parser` provides deterministic HTML parsing with bounded resource controls.
+`@ismail-elkorchi/html-parser` provides HTML parsing with visible-text extraction, fragment parsing, and structural traversal.
 
 ## Tutorial
 - [First parse success](./tutorial/first-parse.md)

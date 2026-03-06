@@ -1,5 +1,5 @@
 /**
- * Deno/JSR entrypoint for deterministic HTML parsing and text extraction.
+ * Deno/JSR entrypoint for HTML parsing with visible-text extraction, fragment parsing, and structural traversal.
  *
  * Quickstart:
  * @example

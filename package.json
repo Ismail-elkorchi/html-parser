@@ -1,7 +1,7 @@
 {
   "name": "@ismail-elkorchi/html-parser",
   "version": "0.1.1",
-  "description": "Deterministic HTML parser with fragment parsing, visible-text extraction, and budgets for Node, Deno, Bun, and browsers.",
+  "description": "HTML parser with visible-text extraction, fragment parsing, and structural traversal.",
   "license": "MIT",
   "repository": {
     "type": "git",

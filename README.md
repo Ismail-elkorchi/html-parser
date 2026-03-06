@@ -1,6 +1,8 @@
 # @ismail-elkorchi/html-parser
 
-Deterministic HTML parsing with fragment parsing, visible-text extraction, and resource budgets across Node, Deno, Bun, and browsers.
+HTML parser with visible-text extraction, fragment parsing, and structural traversal.
+
+Supports Node, Deno, Bun, and browsers with explicit resource budgets.
 
 No runtime dependencies: this package ships with zero runtime dependencies.
 
@@ -110,6 +112,6 @@ Parsing is not sanitization. For untrusted input:
 
 ## Documentation
 
-- [Docs index](./docs/index.md)
-- [First parse success tutorial](./docs/tutorial/first-parse.md)
-- [Options reference](./docs/reference/options.md)
+- [Docs index](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/index.md)
+- [First parse success tutorial](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/tutorial/first-parse.md)
+- [Options reference](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/reference/options.md)
