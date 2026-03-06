@@ -9,10 +9,11 @@
 - [Parse fragments](./how-to/parse-fragments.md)
 - [Parse streaming input](./how-to/parse-streaming-input.md)
 - [Extract text safely](./how-to/extract-text-safely.md)
+- [Traverse the data model](./how-to/traverse-data-model.md)
 - [Tune parser budgets](./how-to/tune-parser-budgets.md)
+- [Understand why parsing is not sanitization](./how-to/parsing-is-not-sanitization.md)
 
 ## Reference
-- [Releasing reference](./reference/releasing.md)
 - [API overview](./reference/api-overview.md)
 - [Options](./reference/options.md)
 - [Data model](./reference/data-model.md)
