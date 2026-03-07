@@ -1,7 +1,7 @@
 {
   "name": "@ismail-elkorchi/html-parser",
   "version": "0.1.1",
-  "description": "Deterministic HTML parser for Node, Deno, Bun, and modern browsers.",
+  "description": "HTML parser with visible-text extraction, fragment parsing, and structural traversal.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,8 +13,8 @@
   "type": "module",
   "packageManager": "npm@11.10.0",
   "engines": {
-    "node": ">=24.0.0",
-    "npm": ">=11.0.0"
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
   },
   "main": "./dist/mod.js",
   "types": "./dist/mod.d.ts",
@@ -37,7 +37,7 @@
     "build": "tsc -p tsconfig.build.json && node scripts/build/copy-vendor.mjs",
     "prepare": "npm run build",
     "test": "npm run test:control",
-    "test:control": "npm run build && node --test test/control/**/*.test.js tests/control/**/*.test.js && node scripts/eval/write-stub-reports.mjs",
+    "test:control": "npm run build && node scripts/test/run-node-tests.mjs test/control tests/control && node scripts/eval/write-stub-reports.mjs",
     "test:conformance": "node scripts/conformance/run-all.mjs",
     "test:encoding": "npm run build && node scripts/conformance/run-encoding-fixtures.mjs",
     "test:tokenizer": "npm run build && node scripts/conformance/run-tokenizer-fixtures.mjs",
@@ -54,7 +54,7 @@
     "smoke:bun": "bun run scripts/smoke/control.mjs --runtime=bun --report=reports/smoke-bun.json",
     "smoke:browser": "npm run build && node scripts/smoke/browser-smoke.mjs --report=reports/smoke-browser.json",
     "smoke:all": "npm run smoke:node && npm run smoke:deno && npm run smoke:bun",
-    "check:fast": "npm run lint && npm run typecheck && npm run test:control && npm run docs:required && npm run examples:run",
+    "check:fast": "npm run lint && npm run typecheck && npm run test:control && npm run docs:required && npm run docs:quality:jsr && npm run examples:run",
     "docs:lint:jsr": "deno doc --lint --sloppy-imports jsr/mod.ts",
     "docs:test:jsr": "deno test --doc --no-check --sloppy-imports jsr/mod.ts",
     "deps:freshness": "npm outdated || true",
@@ -63,6 +63,7 @@
     "eval:ci": "node scripts/eval/run-eval.mjs --profile=ci",
     "eval:release": "node scripts/eval/run-eval.mjs --profile=release",
     "docs:required": "node scripts/quality/doc-required.mjs",
+    "docs:quality:jsr": "node scripts/quality/doc-jsr-quality.mjs",
     "release:notes:dry-run": "node scripts/release/render-notes.mjs --dry-run",
     "changelog:update:dry-run": "node scripts/release/update-changelog.mjs --dry-run"
   },

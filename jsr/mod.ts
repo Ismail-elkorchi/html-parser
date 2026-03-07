@@ -1,5 +1,5 @@
 /**
- * Deno/JSR entrypoint for deterministic HTML parsing and text extraction.
+ * Deno/JSR entrypoint for HTML parsing with visible-text extraction, fragment parsing, and structural traversal.
  *
  * Quickstart:
  * @example
@@ -236,8 +236,9 @@ export function parseBytes(input: Uint8Array, options: ParseOptions = {}): Docum
  *
  * @param html Fragment HTML source text.
  * @param contextTagName Context element tag name (for example `"template"` or `"table"`).
+ * Use the real embedding element so recovery behavior matches browser fragment parsing.
  * @param options Parse controls for tracing and budgets.
- * @returns Parsed `FragmentTree` scoped to the requested context.
+ * @returns Parsed `FragmentTree` scoped to the requested context with non-fatal diagnostics.
  * @throws {Error} When context is invalid, parsing fails, or budgets are exceeded.
  *
  * @example
@@ -266,7 +267,8 @@ export function parseFragment(
  *
  * @param input Stream of HTML bytes.
  * @param options Parse controls including stream budget limits.
- * @returns Promise resolving to parsed `DocumentTree`.
+ * `budgets.maxBufferedBytes` is the main guard for untrusted stream decoding.
+ * @returns Promise resolving to parsed `DocumentTree` with accumulated parse diagnostics.
  * @throws {Error} When stream reading/decoding/parsing fails or budgets are exceeded.
  *
  * @example
@@ -310,9 +312,12 @@ export function serialize(input: SerializableHtml): string {
  * Extracts visible text from a parsed tree or node.
  *
  * @param input Parsed document, fragment, or node.
- * @param options Visible-text extraction controls.
- * @returns Stable text output suitable for indexing/auditing.
- * @throws {Error} Propagated parsing/model errors from caller-supplied structures.
+ * @param options Visible-text extraction controls. Hidden-subtree skipping is
+ * enabled by default; broaden extraction only when you explicitly need more source text.
+ * @returns Stable text output suitable for indexing and plain-text auditing.
+ *
+ * Failure mode:
+ * - This function does not sanitize HTML; it only returns text.
  *
  * @example
  * ```ts
