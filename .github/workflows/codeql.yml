@@ -10,23 +10,20 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  analyze:
-    name: codeql-${{ matrix.lane }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - lane: security-extended
-            queries: security-extended
-            category: "/language:javascript-typescript/security-extended"
-          - lane: security-and-quality
-            queries: security-and-quality
-            category: "/language:javascript-typescript/security-and-quality"
+  codeql-security-extended:
+    name: codeql-security-extended
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
+      actions: read
       contents: read
       security-events: write
     steps:
@@ -37,12 +34,41 @@ jobs:
         uses: github/codeql-action/init@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4
         with:
           languages: javascript-typescript
-          queries: ${{ matrix.queries }}
+          queries: security-extended
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4
 
       - name: Analyze
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         uses: github/codeql-action/analyze@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4
         with:
-          category: ${{ matrix.category }}
+          category: "/language:javascript-typescript/security-extended"
+
+  codeql-security-and-quality:
+    name: codeql-security-and-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4
+
+      - name: Analyze
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+        uses: github/codeql-action/analyze@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4
+        with:
+          category: "/language:javascript-typescript/security-and-quality"
