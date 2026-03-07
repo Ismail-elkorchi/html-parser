@@ -22,7 +22,7 @@ on:
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 
 jobs:
@@ -97,14 +97,26 @@ jobs:
             git diff -- CHANGELOG.md > release-artifacts/changelog-preview.md
           fi
 
-      - name: Apply release notes to published release
-        if: ${{ github.event_name == 'release' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release edit "${{ github.event.release.tag_name }}" --notes-file release-artifacts/release-notes.md
-
       - name: Upload release-note artifacts
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: release-notes-${{ github.run_id }}
           path: release-artifacts/
+
+  publish-release-notes:
+    if: ${{ github.event_name == 'release' }}
+    needs: release-notes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download release-note artifacts
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: release-notes-${{ github.run_id }}
+          path: release-artifacts
+
+      - name: Apply release notes to published release
+        run: gh release edit "${{ github.event.release.tag_name }}" --notes-file release-artifacts/release-notes.md
