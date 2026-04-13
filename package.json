@@ -77,9 +77,9 @@
     "eslint-import-resolver-typescript": "4.4.4",
     "eslint-plugin-boundaries": "5.4.0",
     "eslint-plugin-import": "2.32.0",
-    "playwright": "1.58.2",
+    "playwright": "1.59.1",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.56.0"
+    "typescript-eslint": "8.58.0"
   },
   "volta": {
     "node": "24.13.1"
