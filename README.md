@@ -90,6 +90,21 @@ Run packaged examples:
 npm run examples:run
 ```
 
+## Source Checkout
+
+The conformance corpus is a Git submodule. Clone recursively:
+
+```bash
+git clone --recurse-submodules https://github.com/Ismail-elkorchi/html-parser.git
+```
+
+For an existing checkout, initialize it before running conformance tests:
+
+```bash
+git submodule update --init --recursive
+npm run test:conformance
+```
+
 ## Compatibility
 
 Runtime compatibility matrix:

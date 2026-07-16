@@ -53,8 +53,6 @@ export interface ParseBudgets {
 export interface ParseOptions {
   /** Include source span offsets on nodes and attributes. */
   readonly captureSpans?: boolean;
-  /** Backward-compatible alias for `captureSpans`. */
-  readonly includeSpans?: boolean;
   /** Emit structured parser trace events. */
   readonly trace?: boolean;
   /** Optional transport encoding hint for byte parsing. */
@@ -92,12 +90,7 @@ export interface VisibleTextOptions {
  */
 export interface ParseError {
   /** Stable parse error category. */
-  readonly code:
-    | "BUDGET_EXCEEDED"
-    | "STREAM_READ_FAILED"
-    | "UNSUPPORTED_ENCODING"
-    | "INVALID_FRAGMENT_CONTEXT"
-    | "PARSER_ERROR";
+  readonly code: "PARSER_ERROR";
   /** Deterministic WHATWG parse-error identifier. */
   readonly parseErrorId: string;
   /** Human-readable failure message. */
@@ -267,7 +260,8 @@ export function parseFragment(
  *
  * @param input Stream of HTML bytes.
  * @param options Parse controls including stream budget limits.
- * `budgets.maxBufferedBytes` is the main guard for untrusted stream decoding.
+ * `budgets.maxInputBytes` bounds the full stream and `budgets.maxBufferedBytes`
+ * caps the encoding-prescan memory retained before decoding begins.
  * @returns Promise resolving to parsed `DocumentTree` with accumulated parse diagnostics.
  * @throws {Error} When stream reading/decoding/parsing fails or budgets are exceeded.
  *

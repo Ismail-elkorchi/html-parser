@@ -28,3 +28,7 @@ console.log(tree.kind, tree.children.length);
 
 Expected output:
 - A deterministic `document` tree even when bytes arrive in multiple chunks.
+
+`maxInputBytes` limits the complete transport payload. `maxBufferedBytes` limits
+the prefix retained for encoding sniffing; it does not depend on how the producer
+chunks the same bytes.

@@ -15,6 +15,12 @@ Run before opening a pull request:
 - `npm test`
 - `npm run eval:ci`
 
+The html5lib conformance corpus is a submodule. Initialize it once per checkout:
+
+```bash
+git submodule update --init --recursive
+```
+
 For release-level audits:
 - `npm run eval:release`
 

@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
 
+import { collectDocSymbols } from "./doc-jsr-shape.mjs";
+
 const ENTRYPOINT = "jsr/mod.ts";
 const REQUIRED_SYMBOLS = ["parse", "parseFragment", "parseStream", "visibleText"];
 
@@ -8,7 +10,7 @@ const docJson = JSON.parse(execFileSync("deno", ["doc", "--json", "--sloppy-impo
   maxBuffer: 10 * 1024 * 1024
 }));
 
-const nodes = new Map((docJson.nodes ?? []).map((node) => [node.name, node]));
+const nodes = new Map(collectDocSymbols(docJson).map((node) => [node.name, node]));
 const issues = [];
 
 for (const symbolName of REQUIRED_SYMBOLS) {
