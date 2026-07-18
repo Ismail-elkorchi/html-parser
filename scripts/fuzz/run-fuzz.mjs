@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 
-import { BudgetExceededError, parse } from "../../dist/mod.js";
+import { HtmlBudgetExceededError, parse } from "../../dist/mod.js";
 import { writeJson } from "../eval/eval-primitives.mjs";
 
 const RUNS = 600;
@@ -253,7 +253,7 @@ for (let run = 0; run < RUNS; run += 1) {
       });
     }
   } catch (error) {
-    if (error instanceof BudgetExceededError) {
+    if (error instanceof HtmlBudgetExceededError) {
       budgetErrors += 1;
       outcome = "budget-error";
     } else {

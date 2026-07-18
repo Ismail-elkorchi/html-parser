@@ -95,6 +95,13 @@ async function runBrowserSmoke(baseUrl) {
       const streamParsed = await mod.parseStream(streamFromText(sampleHtml));
       const streamSerialized = mod.serialize(streamParsed);
 
+      let budgetError = null;
+      try {
+        mod.parse("budget", { budgets: { maxInputBytes: 1 } });
+      } catch (error) {
+        budgetError = error;
+      }
+
       const tokenKinds = [];
       for await (const token of mod.tokenizeStream(streamFromText(sampleHtml))) {
         tokenKinds.push(token.kind);
@@ -123,7 +130,12 @@ async function runBrowserSmoke(baseUrl) {
         parseBytes: bytesSerialized.includes("<p>smoke</p>"),
         parseStream: streamSerialized.includes("<p>smoke</p>"),
         parseFragment: fragment.contextTagName === "section",
-        tokenizeStream: tokenKinds.includes("startTag") && tokenKinds.includes("endTag")
+        tokenizeStream: tokenKinds.includes("startTag") && tokenKinds.includes("endTag"),
+        errorGuards: typeof mod.isHtmlBudgetExceededError === "function" &&
+          mod.isHtmlBudgetExceededError(budgetError) &&
+          budgetError.code === "BUDGET_EXCEEDED" &&
+          budgetError.budget === "maxInputBytes" &&
+          !("payload" in budgetError)
       };
       const ok = Object.values(checks).every((value) => value === true);
       return {

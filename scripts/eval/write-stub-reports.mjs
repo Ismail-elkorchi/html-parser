@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import {
-  BudgetExceededError,
+  isHtmlBudgetExceededError,
   chunk,
   outline,
   parse,
@@ -94,7 +94,7 @@ function assertBudgetErrorSync(checks, checkId, budgetKey, executeCheck) {
       observedErrorCode: "NONE"
     });
   } catch (error) {
-    const observedBudgetKey = error instanceof BudgetExceededError ? error.payload.budget : "UNEXPECTED_ERROR";
+    const observedBudgetKey = isHtmlBudgetExceededError(error) ? error.budget : "UNEXPECTED_ERROR";
     checks.push({
       id: checkId,
       ok: observedBudgetKey === budgetKey,
@@ -286,8 +286,8 @@ async function writeStream() {
       { budgets: { maxInputBytes: 6, maxBufferedBytes: 64 } }
     );
   } catch (error) {
-    if (error instanceof BudgetExceededError) {
-      inputBudgetError = error.payload.budget;
+    if (isHtmlBudgetExceededError(error)) {
+      inputBudgetError = error.budget;
     }
   }
 

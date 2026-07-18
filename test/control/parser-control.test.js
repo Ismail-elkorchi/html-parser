@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  BudgetExceededError,
+  HtmlBudgetExceededError,
   parse,
   parseBytes,
   parseFragment,
@@ -44,8 +44,8 @@ test("budget exceed is structured", () => {
   assert.throws(
     () => parse("too-long", { budgets: { maxInputBytes: 2 } }),
     (error) => {
-      assert.ok(error instanceof BudgetExceededError);
-      assert.equal(error.payload.code, "BUDGET_EXCEEDED");
+      assert.ok(error instanceof HtmlBudgetExceededError);
+      assert.equal(error.code, "BUDGET_EXCEEDED");
       return true;
     }
   );
@@ -58,9 +58,9 @@ test("string and fragment input budgets measure UTF-8 bytes", () => {
     () => parseFragment(input, "div", { budgets: { maxInputBytes: 10 } })
   ]) {
     assert.throws(parseInput, (error) => {
-      assert.ok(error instanceof BudgetExceededError);
-      assert.equal(error.payload.budget, "maxInputBytes");
-      assert.equal(error.payload.actual, 20);
+      assert.ok(error instanceof HtmlBudgetExceededError);
+      assert.equal(error.budget, "maxInputBytes");
+      assert.equal(error.actual, 20);
       return true;
     });
   }

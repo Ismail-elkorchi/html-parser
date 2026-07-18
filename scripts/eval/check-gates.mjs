@@ -418,8 +418,8 @@ async function main() {
         publicModule.computePatch("<p>x</p>", [{ kind: "removeNode", target: nonInputNode.id }]);
       } catch (error) {
         patchRejectsNonInputSpan =
-          error instanceof publicModule.PatchPlanningError &&
-          error.payload?.code === "NON_INPUT_SPAN_PROVENANCE";
+          publicModule.isHtmlPatchPlanningError(error) &&
+          error.reason === "NON_INPUT_SPAN_PROVENANCE";
       }
     }
   } catch (error) {

@@ -8,21 +8,33 @@ import {
   type TreeSpan
 } from "../internal/tree/mod.js";
 
+import {
+  HtmlBudgetExceededError,
+  HtmlConfigurationError,
+  HtmlPatchPlanningError,
+  HtmlStreamReadError,
+  isHtmlBudgetExceededError,
+  isHtmlConfigurationError,
+  isHtmlOperationalError,
+  isHtmlPatchPlanningError,
+  isHtmlStreamReadError
+} from "./errors.js";
+
 import type {
   Attribute,
-  BudgetExceededPayload,
   Chunk,
   ChunkOptions,
   DocumentTree,
   Edit,
   ElementVisitor,
   FragmentTree,
+  HtmlBudgetName,
   HtmlNode,
+  HtmlPatchPlanningReason,
   NodeId,
   NodeVisitor,
   Outline,
   OutlineEntry,
-  PatchPlanningErrorPayload,
   PatchPlan,
   PatchStep,
   ParseError,
@@ -42,7 +54,6 @@ import type {
 export type {
   Attribute,
   BudgetOptions,
-  BudgetExceededPayload,
   CharsToken,
   Chunk,
   ChunkOptions,
@@ -56,13 +67,15 @@ export type {
   EofToken,
   ElementNode,
   FragmentTree,
+  HtmlBudgetName,
+  HtmlConfigurationErrorReason,
   HtmlNode,
+  HtmlPatchPlanningReason,
   NodeId,
   NodeKind,
   NodeVisitor,
   Outline,
   OutlineEntry,
-  PatchPlanningErrorPayload,
   PatchInsertStep,
   PatchPlan,
   PatchSliceStep,
@@ -84,6 +97,19 @@ export type {
   VisibleTextTokenWithProvenance
 } from "./types.js";
 
+export {
+  HtmlBudgetExceededError,
+  HtmlConfigurationError,
+  HtmlPatchPlanningError,
+  HtmlStreamReadError,
+  isHtmlBudgetExceededError,
+  isHtmlConfigurationError,
+  isHtmlOperationalError,
+  isHtmlPatchPlanningError,
+  isHtmlStreamReadError
+};
+export type { HtmlOperationalError } from "./errors.js";
+
 const VOID_ELEMENTS = new Set([
   "area",
   "base",
@@ -100,39 +126,7 @@ const VOID_ELEMENTS = new Set([
   "track",
   "wbr"
 ]);
-const STREAM_ENCODING_PRESCAN_BYTES = 16_384;/**
- * Represents a structured public error for `BudgetExceededError` failure cases.
- */
-
-
-export class BudgetExceededError extends Error {
-  readonly payload: BudgetExceededPayload;
-
-  constructor(payload: BudgetExceededPayload) {
-    super(
-      `Budget exceeded: ${payload.budget} limit=${String(payload.limit)} actual=${String(payload.actual)}`
-    );
-    this.name = "BudgetExceededError";
-    this.payload = payload;
-  }
-}/**
- * Represents a structured public error for `PatchPlanningError` failure cases.
- */
-
-
-export class PatchPlanningError extends Error {
-  readonly payload: PatchPlanningErrorPayload;
-
-  constructor(payload: PatchPlanningErrorPayload) {
-    super(
-      `Patch planning failed: ${payload.code}${
-        payload.target === undefined ? "" : ` target=${String(payload.target)}`
-      }`
-    );
-    this.name = "PatchPlanningError";
-    this.payload = payload;
-  }
-}
+const STREAM_ENCODING_PRESCAN_BYTES = 16_384;
 
 class NodeIdAssigner {
   #next: NodeId = 1;
@@ -163,7 +157,7 @@ function toPublicTagName(internalName: string): string {
 }
 
 function enforceBudget(
-  budget: BudgetExceededPayload["budget"],
+  budget: HtmlBudgetName,
   limit: number | undefined,
   actual: number
 ): void {
@@ -171,12 +165,7 @@ function enforceBudget(
     return;
   }
 
-  throw new BudgetExceededError({
-    code: "BUDGET_EXCEEDED",
-    budget,
-    limit,
-    actual
-  });
+  throw new HtmlBudgetExceededError(budget, limit, actual);
 }
 
 function utf8ByteLength(value: string): number {
@@ -218,7 +207,7 @@ function pushTrace(
 
 function pushBudgetTrace(
   trace: TraceEvent[] | undefined,
-  budget: BudgetExceededPayload["budget"],
+  budget: HtmlBudgetName,
   limit: number | undefined,
   actual: number,
   budgets: ParseOptions["budgets"] | undefined
@@ -684,7 +673,11 @@ export function parseFragment(
   const normalizedContext = contextTagName.trim().toLowerCase();
 
   if (normalizedContext.length === 0) {
-    throw new Error("contextTagName must be a non-empty tag name");
+    throw new HtmlConfigurationError(
+      "contextTagName",
+      "INVALID_VALUE",
+      "must be a non-empty tag name"
+    );
   }
 
   const inputByteLength = utf8ByteLength(html);
@@ -831,7 +824,12 @@ async function decodeStreamToText(
   startedAt: number
 ): Promise<StreamDecodeResult> {
   const budgets = options.budgets;
-  const reader = stream.getReader();
+  let reader: ReadableStreamDefaultReader<Uint8Array>;
+  try {
+    reader = stream.getReader();
+  } catch (cause) {
+    throw new HtmlStreamReadError(cause);
+  }
   let total = 0;
   const prescanLimit = Math.max(
     0,
@@ -875,7 +873,12 @@ async function decodeStreamToText(
     }
 
     for (;;) {
-      const next = await reader.read();
+      let next: ReadableStreamReadResult<Uint8Array>;
+      try {
+        next = await reader.read();
+      } catch (cause) {
+        throw new HtmlStreamReadError(cause);
+      }
       if (next.done) {
         break;
       }
@@ -1911,7 +1914,9 @@ export function applyPatchPlan(originalHtml: string, plan: PatchPlan): string {
   for (const step of plan.steps) {
     if (step.kind === "slice") {
       if (step.start < cursor || step.end < step.start || step.end > originalHtml.length) {
-        throw new Error("invalid patch slice bounds");
+        throw new HtmlPatchPlanningError("INVALID_PLAN_SLICE", {
+          detail: "slice bounds must be ordered, non-overlapping, and within the source"
+        });
       }
 
       output += originalHtml.slice(step.start, step.end);
@@ -1920,7 +1925,9 @@ export function applyPatchPlan(originalHtml: string, plan: PatchPlan): string {
     }
 
     if (step.at !== cursor || step.at > originalHtml.length) {
-      throw new Error("invalid patch insertion offset");
+      throw new HtmlPatchPlanningError("INVALID_PLAN_INSERTION", {
+        detail: "insertion offset must equal the current source cursor"
+      });
     }
 
     output += step.text;
@@ -1937,14 +1944,17 @@ interface PlannedReplacement {
   readonly replacementHtml: string;
 }
 
-function failPatchPlanning(payload: PatchPlanningErrorPayload): never {
-  throw new PatchPlanningError(payload);
+function failPatchPlanning(
+  reason: HtmlPatchPlanningReason,
+  options: { readonly target?: NodeId; readonly detail?: string } = {}
+): never {
+  throw new HtmlPatchPlanningError(reason, options);
 }
 
 function requireNode(nodeById: Map<NodeId, HtmlNode>, target: NodeId): HtmlNode {
   const node = nodeById.get(target);
   if (!node) {
-    failPatchPlanning({ code: "NODE_NOT_FOUND", target });
+    failPatchPlanning("NODE_NOT_FOUND", { target });
   }
   return node;
 }
@@ -1952,17 +1962,16 @@ function requireNode(nodeById: Map<NodeId, HtmlNode>, target: NodeId): HtmlNode 
 function requireNodeSpan(spanByNode: Map<NodeId, IndexedNodeSpan>, target: NodeId): Span {
   const indexedSpan = spanByNode.get(target);
   if (!indexedSpan) {
-    failPatchPlanning({ code: "MISSING_NODE_SPAN", target });
+    failPatchPlanning("MISSING_NODE_SPAN", { target });
   }
   if (indexedSpan.provenance !== "input") {
-    failPatchPlanning({
-      code: "NON_INPUT_SPAN_PROVENANCE",
+    failPatchPlanning("NON_INPUT_SPAN_PROVENANCE", {
       target,
       detail: indexedSpan.provenance
     });
   }
   if (!indexedSpan.span) {
-    failPatchPlanning({ code: "MISSING_NODE_SPAN", target });
+    failPatchPlanning("MISSING_NODE_SPAN", { target });
   }
   return indexedSpan.span;
 }
@@ -1970,7 +1979,7 @@ function requireNodeSpan(spanByNode: Map<NodeId, IndexedNodeSpan>, target: NodeI
 function requireElementNode(nodeById: Map<NodeId, HtmlNode>, target: NodeId): Extract<HtmlNode, { kind: "element" }> {
   const node = requireNode(nodeById, target);
   if (node.kind !== "element") {
-    failPatchPlanning({ code: "INVALID_EDIT_TARGET", target, detail: "expected element node target" });
+    failPatchPlanning("INVALID_EDIT_TARGET", { target, detail: "expected element node target" });
   }
   return node;
 }
@@ -1988,7 +1997,7 @@ function buildSetAttrReplacement(
 
   if (existing) {
     if (!existing.span) {
-      failPatchPlanning({ code: "ATTRIBUTE_SPAN_MISSING", target: edit.target, detail: edit.name });
+      failPatchPlanning("ATTRIBUTE_SPAN_MISSING", { target: edit.target, detail: edit.name });
     }
     return {
       sourceIndex,
@@ -2002,7 +2011,7 @@ function buildSetAttrReplacement(
   const elementSpan = requireNodeSpan(spanByNode, edit.target);
   const closeIndex = findElementStartTagClose(originalHtml, elementSpan);
   if (closeIndex === -1) {
-    failPatchPlanning({ code: "ELEMENT_START_TAG_NOT_FOUND", target: edit.target });
+    failPatchPlanning("ELEMENT_START_TAG_NOT_FOUND", { target: edit.target });
   }
   const insertAt = findAttributeInsertOffset(originalHtml, closeIndex, elementSpan.start);
   return {
@@ -2024,16 +2033,16 @@ function buildRemoveAttrReplacement(
   const element = requireElementNode(nodeById, edit.target);
   const existing = element.attributes.find((entry) => entry.name === edit.name);
   if (!existing) {
-    failPatchPlanning({ code: "ATTRIBUTE_NOT_FOUND", target: edit.target, detail: edit.name });
+    failPatchPlanning("ATTRIBUTE_NOT_FOUND", { target: edit.target, detail: edit.name });
   }
   if (!existing.span) {
-    failPatchPlanning({ code: "ATTRIBUTE_SPAN_MISSING", target: edit.target, detail: edit.name });
+    failPatchPlanning("ATTRIBUTE_SPAN_MISSING", { target: edit.target, detail: edit.name });
   }
 
   const elementSpan = requireNodeSpan(spanByNode, edit.target);
   const closeIndex = findElementStartTagClose(originalHtml, elementSpan);
   if (closeIndex === -1) {
-    failPatchPlanning({ code: "ELEMENT_START_TAG_NOT_FOUND", target: edit.target });
+    failPatchPlanning("ELEMENT_START_TAG_NOT_FOUND", { target: edit.target });
   }
 
   let start = existing.span.start;
@@ -2077,7 +2086,7 @@ function buildReplacement(
   if (edit.kind === "replaceText") {
     const node = requireNode(nodeById, edit.target);
     if (node.kind !== "text") {
-      failPatchPlanning({ code: "INVALID_EDIT_TARGET", target: edit.target, detail: "expected text node target" });
+      failPatchPlanning("INVALID_EDIT_TARGET", { target: edit.target, detail: "expected text node target" });
     }
     const span = requireNodeSpan(spanByNode, edit.target);
     return {
@@ -2158,10 +2167,13 @@ export function computePatch(originalHtml: string, edits: readonly Edit[]): Patc
   let previousEnd = 0;
   for (const replacement of replacements) {
     if (replacement.start < 0 || replacement.end < replacement.start || replacement.end > originalHtml.length) {
-      failPatchPlanning({ code: "OVERLAPPING_EDITS", target: replacement.target, detail: "invalid replacement bounds" });
+      failPatchPlanning("OVERLAPPING_EDITS", {
+        target: replacement.target,
+        detail: "invalid replacement bounds"
+      });
     }
     if (replacement.start < previousEnd) {
-      failPatchPlanning({ code: "OVERLAPPING_EDITS", target: replacement.target });
+      failPatchPlanning("OVERLAPPING_EDITS", { target: replacement.target });
     }
     previousEnd = Math.max(previousEnd, replacement.end);
   }

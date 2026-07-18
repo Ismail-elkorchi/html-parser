@@ -1,6 +1,6 @@
 import {
-  BudgetExceededError,
-  PatchPlanningError,
+  isHtmlBudgetExceededError,
+  isHtmlPatchPlanningError,
   applyPatchPlan,
   chunk,
   computePatch,
@@ -111,11 +111,11 @@ function evaluateTraceFeature() {
       }
     });
   } catch (error) {
-    if (error instanceof BudgetExceededError) {
+    if (isHtmlBudgetExceededError(error)) {
       tightBudgetError = {
-        budget: error.payload.budget,
-        limit: error.payload.limit,
-        actual: error.payload.actual
+        budget: error.budget,
+        limit: error.limit,
+        actual: error.actual
       };
     } else {
       throw error;
@@ -257,10 +257,10 @@ function evaluatePatchFeature() {
     try {
       computePatch(source, [{ kind: "removeNode", target: impliedNode.id }]);
     } catch (error) {
-      if (error instanceof PatchPlanningError) {
+      if (isHtmlPatchPlanningError(error)) {
         structuredErrorOk =
-          error.payload.code === "NON_INPUT_SPAN_PROVENANCE" &&
-          error.payload.detail === impliedNode.spanProvenance;
+          error.reason === "NON_INPUT_SPAN_PROVENANCE" &&
+          error.detail === impliedNode.spanProvenance;
       }
     }
   }
@@ -379,11 +379,11 @@ async function captureTokenBudgetFailure(chunks, options) {
     await collectStreamTokens(chunks, options);
     return null;
   } catch (error) {
-    if (error instanceof BudgetExceededError) {
+    if (isHtmlBudgetExceededError(error)) {
       return {
-        budget: error.payload.budget,
-        limit: error.payload.limit,
-        actual: error.payload.actual
+        budget: error.budget,
+        limit: error.limit,
+        actual: error.actual
       };
     }
     throw error;

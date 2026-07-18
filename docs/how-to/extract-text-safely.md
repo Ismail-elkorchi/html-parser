@@ -10,7 +10,7 @@ keeping sanitization as a separate step.
 
 ## Copy/paste
 ```ts
-import { BudgetExceededError, parse, visibleText } from "@ismail-elkorchi/html-parser";
+import { isHtmlBudgetExceededError, parse, visibleText } from "@ismail-elkorchi/html-parser";
 
 const input = `
   <article>
@@ -31,8 +31,8 @@ try {
 
   console.log(visibleText(tree, { trim: true }));
 } catch (error) {
-  if (error instanceof BudgetExceededError) {
-    console.log(error.payload.code, error.payload.budget);
+  if (isHtmlBudgetExceededError(error)) {
+    console.log(error.code, error.budget);
   } else {
     throw error;
   }
@@ -45,7 +45,7 @@ Release Hello world.
 ```
 
 ## Common failure modes
-- `BudgetExceededError` when the input exceeds `maxInputBytes`, `maxNodes`, or
+- `HtmlBudgetExceededError` when the input exceeds `maxInputBytes`, `maxNodes`, or
   `maxDepth`.
 - Hidden or scripted content expectations are wrong because `visibleText()` is
   about deterministic text extraction, not browser execution.

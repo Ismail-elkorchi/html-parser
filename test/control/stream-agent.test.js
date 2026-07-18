@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  BudgetExceededError,
+  HtmlBudgetExceededError,
   chunk,
   outline,
   parse,
@@ -120,8 +120,8 @@ test("parseStream aborts before extra pulls when maxInputBytes is exceeded", asy
   await assert.rejects(
     parseStream(stream, { budgets: { maxInputBytes: 6, maxBufferedBytes: 64 } }),
     (error) => {
-      assert.ok(error instanceof BudgetExceededError);
-      assert.equal(error.payload.budget, "maxInputBytes");
+      assert.ok(error instanceof HtmlBudgetExceededError);
+      assert.equal(error.budget, "maxInputBytes");
       return true;
     }
   );
@@ -150,8 +150,8 @@ test("parseStream cancels and releases its reader after budget failures", async 
       }
     });
 
-    await assert.rejects(parseStream(stream, { budgets }), BudgetExceededError);
-    assert.ok(cancellationReason instanceof BudgetExceededError);
+    await assert.rejects(parseStream(stream, { budgets }), HtmlBudgetExceededError);
+    assert.ok(cancellationReason instanceof HtmlBudgetExceededError);
     assert.equal(stream.locked, false);
   }
 });

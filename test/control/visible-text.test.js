@@ -4,7 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
-  BudgetExceededError,
+  HtmlBudgetExceededError,
   parse,
   visibleText,
   visibleTextTokens,
@@ -108,8 +108,8 @@ test("budget errors remain structured on pathological depth input", () => {
       }
     });
   } catch (error) {
-    if (error instanceof BudgetExceededError) {
-      observed = error.payload;
+    if (error instanceof HtmlBudgetExceededError) {
+      observed = error;
     } else {
       throw error;
     }

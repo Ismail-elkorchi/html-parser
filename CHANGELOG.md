@@ -3,6 +3,9 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Replace nested generic error payloads with HTML-specific operational error
+  classes, direct frozen fields, cross-realm structural guards, and preserved
+  stream-read causes.
 - Parse documents and fragments in a single parse5 pass, report the actual
   context-sensitive token count, and remove the catch-all legacy tokenizer
   fallback and its unused generated entity dataset.

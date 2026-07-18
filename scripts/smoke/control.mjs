@@ -2,7 +2,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import {
-  BudgetExceededError,
+  HtmlBudgetExceededError,
+  isHtmlBudgetExceededError,
   chunk,
   outline,
   parse,
@@ -253,8 +254,10 @@ async function runSmokeAssertions() {
     budgetError = error;
   }
 
-  ensure(budgetError instanceof BudgetExceededError, "expected BudgetExceededError");
-  ensure(budgetError.payload.code === "BUDGET_EXCEEDED", "expected structured budget code");
+  ensure(budgetError instanceof HtmlBudgetExceededError, "expected HtmlBudgetExceededError");
+  ensure(isHtmlBudgetExceededError(budgetError), "expected structural budget classification");
+  ensure(budgetError.code === "BUDGET_EXCEEDED", "expected structured budget code");
+  ensure(budgetError.budget === "maxInputBytes", "expected direct budget field");
 }
 
 async function main() {

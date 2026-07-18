@@ -70,7 +70,8 @@
 
 ### `computePatch(originalHtml, edits)`
 - Generates deterministic patch steps over input spans.
-- Throws `PatchPlanningError` for invalid targets or non-input spans.
+- Throws `HtmlPatchPlanningError` for invalid targets, non-input spans, or
+  invalid plan steps.
 
 ### `applyPatchPlan(originalHtml, plan)`
 - Applies a computed patch plan to produce final HTML.
