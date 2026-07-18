@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BudgetExceededError, parse } from "../../dist/mod.js";
+import { BudgetExceededError, parse, parseFragment } from "../../dist/mod.js";
+
+function tokenCount(result) {
+  const event = result.trace?.find((entry) => entry.kind === "token");
+  assert.ok(event && event.kind === "token");
+  return event.count;
+}
 
 test("trace emits structured events across tokenization and tree phases", () => {
   const traced = parse("<!doctype html><table><tr><td>a</td></tr>outside<tr><td>b</td></tr></table>", {
@@ -56,6 +62,15 @@ test("trace emits structured events across tokenization and tree phases", () => 
   for (const kind of requiredKinds) {
     assert.ok(seenKinds.has(kind));
   }
+});
+
+test("trace counts logical parser tokens once, including EOF", () => {
+  assert.equal(tokenCount(parse("", { trace: true })), 1);
+  assert.equal(
+    tokenCount(parse("<!doctype html><main><p>alpha &amp; beta</p></main>", { trace: true })),
+    7
+  );
+  assert.equal(tokenCount(parseFragment("a<b>&amp;</b>", "textarea", { trace: true })), 2);
 });
 
 test("trace includes parseError events for malformed input", () => {

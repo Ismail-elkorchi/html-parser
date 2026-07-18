@@ -11,7 +11,8 @@ import type {
   TreeNodeDoctype,
   TreeNodeElement,
   TreeNodeText,
-  TreeSpan
+  TreeSpan,
+  TreeTokenKind
 } from "./types.js";
 import type { HtmlToken } from "../tokenizer/tokens.js";
 
@@ -393,6 +394,14 @@ function parseTree(
       options.onParseError?.(normalized);
     }
   };
+
+  if (options.onToken) {
+    Object.assign(parseOptions, {
+      onToken(kind: TreeTokenKind): void {
+        options.onToken?.(kind);
+      }
+    });
+  }
 
   if (options.onInsertionModeTransition) {
     Object.assign(parseOptions, {

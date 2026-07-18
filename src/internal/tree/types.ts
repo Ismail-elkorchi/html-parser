@@ -20,9 +20,18 @@ export interface TreeBuildOptions {
   readonly fragmentContextTagName?: string;
   readonly scriptingEnabled?: boolean;
   readonly captureSpans?: boolean;
+  readonly onToken?: (kind: TreeTokenKind) => void;
   readonly onParseError?: (error: TreeBuilderError) => void;
   readonly onInsertionModeTransition?: (transition: TreeInsertionModeTransition) => void;
 }
+
+export type TreeTokenKind =
+  | "startTag"
+  | "endTag"
+  | "comment"
+  | "doctype"
+  | "character"
+  | "eof";
 
 export interface TreeNodeDocument {
   readonly kind: "document";

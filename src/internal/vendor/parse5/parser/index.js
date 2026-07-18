@@ -55,6 +55,7 @@ const defaultParserOptions = {
     treeAdapter: defaultTreeAdapter,
     onParseError: null,
     onInsertionModeTransition: null,
+    onToken: null,
 };
 function insertionModeName(mode) {
     if (typeof mode !== 'number') {

@@ -11,6 +11,8 @@
 - Type: `boolean`
 - Default: `false`
 - Adds structured trace events for decode/token/parse/budget stages.
+- Token events count logical context-aware tokens consumed by tree construction,
+  coalescing adjacent character chunks and including EOF.
 
 ### `transportEncodingLabel`
 - Type: `string`

@@ -168,15 +168,6 @@ export class EntityDecoder {
         this.state = EntityDecoderState.NumericDecimal;
         return this.stateNumericDecimal(input, offset);
     }
-    addToNumericResult(input, start, end, base) {
-        if (start !== end) {
-            const digitCount = end - start;
-            this.result =
-                this.result * Math.pow(base, digitCount) +
-                    Number.parseInt(input.substr(start, digitCount), base);
-            this.consumed += digitCount;
-        }
-    }
     /**
      * Parses a hexadecimal numeric entity.
      *
@@ -187,18 +178,20 @@ export class EntityDecoder {
      * @returns The number of characters that were consumed, or -1 if the entity is incomplete.
      */
     stateNumericHex(input, offset) {
-        const startIndex = offset;
         while (offset < input.length) {
             const char = input.charCodeAt(offset);
             if (isNumber(char) || isHexadecimalCharacter(char)) {
+                const digit = char <= CharCodes.NINE
+                    ? char - CharCodes.ZERO
+                    : (char | TO_LOWER_BIT) - CharCodes.LOWER_A + 10;
+                this.result = this.result * 16 + digit;
+                this.consumed += 1;
                 offset += 1;
             }
             else {
-                this.addToNumericResult(input, startIndex, offset, 16);
                 return this.emitNumericEntity(char, 3);
             }
         }
-        this.addToNumericResult(input, startIndex, offset, 16);
         return -1;
     }
     /**
@@ -211,18 +204,17 @@ export class EntityDecoder {
      * @returns The number of characters that were consumed, or -1 if the entity is incomplete.
      */
     stateNumericDecimal(input, offset) {
-        const startIndex = offset;
         while (offset < input.length) {
             const char = input.charCodeAt(offset);
             if (isNumber(char)) {
+                this.result = this.result * 10 + (char - CharCodes.ZERO);
+                this.consumed += 1;
                 offset += 1;
             }
             else {
-                this.addToNumericResult(input, startIndex, offset, 10);
                 return this.emitNumericEntity(char, 2);
             }
         }
-        this.addToNumericResult(input, startIndex, offset, 10);
         return -1;
     }
     /**
