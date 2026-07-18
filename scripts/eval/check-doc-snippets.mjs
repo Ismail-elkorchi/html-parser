@@ -96,9 +96,8 @@ async function compileSnippets(snippetFileNames) {
       skipLibCheck: true,
       lib: ["ES2022", "DOM", "DOM.Iterable"],
       types: [],
-      baseUrl: "../..",
       paths: {
-        [CANONICAL_IMPORT_SPECIFIER]: ["dist/mod.d.ts"]
+        [CANONICAL_IMPORT_SPECIFIER]: ["../../dist/mod.d.ts"]
       }
     },
     files: snippetFileNames

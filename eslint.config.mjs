@@ -1,7 +1,8 @@
 import js from "@eslint/js";
+import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
 import tseslint from "typescript-eslint";
 import boundaries from "eslint-plugin-boundaries";
-import importPlugin from "eslint-plugin-import";
+import importPlugin from "eslint-plugin-import-x";
 
 const typedFiles = ["src/**/*.ts", "tests/**/*.ts"];
 
@@ -45,15 +46,15 @@ export default [
     },
     plugins: {
       boundaries,
-      import: importPlugin
+      "import-x": importPlugin
     },
     settings: {
-      "import/resolver": {
-        typescript: {
+      "import-x/resolver-next": [
+        createTypeScriptImportResolver({
           alwaysTryTypes: false,
           project: "./tsconfig.eslint.json"
-        }
-      },
+        })
+      ],
       "boundaries/elements": [
         { "type": "public", "pattern": "src/public/**" },
         { "type": "internal", "pattern": "src/internal/**" },
@@ -69,8 +70,8 @@ export default [
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-misused-promises": "error",
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
-      "import/no-duplicates": "error",
-      "import/order": [
+      "import-x/no-duplicates": "error",
+      "import-x/order": [
         "error",
         {
           "groups": ["builtin", "external", "internal", "parent", "sibling", "index", "type"],
@@ -81,14 +82,25 @@ export default [
           }
         }
       ],
-      "boundaries/element-types": [
+      "boundaries/dependencies": [
         "error",
         {
           "default": "disallow",
-          "rules": [
-            { "from": "public", "allow": ["public", "internal"] },
-            { "from": "internal", "allow": ["internal"] },
-            { "from": "tests", "allow": ["public", "internal", "tests"] }
+          "policies": [
+            {
+              "from": { "element": { "types": "public" } },
+              "allow": { "to": { "element": { "types": { "anyOf": ["public", "internal"] } } } }
+            },
+            {
+              "from": { "element": { "types": "internal" } },
+              "allow": { "to": { "element": { "types": "internal" } } }
+            },
+            {
+              "from": { "element": { "types": "tests" } },
+              "allow": {
+                "to": { "element": { "types": { "anyOf": ["public", "internal", "tests"] } } }
+              }
+            }
           ]
         }
       ]
@@ -97,7 +109,7 @@ export default [
   {
     files: ["src/**/*.ts"],
     rules: {
-      "import/no-nodejs-modules": "error"
+      "import-x/no-nodejs-modules": "error"
     }
   },
   {
