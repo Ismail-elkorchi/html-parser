@@ -135,16 +135,23 @@ function createDebugSnapshot(
 }
 
 function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeResult {
-  const startedAt = Date.now();
+  options.checkpoint?.();
   const tokens: HtmlToken[] = [];
   const errors: TokenizerParseError[] = [];
 
   const parser = new Tokenizer(
     {
-      sourceCodeLocationInfo: false
+      sourceCodeLocationInfo: false,
+      ...(options.checkpoint ? { onProgress: options.checkpoint } : {}),
+      ...(options.onStartTagOpen ? { onStartTagOpen: options.onStartTagOpen } : {}),
+      ...(options.onStartTagAttribute
+        ? { onStartTagAttribute: options.onStartTagAttribute }
+        : {})
     },
     {
       onStartTag(token) {
+        options.checkpoint?.();
+        options.onStartTag?.(token.attrs);
         const attrs: Record<string, string> = {};
         for (const attr of token.attrs) {
           if (attrs[attr.name] === undefined) {
@@ -160,18 +167,21 @@ function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeRe
         });
       },
       onEndTag(token) {
+        options.checkpoint?.();
         tokens.push({
           type: "EndTag",
           name: token.tagName
         });
       },
       onComment(token) {
+        options.checkpoint?.();
         tokens.push({
           type: "Comment",
           data: normalizeCommentData(token.data, options)
         });
       },
       onDoctype(token) {
+        options.checkpoint?.();
         tokens.push({
           type: "Doctype",
           name: token.name ?? "",
@@ -181,24 +191,29 @@ function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeRe
         });
       },
       onCharacter(token) {
+        options.checkpoint?.();
         tokens.push({
           type: "Character",
           data: normalizeCharacterData(token.chars, input, options)
         });
       },
       onWhitespaceCharacter(token) {
+        options.checkpoint?.();
         tokens.push({
           type: "Character",
           data: normalizeCharacterData(token.chars, input, options)
         });
       },
       onNullCharacter(token) {
+        options.checkpoint?.();
         tokens.push({
           type: "Character",
           data: normalizeCharacterData(token.chars, input, options)
         });
       },
       onParseError(error: { readonly code: string; readonly startOffset: number }) {
+        options.checkpoint?.();
+        options.onParseError?.(errors.length + 1);
         const maxParseErrors = options.budgets?.maxParseErrors;
         if (maxParseErrors !== undefined && errors.length >= maxParseErrors) {
           return;
@@ -210,7 +225,7 @@ function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeRe
         });
       },
       onEof() {
-        // No-op.
+        options.checkpoint?.();
       }
     }
   );
@@ -239,11 +254,6 @@ function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeRe
   }
 
   const mergedTokens = mergeAdjacentCharacterTokens(tokens);
-
-  const maxTimeMs = options.budgets?.maxTimeMs;
-  if (maxTimeMs !== undefined && Date.now() - startedAt > maxTimeMs) {
-    errors.push({ code: "soft-time-budget-exceeded", index: input.length });
-  }
 
   enforceBudgets(mergedTokens, errors, options);
 

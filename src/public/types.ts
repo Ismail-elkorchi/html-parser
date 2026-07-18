@@ -24,26 +24,66 @@ export interface ParseError {
   readonly span?: Span;
 }
 
+/** Inclusive, optional resource limits for one parse operation. */
 export interface BudgetOptions {
+  /** UTF-8 bytes for string input; transport bytes for byte and stream input. */
   readonly maxInputBytes?: number;
+  /** Bytes retained only for stream encoding prescan. */
   readonly maxBufferedBytes?: number;
+  /** UTF-8 bytes produced by decoding, checked before retaining each decoded chunk. */
+  readonly maxDecodedUtf8Bytes?: number;
+  /** Public root plus input and parser-recovery node allocations. */
   readonly maxNodes?: number;
+  /** Tree depth with the public document or fragment root at depth one. */
   readonly maxDepth?: number;
+  /** Parse errors emitted while constructing the tree. */
+  readonly maxParseErrors?: number;
+  /** Attempted attributes on one start tag, including duplicates later discarded. */
+  readonly maxAttributesPerElement?: number;
+  /** UTF-8 bytes in attempted attribute names and decoded values on one start tag. */
+  readonly maxAttributeBytes?: number;
+  /** Trace events retained when tracing is enabled. */
   readonly maxTraceEvents?: number;
+  /** Serialized trace bytes retained when tracing is enabled. */
   readonly maxTraceBytes?: number;
+  /** Elapsed milliseconds measured by the monotonic runtime clock. */
   readonly maxTimeMs?: number;
 }
 
+/** Options accepted by document, byte, fragment, and stream parse entrypoints. */
 export interface ParseOptions {
   readonly captureSpans?: boolean;
   readonly trace?: boolean;
   readonly transportEncodingLabel?: string;
   readonly budgets?: BudgetOptions;
+  readonly signal?: AbortSignal;
 }
 
+/** Resource limits that apply to byte-stream decoding and token emission. */
+export type TokenizeStreamBudgetOptions = Pick<
+  BudgetOptions,
+  | "maxInputBytes"
+  | "maxBufferedBytes"
+  | "maxDecodedUtf8Bytes"
+  | "maxParseErrors"
+  | "maxAttributesPerElement"
+  | "maxAttributeBytes"
+  | "maxTimeMs"
+>;
+
+/** Options accepted by byte-stream tokenization. */
 export interface TokenizeStreamOptions {
   readonly transportEncodingLabel?: string;
-  readonly budgets?: BudgetOptions;
+  readonly budgets?: TokenizeStreamBudgetOptions;
+  readonly signal?: AbortSignal;
+}
+
+/** Deadline and cancellation controls for one non-parse operation. */
+export interface OperationOptions {
+  /** Inclusive elapsed-time limit measured with the monotonic runtime clock. */
+  readonly maxTimeMs?: number;
+  /** Cancels the operation with an `HtmlAbortError` carrying this signal's reason. */
+  readonly signal?: AbortSignal;
 }
 
 export interface TokenAttribute {
@@ -235,13 +275,13 @@ export interface Chunk {
   readonly nodes: number;
 }
 
-export interface ChunkOptions {
+export interface ChunkOptions extends OperationOptions {
   readonly maxChars?: number;
   readonly maxNodes?: number;
   readonly maxBytes?: number;
 }
 
-export interface VisibleTextOptions {
+export interface VisibleTextOptions extends OperationOptions {
   readonly skipHiddenSubtrees?: boolean;
   readonly includeControlValues?: boolean;
   readonly includeAccessibleNameFallback?: boolean;
@@ -383,8 +423,12 @@ export interface PatchPlan {
 export type HtmlBudgetName =
   | "maxInputBytes"
   | "maxBufferedBytes"
+  | "maxDecodedUtf8Bytes"
   | "maxNodes"
   | "maxDepth"
+  | "maxParseErrors"
+  | "maxAttributesPerElement"
+  | "maxAttributeBytes"
   | "maxTraceEvents"
   | "maxTraceBytes"
   | "maxTimeMs";

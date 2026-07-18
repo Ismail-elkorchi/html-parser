@@ -102,6 +102,16 @@ async function runBrowserSmoke(baseUrl) {
         budgetError = error;
       }
 
+      const abortReason = { source: "browser-smoke" };
+      const abortController = new globalThis.AbortController();
+      abortController.abort(abortReason);
+      let abortError = null;
+      try {
+        mod.parse("abort", { signal: abortController.signal });
+      } catch (error) {
+        abortError = error;
+      }
+
       const tokenKinds = [];
       for await (const token of mod.tokenizeStream(streamFromText(sampleHtml))) {
         tokenKinds.push(token.kind);
@@ -135,7 +145,13 @@ async function runBrowserSmoke(baseUrl) {
           mod.isHtmlBudgetExceededError(budgetError) &&
           budgetError.code === "BUDGET_EXCEEDED" &&
           budgetError.budget === "maxInputBytes" &&
-          !("payload" in budgetError)
+          !("payload" in budgetError),
+        abortGuards: typeof mod.HtmlAbortError === "function" &&
+          typeof mod.isHtmlAbortError === "function" &&
+          abortError instanceof mod.HtmlAbortError &&
+          mod.isHtmlAbortError(abortError) &&
+          abortError.code === "ABORTED" &&
+          abortError.cause === abortReason
       };
       const ok = Object.values(checks).every((value) => value === true);
       return {

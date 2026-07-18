@@ -65,7 +65,6 @@ export interface TokenizerBudgets {
   readonly maxTextBytes?: number;
   readonly maxTokenBytes?: number;
   readonly maxParseErrors?: number;
-  readonly maxTimeMs?: number;
 }
 
 export interface TokenizerDebugOptions {
@@ -76,6 +75,11 @@ export interface TokenizerDebugOptions {
 
 export interface TokenizeOptions {
   readonly budgets?: TokenizerBudgets;
+  readonly checkpoint?: () => void;
+  readonly onParseError?: (count: number) => void;
+  readonly onStartTagOpen?: () => void;
+  readonly onStartTagAttribute?: (value: string, start: boolean) => void;
+  readonly onStartTag?: (attributes: readonly Readonly<{ readonly name: string; readonly value: string }>[]) => void;
   readonly debug?: TokenizerDebugOptions;
   readonly initialState?: TokenizerInitialState;
   readonly lastStartTag?: string;

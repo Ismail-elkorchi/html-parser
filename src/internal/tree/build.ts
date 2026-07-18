@@ -1,4 +1,9 @@
-import { parse, parseFragment } from "../parse5-runtime.js";
+import {
+  defaultTreeAdapter,
+  parse,
+  parseFragment,
+  type Parse5TokenDetails
+} from "../parse5-runtime.js";
 
 import type {
   TreeAttribute,
@@ -57,7 +62,7 @@ interface Parse5Element extends Parse5ParentNode {
 
 interface Parse5TextNode extends Parse5NodeBase {
   readonly nodeName: "#text";
-  readonly value: string;
+  value: string;
 }
 
 interface Parse5CommentNode extends Parse5NodeBase {
@@ -78,6 +83,32 @@ type Parse5ChildNode =
   | Parse5DocumentType
   | Parse5Element;
 
+type Parse5AnyNode = Parse5Document | Parse5DocumentFragment | Parse5ChildNode;
+
+interface Parse5TreeAdapter {
+  createDocument(): Parse5Document;
+  createDocumentFragment(): Parse5DocumentFragment;
+  createElement(tagName: string, namespaceURI: string, attrs: Parse5Attribute[]): Parse5Element;
+  createCommentNode(data: string): Parse5CommentNode;
+  createTextNode(value: string): Parse5TextNode;
+  appendChild(parentNode: Parse5ParentNode, newNode: Parse5ChildNode): void;
+  insertBefore(parentNode: Parse5ParentNode, newNode: Parse5ChildNode, referenceNode: Parse5ChildNode): void;
+  setTemplateContent(templateElement: Parse5Element, contentElement: Parse5DocumentFragment): void;
+  getTemplateContent(templateElement: Parse5Element): Parse5DocumentFragment;
+  setDocumentType(document: Parse5Document, name: string, publicId: string, systemId: string): void;
+  detachNode(node: Parse5ChildNode): void;
+  insertText(parentNode: Parse5ParentNode, text: string): void;
+  insertTextBefore(parentNode: Parse5ParentNode, text: string, referenceNode: Parse5ChildNode): void;
+  adoptAttributes(recipient: Parse5Element, attrs: Parse5Attribute[]): void;
+  getFirstChild(node: Parse5ParentNode): Parse5ChildNode | undefined;
+  getChildNodes(node: Parse5ParentNode): Parse5ChildNode[];
+  getParentNode(node: Parse5AnyNode): Parse5ParentNode | null | undefined;
+  getAttrList(element: Parse5Element): Parse5Attribute[];
+  isTextNode(node: Parse5AnyNode): node is Parse5TextNode;
+  isDocumentTypeNode(node: Parse5AnyNode): node is Parse5DocumentType;
+  readonly [key: PropertyKey]: unknown;
+}
+
 interface SourceLocationLike {
   readonly startOffset?: number;
   readonly endOffset?: number;
@@ -86,14 +117,300 @@ interface SourceLocationLike {
 }
 
 interface BuildState {
-  readonly budgets: TreeBudgets | undefined;
   readonly captureSpans: boolean;
-  readonly errors: TreeBuilderError[];
-  nodeCount: number;
+  readonly checkpoint: (() => void) | undefined;
 }
 
-function pushError(errors: TreeBuilderError[], code: string, tokenIndex = 0): void {
-  errors.push({ code, tokenIndex });
+export type TreeBudgetName =
+  | "maxNodes"
+  | "maxDepth"
+  | "maxParseErrors"
+  | "maxAttributesPerElement"
+  | "maxAttributeBytes";
+
+/** Internal hard-stop signal mapped to the public budget error at the package boundary. */
+export class TreeBudgetExceededError extends Error {
+  readonly budget: TreeBudgetName;
+  readonly limit: number;
+  readonly actual: number;
+
+  constructor(budget: TreeBudgetName, limit: number, actual: number) {
+    super(`Tree budget exceeded: ${budget} limit=${String(limit)} actual=${String(actual)}`);
+    this.name = "TreeBudgetExceededError";
+    this.budget = budget;
+    this.limit = limit;
+    this.actual = actual;
+  }
+}
+
+class TreeBudgetController {
+  readonly adapter: Parse5TreeAdapter;
+  readonly #budgets: TreeBudgets | undefined;
+  readonly #checkpoint: (() => void) | undefined;
+  readonly #fragment: boolean;
+  readonly #depths = new WeakMap<object, number>();
+  readonly #templateContents = new WeakMap<object, Parse5DocumentFragment>();
+  readonly #encoder = new TextEncoder();
+  #nodeCount: number;
+  #parseErrorCount = 0;
+  #currentStartTagAttributeCount = 0;
+  #currentStartTagAttributeBytes = 0;
+  #afterEof = false;
+  #fragmentDocumentMockSeen = false;
+  #fragmentFakeRootSeen = false;
+
+  constructor(budgets: TreeBudgets | undefined, checkpoint: (() => void) | undefined, fragment: boolean) {
+    this.#budgets = budgets;
+    this.#checkpoint = checkpoint;
+    this.#fragment = fragment;
+    this.#nodeCount = fragment ? 1 : 0;
+    if (fragment) {
+      this.#enforce("maxNodes", this.#nodeCount);
+      this.#enforce("maxDepth", 1);
+    }
+    this.adapter = this.#createAdapter();
+  }
+
+  checkpoint(): void {
+    this.#checkpoint?.();
+  }
+
+  markEof(): void {
+    this.#afterEof = true;
+  }
+
+  recordParseError(): void {
+    this.checkpoint();
+    this.#parseErrorCount += 1;
+    this.#enforce("maxParseErrors", this.#parseErrorCount);
+  }
+
+  startTag(): void {
+    this.checkpoint();
+    this.#currentStartTagAttributeCount = 0;
+    this.#currentStartTagAttributeBytes = 0;
+  }
+
+  appendStartTagAttribute(value: string, start: boolean): void {
+    this.checkpoint();
+    if (start) {
+      this.#currentStartTagAttributeCount += 1;
+      this.#enforce("maxAttributesPerElement", this.#currentStartTagAttributeCount);
+    }
+    this.#currentStartTagAttributeBytes += this.#encoder.encode(value).byteLength;
+    this.#enforce("maxAttributeBytes", this.#currentStartTagAttributeBytes);
+  }
+
+  createRecoveryElement(tagName: string, namespaceURI: string): Parse5Element {
+    return this.adapter.createElement(tagName, namespaceURI, []);
+  }
+
+  recheckSubtreeDepth(root: Parse5AnyNode): void {
+    this.#assignSubtreeDepth(root, this.#depths.get(root) ?? 1);
+  }
+
+  checkAttributes(attrs: readonly Parse5Attribute[]): void {
+    this.checkpoint();
+    const maxAttributes = this.#budgets?.maxAttributesPerElement;
+    if (maxAttributes !== undefined && attrs.length > maxAttributes) {
+      throw new TreeBudgetExceededError(
+        "maxAttributesPerElement",
+        maxAttributes,
+        maxAttributes + 1
+      );
+    }
+
+    const maxBytes = this.#budgets?.maxAttributeBytes;
+    if (maxBytes === undefined) {
+      return;
+    }
+    let bytes = 0;
+    for (const attribute of attrs) {
+      bytes += this.#encoder.encode(attribute.name).byteLength;
+      bytes += this.#encoder.encode(attribute.value).byteLength;
+      if (bytes > maxBytes) {
+        throw new TreeBudgetExceededError("maxAttributeBytes", maxBytes, maxBytes + 1);
+      }
+    }
+  }
+
+  #enforce(budget: TreeBudgetName, actual: number): void {
+    this.checkpoint();
+    const limit = this.#budgets?.[budget];
+    if (limit !== undefined && actual > limit) {
+      throw new TreeBudgetExceededError(budget, limit, limit + 1);
+    }
+  }
+
+  #countNode(): void {
+    this.#nodeCount += 1;
+    this.#enforce("maxNodes", this.#nodeCount);
+  }
+
+  #isFragmentInfrastructureElement(tagName: string): boolean {
+    if (!this.#fragment || this.#afterEof) {
+      return false;
+    }
+    if (!this.#fragmentDocumentMockSeen && tagName === "documentmock") {
+      this.#fragmentDocumentMockSeen = true;
+      return true;
+    }
+    if (this.#fragmentDocumentMockSeen && !this.#fragmentFakeRootSeen && tagName === "html") {
+      this.#fragmentFakeRootSeen = true;
+      return true;
+    }
+    return false;
+  }
+
+  #assignSubtreeDepth(root: Parse5AnyNode, rootDepth: number): void {
+    const stack: { readonly node: Parse5AnyNode; readonly depth: number }[] = [
+      { node: root, depth: rootDepth }
+    ];
+    while (stack.length > 0) {
+      const entry = stack.pop();
+      if (!entry) {
+        continue;
+      }
+      this.#depths.set(entry.node, entry.depth);
+      this.#enforce("maxDepth", entry.depth);
+      if ("childNodes" in entry.node) {
+        for (let index = entry.node.childNodes.length - 1; index >= 0; index -= 1) {
+          const child = entry.node.childNodes[index];
+          if (child) {
+            stack.push({ node: child, depth: entry.depth + 1 });
+          }
+        }
+      }
+      const templateContent = this.#templateContents.get(entry.node);
+      if (templateContent) {
+        stack.push({ node: templateContent, depth: entry.depth + 1 });
+      }
+    }
+  }
+
+  #createAdapter(): Parse5TreeAdapter {
+    const base = defaultTreeAdapter as Parse5TreeAdapter;
+    const depths = this.#depths;
+    const templateContents = this.#templateContents;
+    const countNode = (): void => {
+      this.#countNode();
+    };
+    const enforceDepth = (depth: number): void => {
+      this.#enforce("maxDepth", depth);
+    };
+    const isFinalFragmentRoot = (): boolean => this.#fragment && this.#afterEof;
+    const isFragmentInfrastructureElement = (tagName: string): boolean =>
+      this.#isFragmentInfrastructureElement(tagName);
+    const checkAttributes = (attrs: readonly Parse5Attribute[]): void => {
+      this.checkAttributes(attrs);
+    };
+    const assignSubtreeDepth = (node: Parse5AnyNode, depth: number): void => {
+      this.#assignSubtreeDepth(node, depth);
+    };
+    const adapter: Parse5TreeAdapter = {
+      ...base,
+      createDocument(): Parse5Document {
+        countNode();
+        const document = base.createDocument();
+        depths.set(document, 1);
+        enforceDepth(1);
+        return document;
+      },
+      createDocumentFragment(): Parse5DocumentFragment {
+        const isFinalRoot = isFinalFragmentRoot();
+        if (!isFinalRoot) {
+          countNode();
+        }
+        const fragment = base.createDocumentFragment();
+        if (isFinalRoot) {
+          depths.set(fragment, 1);
+        }
+        return fragment;
+      },
+      createElement(tagName: string, namespaceURI: string, attrs: Parse5Attribute[]): Parse5Element {
+        checkAttributes(attrs);
+        const infrastructure = isFragmentInfrastructureElement(tagName);
+        if (!infrastructure) {
+          countNode();
+        }
+        const element = base.createElement(tagName, namespaceURI, attrs);
+        if (infrastructure) {
+          depths.set(element, tagName === "documentmock" ? 0 : 1);
+        }
+        return element;
+      },
+      createCommentNode(data: string): Parse5CommentNode {
+        countNode();
+        return base.createCommentNode(data);
+      },
+      createTextNode(value: string): Parse5TextNode {
+        countNode();
+        return base.createTextNode(value);
+      },
+      appendChild(parentNode: Parse5ParentNode, newNode: Parse5ChildNode): void {
+        base.appendChild(parentNode, newNode);
+        const parentDepth = depths.get(parentNode) ?? 1;
+        assignSubtreeDepth(newNode, parentDepth + 1);
+      },
+      insertBefore(
+        parentNode: Parse5ParentNode,
+        newNode: Parse5ChildNode,
+        referenceNode: Parse5ChildNode
+      ): void {
+        base.insertBefore(parentNode, newNode, referenceNode);
+        const parentDepth = depths.get(parentNode) ?? 1;
+        assignSubtreeDepth(newNode, parentDepth + 1);
+      },
+      setTemplateContent(templateElement: Parse5Element, contentElement: Parse5DocumentFragment): void {
+        base.setTemplateContent(templateElement, contentElement);
+        templateContents.set(templateElement, contentElement);
+        const templateDepth = depths.get(templateElement);
+        if (templateDepth !== undefined) {
+          assignSubtreeDepth(contentElement, templateDepth + 1);
+        }
+      },
+      setDocumentType(document: Parse5Document, name: string, publicId: string, systemId: string): void {
+        const existing = base.getChildNodes(document).find((node) => base.isDocumentTypeNode(node));
+        if (!existing) {
+          countNode();
+        }
+        base.setDocumentType(document, name, publicId, systemId);
+        const doctype = base.getChildNodes(document).find((node) => base.isDocumentTypeNode(node));
+        if (doctype) {
+          const documentDepth = depths.get(document) ?? 1;
+          assignSubtreeDepth(doctype, documentDepth + 1);
+        }
+      },
+      insertText(parentNode: Parse5ParentNode, text: string): void {
+        const children = base.getChildNodes(parentNode);
+        const previous = children[children.length - 1];
+        if (previous && base.isTextNode(previous)) {
+          previous.value += text;
+          return;
+        }
+        adapter.appendChild(parentNode, adapter.createTextNode(text));
+      },
+      insertTextBefore(parentNode: Parse5ParentNode, text: string, referenceNode: Parse5ChildNode): void {
+        const children = base.getChildNodes(parentNode);
+        const previous = children[children.indexOf(referenceNode) - 1];
+        if (previous && base.isTextNode(previous)) {
+          previous.value += text;
+          return;
+        }
+        adapter.insertBefore(parentNode, adapter.createTextNode(text), referenceNode);
+      },
+      adoptAttributes(recipient: Parse5Element, attrs: Parse5Attribute[]): void {
+        const existingNames = new Set(base.getAttrList(recipient).map((attribute) => attribute.name));
+        const combined = [
+          ...base.getAttrList(recipient),
+          ...attrs.filter((attribute) => !existingNames.has(attribute.name))
+        ];
+        checkAttributes(combined);
+        base.adoptAttributes(recipient, attrs);
+      }
+    };
+    return adapter;
+  }
 }
 
 function pushParseError(
@@ -113,18 +430,6 @@ function pushParseError(
   };
   errors.push(next);
   return next;
-}
-
-function enforceTreeBudgets(depth: number, state: BuildState, tokenIndex: number): void {
-  const maxDepth = state.budgets?.maxDepth;
-  if (maxDepth !== undefined && depth > maxDepth) {
-    pushError(state.errors, "max-depth-exceeded", tokenIndex);
-  }
-
-  const maxNodes = state.budgets?.maxNodes;
-  if (maxNodes !== undefined && state.nodeCount > maxNodes) {
-    pushError(state.errors, "max-nodes-exceeded", tokenIndex);
-  }
 }
 
 function formatElementName(namespaceURI: string, tagName: string): string {
@@ -195,21 +500,14 @@ function toElementTreeSpan(location: SourceLocationLike | undefined): TreeSpan |
 function normalizeAttributes(
   attrs: readonly Parse5Attribute[],
   state: BuildState,
-  tokenIndex: number,
   sourceLocation: SourceLocationLike | undefined
 ): readonly TreeAttribute[] {
-  const maxAttributesPerElement = state.budgets?.maxAttributesPerElement;
-  if (maxAttributesPerElement !== undefined && attrs.length > maxAttributesPerElement) {
-    pushError(state.errors, "max-attributes-per-element-exceeded", tokenIndex);
-  }
-
   const normalized: TreeAttribute[] = [];
   const seen = new Set<string>();
-  let totalAttributeBytes = 0;
 
   for (const attr of attrs) {
+    state.checkpoint?.();
     const name = formatAttributeName(attr);
-    totalAttributeBytes += name.length + attr.value.length;
 
     if (seen.has(name)) {
       continue;
@@ -226,11 +524,6 @@ function normalizeAttributes(
         ...(span ? { span } : {})
       })
     );
-  }
-
-  const maxAttributeBytes = state.budgets?.maxAttributeBytes;
-  if (maxAttributeBytes !== undefined && totalAttributeBytes > maxAttributeBytes) {
-    pushError(state.errors, "max-attribute-bytes-exceeded", tokenIndex);
   }
 
   return Object.freeze(normalized);
@@ -305,8 +598,12 @@ function createFragmentContext(fragmentContextTagName: string): Parse5Element | 
   return null;
 }
 
-function patchSelectAdoptionCompatibility(root: Parse5Document | Parse5DocumentFragment): void {
+function patchSelectAdoptionCompatibility(
+  root: Parse5Document | Parse5DocumentFragment,
+  controller: TreeBudgetController
+): void {
   const walk = (node: Parse5ParentNode): void => {
+    controller.checkpoint();
     for (const child of node.childNodes) {
       if ("childNodes" in child) {
         walk(child);
@@ -341,30 +638,20 @@ function patchSelectAdoptionCompatibility(root: Parse5Document | Parse5DocumentF
         continue;
       }
 
-      const leftWrapper: Parse5Element = {
-        nodeName: "b",
-        tagName: "b",
-        attrs: [],
-        namespaceURI: left.namespaceURI,
-        parentNode: left,
-        childNodes: [selectChild]
-      };
+      const leftWrapper = controller.createRecoveryElement("b", left.namespaceURI);
 
       selectChild.parentNode = leftWrapper;
+      leftWrapper.parentNode = left;
+      leftWrapper.childNodes = [selectChild];
       left.childNodes = [leftWrapper];
 
       const detachedTextNodes = right.childNodes.filter((child) => child.nodeName === "#text");
       right.childNodes = right.childNodes.filter((child) => child.nodeName !== "#text");
 
-      const rightWrapper: Parse5Element = {
-        nodeName: "b",
-        tagName: "b",
-        attrs: [],
-        namespaceURI: right.namespaceURI,
-        parentNode: node,
-        childNodes: [right]
-      };
+      const rightWrapper = controller.createRecoveryElement("b", right.namespaceURI);
 
+      rightWrapper.parentNode = node;
+      rightWrapper.childNodes = [right];
       right.parentNode = rightWrapper;
       node.childNodes[index + 1] = rightWrapper;
 
@@ -379,29 +666,55 @@ function patchSelectAdoptionCompatibility(root: Parse5Document | Parse5DocumentF
   };
 
   walk(root);
+  controller.recheckSubtreeDepth(root);
 }
 
 function parseTree(
   input: string,
+  budgets: TreeBudgets | undefined,
   options: TreeBuildOptions,
   errors: TreeBuilderError[]
 ): Parse5Document | Parse5DocumentFragment {
+  const controller = new TreeBudgetController(
+    budgets,
+    options.checkpoint,
+    options.fragmentContextTagName !== undefined
+  );
   const parseOptions = {
     scriptingEnabled: options.scriptingEnabled ?? true,
     sourceCodeLocationInfo: options.captureSpans ?? false,
+    treeAdapter: controller.adapter,
+    onProgress(): void {
+      controller.checkpoint();
+    },
     onParseError(error: { readonly code: string; readonly startOffset?: number; readonly endOffset?: number }): void {
+      controller.recordParseError();
       const normalized = pushParseError(errors, error);
       options.onParseError?.(normalized);
     }
   };
 
-  if (options.onToken) {
-    Object.assign(parseOptions, {
-      onToken(kind: TreeTokenKind): void {
-        options.onToken?.(kind);
+  Object.assign(parseOptions, {
+    onStartTagOpen(): void {
+      controller.startTag();
+    },
+    onStartTagAttribute(value: string, start: boolean): void {
+      controller.appendStartTagAttribute(value, start);
+    },
+    onToken(kind: TreeTokenKind, token: Parse5TokenDetails): void {
+      controller.checkpoint();
+      const attrs = token.attrs;
+      if (kind === "startTag" && attrs) {
+        controller.checkAttributes(attrs);
       }
-    });
-  }
+      if (kind === "eof") {
+        controller.markEof();
+      }
+      options.onToken?.(kind, {
+        ...(attrs ? { attributes: attrs } : {})
+      });
+    }
+  });
 
   if (options.onInsertionModeTransition) {
     Object.assign(parseOptions, {
@@ -418,22 +731,23 @@ function parseTree(
     });
   }
 
+  let parsed: Parse5Document | Parse5DocumentFragment;
   if (options.fragmentContextTagName !== undefined) {
     const context = createFragmentContext(options.fragmentContextTagName);
-    return parseFragment(context, input, parseOptions) as Parse5DocumentFragment;
+    parsed = parseFragment(context, input, parseOptions) as Parse5DocumentFragment;
+  } else {
+    parsed = parse(input, parseOptions) as Parse5Document;
   }
-
-  return parse(input, parseOptions) as Parse5Document;
+  patchSelectAdoptionCompatibility(parsed, controller);
+  return parsed;
 }
 
 function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): TreeNode | null {
+  state.checkpoint?.();
   const sourceLocation = state.captureSpans ? asSourceLocation(node.sourceCodeLocation) : undefined;
   const nodeSpan = toTreeSpan(sourceLocation);
 
   if (isTextNode(node)) {
-    state.nodeCount += 1;
-    enforceTreeBudgets(depth, state, 0);
-
     const textNode: TreeNodeText = {
       kind: "text",
       value: readString(node.value),
@@ -444,9 +758,6 @@ function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): T
   }
 
   if (isCommentNode(node)) {
-    state.nodeCount += 1;
-    enforceTreeBudgets(depth, state, 0);
-
     const commentNode: TreeNodeComment = {
       kind: "comment",
       value: readString(node.data),
@@ -457,9 +768,6 @@ function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): T
   }
 
   if (isDocumentTypeNode(node)) {
-    state.nodeCount += 1;
-    enforceTreeBudgets(depth, state, 0);
-
     const doctypeNode: TreeNodeDoctype = {
       kind: "doctype",
       name: readString(node.name),
@@ -475,9 +783,6 @@ function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): T
     return null;
   }
 
-  state.nodeCount += 1;
-  enforceTreeBudgets(depth, state, 0);
-
   const children: TreeNode[] = [];
   for (const child of node.childNodes) {
     const converted = convertNode(child, depth + 1, state);
@@ -490,7 +795,7 @@ function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): T
   const elementNode: TreeNodeElement = {
     kind: "element",
     name: formatElementName(node.namespaceURI, node.tagName),
-    attributes: normalizeAttributes(node.attrs, state, 0, sourceLocation),
+    attributes: normalizeAttributes(node.attrs, state, sourceLocation),
     children,
     ...(elementSpan ? { span: elementSpan } : {})
   };
@@ -558,14 +863,11 @@ export function buildTreeFromHtml(
   options: TreeBuildOptions = {}
 ): TreeBuildResult {
   const errors: TreeBuilderError[] = [];
-  const parsed = parseTree(input, options, errors);
-  patchSelectAdoptionCompatibility(parsed);
+  const parsed = parseTree(input, budgets, options, errors);
 
   const state: BuildState = {
-    budgets,
     captureSpans: options.captureSpans ?? false,
-    errors,
-    nodeCount: 0
+    checkpoint: options.checkpoint
   };
 
   const children: TreeNode[] = [];

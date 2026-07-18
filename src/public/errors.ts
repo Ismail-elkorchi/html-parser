@@ -27,8 +27,12 @@ function hasErrorShape(record: UnknownRecord): boolean {
 const BUDGET_NAMES: ReadonlySet<string> = new Set<HtmlBudgetName>([
   "maxInputBytes",
   "maxBufferedBytes",
+  "maxDecodedUtf8Bytes",
   "maxNodes",
   "maxDepth",
+  "maxParseErrors",
+  "maxAttributesPerElement",
+  "maxAttributeBytes",
   "maxTraceEvents",
   "maxTraceBytes",
   "maxTimeMs"
@@ -142,6 +146,21 @@ export class HtmlStreamReadError extends Error {
   }
 }
 
+/** An HTML parser operation was cancelled through its abort signal. */
+export class HtmlAbortError extends Error {
+  /** Stable structural discriminator for cancellation. */
+  readonly code = "ABORTED";
+  /** Exact reason exposed by the aborted signal. */
+  declare readonly cause: unknown;
+
+  /** Creates an immutable cancellation failure that preserves the signal reason. */
+  constructor(cause: unknown) {
+    super("HTML parser operation aborted", { cause });
+    this.name = "HtmlAbortError";
+    Object.freeze(this);
+  }
+}
+
 /** Classifies budget failures across JavaScript realms and package copies. */
 export function isHtmlBudgetExceededError(value: unknown): value is HtmlBudgetExceededError {
   if (!isRecord(value)) {
@@ -207,8 +226,21 @@ export function isHtmlStreamReadError(value: unknown): value is HtmlStreamReadEr
   }
 }
 
+/** Classifies HTML parser cancellation across realms and package copies. */
+export function isHtmlAbortError(value: unknown): value is HtmlAbortError {
+  if (!isRecord(value)) {
+    return false;
+  }
+  try {
+    return hasErrorShape(value) && value["code"] === "ABORTED" && "cause" in value;
+  } catch {
+    return false;
+  }
+}
+
 /** Any structured operational failure thrown by the HTML parser. */
 export type HtmlOperationalError =
+  | HtmlAbortError
   | HtmlBudgetExceededError
   | HtmlConfigurationError
   | HtmlPatchPlanningError
@@ -216,7 +248,8 @@ export type HtmlOperationalError =
 
 /** Classifies any structured operational failure exported by this package. */
 export function isHtmlOperationalError(value: unknown): value is HtmlOperationalError {
-  return isHtmlBudgetExceededError(value) ||
+  return isHtmlAbortError(value) ||
+    isHtmlBudgetExceededError(value) ||
     isHtmlConfigurationError(value) ||
     isHtmlPatchPlanningError(value) ||
     isHtmlStreamReadError(value);

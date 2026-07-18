@@ -206,7 +206,13 @@ export class Tokenizer {
         if (this.inLoop)
             return;
         this.inLoop = true;
+        let progressCounter = 0;
         while (this.active && !this.paused) {
+            progressCounter++;
+            if (progressCounter >= 1024) {
+                this.options.onProgress?.();
+                progressCounter = 0;
+            }
             this.consumedAfterSnapshot = 0;
             const cp = this._consume();
             if (!this._ensureHibernation()) {
@@ -276,6 +282,7 @@ export class Tokenizer {
     }
     //Token creation
     _createStartTagToken() {
+        this.options.onStartTagOpen?.();
         this.currentToken = {
             type: TokenType.START_TAG,
             tagName: '',
@@ -323,11 +330,20 @@ export class Tokenizer {
     }
     //Tag attributes
     _createAttr(attrNameFirstCh) {
+        if (this.currentToken?.type === TokenType.START_TAG) {
+            this.options.onStartTagAttribute?.(attrNameFirstCh, true);
+        }
         this.currentAttr = {
             name: attrNameFirstCh,
             value: '',
         };
         this.currentLocation = this.getCurrentLocation(0);
+    }
+    _appendToCurrentAttr(field, value) {
+        if (this.currentToken?.type === TokenType.START_TAG) {
+            this.options.onStartTagAttribute?.(value, false);
+        }
+        this.currentAttr[field] += value;
     }
     _leaveAttrName() {
         var _a;
@@ -368,7 +384,7 @@ export class Tokenizer {
         const ct = this.currentToken;
         this.prepareToken(ct);
         ct.tagID = getTagID(ct.tagName);
-        this.options.onToken?.(ct.type === TokenType.START_TAG ? 'startTag' : 'endTag');
+        this.options.onToken?.(ct.type === TokenType.START_TAG ? 'startTag' : 'endTag', ct);
         if (ct.type === TokenType.START_TAG) {
             this.lastStartTagName = ct.tagName;
             this.handler.onStartTag(ct);
@@ -386,13 +402,13 @@ export class Tokenizer {
     }
     emitCurrentComment(ct) {
         this.prepareToken(ct);
-        this.options.onToken?.('comment');
+        this.options.onToken?.('comment', ct);
         this.handler.onComment(ct);
         this.preprocessor.dropParsedChunk();
     }
     emitCurrentDoctype(ct) {
         this.prepareToken(ct);
-        this.options.onToken?.('doctype');
+        this.options.onToken?.('doctype', ct);
         this.handler.onDoctype(ct);
         this.preprocessor.dropParsedChunk();
     }
@@ -405,7 +421,7 @@ export class Tokenizer {
                 this.currentCharacterToken.location.endCol = nextLocation.startCol;
                 this.currentCharacterToken.location.endOffset = nextLocation.startOffset;
             }
-            this.options.onToken?.('character');
+            this.options.onToken?.('character', this.currentCharacterToken);
             switch (this.currentCharacterToken.type) {
                 case TokenType.CHARACTER: {
                     this.handler.onCharacter(this.currentCharacterToken);
@@ -431,7 +447,7 @@ export class Tokenizer {
             location.endOffset = location.startOffset;
         }
         this._emitCurrentCharacterToken(location);
-        this.options.onToken?.('eof');
+        this.options.onToken?.('eof', { type: TokenType.EOF, location });
         this.handler.onEof({ type: TokenType.EOF, location });
         this.active = false;
     }
@@ -485,7 +501,7 @@ export class Tokenizer {
     }
     _flushCodePointConsumedAsCharacterReference(cp) {
         if (this._isCharacterReferenceInAttribute()) {
-            this.currentAttr.value += String.fromCodePoint(cp);
+            this._appendToCurrentAttr('value', String.fromCodePoint(cp));
         }
         else {
             this._emitCodePoint(cp);
@@ -1503,16 +1519,16 @@ export class Tokenizer {
             case $.APOSTROPHE:
             case $.LESS_THAN_SIGN: {
                 this._err(ERR.unexpectedCharacterInAttributeName);
-                this.currentAttr.name += String.fromCodePoint(cp);
+                this._appendToCurrentAttr('name', String.fromCodePoint(cp));
                 break;
             }
             case $.NULL: {
                 this._err(ERR.unexpectedNullCharacter);
-                this.currentAttr.name += REPLACEMENT_CHARACTER;
+                this._appendToCurrentAttr('name', REPLACEMENT_CHARACTER);
                 break;
             }
             default: {
-                this.currentAttr.name += String.fromCodePoint(isAsciiUpper(cp) ? toAsciiLower(cp) : cp);
+                this._appendToCurrentAttr('name', String.fromCodePoint(isAsciiUpper(cp) ? toAsciiLower(cp) : cp));
             }
         }
     }
@@ -1597,7 +1613,7 @@ export class Tokenizer {
             }
             case $.NULL: {
                 this._err(ERR.unexpectedNullCharacter);
-                this.currentAttr.value += REPLACEMENT_CHARACTER;
+                this._appendToCurrentAttr('value', REPLACEMENT_CHARACTER);
                 break;
             }
             case $.EOF: {
@@ -1606,7 +1622,7 @@ export class Tokenizer {
                 break;
             }
             default: {
-                this.currentAttr.value += String.fromCodePoint(cp);
+                this._appendToCurrentAttr('value', String.fromCodePoint(cp));
             }
         }
     }
@@ -1624,7 +1640,7 @@ export class Tokenizer {
             }
             case $.NULL: {
                 this._err(ERR.unexpectedNullCharacter);
-                this.currentAttr.value += REPLACEMENT_CHARACTER;
+                this._appendToCurrentAttr('value', REPLACEMENT_CHARACTER);
                 break;
             }
             case $.EOF: {
@@ -1633,7 +1649,7 @@ export class Tokenizer {
                 break;
             }
             default: {
-                this.currentAttr.value += String.fromCodePoint(cp);
+                this._appendToCurrentAttr('value', String.fromCodePoint(cp));
             }
         }
     }
@@ -1661,7 +1677,7 @@ export class Tokenizer {
             }
             case $.NULL: {
                 this._err(ERR.unexpectedNullCharacter);
-                this.currentAttr.value += REPLACEMENT_CHARACTER;
+                this._appendToCurrentAttr('value', REPLACEMENT_CHARACTER);
                 break;
             }
             case $.QUOTATION_MARK:
@@ -1670,7 +1686,7 @@ export class Tokenizer {
             case $.EQUALS_SIGN:
             case $.GRAVE_ACCENT: {
                 this._err(ERR.unexpectedCharacterInUnquotedAttributeValue);
-                this.currentAttr.value += String.fromCodePoint(cp);
+                this._appendToCurrentAttr('value', String.fromCodePoint(cp));
                 break;
             }
             case $.EOF: {
@@ -1679,7 +1695,7 @@ export class Tokenizer {
                 break;
             }
             default: {
-                this.currentAttr.value += String.fromCodePoint(cp);
+                this._appendToCurrentAttr('value', String.fromCodePoint(cp));
             }
         }
     }

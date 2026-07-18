@@ -1,6 +1,7 @@
 export interface TreeBudgets {
   readonly maxNodes?: number;
   readonly maxDepth?: number;
+  readonly maxParseErrors?: number;
   readonly maxAttributesPerElement?: number;
   readonly maxAttributeBytes?: number;
 }
@@ -20,9 +21,14 @@ export interface TreeBuildOptions {
   readonly fragmentContextTagName?: string;
   readonly scriptingEnabled?: boolean;
   readonly captureSpans?: boolean;
-  readonly onToken?: (kind: TreeTokenKind) => void;
+  readonly checkpoint?: () => void;
+  readonly onToken?: (kind: TreeTokenKind, token: TreeTokenDetails) => void;
   readonly onParseError?: (error: TreeBuilderError) => void;
   readonly onInsertionModeTransition?: (transition: TreeInsertionModeTransition) => void;
+}
+
+export interface TreeTokenDetails {
+  readonly attributes?: readonly Readonly<{ readonly name: string; readonly value: string }>[];
 }
 
 export type TreeTokenKind =

@@ -9,17 +9,18 @@ Primary JSR runtime exports:
 - `parseBytes(input, options?)`
 - `parseFragment(input, contextTagName, options?)`
 - `parseStream(stream, options?)`
-- `serialize(input)`
+- `serialize(input, operationOptions?)`
 - `visibleText(input, options?)`
 - `tokenizeStream(stream, options?)`
-- `HtmlBudgetExceededError`, `HtmlConfigurationError`,
+- `HtmlAbortError`, `HtmlBudgetExceededError`, `HtmlConfigurationError`,
   `HtmlPatchPlanningError`, `HtmlStreamReadError`
-- `isHtmlBudgetExceededError`, `isHtmlConfigurationError`,
+- `isHtmlAbortError`, `isHtmlBudgetExceededError`, `isHtmlConfigurationError`,
   `isHtmlPatchPlanningError`, `isHtmlStreamReadError`,
   `isHtmlOperationalError`
 
 Primary JSR type exports:
-- `ParseBudgets`, `ParseOptions`, `TokenizeStreamOptions`
+- `ParseBudgets`, `ParseOptions`, `TokenizeStreamBudgets`,
+  `TokenizeStreamOptions`, `OperationOptions`
 - `DocumentTree`, `FragmentTree`, `HtmlNode`, `ParseError`
 - `VisibleTextOptions`, `SerializableHtml`, `VisibleTextInput`, `HtmlToken`
 - `HtmlOperationalError`, `HtmlBudgetName`,
@@ -37,6 +38,8 @@ In addition to the shared parse and operational-error surface, Node/npm includes
 - structural helpers (`outline`, `chunk`)
 - patch planning helpers (`computePatch`, `applyPatchPlan`)
 - span metadata fields including `spanProvenance` on parsed nodes when spans are enabled
+- per-operation monotonic deadlines and abort signals on serialization,
+  traversal, extraction, outlining, and chunking
 
 ## JSR Surface vs Node Surface
 

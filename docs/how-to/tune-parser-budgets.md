@@ -19,8 +19,12 @@ function run(maxNodes: number) {
     parse(html, {
       budgets: {
         maxInputBytes: 64_000,
+        maxDecodedUtf8Bytes: 64_000,
         maxNodes,
         maxDepth: 256,
+        maxParseErrors: 128,
+        maxAttributesPerElement: 256,
+        maxAttributeBytes: 32_768,
         maxTimeMs: 250
       }
     });
@@ -47,10 +51,19 @@ maxNodes=20000: ok
 ## Common failure modes
 - `maxInputBytes` is lower than the actual transport payload size, so parsing
   fails before tree construction starts.
+- `maxBufferedBytes` is mistaken for a complete-stream cap. It limits only
+  encoding-prescan retention; use `maxInputBytes` and `maxDecodedUtf8Bytes` for
+  total transport and decoded-output bounds.
 - `maxNodes` or `maxDepth` is sized for happy-path documents instead of real
   hostile inputs.
+- Attribute budgets omit duplicate attempts. Duplicate attributes are counted
+  because their names and values allocate before HTML duplicate elimination.
 - `maxTimeMs` is left unset for internet-facing paths, which removes the
   last-resort wall-clock bound.
+
+All values must be finite non-negative safe integers. Zero is a valid hard
+limit. Unknown keys fail as configuration errors before a stream reader is
+acquired.
 
 ## Related reference
 - [Options](../reference/options.md)

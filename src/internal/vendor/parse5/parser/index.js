@@ -56,6 +56,9 @@ const defaultParserOptions = {
     onParseError: null,
     onInsertionModeTransition: null,
     onToken: null,
+    onProgress: null,
+    onStartTagOpen: null,
+    onStartTagAttribute: null,
 };
 function insertionModeName(mode) {
     if (typeof mode !== 'number') {

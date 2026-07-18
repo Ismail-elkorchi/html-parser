@@ -4,6 +4,8 @@
 import { Parser as RawParser } from "./vendor/parse5/parser/index.js";
 // @ts-expect-error Vendored JS module does not include local .d.ts in this repository.
 import { Tokenizer as RawTokenizer, TokenizerMode as RawTokenizerMode } from "./vendor/parse5/tokenizer/index.js";
+// @ts-expect-error Vendored JS module does not include local .d.ts in this repository.
+import { defaultTreeAdapter as RawDefaultTreeAdapter } from "./vendor/parse5/tree-adapters/default.js";
 
 type ParseOptions = {
   readonly scriptingEnabled?: boolean;
@@ -21,7 +23,15 @@ type ParseOptions = {
     readonly tokenStartOffset: number | null;
     readonly tokenEndOffset: number | null;
   }) => void;
-  readonly onToken?: (kind: Parse5TokenKind) => void;
+  readonly onToken?: (kind: Parse5TokenKind, token: Parse5TokenDetails) => void;
+  readonly onProgress?: () => void;
+  readonly onStartTagOpen?: () => void;
+  readonly onStartTagAttribute?: (value: string, start: boolean) => void;
+  readonly treeAdapter?: unknown;
+};
+
+export type Parse5TokenDetails = {
+  readonly attrs?: readonly Parse5TokenizerAttribute[];
 };
 
 export type Parse5TokenKind =
@@ -109,7 +119,12 @@ export type Parse5Tokenizer = {
 };
 
 type Parse5TokenizerConstructor = new (
-  options: { readonly sourceCodeLocationInfo: boolean },
+  options: {
+    readonly sourceCodeLocationInfo: boolean;
+    readonly onProgress?: () => void;
+    readonly onStartTagOpen?: () => void;
+    readonly onStartTagAttribute?: (value: string, start: boolean) => void;
+  },
   handlers: Parse5TokenizerHandlers
 ) => Parse5Tokenizer;
 
@@ -117,6 +132,7 @@ const Parser = RawParser as ParserFacade;
 
 export const Tokenizer = RawTokenizer as Parse5TokenizerConstructor;
 export const TokenizerMode = RawTokenizerMode as Parse5TokenizerMode;
+export const defaultTreeAdapter = RawDefaultTreeAdapter as unknown;
 
 export function parse(html: string, options?: ParseOptions): unknown {
   return Parser.parse(html, options);
