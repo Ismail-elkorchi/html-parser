@@ -28,11 +28,13 @@ import {
 } from "../src/public/mod.ts";
 
 export {
+  HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
   HtmlPatchPlanningError,
   HtmlStreamReadError,
   isHtmlBudgetExceededError,
+  isHtmlAbortError,
   isHtmlConfigurationError,
   isHtmlOperationalError,
   isHtmlPatchPlanningError,
@@ -50,19 +52,27 @@ export type {
  * Parse budget controls for bounding CPU/memory usage.
  */
 export interface ParseBudgets {
-  /** Maximum input bytes accepted for one parse call. */
+  /** Maximum UTF-8 text bytes or byte/stream transport bytes accepted. */
   readonly maxInputBytes?: number;
-  /** Maximum buffered bytes while decoding a stream. */
+  /** Maximum bytes retained for stream encoding prescan. */
   readonly maxBufferedBytes?: number;
-  /** Maximum node count emitted by parsing. */
+  /** Maximum UTF-8 bytes in the decoded HTML text. */
+  readonly maxDecodedUtf8Bytes?: number;
+  /** Maximum public-root and parser node allocations, including recovery nodes. */
   readonly maxNodes?: number;
-  /** Maximum tree depth emitted by parsing. */
+  /** Maximum tree depth, with the public root at depth one. */
   readonly maxDepth?: number;
+  /** Maximum parse diagnostics emitted during tree construction. */
+  readonly maxParseErrors?: number;
+  /** Maximum attempted start-tag attributes, including discarded duplicates. */
+  readonly maxAttributesPerElement?: number;
+  /** Maximum attempted name/value UTF-8 bytes on one start tag. */
+  readonly maxAttributeBytes?: number;
   /** Maximum trace event count. */
   readonly maxTraceEvents?: number;
   /** Maximum serialized trace size in bytes. */
   readonly maxTraceBytes?: number;
-  /** Maximum parse/decode elapsed time in milliseconds. */
+  /** Maximum parse/decode elapsed time measured by a monotonic clock. */
   readonly maxTimeMs?: number;
 }
 
@@ -78,7 +88,21 @@ export interface ParseOptions {
   readonly transportEncodingLabel?: string;
   /** Optional budget controls for parse/decode operations. */
   readonly budgets?: ParseBudgets;
+  /** Optional cancellation signal shared by every parse phase. */
+  readonly signal?: AbortSignal;
 }
+
+/** Resource limits that apply to byte-stream decoding and token emission. */
+export type TokenizeStreamBudgets = Pick<
+  ParseBudgets,
+  | "maxInputBytes"
+  | "maxBufferedBytes"
+  | "maxDecodedUtf8Bytes"
+  | "maxParseErrors"
+  | "maxAttributesPerElement"
+  | "maxAttributeBytes"
+  | "maxTimeMs"
+>;
 
 /**
  * Options accepted by stream tokenization.
@@ -87,13 +111,23 @@ export interface TokenizeStreamOptions {
   /** Optional transport encoding hint for stream decoding. */
   readonly transportEncodingLabel?: string;
   /** Optional budget controls for stream tokenization. */
-  readonly budgets?: ParseBudgets;
+  readonly budgets?: TokenizeStreamBudgets;
+  /** Optional cancellation signal shared by decode and tokenization. */
+  readonly signal?: AbortSignal;
+}
+
+/** Deadline and cancellation controls for one non-parse operation. */
+export interface OperationOptions {
+  /** Inclusive monotonic elapsed-time limit in milliseconds. */
+  readonly maxTimeMs?: number;
+  /** Optional cancellation signal for the operation. */
+  readonly signal?: AbortSignal;
 }
 
 /**
  * Options accepted by visible text extraction.
  */
-export interface VisibleTextOptions {
+export interface VisibleTextOptions extends OperationOptions {
   /** Skip hidden or non-visible subtrees. */
   readonly skipHiddenSubtrees?: boolean;
   /** Include values from control-like nodes such as inputs. */
@@ -210,6 +244,7 @@ export interface HtmlToken {
  * @param options Parse controls for spans, tracing, and resource budgets.
  * @returns Parsed `DocumentTree` with nodes and non-fatal parse diagnostics.
  * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
+ * @throws {HtmlAbortError} When `options.signal` is aborted.
  *
  * Security and limits:
  * - Use strict `budgets` for untrusted input.
@@ -238,6 +273,7 @@ export function parse(input: string, options: ParseOptions = {}): DocumentTree {
  * @param options Parse controls for encoding hints, tracing, and budgets.
  * @returns Parsed `DocumentTree` for decoded HTML input.
  * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
+ * @throws {HtmlAbortError} When `options.signal` is aborted.
  */
 export function parseBytes(input: Uint8Array, options: ParseOptions = {}): DocumentTree {
   return parseBytesInternal(input, options as Parameters<typeof parseBytesInternal>[1]);
@@ -253,6 +289,7 @@ export function parseBytes(input: Uint8Array, options: ParseOptions = {}): Docum
  * @returns Parsed `FragmentTree` scoped to the requested context with non-fatal diagnostics.
  * @throws {HtmlConfigurationError} When the fragment context is invalid.
  * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
+ * @throws {HtmlAbortError} When `options.signal` is aborted.
  *
  * @example
  * ```ts
@@ -285,6 +322,7 @@ export function parseFragment(
  * @returns Promise resolving to parsed `DocumentTree` with accumulated parse diagnostics.
  * @throws {HtmlStreamReadError} When acquiring or reading the stream fails.
  * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
+ * @throws {HtmlAbortError} When `options.signal` is aborted.
  *
  * @example
  * ```ts
@@ -317,10 +355,16 @@ export async function parseStream(
  * Serializes a parsed document, fragment, or node back to HTML text.
  *
  * @param input Parsed tree or node.
+ * @param options Optional monotonic deadline and cancellation signal.
  * @returns Deterministic HTML serialization output.
+ * @throws {HtmlAbortError} When `options.signal` is aborted.
+ * @throws {HtmlBudgetExceededError} When `options.maxTimeMs` expires.
  */
-export function serialize(input: SerializableHtml): string {
-  return serializeInternal(input as Parameters<typeof serializeInternal>[0]);
+export function serialize(input: SerializableHtml, options: OperationOptions = {}): string {
+  return serializeInternal(
+    input as Parameters<typeof serializeInternal>[0],
+    options as Parameters<typeof serializeInternal>[1]
+  );
 }
 
 /**
@@ -330,6 +374,8 @@ export function serialize(input: SerializableHtml): string {
  * @param options Visible-text extraction controls. Hidden-subtree skipping is
  * enabled by default; broaden extraction only when you explicitly need more source text.
  * @returns Stable text output suitable for indexing and plain-text auditing.
+ * @throws {HtmlAbortError} When `options.signal` is aborted.
+ * @throws {HtmlBudgetExceededError} When `options.maxTimeMs` expires.
  *
  * Failure mode:
  * - This function does not sanitize HTML; it only returns text.
@@ -357,6 +403,7 @@ export function visibleText(input: VisibleTextInput, options: VisibleTextOptions
  * @returns Async iterator yielding parser-compatible HTML tokens in source order.
  * @throws {HtmlStreamReadError} When acquiring or reading the stream fails.
  * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
+ * @throws {HtmlAbortError} When `options.signal` is aborted.
  */
 export async function* tokenizeStream(
   input: ReadableStream<Uint8Array>,

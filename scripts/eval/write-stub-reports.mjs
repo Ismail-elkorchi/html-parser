@@ -210,7 +210,23 @@ async function writeBudgets() {
   });
 
   assertBudgetErrorSync(checks, "budget-max-time-ms", "maxTimeMs", () => {
-    parse("abcdef", { budgets: { maxTimeMs: -1 } });
+    parse("abcdef", { budgets: { maxTimeMs: 0 } });
+  });
+
+  assertBudgetErrorSync(checks, "budget-max-decoded-utf8-bytes", "maxDecodedUtf8Bytes", () => {
+    parse("é", { budgets: { maxDecodedUtf8Bytes: 1 } });
+  });
+
+  assertBudgetErrorSync(checks, "budget-max-parse-errors", "maxParseErrors", () => {
+    parse("\0", { budgets: { maxParseErrors: 0 } });
+  });
+
+  assertBudgetErrorSync(checks, "budget-max-attributes-per-element", "maxAttributesPerElement", () => {
+    parse("<x a>", { budgets: { maxAttributesPerElement: 0 } });
+  });
+
+  assertBudgetErrorSync(checks, "budget-max-attribute-bytes", "maxAttributeBytes", () => {
+    parse("<x a>", { budgets: { maxAttributeBytes: 0 } });
   });
 
   const bufferedTree = await parseStream(

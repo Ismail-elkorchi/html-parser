@@ -3,6 +3,12 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Validate closed parser option schemas and hard-stop node, depth, parse-error,
+  attribute, decoded-output, trace, input, and monotonic-time budgets at the
+  first unavailable unit.
+- Add abort signals and operation deadlines across parsing, stream reads,
+  serialization, traversal, and text extraction, with exact abort reasons and
+  deterministic stream cleanup.
 - Replace nested generic error payloads with HTML-specific operational error
   classes, direct frozen fields, cross-realm structural guards, and preserved
   stream-read causes.

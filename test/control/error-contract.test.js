@@ -4,11 +4,13 @@ import test from "node:test";
 import { runInNewContext } from "node:vm";
 
 import {
+  HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
   HtmlPatchPlanningError,
   HtmlStreamReadError,
   applyPatchPlan,
+  isHtmlAbortError,
   isHtmlBudgetExceededError,
   isHtmlConfigurationError,
   isHtmlOperationalError,
@@ -37,6 +39,12 @@ test("operational errors expose direct immutable fields without payload wrappers
   assert.equal(patch.target, 42);
   assert.equal(patch.detail, "missing");
   assert.equal(Object.isFrozen(patch), true);
+
+  const abortReason = { source: "test" };
+  const abort = new HtmlAbortError(abortReason);
+  assert.equal(abort.code, "ABORTED");
+  assert.equal(abort.cause, abortReason);
+  assert.equal(Object.isFrozen(abort), true);
 });
 
 test("structural guards classify errors across realms and package copies", async () => {
@@ -55,10 +63,26 @@ test("structural guards classify errors across realms and package copies", async
   assert.equal(isHtmlBudgetExceededError(crossRealmBudget), true);
   assert.equal(isHtmlOperationalError(crossRealmBudget), true);
 
+  const crossRealmAbort = runInNewContext(
+    `(() => {
+      const error = new Error("cross-realm abort");
+      error.name = "HtmlAbortError";
+      error.code = "ABORTED";
+      error.cause = "stop";
+      return Object.freeze(error);
+    })()`
+  );
+  assert.equal(crossRealmAbort instanceof HtmlAbortError, false);
+  assert.equal(isHtmlAbortError(crossRealmAbort), true);
+  assert.equal(isHtmlOperationalError(crossRealmAbort), true);
+
   const duplicate = await import(`../../dist/public/errors.js?copy=${String(Date.now())}`);
   const duplicateBudget = new duplicate.HtmlBudgetExceededError("maxNodes", 1, 2);
   assert.equal(duplicateBudget instanceof HtmlBudgetExceededError, false);
   assert.equal(isHtmlBudgetExceededError(duplicateBudget), true);
+  const duplicateAbort = new duplicate.HtmlAbortError("duplicate stop");
+  assert.equal(duplicateAbort instanceof HtmlAbortError, false);
+  assert.equal(isHtmlAbortError(duplicateAbort), true);
 
   const hostile = {};
   Object.defineProperty(hostile, "code", {

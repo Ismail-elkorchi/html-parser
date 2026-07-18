@@ -10,16 +10,23 @@ installed package copies, where `instanceof` may fail.
 
 | Class | Stable `code` | Direct fields |
 | --- | --- | --- |
+| `HtmlAbortError` | `ABORTED` | `cause` |
 | `HtmlBudgetExceededError` | `BUDGET_EXCEEDED` | `budget`, `limit`, `actual` |
 | `HtmlConfigurationError` | `INVALID_CONFIGURATION` | `option`, `reason`, `expected` |
 | `HtmlPatchPlanningError` | `PATCH_PLANNING_FAILED` | `reason`, optional `target`, optional `detail` |
 | `HtmlStreamReadError` | `STREAM_READ_FAILED` | `cause` |
 
 Instances and their direct fields are frozen. There is no nested `payload`
-object. `HtmlStreamReadError.cause` is the exact value thrown while acquiring or
-reading the source stream; cancellation or cleanup failures do not replace it.
+object. `HtmlAbortError.cause` is the exact `AbortSignal.reason`.
+`HtmlStreamReadError.cause` is the exact value thrown while acquiring or reading
+the source stream; cancellation or cleanup failures do not replace it.
 Budget, configuration, parse, callback, and patch failures retain their own
 categories and are not wrapped as stream-read failures.
+
+All budget limits are inclusive and a failure reports `actual: limit + 1`.
+Invalid, fractional, negative, non-finite, or unknown limits are configuration
+errors rather than budget failures. Configuration validation takes priority
+over an already-aborted signal and occurs before stream-reader acquisition.
 
 `HtmlConfigurationError.reason` is one of `UNKNOWN_OPTION`, `INVALID_VALUE`, or
 `CONFLICTING_OPTIONS`. `HtmlPatchPlanningError.reason` supplies the specific

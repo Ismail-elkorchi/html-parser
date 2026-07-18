@@ -43,4 +43,6 @@ For JSR-only workflows, iterate over `children` recursively using node `kind` ch
 - Stream acquisition/read failures throw `HtmlStreamReadError` with the
   original failure as `cause`.
 
-Budget controls live in `ParseOptions.budgets` and bound input bytes, nodes, depth, trace size, and parse time.
+Budget controls live in `ParseOptions.budgets` and hard-stop input/decoded
+bytes, parser node/depth/error/attribute allocation, trace retention, and
+elapsed work at the first unavailable unit.

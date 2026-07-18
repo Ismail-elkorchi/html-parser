@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   HtmlBudgetExceededError,
+  HtmlConfigurationError,
   chunk,
   outline,
   parse,
@@ -135,24 +136,39 @@ test("parseStream cancels and releases its reader after budget failures", async 
     throw new Error("ReadableStream is unavailable in this runtime");
   }
 
-  for (const budgets of [
-    { maxInputBytes: 1 },
-    { maxBufferedBytes: -1 },
-    { maxBufferedBytes: Number.NaN }
-  ]) {
-    let cancellationReason = null;
-    const stream = new streamFactory({
-      start(controller) {
-        controller.enqueue(new Uint8Array(8));
-      },
-      cancel(reason) {
-        cancellationReason = reason;
-      }
-    });
+  let cancellationReason = null;
+  const stream = new streamFactory({
+    start(controller) {
+      controller.enqueue(new Uint8Array(8));
+    },
+    cancel(reason) {
+      cancellationReason = reason;
+    }
+  });
 
-    await assert.rejects(parseStream(stream, { budgets }), HtmlBudgetExceededError);
-    assert.ok(cancellationReason instanceof HtmlBudgetExceededError);
-    assert.equal(stream.locked, false);
+  await assert.rejects(
+    parseStream(stream, { budgets: { maxInputBytes: 1 } }),
+    HtmlBudgetExceededError
+  );
+  assert.ok(cancellationReason instanceof HtmlBudgetExceededError);
+  assert.equal(stream.locked, false);
+});
+
+test("parseStream rejects invalid budgets before reader acquisition", async () => {
+  for (const maxBufferedBytes of [-1, Number.NaN]) {
+    let readerAcquisitions = 0;
+    const stream = {
+      getReader() {
+        readerAcquisitions += 1;
+        throw new Error("reader must not be acquired");
+      }
+    };
+
+    await assert.rejects(
+      parseStream(stream, { budgets: { maxBufferedBytes } }),
+      HtmlConfigurationError
+    );
+    assert.equal(readerAcquisitions, 0);
   }
 });
 

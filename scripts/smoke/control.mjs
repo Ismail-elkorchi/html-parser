@@ -2,7 +2,9 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import {
+  HtmlAbortError,
   HtmlBudgetExceededError,
+  isHtmlAbortError,
   isHtmlBudgetExceededError,
   chunk,
   outline,
@@ -258,6 +260,20 @@ async function runSmokeAssertions() {
   ensure(isHtmlBudgetExceededError(budgetError), "expected structural budget classification");
   ensure(budgetError.code === "BUDGET_EXCEEDED", "expected structured budget code");
   ensure(budgetError.budget === "maxInputBytes", "expected direct budget field");
+
+  const abortReason = { source: "smoke" };
+  const abortController = new globalThis.AbortController();
+  abortController.abort(abortReason);
+  let abortError = null;
+  try {
+    parse("abort", { signal: abortController.signal });
+  } catch (error) {
+    abortError = error;
+  }
+  ensure(abortError instanceof HtmlAbortError, "expected HtmlAbortError");
+  ensure(isHtmlAbortError(abortError), "expected structural abort classification");
+  ensure(abortError.code === "ABORTED", "expected structured abort code");
+  ensure(abortError.cause === abortReason, "expected exact abort reason");
 }
 
 async function main() {

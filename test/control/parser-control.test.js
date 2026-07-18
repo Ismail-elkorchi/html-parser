@@ -60,7 +60,7 @@ test("string and fragment input budgets measure UTF-8 bytes", () => {
     assert.throws(parseInput, (error) => {
       assert.ok(error instanceof HtmlBudgetExceededError);
       assert.equal(error.budget, "maxInputBytes");
-      assert.equal(error.actual, 20);
+      assert.equal(error.actual, 11);
       return true;
     });
   }

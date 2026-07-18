@@ -1,27 +1,42 @@
 import { decodeHtmlBytes, sniffHtmlEncoding } from "../internal/encoding/mod.js";
-import { tokenize, type HtmlToken, type TokenizerBudgets } from "../internal/tokenizer/mod.js";
+import { tokenize, type HtmlToken } from "../internal/tokenizer/mod.js";
 import {
   buildTreeFromHtml,
+  TreeBudgetExceededError,
   type TreeAttribute,
+  type TreeBuildOptions,
+  type TreeBuildResult,
   type TreeBudgets,
   type TreeNode,
   type TreeSpan
 } from "../internal/tree/mod.js";
 
 import {
+  HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
   HtmlPatchPlanningError,
   HtmlStreamReadError,
   isHtmlBudgetExceededError,
+  isHtmlAbortError,
   isHtmlConfigurationError,
   isHtmlOperationalError,
   isHtmlPatchPlanningError,
   isHtmlStreamReadError
 } from "./errors.js";
+import {
+  createOperationContext,
+  validateChunkOptions,
+  validateOperationOptions,
+  validateParseOptions,
+  validateTokenizeStreamOptions,
+  validateVisibleTextOptions,
+  type OperationContext
+} from "./operation.js";
 
 import type {
   Attribute,
+  BudgetOptions,
   Chunk,
   ChunkOptions,
   DocumentTree,
@@ -33,6 +48,7 @@ import type {
   HtmlPatchPlanningReason,
   NodeId,
   NodeVisitor,
+  OperationOptions,
   Outline,
   OutlineEntry,
   PatchPlan,
@@ -67,6 +83,7 @@ export type {
   EofToken,
   ElementNode,
   FragmentTree,
+  OperationOptions,
   HtmlBudgetName,
   HtmlConfigurationErrorReason,
   HtmlNode,
@@ -87,6 +104,7 @@ export type {
   StartTagToken,
   Token,
   TokenAttribute,
+  TokenizeStreamBudgetOptions,
   TokenizeStreamOptions,
   TextNode,
   TraceEvent,
@@ -98,11 +116,13 @@ export type {
 } from "./types.js";
 
 export {
+  HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
   HtmlPatchPlanningError,
   HtmlStreamReadError,
   isHtmlBudgetExceededError,
+  isHtmlAbortError,
   isHtmlConfigurationError,
   isHtmlOperationalError,
   isHtmlPatchPlanningError,
@@ -165,11 +185,66 @@ function enforceBudget(
     return;
   }
 
-  throw new HtmlBudgetExceededError(budget, limit, actual);
+  throw new HtmlBudgetExceededError(budget, limit, limit + 1);
+}
+
+function requireString(value: unknown, option: string): asserts value is string {
+  if (typeof value !== "string") {
+    throw new HtmlConfigurationError(option, "INVALID_VALUE", "must be a string");
+  }
+}
+
+function requireByteArray(value: unknown, option: string): asserts value is Uint8Array {
+  if (!(value instanceof Uint8Array)) {
+    throw new HtmlConfigurationError(option, "INVALID_VALUE", "must be a Uint8Array");
+  }
+}
+
+function requireReadableByteStream(
+  value: unknown,
+  option: string
+): asserts value is ReadableStream<Uint8Array> {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    typeof (value as Readonly<Record<PropertyKey, unknown>>)["getReader"] !== "function"
+  ) {
+    throw new HtmlConfigurationError(
+      option,
+      "INVALID_VALUE",
+      "must be a ReadableStream of Uint8Array chunks"
+    );
+  }
+}
+
+function parseOperationContext(options: ParseOptions, startedAt: number): OperationContext {
+  return createOperationContext(options.budgets?.maxTimeMs, options.signal, startedAt);
 }
 
 function utf8ByteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength;
+}
+
+class DecodedUtf8BudgetCounter {
+  readonly #limit: number | undefined;
+  readonly #operation: OperationContext;
+  readonly #encoder = new TextEncoder();
+  #bytes = 0;
+
+  constructor(limit: number | undefined, operation: OperationContext) {
+    this.#limit = limit;
+    this.#operation = operation;
+  }
+
+  append(value: string): void {
+    this.#operation.checkpoint();
+    this.#bytes += this.#encoder.encode(value).byteLength;
+    enforceBudget("maxDecodedUtf8Bytes", this.#limit, this.#bytes);
+  }
+
+  get bytes(): number {
+    return this.#bytes;
+  }
 }
 
 function eventSize(event: TraceEvent): number {
@@ -186,8 +261,10 @@ type TraceEventInput =
 function pushTrace(
   trace: TraceEvent[] | undefined,
   event: TraceEventInput,
-  budgets: ParseOptions["budgets"] | undefined
+  budgets: ParseOptions["budgets"] | undefined,
+  operation?: OperationContext
 ): TraceEvent[] | undefined {
+  operation?.checkpoint();
   if (!trace) {
     return undefined;
   }
@@ -210,7 +287,8 @@ function pushBudgetTrace(
   budget: HtmlBudgetName,
   limit: number | undefined,
   actual: number,
-  budgets: ParseOptions["budgets"] | undefined
+  budgets: ParseOptions["budgets"] | undefined,
+  operation?: OperationContext
 ): TraceEvent[] | undefined {
   return pushTrace(trace, {
     kind: "budget",
@@ -218,7 +296,52 @@ function pushBudgetTrace(
     limit: limit ?? null,
     actual,
     status: limit === undefined || actual <= limit ? "ok" : "exceeded"
-  }, budgets);
+  }, budgets, operation);
+}
+
+class PendingTraceBudgetController {
+  readonly #enabled: boolean;
+  readonly #baseEventCount: number;
+  readonly #baseSize: number;
+  readonly #budgets: ParseOptions["budgets"] | undefined;
+  readonly #operation: OperationContext;
+  #pendingEventCount = 0;
+  #pendingSize = 0;
+
+  constructor(
+    trace: readonly TraceEvent[] | undefined,
+    budgets: ParseOptions["budgets"] | undefined,
+    operation: OperationContext
+  ) {
+    this.#enabled = trace !== undefined;
+    this.#baseEventCount = trace?.length ?? 0;
+    this.#baseSize = trace?.reduce((total, event) => total + eventSize(event), 0) ?? 0;
+    this.#budgets = budgets;
+    this.#operation = operation;
+    if (this.#enabled) {
+      // Token, tree-mutation, node-budget, and depth-budget events are always appended.
+      enforceBudget("maxTraceEvents", budgets?.maxTraceEvents, this.#baseEventCount + 4);
+    }
+  }
+
+  retain(value: unknown): void {
+    if (!this.#enabled) {
+      return;
+    }
+    this.#operation.checkpoint();
+    this.#pendingEventCount += 1;
+    enforceBudget(
+      "maxTraceEvents",
+      this.#budgets?.maxTraceEvents,
+      this.#baseEventCount + 4 + this.#pendingEventCount
+    );
+    this.#pendingSize += JSON.stringify(value).length;
+    enforceBudget(
+      "maxTraceBytes",
+      this.#budgets?.maxTraceBytes,
+      this.#baseSize + this.#pendingSize
+    );
+  }
 }
 
 function toPublicSpan(span: TreeSpan | undefined, captureSpans: boolean): Span | undefined {
@@ -236,8 +359,13 @@ function toSpanProvenance(span: TreeSpan | undefined, captureSpans: boolean): Sp
   return span ? "input" : "inferred";
 }
 
-function toAttributes(attributes: readonly TreeAttribute[], captureSpans: boolean): readonly Attribute[] {
+function toAttributes(
+  attributes: readonly TreeAttribute[],
+  captureSpans: boolean,
+  operation: OperationContext
+): readonly Attribute[] {
   return attributes.map((attribute) => {
+    operation.checkpoint();
     const span = toPublicSpan(attribute.span, captureSpans);
     return Object.freeze({
       name: attribute.name,
@@ -274,9 +402,11 @@ function toParseErrors(
     readonly code: string;
     readonly startOffset?: number;
     readonly endOffset?: number;
-  }[]
+  }[],
+  operation: OperationContext
 ): readonly ParseError[] {
   return errors.map((error) => {
+    operation.checkpoint();
     const hasOffsets =
       typeof error.startOffset === "number" &&
       typeof error.endOffset === "number" &&
@@ -297,20 +427,6 @@ function toParseErrors(
         : {})
     };
   });
-}
-
-function tokenizerBudgetsFromParseOptions(
-  budgets: ParseOptions["budgets"] | undefined
-): TokenizerBudgets | undefined {
-  if (!budgets) {
-    return undefined;
-  }
-
-  const next: TokenizerBudgets = {
-    ...(budgets.maxTimeMs !== undefined ? { maxTimeMs: budgets.maxTimeMs } : {})
-  };
-
-  return Object.keys(next).length > 0 ? next : undefined;
 }
 
 function toToken(token: HtmlToken): Token {
@@ -369,13 +485,62 @@ function treeBudgetsFromParseOptions(budgets: ParseOptions["budgets"] | undefine
 
   const next: TreeBudgets = {
     ...(budgets.maxNodes !== undefined ? { maxNodes: budgets.maxNodes } : {}),
-    ...(budgets.maxDepth !== undefined ? { maxDepth: budgets.maxDepth } : {})
+    ...(budgets.maxDepth !== undefined ? { maxDepth: budgets.maxDepth } : {}),
+    ...(budgets.maxParseErrors !== undefined ? { maxParseErrors: budgets.maxParseErrors } : {}),
+    ...(budgets.maxAttributesPerElement !== undefined
+      ? { maxAttributesPerElement: budgets.maxAttributesPerElement }
+      : {}),
+    ...(budgets.maxAttributeBytes !== undefined
+      ? { maxAttributeBytes: budgets.maxAttributeBytes }
+      : {})
   };
 
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, captureSpans: boolean): HtmlNode {
+function enforceTokenAttributeBudgets(
+  attributes: readonly Readonly<{ readonly name: string; readonly value: string }>[],
+  budgets: Pick<BudgetOptions, "maxAttributesPerElement" | "maxAttributeBytes"> | undefined
+): void {
+  enforceBudget(
+    "maxAttributesPerElement",
+    budgets?.maxAttributesPerElement,
+    attributes.length
+  );
+  if (budgets?.maxAttributeBytes === undefined) {
+    return;
+  }
+  const encoder = new TextEncoder();
+  let bytes = 0;
+  for (const attribute of attributes) {
+    bytes += encoder.encode(attribute.name).byteLength;
+    bytes += encoder.encode(attribute.value).byteLength;
+    enforceBudget("maxAttributeBytes", budgets.maxAttributeBytes, bytes);
+  }
+}
+
+function buildHtmlTree(
+  html: string,
+  budgets: ParseOptions["budgets"] | undefined,
+  options: TreeBuildOptions
+): TreeBuildResult {
+  try {
+    return buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets), options);
+  } catch (error) {
+    if (error instanceof TreeBudgetExceededError) {
+      throw new HtmlBudgetExceededError(error.budget, error.limit, error.actual);
+    }
+    throw error;
+  }
+}
+
+function convertTreeNode(
+  node: TreeNode,
+  assigner: NodeIdAssigner,
+  captureSpans: boolean,
+  operation: OperationContext
+): HtmlNode {
+  operation.checkpoint();
   if (node.kind === "text") {
     const span = toPublicSpan(node.span, captureSpans);
     const spanProvenance = toSpanProvenance(node.span, captureSpans);
@@ -416,8 +581,10 @@ function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, captureSpans:
 
   const span = toPublicSpan(node.span, captureSpans);
   const spanProvenance = toSpanProvenance(node.span, captureSpans);
-  const children = node.children.map((child) => convertTreeNode(child, assigner, captureSpans));
-  const attributes = normalizeAttributes(toAttributes(node.attributes, captureSpans));
+  const children = node.children.map((child) =>
+    convertTreeNode(child, assigner, captureSpans, operation)
+  );
+  const attributes = normalizeAttributes(toAttributes(node.attributes, captureSpans, operation));
 
   return {
     id: assigner.next(),
@@ -430,7 +597,8 @@ function convertTreeNode(node: TreeNode, assigner: NodeIdAssigner, captureSpans:
   };
 }
 
-function collectMetricsForNode(node: HtmlNode, depth: number): NodeMetrics {
+function collectMetricsForNode(node: HtmlNode, depth: number, operation: OperationContext): NodeMetrics {
+  operation.checkpoint();
   if (node.kind !== "element") {
     return { nodes: 1, maxDepth: depth };
   }
@@ -439,7 +607,7 @@ function collectMetricsForNode(node: HtmlNode, depth: number): NodeMetrics {
   let maxDepth = depth;
 
   for (const child of node.children) {
-    const childMetrics = collectMetricsForNode(child, depth + 1);
+    const childMetrics = collectMetricsForNode(child, depth + 1, operation);
     nodes += childMetrics.nodes;
     if (childMetrics.maxDepth > maxDepth) {
       maxDepth = childMetrics.maxDepth;
@@ -449,12 +617,12 @@ function collectMetricsForNode(node: HtmlNode, depth: number): NodeMetrics {
   return { nodes, maxDepth };
 }
 
-function collectMetrics(nodes: readonly HtmlNode[]): NodeMetrics {
+function collectMetrics(nodes: readonly HtmlNode[], operation: OperationContext): NodeMetrics {
   let totalNodes = 0;
   let maxDepth = 1;
 
   for (const node of nodes) {
-    const metrics = collectMetricsForNode(node, 2);
+    const metrics = collectMetricsForNode(node, 2, operation);
     totalNodes += metrics.nodes;
     if (metrics.maxDepth > maxDepth) {
       maxDepth = metrics.maxDepth;
@@ -466,7 +634,8 @@ function collectMetrics(nodes: readonly HtmlNode[]): NodeMetrics {
 
 interface ParseInputContext {
   readonly byteLength: number;
-  readonly startedAt: number;
+  readonly decodedUtf8ByteLength: number;
+  readonly operation: OperationContext;
   readonly decode: {
     readonly source: "input" | "sniff";
     readonly encoding: string;
@@ -478,11 +647,12 @@ interface ParseInputContext {
   };
 }
 
-function stringInputContext(html: string): ParseInputContext {
-  const startedAt = Date.now();
+function stringInputContext(html: string, operation: OperationContext): ParseInputContext {
+  const byteLength = utf8ByteLength(html);
   return {
-    byteLength: utf8ByteLength(html),
-    startedAt,
+    byteLength,
+    decodedUtf8ByteLength: byteLength,
+    operation,
     decode: {
       source: "input",
       encoding: "utf-8",
@@ -496,32 +666,47 @@ function parseDocumentInternal(
   options: ParseOptions,
   input: ParseInputContext
 ): DocumentTree {
-  const startedAt = input.startedAt;
+  const operation = input.operation;
   const budgets = options.budgets;
   const captureSpans = options.captureSpans ?? false;
   const assigner = new NodeIdAssigner();
   const documentId = assigner.next();
   let trace: TraceEvent[] | undefined = options.trace ? [] : undefined;
 
+  operation.checkpoint();
   enforceBudget("maxInputBytes", budgets?.maxInputBytes, input.byteLength);
+  enforceBudget(
+    "maxDecodedUtf8Bytes",
+    budgets?.maxDecodedUtf8Bytes,
+    input.decodedUtf8ByteLength
+  );
   trace = pushTrace(trace, {
     kind: "decode",
     ...input.decode
-  }, budgets);
+  }, budgets, operation);
   if (input.stream !== undefined) {
     trace = pushTrace(trace, {
       kind: "stream",
       bytesRead: input.stream.bytesRead
-    }, budgets);
+    }, budgets, operation);
     trace = pushBudgetTrace(
       trace,
       "maxBufferedBytes",
       budgets?.maxBufferedBytes,
       input.stream.maxBufferedObserved,
-      budgets
+      budgets,
+      operation
     );
   }
-  trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, input.byteLength, budgets);
+  trace = pushBudgetTrace(
+    trace,
+    "maxInputBytes",
+    budgets?.maxInputBytes,
+    input.byteLength,
+    budgets,
+    operation
+  );
+  const pendingTrace = new PendingTraceBudgetController(trace, budgets, operation);
 
   let tokenCount = 0;
   let previousTokenWasCharacter = false;
@@ -540,8 +725,11 @@ function parseDocumentInternal(
     readonly endOffset?: number;
   }[] = [];
 
-  const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets), {
+  const built = buildHtmlTree(html, budgets, {
     captureSpans,
+    checkpoint(): void {
+      operation.checkpoint();
+    },
     ...(trace
       ? {
           onToken(kind: "startTag" | "endTag" | "comment" | "doctype" | "character" | "eof"): void {
@@ -558,6 +746,7 @@ function parseDocumentInternal(
             readonly tokenStartOffset: number | null;
             readonly tokenEndOffset: number | null;
           }): void {
+            pendingTrace.retain(transition);
             insertionModeTransitions.push(transition);
           },
           onParseError(error: {
@@ -565,6 +754,7 @@ function parseDocumentInternal(
             readonly startOffset?: number;
             readonly endOffset?: number;
           }): void {
+            pendingTrace.retain(error);
             parseErrorTrace.push(error);
           }
         }
@@ -574,24 +764,24 @@ function parseDocumentInternal(
   trace = pushTrace(trace, {
     kind: "token",
     count: tokenCount
-  }, budgets);
+  }, budgets, operation);
 
-  const children = built.document.children.map((node) => convertTreeNode(node, assigner, captureSpans));
-  const metrics = collectMetrics(children);
+  const children = built.document.children.map((node) =>
+    convertTreeNode(node, assigner, captureSpans, operation)
+  );
+  const metrics = collectMetrics(children, operation);
   const totalNodes = metrics.nodes + 1;
 
-  enforceBudget("maxNodes", budgets?.maxNodes, totalNodes);
-  enforceBudget("maxDepth", budgets?.maxDepth, metrics.maxDepth);
-  const elapsedMs = Date.now() - startedAt;
-  enforceBudget("maxTimeMs", budgets?.maxTimeMs, elapsedMs);
+  operation.checkpoint();
 
   trace = pushTrace(trace, {
     kind: "tree-mutation",
     nodeCount: totalNodes,
     errorCount: built.errors.length
-  }, budgets);
+  }, budgets, operation);
 
   for (const transition of insertionModeTransitions) {
+    operation.checkpoint();
     trace = pushTrace(trace, {
       kind: "insertionModeTransition",
       fromMode: transition.fromMode,
@@ -602,21 +792,22 @@ function parseDocumentInternal(
         startOffset: transition.tokenStartOffset,
         endOffset: transition.tokenEndOffset
       }
-    }, budgets);
+    }, budgets, operation);
   }
 
   for (const treeError of parseErrorTrace) {
+    operation.checkpoint();
     trace = pushTrace(trace, {
       kind: "parseError",
       parseErrorId: normalizeParseErrorId(treeError.code),
       startOffset: typeof treeError.startOffset === "number" ? treeError.startOffset : null,
       endOffset: typeof treeError.endOffset === "number" ? treeError.endOffset : null
-    }, budgets);
+    }, budgets, operation);
   }
-  trace = pushBudgetTrace(trace, "maxNodes", budgets?.maxNodes, totalNodes, budgets);
-  trace = pushBudgetTrace(trace, "maxDepth", budgets?.maxDepth, metrics.maxDepth, budgets);
+  trace = pushBudgetTrace(trace, "maxNodes", budgets?.maxNodes, totalNodes, budgets, operation);
+  trace = pushBudgetTrace(trace, "maxDepth", budgets?.maxDepth, metrics.maxDepth, budgets, operation);
 
-  const errors = toParseErrors(built.errors);
+  const errors = toParseErrors(built.errors, operation);
 
   return {
     id: documentId,
@@ -631,26 +822,49 @@ function parseDocumentInternal(
 
 
 export function parse(html: string, options: ParseOptions = {}): DocumentTree {
-  return parseDocumentInternal(html, options, stringInputContext(html));
+  const startedAt = performance.now();
+  validateParseOptions(options);
+  requireString(html, "input");
+  const operation = parseOperationContext(options, startedAt);
+  operation.checkpoint();
+  const input = stringInputContext(html, operation);
+  operation.checkpoint();
+  return parseDocumentInternal(html, options, input);
 }/**
  * Parses input deterministically for the `parseBytes` public API.
  */
 
 
 export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): DocumentTree {
-  const startedAt = Date.now();
+  const startedAt = performance.now();
+  validateParseOptions(options);
+  requireByteArray(bytes, "input");
+  const operation = parseOperationContext(options, startedAt);
+  operation.checkpoint();
   enforceBudget("maxInputBytes", options.budgets?.maxInputBytes, bytes.byteLength);
+
+  const decodedBudget = new DecodedUtf8BudgetCounter(
+    options.budgets?.maxDecodedUtf8Bytes,
+    operation
+  );
 
   const decoded = decodeHtmlBytes(
     bytes,
-    options.transportEncodingLabel
-      ? { transportEncodingLabel: options.transportEncodingLabel }
-      : {}
+    {
+      ...(options.transportEncodingLabel
+        ? { transportEncodingLabel: options.transportEncodingLabel }
+        : {}),
+      onDecodedChunk(chunk): void {
+        decodedBudget.append(chunk);
+      }
+    }
   );
+  operation.checkpoint();
 
   return parseDocumentInternal(decoded.text, options, {
     byteLength: bytes.byteLength,
-    startedAt,
+    decodedUtf8ByteLength: decodedBudget.bytes,
+    operation,
     decode: {
       source: "sniff",
       encoding: decoded.sniff.encoding,
@@ -667,7 +881,10 @@ export function parseFragment(
   contextTagName: string,
   options: ParseOptions = {}
 ): FragmentTree {
-  const startedAt = Date.now();
+  const startedAt = performance.now();
+  validateParseOptions(options);
+  requireString(html, "input");
+  requireString(contextTagName, "contextTagName");
   const budgets = options.budgets;
   const captureSpans = options.captureSpans ?? false;
   const normalizedContext = contextTagName.trim().toLowerCase();
@@ -680,8 +897,12 @@ export function parseFragment(
     );
   }
 
+  const operation = parseOperationContext(options, startedAt);
+  operation.checkpoint();
+
   const inputByteLength = utf8ByteLength(html);
   enforceBudget("maxInputBytes", budgets?.maxInputBytes, inputByteLength);
+  enforceBudget("maxDecodedUtf8Bytes", budgets?.maxDecodedUtf8Bytes, inputByteLength);
 
   const assigner = new NodeIdAssigner();
   const fragmentId = assigner.next();
@@ -692,8 +913,16 @@ export function parseFragment(
     source: "input",
     encoding: "utf-8",
     sniffSource: "input"
-  }, budgets);
-  trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, inputByteLength, budgets);
+  }, budgets, operation);
+  trace = pushBudgetTrace(
+    trace,
+    "maxInputBytes",
+    budgets?.maxInputBytes,
+    inputByteLength,
+    budgets,
+    operation
+  );
+  const pendingTrace = new PendingTraceBudgetController(trace, budgets, operation);
 
   let tokenCount = 0;
   let previousTokenWasCharacter = false;
@@ -712,9 +941,12 @@ export function parseFragment(
     readonly endOffset?: number;
   }[] = [];
 
-  const built = buildTreeFromHtml(html, treeBudgetsFromParseOptions(budgets), {
+  const built = buildHtmlTree(html, budgets, {
     fragmentContextTagName: normalizedContext,
     captureSpans,
+    checkpoint(): void {
+      operation.checkpoint();
+    },
     ...(trace
       ? {
           onToken(kind: "startTag" | "endTag" | "comment" | "doctype" | "character" | "eof"): void {
@@ -731,6 +963,7 @@ export function parseFragment(
             readonly tokenStartOffset: number | null;
             readonly tokenEndOffset: number | null;
           }): void {
+            pendingTrace.retain(transition);
             insertionModeTransitions.push(transition);
           },
           onParseError(error: {
@@ -738,6 +971,7 @@ export function parseFragment(
             readonly startOffset?: number;
             readonly endOffset?: number;
           }): void {
+            pendingTrace.retain(error);
             parseErrorTrace.push(error);
           }
         }
@@ -747,24 +981,24 @@ export function parseFragment(
   trace = pushTrace(trace, {
     kind: "token",
     count: tokenCount
-  }, budgets);
+  }, budgets, operation);
 
-  const children = built.document.children.map((node) => convertTreeNode(node, assigner, captureSpans));
-  const metrics = collectMetrics(children);
+  const children = built.document.children.map((node) =>
+    convertTreeNode(node, assigner, captureSpans, operation)
+  );
+  const metrics = collectMetrics(children, operation);
   const totalNodes = metrics.nodes + 1;
 
-  enforceBudget("maxNodes", budgets?.maxNodes, totalNodes);
-  enforceBudget("maxDepth", budgets?.maxDepth, metrics.maxDepth);
-  const elapsedMs = Date.now() - startedAt;
-  enforceBudget("maxTimeMs", budgets?.maxTimeMs, elapsedMs);
+  operation.checkpoint();
 
   trace = pushTrace(trace, {
     kind: "tree-mutation",
     nodeCount: totalNodes,
     errorCount: built.errors.length
-  }, budgets);
+  }, budgets, operation);
 
   for (const transition of insertionModeTransitions) {
+    operation.checkpoint();
     trace = pushTrace(trace, {
       kind: "insertionModeTransition",
       fromMode: transition.fromMode,
@@ -775,21 +1009,22 @@ export function parseFragment(
         startOffset: transition.tokenStartOffset,
         endOffset: transition.tokenEndOffset
       }
-    }, budgets);
+    }, budgets, operation);
   }
 
   for (const treeError of parseErrorTrace) {
+    operation.checkpoint();
     trace = pushTrace(trace, {
       kind: "parseError",
       parseErrorId: normalizeParseErrorId(treeError.code),
       startOffset: typeof treeError.startOffset === "number" ? treeError.startOffset : null,
       endOffset: typeof treeError.endOffset === "number" ? treeError.endOffset : null
-    }, budgets);
+    }, budgets, operation);
   }
-  trace = pushBudgetTrace(trace, "maxNodes", budgets?.maxNodes, totalNodes, budgets);
-  trace = pushBudgetTrace(trace, "maxDepth", budgets?.maxDepth, metrics.maxDepth, budgets);
+  trace = pushBudgetTrace(trace, "maxNodes", budgets?.maxNodes, totalNodes, budgets, operation);
+  trace = pushBudgetTrace(trace, "maxDepth", budgets?.maxDepth, metrics.maxDepth, budgets, operation);
 
-  const errors = toParseErrors(built.errors);
+  const errors = toParseErrors(built.errors, operation);
 
   return {
     id: fragmentId,
@@ -805,6 +1040,7 @@ interface StreamDecodeResult {
   readonly text: string;
   readonly sniff: StreamEncodingSniff;
   readonly totalBytes: number;
+  readonly decodedUtf8Bytes: number;
   readonly maxBufferedObserved: number;
 }
 
@@ -818,12 +1054,78 @@ interface StreamDecoderState {
   readonly sniff: StreamEncodingSniff;
 }
 
+async function readStreamChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  operation: OperationContext
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  operation.checkpoint();
+  let readPromise: Promise<ReadableStreamReadResult<Uint8Array>>;
+  try {
+    readPromise = reader.read();
+  } catch (cause) {
+    throw new HtmlStreamReadError(cause);
+  }
+
+  const signal = operation.signal;
+  const remainingTimeMs = operation.remainingTimeMs();
+  if (!signal && remainingTimeMs === undefined) {
+    try {
+      return await readPromise;
+    } catch (cause) {
+      throw new HtmlStreamReadError(cause);
+    }
+  }
+
+  let abortListener: (() => void) | undefined;
+  const abortPromise = signal
+    ? new Promise<never>((_resolve, reject) => {
+        abortListener = () => {
+          reject(new HtmlAbortError(signal.reason));
+        };
+        signal.addEventListener("abort", abortListener, { once: true });
+        if (signal.aborted) {
+          abortListener();
+        }
+      })
+    : undefined;
+  let deadlineTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  const deadlinePromise = remainingTimeMs === undefined
+    ? undefined
+    : new Promise<never>((_resolve, reject) => {
+        deadlineTimer = globalThis.setTimeout(() => {
+          const limit = operation.timeLimit ?? 0;
+          reject(new HtmlBudgetExceededError("maxTimeMs", limit, limit + 1));
+        }, Math.ceil(remainingTimeMs));
+      });
+
+  try {
+    return await Promise.race([
+      readPromise,
+      ...(abortPromise ? [abortPromise] : []),
+      ...(deadlinePromise ? [deadlinePromise] : [])
+    ]);
+  } catch (cause) {
+    if (cause instanceof HtmlAbortError || cause instanceof HtmlBudgetExceededError) {
+      throw cause;
+    }
+    throw new HtmlStreamReadError(cause);
+  } finally {
+    if (abortListener) {
+      signal?.removeEventListener("abort", abortListener);
+    }
+    if (deadlineTimer !== undefined) {
+      globalThis.clearTimeout(deadlineTimer);
+    }
+  }
+}
+
 async function decodeStreamToText(
   stream: ReadableStream<Uint8Array>,
   options: { readonly transportEncodingLabel?: string; readonly budgets?: ParseOptions["budgets"] },
-  startedAt: number
+  operation: OperationContext
 ): Promise<StreamDecodeResult> {
   const budgets = options.budgets;
+  operation.checkpoint();
   let reader: ReadableStreamDefaultReader<Uint8Array>;
   try {
     reader = stream.getReader();
@@ -840,6 +1142,10 @@ async function decodeStreamToText(
   let maxBufferedObserved = 0;
   let decoderState: StreamDecoderState | undefined;
   const decodedParts: string[] = [];
+  const decodedBudget = new DecodedUtf8BudgetCounter(
+    budgets?.maxDecodedUtf8Bytes,
+    operation
+  );
   const sniffOptions =
     options.transportEncodingLabel === undefined
       ? { maxPrescanBytes: prescanLimit }
@@ -850,7 +1156,18 @@ async function decodeStreamToText(
 
   const appendDecoded = (value: string): void => {
     if (value.length > 0) {
+      decodedBudget.append(value);
       decodedParts.push(value);
+    }
+  };
+
+  const decodeBytes = (decoder: TextDecoder, bytes: Uint8Array): void => {
+    const decodeChunkBytes = 16_384;
+    for (let offset = 0; offset < bytes.byteLength; offset += decodeChunkBytes) {
+      operation.checkpoint();
+      appendDecoded(
+        decoder.decode(bytes.subarray(offset, offset + decodeChunkBytes), { stream: true })
+      );
     }
   };
 
@@ -862,7 +1179,7 @@ async function decodeStreamToText(
       sniff
     };
     decoderState = state;
-    appendDecoded(state.decoder.decode(bufferedBytes, { stream: true }));
+    decodeBytes(state.decoder, bufferedBytes);
     return state;
   };
 
@@ -873,21 +1190,21 @@ async function decodeStreamToText(
     }
 
     for (;;) {
-      let next: ReadableStreamReadResult<Uint8Array>;
-      try {
-        next = await reader.read();
-      } catch (cause) {
-        throw new HtmlStreamReadError(cause);
-      }
+      const next = await readStreamChunk(reader, operation);
       if (next.done) {
         break;
       }
 
       const chunkValue = next.value;
+      if (!(chunkValue instanceof Uint8Array)) {
+        throw new HtmlStreamReadError(
+          new TypeError("HTML byte stream yielded a non-Uint8Array chunk")
+        );
+      }
       total += chunkValue.byteLength;
 
       enforceBudget("maxInputBytes", budgets?.maxInputBytes, total);
-      enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
+      operation.checkpoint();
 
       if (decoderState === undefined) {
         const bytesToBuffer = Math.min(chunkValue.byteLength, prescanLimit - pendingBytes);
@@ -902,12 +1219,12 @@ async function decodeStreamToText(
 
         const activeDecoder = initializeDecoder().decoder;
         if (bytesToBuffer < chunkValue.byteLength) {
-          appendDecoded(activeDecoder.decode(chunkValue.subarray(bytesToBuffer), { stream: true }));
+          decodeBytes(activeDecoder, chunkValue.subarray(bytesToBuffer));
         }
         continue;
       }
 
-      appendDecoded(decoderState.decoder.decode(chunkValue, { stream: true }));
+      decodeBytes(decoderState.decoder, chunkValue);
     }
 
     const finalState = decoderState ?? initializeDecoder();
@@ -917,11 +1234,15 @@ async function decodeStreamToText(
       text: decodedParts.join(""),
       sniff: finalState.sniff,
       totalBytes: total,
+      decodedUtf8Bytes: decodedBudget.bytes,
       maxBufferedObserved
     };
   } catch (error) {
     try {
-      await reader.cancel(error);
+      const cancellation = reader.cancel(error);
+      void cancellation.catch(() => {
+        // Cleanup failures never replace or delay the original operation failure.
+      });
     } catch {
       // Preserve the original read, decode, or budget failure.
     }
@@ -934,19 +1255,71 @@ async function decodeStreamToText(
  */
 
 
-export async function* tokenizeStream(
+async function* tokenizeDecodedStream(
+  stream: ReadableStream<Uint8Array>,
+  options: TokenizeStreamOptions,
+  operation: OperationContext
+): AsyncIterable<Token> {
+  const decoded = await decodeStreamToText(stream, options, operation);
+  let parseErrorCount = 0;
+  let currentStartTagAttributeCount = 0;
+  let currentStartTagAttributeBytes = 0;
+  const encoder = new TextEncoder();
+  const tokenized = tokenize(decoded.text, {
+    checkpoint(): void {
+      operation.checkpoint();
+    },
+    onParseError(): void {
+      parseErrorCount += 1;
+      enforceBudget("maxParseErrors", options.budgets?.maxParseErrors, parseErrorCount);
+    },
+    onStartTagOpen(): void {
+      currentStartTagAttributeCount = 0;
+      currentStartTagAttributeBytes = 0;
+    },
+    onStartTagAttribute(value, start): void {
+      operation.checkpoint();
+      if (start) {
+        currentStartTagAttributeCount += 1;
+        enforceBudget(
+          "maxAttributesPerElement",
+          options.budgets?.maxAttributesPerElement,
+          currentStartTagAttributeCount
+        );
+      }
+      currentStartTagAttributeBytes += encoder.encode(value).byteLength;
+      enforceBudget(
+        "maxAttributeBytes",
+        options.budgets?.maxAttributeBytes,
+        currentStartTagAttributeBytes
+      );
+    },
+    onStartTag(attributes): void {
+      enforceTokenAttributeBudgets(attributes, options.budgets);
+    }
+  });
+  operation.checkpoint();
+
+  for (const token of tokenized.tokens) {
+    operation.checkpoint();
+    yield toToken(token);
+  }
+}
+
+/**
+ * Validates and tokenizes a byte stream with bounded decoding, parser limits,
+ * cancellation, and deterministic reader cleanup.
+ */
+export function tokenizeStream(
   stream: ReadableStream<Uint8Array>,
   options: TokenizeStreamOptions = {}
 ): AsyncIterable<Token> {
-  const startedAt = Date.now();
-  const decoded = await decodeStreamToText(stream, options, startedAt);
-  const tokenizerBudgets = tokenizerBudgetsFromParseOptions(options.budgets);
-  const tokenized = tokenizerBudgets ? tokenize(decoded.text, { budgets: tokenizerBudgets }) : tokenize(decoded.text);
-  enforceBudget("maxTimeMs", options.budgets?.maxTimeMs, Date.now() - startedAt);
-
-  for (const token of tokenized.tokens) {
-    yield toToken(token);
-  }
+  const startedAt = performance.now();
+  validateTokenizeStreamOptions(options);
+  requireReadableByteStream(stream, "input");
+  const operation = createOperationContext(options.budgets?.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
+  return tokenizeDecodedStream(stream, options, operation);
 }/**
  * Parses input deterministically for the `parseStream` public API.
  */
@@ -956,11 +1329,16 @@ export async function parseStream(
   stream: ReadableStream<Uint8Array>,
   options: ParseOptions = {}
 ): Promise<DocumentTree> {
-  const startedAt = Date.now();
-  const decoded = await decodeStreamToText(stream, options, startedAt);
+  const startedAt = performance.now();
+  validateParseOptions(options);
+  requireReadableByteStream(stream, "input");
+  const operation = parseOperationContext(options, startedAt);
+  operation.checkpoint();
+  const decoded = await decodeStreamToText(stream, options, operation);
   return parseDocumentInternal(decoded.text, options, {
     byteLength: decoded.totalBytes,
-    startedAt,
+    decodedUtf8ByteLength: decoded.decodedUtf8Bytes,
+    operation,
     decode: {
       source: "sniff",
       encoding: decoded.sniff.encoding,
@@ -981,7 +1359,8 @@ function escapeAttribute(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
-function serializeNode(node: HtmlNode): string {
+function serializeNode(node: HtmlNode, operation: OperationContext): string {
+  operation.checkpoint();
   if (node.kind === "text") {
     return escapeText(node.value);
   }
@@ -1006,24 +1385,35 @@ function serializeNode(node: HtmlNode): string {
     return open;
   }
 
-  const body = node.children.map((child) => serializeNode(child)).join("");
+  const body = node.children.map((child) => serializeNode(child, operation)).join("");
   return `${open}${body}</${node.tagName}>`;
 }/**
  * Serializes data deterministically for the `serialize` public API.
  */
 
 
-export function serialize(tree: DocumentTree | FragmentTree | HtmlNode): string {
+export function serialize(
+  tree: DocumentTree | FragmentTree | HtmlNode,
+  options: OperationOptions = {}
+): string {
+  const startedAt = performance.now();
+  validateOperationOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
   if (tree.kind === "document" || tree.kind === "fragment") {
-    return tree.children.map((child) => serializeNode(child)).join("");
+    return tree.children.map((child) => serializeNode(child, operation)).join("");
   }
 
-  return serializeNode(tree);
+  return serializeNode(tree, operation);
 }
 
-function textContentFromNode(node: DocumentTree | FragmentTree | HtmlNode): string {
+function textContentFromNode(
+  node: DocumentTree | FragmentTree | HtmlNode,
+  operation: OperationContext
+): string {
+  operation.checkpoint();
   if (node.kind === "document" || node.kind === "fragment") {
-    return node.children.map((child) => textContentFromNode(child)).join("");
+    return node.children.map((child) => textContentFromNode(child, operation)).join("");
   }
 
   if (node.kind === "text") {
@@ -1034,7 +1424,7 @@ function textContentFromNode(node: DocumentTree | FragmentTree | HtmlNode): stri
     return "";
   }
 
-  return node.children.map((child) => textContentFromNode(child)).join("");
+  return node.children.map((child) => textContentFromNode(child, operation)).join("");
 }
 
 const VISIBLE_TEXT_SKIP_TAGS = new Set(["head", "script", "style", "template", "title", "optgroup", "option"]);
@@ -1070,7 +1460,18 @@ const VISIBLE_TEXT_BLOCK_BREAK_TAGS = new Set([
   "ul"
 ]);
 
-const DEFAULT_VISIBLE_TEXT_OPTIONS: Required<VisibleTextOptions> = Object.freeze({
+type VisibleTextPolicyOptions = Required<
+  Pick<
+    VisibleTextOptions,
+    "skipHiddenSubtrees" | "includeControlValues" | "includeAccessibleNameFallback" | "trim"
+  >
+>;
+
+type ResolvedVisibleTextOptions = VisibleTextPolicyOptions & {
+  readonly operation: OperationContext;
+};
+
+const DEFAULT_VISIBLE_TEXT_OPTIONS: VisibleTextPolicyOptions = Object.freeze({
   skipHiddenSubtrees: true,
   includeControlValues: true,
   includeAccessibleNameFallback: false,
@@ -1113,8 +1514,9 @@ function attributeValue(node: Extract<HtmlNode, { kind: "element" }>, name: stri
 
 function shouldSkipHiddenSubtree(
   node: Extract<HtmlNode, { kind: "element" }>,
-  options: Required<VisibleTextOptions>
+  options: ResolvedVisibleTextOptions
 ): boolean {
+  options.operation.checkpoint();
   if (!options.skipHiddenSubtrees) {
     return false;
   }
@@ -1149,8 +1551,9 @@ function nonEmptyAttributeValue(
 
 function accessibleNameFallback(
   node: Extract<HtmlNode, { kind: "element" }>,
-  options: Required<VisibleTextOptions>
+  options: ResolvedVisibleTextOptions
 ): string | undefined {
+  options.operation.checkpoint();
   if (!options.includeAccessibleNameFallback) {
     return undefined;
   }
@@ -1165,7 +1568,8 @@ function accessibleNameFallback(
   return nonEmptyAttributeValue(node, "aria-label");
 }
 
-function normalizeVisibleTextOutput(value: string, options: Required<VisibleTextOptions>): string {
+function normalizeVisibleTextOutput(value: string, options: ResolvedVisibleTextOptions): string {
+  options.operation.checkpoint();
   let output = normalizeNewlines(value);
   output = output.replace(/[ \t\f]+\n/g, "\n");
   output = output.replace(/\n[ \t\f]+/g, "\n");
@@ -1239,10 +1643,11 @@ function appendVisibleText(
 function collectNoscriptRawMarkup(
   node: Extract<HtmlNode, { kind: "element" }>,
   parts: string[],
-  options: Required<VisibleTextOptions>,
+  options: ResolvedVisibleTextOptions,
   preserveWhitespace: boolean,
   sourceChunks?: VisibleTextSourceChunk[]
 ): boolean {
+  options.operation.checkpoint();
   if (node.tagName.toLowerCase() !== "noscript") {
     return false;
   }
@@ -1262,6 +1667,7 @@ function collectNoscriptRawMarkup(
   }
 
   const fallbackFragment = parseFragment(rawMarkup, "body");
+  options.operation.checkpoint();
   for (const child of fallbackFragment.children) {
     collectVisibleTextFromNode(child, parts, options, preserveWhitespace, sourceChunks, "noscript-fallback");
   }
@@ -1271,11 +1677,12 @@ function collectNoscriptRawMarkup(
 function collectVisibleTextFromNode(
   node: HtmlNode,
   parts: string[],
-  options: Required<VisibleTextOptions>,
+  options: ResolvedVisibleTextOptions,
   preserveWhitespace: boolean,
   sourceChunks?: VisibleTextSourceChunk[],
   sourceRoleOverride: VisibleTextTokenSourceRole | null = null
 ): void {
+  options.operation.checkpoint();
   if (node.kind === "text") {
     appendVisibleText(
       parts,
@@ -1411,8 +1818,9 @@ function collectVisibleTextFromNode(
 
 function collectVisibleText(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
-  options: Required<VisibleTextOptions>
+  options: ResolvedVisibleTextOptions
 ): string {
+  options.operation.checkpoint();
   const parts: string[] = [];
   if (nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment") {
     for (const child of nodeOrTree.children) {
@@ -1426,8 +1834,9 @@ function collectVisibleText(
 
 function collectVisibleTextWithSourceChunks(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
-  options: Required<VisibleTextOptions>
+  options: ResolvedVisibleTextOptions
 ): { readonly output: string; readonly sourceChunks: readonly VisibleTextSourceChunk[] } {
+  options.operation.checkpoint();
   const parts: string[] = [];
   const sourceChunks: VisibleTextSourceChunk[] = [];
   if (nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment") {
@@ -1443,10 +1852,14 @@ function collectVisibleTextWithSourceChunks(
   };
 }
 
-function sourceChunksToChars(chunks: readonly VisibleTextSourceChunk[]): VisibleTextSourceChar[] {
+function sourceChunksToChars(
+  chunks: readonly VisibleTextSourceChunk[],
+  operation: OperationContext
+): VisibleTextSourceChar[] {
   const chars: VisibleTextSourceChar[] = [];
   for (const chunk of chunks) {
     for (const char of chunk.value) {
+      operation.checkpoint();
       chars.push({
         char,
         sourceNodeId: chunk.sourceNodeId,
@@ -1465,11 +1878,13 @@ function isSpaceTabFormFeed(char: string): boolean {
 function collapseSourceChars(
   chars: readonly VisibleTextSourceChar[],
   predicate: (char: string) => boolean,
-  limit: number
+  limit: number,
+  operation: OperationContext
 ): VisibleTextSourceChar[] {
   const result: VisibleTextSourceChar[] = [];
   let runCount = 0;
   for (const entry of chars) {
+    operation.checkpoint();
     if (predicate(entry.char)) {
       runCount += 1;
       if (runCount <= limit) {
@@ -1485,10 +1900,12 @@ function collapseSourceChars(
 
 function normalizeSourceChars(
   sourceChars: readonly VisibleTextSourceChar[],
-  options: Required<VisibleTextOptions>
+  options: ResolvedVisibleTextOptions
 ): VisibleTextSourceChar[] {
+  options.operation.checkpoint();
   const removeSpaceBeforeNewline: VisibleTextSourceChar[] = [];
   for (const entry of sourceChars) {
+    options.operation.checkpoint();
     if (entry.char === "\n") {
       while (
         removeSpaceBeforeNewline.length > 0 &&
@@ -1502,6 +1919,7 @@ function normalizeSourceChars(
 
   const removeSpaceAfterNewline: VisibleTextSourceChar[] = [];
   for (const entry of removeSpaceBeforeNewline) {
+    options.operation.checkpoint();
     const previous = removeSpaceAfterNewline[removeSpaceAfterNewline.length - 1];
     if (previous?.char === "\n" && isSpaceTabFormFeed(entry.char)) {
       continue;
@@ -1509,9 +1927,24 @@ function normalizeSourceChars(
     removeSpaceAfterNewline.push(entry);
   }
 
-  const collapsedNewlines = collapseSourceChars(removeSpaceAfterNewline, (char) => char === "\n", 2);
-  const collapsedSpaces = collapseSourceChars(collapsedNewlines, (char) => char === " ", 1);
-  const collapsedTabs = collapseSourceChars(collapsedSpaces, (char) => char === "\t", 1);
+  const collapsedNewlines = collapseSourceChars(
+    removeSpaceAfterNewline,
+    (char) => char === "\n",
+    2,
+    options.operation
+  );
+  const collapsedSpaces = collapseSourceChars(
+    collapsedNewlines,
+    (char) => char === " ",
+    1,
+    options.operation
+  );
+  const collapsedTabs = collapseSourceChars(
+    collapsedSpaces,
+    (char) => char === "\t",
+    1,
+    options.operation
+  );
 
   if (!options.trim || collapsedTabs.length === 0) {
     return collapsedTabs;
@@ -1552,12 +1985,14 @@ function provenanceToken(
 }
 
 function tokenizeVisibleTextWithSourceChars(
-  chars: readonly VisibleTextSourceChar[]
+  chars: readonly VisibleTextSourceChar[],
+  operation: OperationContext
 ): readonly VisibleTextTokenWithProvenance[] {
   const tokens: VisibleTextTokenWithProvenance[] = [];
   let cursor = 0;
 
   while (cursor < chars.length) {
+    operation.checkpoint();
     const current = chars[cursor];
     if (!current) {
       break;
@@ -1584,6 +2019,7 @@ function tokenizeVisibleTextWithSourceChars(
     let value = "";
     const source = current;
     while (cursor < chars.length) {
+      operation.checkpoint();
       const entry = chars[cursor];
       if (!entry || entry.char === "\n" || entry.char === "\t") {
         break;
@@ -1600,7 +2036,7 @@ function tokenizeVisibleTextWithSourceChars(
   return Object.freeze(tokens);
 }
 
-function tokenizeVisibleText(value: string): readonly VisibleTextToken[] {
+function tokenizeVisibleText(value: string, operation: OperationContext): readonly VisibleTextToken[] {
   const tokens: VisibleTextToken[] = [];
   let cursor = 0;
   let activeText = "";
@@ -1618,6 +2054,7 @@ function tokenizeVisibleText(value: string): readonly VisibleTextToken[] {
   };
 
   while (cursor < value.length) {
+    operation.checkpoint();
     const char = value[cursor];
     if (char === undefined) {
       break;
@@ -1652,9 +2089,18 @@ function tokenizeVisibleText(value: string): readonly VisibleTextToken[] {
 
 
 export function visibleText(nodeOrTree: DocumentTree | FragmentTree | HtmlNode, options: VisibleTextOptions = {}): string {
-  const resolvedOptions: Required<VisibleTextOptions> = {
+  const startedAt = performance.now();
+  validateVisibleTextOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
+  const resolvedOptions: ResolvedVisibleTextOptions = {
     ...DEFAULT_VISIBLE_TEXT_OPTIONS,
-    ...options
+    skipHiddenSubtrees: options.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
+    includeControlValues: options.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
+    includeAccessibleNameFallback:
+      options.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
+    trim: options.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
+    operation
   };
   return collectVisibleText(nodeOrTree, resolvedOptions);
 }/**
@@ -1666,8 +2112,20 @@ export function visibleTextTokens(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
   options: VisibleTextOptions = {}
 ): readonly VisibleTextToken[] {
-  const output = visibleText(nodeOrTree, options);
-  return tokenizeVisibleText(output);
+  const startedAt = performance.now();
+  validateVisibleTextOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
+  const resolvedOptions: ResolvedVisibleTextOptions = {
+    ...DEFAULT_VISIBLE_TEXT_OPTIONS,
+    skipHiddenSubtrees: options.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
+    includeControlValues: options.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
+    includeAccessibleNameFallback:
+      options.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
+    trim: options.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
+    operation
+  };
+  return tokenizeVisibleText(collectVisibleText(nodeOrTree, resolvedOptions), operation);
 }/**
  * Provides deterministic public behavior for `visibleTextTokensWithProvenance`.
  */
@@ -1677,12 +2135,24 @@ export function visibleTextTokensWithProvenance(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
   options: VisibleTextOptions = {}
 ): readonly VisibleTextTokenWithProvenance[] {
-  const resolvedOptions: Required<VisibleTextOptions> = {
+  const startedAt = performance.now();
+  validateVisibleTextOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
+  const resolvedOptions: ResolvedVisibleTextOptions = {
     ...DEFAULT_VISIBLE_TEXT_OPTIONS,
-    ...options
+    skipHiddenSubtrees: options.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
+    includeControlValues: options.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
+    includeAccessibleNameFallback:
+      options.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
+    trim: options.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
+    operation
   };
   const { output, sourceChunks } = collectVisibleTextWithSourceChunks(nodeOrTree, resolvedOptions);
-  const normalizedSourceChars = normalizeSourceChars(sourceChunksToChars(sourceChunks), resolvedOptions);
+  const normalizedSourceChars = normalizeSourceChars(
+    sourceChunksToChars(sourceChunks, operation),
+    resolvedOptions
+  );
   const normalizedOutput = normalizedSourceChars.map((entry) => entry.char).join("");
 
   if (normalizedOutput !== output) {
@@ -1693,7 +2163,7 @@ export function visibleTextTokensWithProvenance(
       sourceRole: "text-node"
     };
     return Object.freeze(
-      tokenizeVisibleText(output).map((token) => provenanceToken(
+      tokenizeVisibleText(output, operation).map((token) => provenanceToken(
         token.kind,
         token.value,
         token.kind === "text" ? fallbackSource : { ...fallbackSource, sourceRole: "structure-break" }
@@ -1701,17 +2171,19 @@ export function visibleTextTokensWithProvenance(
     );
   }
 
-  return tokenizeVisibleTextWithSourceChars(normalizedSourceChars);
+  return tokenizeVisibleTextWithSourceChars(normalizedSourceChars, operation);
 }
 
 function* iterateNodes(
   nodes: readonly HtmlNode[],
-  depth: number
+  depth: number,
+  operation: OperationContext
 ): IterableIterator<{ readonly node: HtmlNode; readonly depth: number }> {
   for (const node of nodes) {
+    operation.checkpoint();
     yield { node, depth };
     if (node.kind === "element") {
-      yield* iterateNodes(node.children, depth + 1);
+      yield* iterateNodes(node.children, depth + 1, operation);
     }
   }
 }/**
@@ -1719,19 +2191,37 @@ function* iterateNodes(
  */
 
 
-export function walk(tree: DocumentTree | FragmentTree, visitor: NodeVisitor): void {
-  for (const entry of iterateNodes(tree.children, 0)) {
+export function walk(
+  tree: DocumentTree | FragmentTree,
+  visitor: NodeVisitor,
+  options: OperationOptions = {}
+): void {
+  const startedAt = performance.now();
+  validateOperationOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
+  for (const entry of iterateNodes(tree.children, 0, operation)) {
     visitor(entry.node, entry.depth);
+    operation.checkpoint();
   }
 }/**
  * Traverses parsed data deterministically for the `walkElements` public API.
  */
 
 
-export function walkElements(tree: DocumentTree | FragmentTree, visitor: ElementVisitor): void {
-  for (const entry of iterateNodes(tree.children, 0)) {
+export function walkElements(
+  tree: DocumentTree | FragmentTree,
+  visitor: ElementVisitor,
+  options: OperationOptions = {}
+): void {
+  const startedAt = performance.now();
+  validateOperationOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
+  for (const entry of iterateNodes(tree.children, 0, operation)) {
     if (entry.node.kind === "element") {
       visitor(entry.node, entry.depth);
+      operation.checkpoint();
     }
   }
 }/**
@@ -1739,15 +2229,30 @@ export function walkElements(tree: DocumentTree | FragmentTree, visitor: Element
  */
 
 
-export function textContent(node: DocumentTree | FragmentTree | HtmlNode): string {
-  return textContentFromNode(node);
+export function textContent(
+  node: DocumentTree | FragmentTree | HtmlNode,
+  options: OperationOptions = {}
+): string {
+  const startedAt = performance.now();
+  validateOperationOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
+  return textContentFromNode(node, operation);
 }/**
  * Traverses parsed data deterministically for the `findById` public API.
  */
 
 
-export function findById(tree: DocumentTree | FragmentTree, id: NodeId): HtmlNode | null {
-  for (const entry of iterateNodes(tree.children, 0)) {
+export function findById(
+  tree: DocumentTree | FragmentTree,
+  id: NodeId,
+  options: OperationOptions = {}
+): HtmlNode | null {
+  const startedAt = performance.now();
+  validateOperationOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
+  for (const entry of iterateNodes(tree.children, 0, operation)) {
     if (entry.node.id === id) {
       return entry.node;
     }
@@ -1759,27 +2264,42 @@ export function findById(tree: DocumentTree | FragmentTree, id: NodeId): HtmlNod
  */
 
 
-export function* findAllByTagName(
+function* findAllByTagNameIterator(
   tree: DocumentTree | FragmentTree,
-  tagName: string
+  tagName: string,
+  operation: OperationContext
 ): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
   const normalized = tagName.toLowerCase();
-  for (const entry of iterateNodes(tree.children, 0)) {
+  for (const entry of iterateNodes(tree.children, 0, operation)) {
     if (entry.node.kind === "element" && entry.node.tagName.toLowerCase() === normalized) {
       yield entry.node;
     }
   }
+}
+
+/** Finds every element whose HTML tag name matches, with optional deadline or cancellation controls. */
+export function findAllByTagName(
+  tree: DocumentTree | FragmentTree,
+  tagName: string,
+  options: OperationOptions = {}
+): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
+  const startedAt = performance.now();
+  validateOperationOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
+  return findAllByTagNameIterator(tree, tagName, operation);
 }/**
  * Traverses parsed data deterministically for the `findAllByAttr` public API.
  */
 
 
-export function* findAllByAttr(
+function* findAllByAttrIterator(
   tree: DocumentTree | FragmentTree,
   name: string,
-  value?: string
+  value: string | undefined,
+  operation: OperationContext
 ): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
-  for (const entry of iterateNodes(tree.children, 0)) {
+  for (const entry of iterateNodes(tree.children, 0, operation)) {
     if (entry.node.kind !== "element") {
       continue;
     }
@@ -1793,7 +2313,27 @@ export function* findAllByAttr(
   }
 }
 
-function collectOutlineNodes(node: HtmlNode, depth: number, entries: OutlineEntry[]): void {
+/** Finds elements carrying an attribute and optional value, with operation controls. */
+export function findAllByAttr(
+  tree: DocumentTree | FragmentTree,
+  name: string,
+  value?: string,
+  options: OperationOptions = {}
+): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
+  const startedAt = performance.now();
+  validateOperationOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
+  return findAllByAttrIterator(tree, name, value, operation);
+}
+
+function collectOutlineNodes(
+  node: HtmlNode,
+  depth: number,
+  entries: OutlineEntry[],
+  operation: OperationContext
+): void {
+  operation.checkpoint();
   if (node.kind !== "element") {
     return;
   }
@@ -1804,33 +2344,41 @@ function collectOutlineNodes(node: HtmlNode, depth: number, entries: OutlineEntr
       nodeId: node.id,
       depth,
       tagName: node.tagName,
-      text: textContentFromNode(node).slice(0, 200)
+      text: textContentFromNode(node, operation).slice(0, 200)
     });
   }
 
   for (const child of node.children) {
-    collectOutlineNodes(child, depth + 1, entries);
+    collectOutlineNodes(child, depth + 1, entries, operation);
   }
 }/**
  * Provides deterministic public behavior for `outline`.
  */
 
 
-export function outline(tree: DocumentTree | FragmentTree): Outline {
+export function outline(
+  tree: DocumentTree | FragmentTree,
+  options: OperationOptions = {}
+): Outline {
+  const startedAt = performance.now();
+  validateOperationOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
   const entries: OutlineEntry[] = [];
   for (const child of tree.children) {
-    collectOutlineNodes(child, 0, entries);
+    collectOutlineNodes(child, 0, entries, operation);
   }
 
   return { entries };
 }
 
-function countNodes(node: HtmlNode): number {
+function countNodes(node: HtmlNode, operation: OperationContext): number {
+  operation.checkpoint();
   if (node.kind !== "element") {
     return 1;
   }
 
-  return 1 + node.children.reduce((total, child) => total + countNodes(child), 0);
+  return 1 + node.children.reduce((total, child) => total + countNodes(child, operation), 0);
 }
 
 interface IndexedNodeSpan {
@@ -2224,6 +2772,10 @@ export function computePatch(originalHtml: string, edits: readonly Edit[]): Patc
 
 
 export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions = {}): Chunk[] {
+  const startedAt = performance.now();
+  validateChunkOptions(options);
+  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  operation.checkpoint();
   const maxChars = options.maxChars ?? 8192;
   const maxNodes = options.maxNodes ?? 256;
   const maxBytes = options.maxBytes ?? Number.POSITIVE_INFINITY;
@@ -2255,8 +2807,9 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
   };
 
   for (const node of tree.children) {
-    const content = serialize(node);
-    const nodes = countNodes(node);
+    operation.checkpoint();
+    const content = serializeNode(node, operation);
+    const nodes = countNodes(node, operation);
     const bytes = textEncoder.encode(content).length;
     const nextChars = activeContent.length + content.length;
     const nextNodes = activeNodes + nodes;

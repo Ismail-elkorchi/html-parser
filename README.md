@@ -61,7 +61,17 @@ const stream = new ReadableStream({
   }
 });
 
-const tree = await parseStream(stream, { budgets: { maxInputBytes: 4096, maxBufferedBytes: 512 } });
+const controller = new AbortController();
+const tree = await parseStream(stream, {
+  signal: controller.signal,
+  budgets: {
+    maxInputBytes: 4096,
+    maxBufferedBytes: 512,
+    maxDecodedUtf8Bytes: 4096,
+    maxNodes: 512,
+    maxTimeMs: 250
+  }
+});
 console.log(tree.kind);
 ```
 
@@ -122,6 +132,7 @@ The Node.js package surface is verified against Node 20, 22, and 24.
 
 Parsing is not sanitization. For untrusted input:
 - set strict budgets,
+- pass an `AbortSignal` for request-scoped cancellation,
 - classify `HtmlBudgetExceededError` with its structural guard,
 - sanitize separately before rendering.
 

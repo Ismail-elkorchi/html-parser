@@ -9,6 +9,10 @@ export interface EncodingSniffResult {
   readonly source: "bom" | "transport" | "meta" | "default";
 }
 
+export interface HtmlByteDecodeOptions extends EncodingSniffOptions {
+  readonly onDecodedChunk?: (chunk: string) => void;
+}
+
 const WINDOWS_1252_ALIASES = new Set([
   "iso-8859-1",
   "iso8859-1",
@@ -291,11 +295,31 @@ export function sniffHtmlEncoding(bytes: Uint8Array, options: EncodingSniffOptio
   return { encoding: defaultEncoding, source: "default" };
 }
 
-export function decodeHtmlBytes(bytes: Uint8Array, options: EncodingSniffOptions = {}): { text: string; sniff: EncodingSniffResult } {
-  const sniff = sniffHtmlEncoding(bytes, options);
+export function decodeHtmlBytes(bytes: Uint8Array, options: HtmlByteDecodeOptions = {}): { text: string; sniff: EncodingSniffResult } {
+  const sniff = sniffHtmlEncoding(bytes, {
+    ...(options.transportEncodingLabel !== undefined
+      ? { transportEncodingLabel: options.transportEncodingLabel }
+      : {}),
+    ...(options.maxPrescanBytes !== undefined ? { maxPrescanBytes: options.maxPrescanBytes } : {}),
+    ...(options.defaultEncoding !== undefined ? { defaultEncoding: options.defaultEncoding } : {})
+  });
   const decoder = new TextDecoder(sniff.encoding);
+  const parts: string[] = [];
+  const decodeChunkBytes = 16_384;
+  for (let offset = 0; offset < bytes.byteLength; offset += decodeChunkBytes) {
+    const decoded = decoder.decode(bytes.subarray(offset, offset + decodeChunkBytes), { stream: true });
+    if (decoded.length > 0) {
+      options.onDecodedChunk?.(decoded);
+      parts.push(decoded);
+    }
+  }
+  const final = decoder.decode();
+  if (final.length > 0) {
+    options.onDecodedChunk?.(final);
+    parts.push(final);
+  }
   return {
-    text: decoder.decode(bytes),
+    text: parts.join(""),
     sniff
   };
 }

@@ -7,7 +7,7 @@ This note records the current module-of-truth paths for published consumer surfa
 - Node runtime import target: `dist/mod.js` (from `package.json` `exports["."].import`)
 
 Node and JSR are versioned together but may expose different subsets. The four
-HTML operational error classes, their structural guards, their reason/name
+HTML operational error classes (including cancellation), their structural guards, their reason/name
 types (including `NodeId`), and `HtmlOperationalError` are deliberately exported
 from both roots.
 See `docs/reference/api-overview.md` for the current parity notes.
