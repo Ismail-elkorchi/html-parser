@@ -84,7 +84,7 @@ async function main() {
     }
   }
 
-  let missingApiReferenceEntries = [];
+  let missingApiReferenceEntries;
   if (await fileExists(API_ENTRYPOINT_PATH) && await fileExists(API_REFERENCE_PATH)) {
     const [entrypointSource, apiReference] = await Promise.all([
       readFile(API_ENTRYPOINT_PATH, "utf8"),

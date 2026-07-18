@@ -32,7 +32,9 @@ export async function readJson(filePath) {
   try {
     return JSON.parse(jsonText);
   } catch (error) {
-    throw new Error(`Invalid JSON in ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Invalid JSON in ${filePath}: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error
+    });
   }
 }
 

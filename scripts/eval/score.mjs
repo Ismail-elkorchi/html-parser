@@ -141,7 +141,7 @@ async function main() {
 
   const browserDiffPoints = Number(weights.browserDiff);
 
-  let browserDiffScore = 0;
+  let browserDiffScore;
   let browserAgreement = { skippedByWeight: browserDiffPoints === 0 };
   if (browserDiffPoints > 0) {
     const browserDiffReport = await loadOptional("reports/browser-diff.json");

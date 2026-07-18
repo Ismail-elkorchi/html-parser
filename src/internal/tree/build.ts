@@ -164,7 +164,7 @@ function asSourceLocation(value: unknown): SourceLocationLike | undefined {
     return undefined;
   }
 
-  return candidate as unknown as SourceLocationLike;
+  return candidate;
 }
 
 function toTreeSpan(location: SourceLocationLike | undefined): TreeSpan | undefined {
@@ -308,7 +308,7 @@ function patchSelectAdoptionCompatibility(root: Parse5Document | Parse5DocumentF
   const walk = (node: Parse5ParentNode): void => {
     for (const child of node.childNodes) {
       if ("childNodes" in child) {
-        walk(child as Parse5ParentNode);
+        walk(child);
       }
     }
 
@@ -377,7 +377,7 @@ function patchSelectAdoptionCompatibility(root: Parse5Document | Parse5DocumentF
     }
   };
 
-  walk(root as Parse5ParentNode);
+  walk(root);
 }
 
 function parseTree(
