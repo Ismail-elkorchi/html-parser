@@ -21,7 +21,16 @@ type ParseOptions = {
     readonly tokenStartOffset: number | null;
     readonly tokenEndOffset: number | null;
   }) => void;
+  readonly onToken?: (kind: Parse5TokenKind) => void;
 };
+
+export type Parse5TokenKind =
+  | "startTag"
+  | "endTag"
+  | "comment"
+  | "doctype"
+  | "character"
+  | "eof";
 
 type ParserFacade = {
   parse(html: string, options?: ParseOptions): unknown;

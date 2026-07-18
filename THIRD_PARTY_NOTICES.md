@@ -10,13 +10,6 @@ Scope:
 - License: MIT
 - Notice: Fixture data is used for conformance evaluation.
 
-## WHATWG entities dataset
-- Source: https://html.spec.whatwg.org/entities.json
-- Location in repository: `vendor/whatwg/entities.json`
-- Generated lookup: `src/internal/entities.ts`
-- License/attribution: HTML Standard content and attribution requirements apply.
-- Notice: Snapshot is vendored for deterministic named character reference decoding.
-
 ## parse5 runtime source (vendored subset)
 - Source: https://github.com/inikulin/parse5
 - Location in repository: `src/internal/vendor/parse5`

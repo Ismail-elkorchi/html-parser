@@ -3,6 +3,11 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Parse documents and fragments in a single parse5 pass, report the actual
+  context-sensitive token count, and remove the catch-all legacy tokenizer
+  fallback and its unused generated entity dataset.
+- Decode long zero-prefixed and out-of-range numeric character references
+  without arithmetic overflow failures.
 - Remove obsolete governance references, dead decision-file validation, and unreachable evaluation wrappers left behind by the documentation consolidation.
 - Upgrade the complete development toolchain and migrate lint configuration to ESLint 10-compatible plugins.
 - Upgrade every GitHub Actions dependency to its latest stable release while retaining immutable commit pins.

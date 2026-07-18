@@ -368,6 +368,7 @@ export class Tokenizer {
         const ct = this.currentToken;
         this.prepareToken(ct);
         ct.tagID = getTagID(ct.tagName);
+        this.options.onToken?.(ct.type === TokenType.START_TAG ? 'startTag' : 'endTag');
         if (ct.type === TokenType.START_TAG) {
             this.lastStartTagName = ct.tagName;
             this.handler.onStartTag(ct);
@@ -385,11 +386,13 @@ export class Tokenizer {
     }
     emitCurrentComment(ct) {
         this.prepareToken(ct);
+        this.options.onToken?.('comment');
         this.handler.onComment(ct);
         this.preprocessor.dropParsedChunk();
     }
     emitCurrentDoctype(ct) {
         this.prepareToken(ct);
+        this.options.onToken?.('doctype');
         this.handler.onDoctype(ct);
         this.preprocessor.dropParsedChunk();
     }
@@ -402,6 +405,7 @@ export class Tokenizer {
                 this.currentCharacterToken.location.endCol = nextLocation.startCol;
                 this.currentCharacterToken.location.endOffset = nextLocation.startOffset;
             }
+            this.options.onToken?.('character');
             switch (this.currentCharacterToken.type) {
                 case TokenType.CHARACTER: {
                     this.handler.onCharacter(this.currentCharacterToken);
@@ -427,6 +431,7 @@ export class Tokenizer {
             location.endOffset = location.startOffset;
         }
         this._emitCurrentCharacterToken(location);
+        this.options.onToken?.('eof');
         this.handler.onEof({ type: TokenType.EOF, location });
         this.active = false;
     }

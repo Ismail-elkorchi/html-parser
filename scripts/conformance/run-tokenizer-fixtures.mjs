@@ -106,23 +106,36 @@ for (const fixtureCase of parsedCases) {
     continue;
   }
 
-  const tokenizeResult = tokenize(fixtureCase.input, {
-    initialState: fixtureCase.initialState,
-    lastStartTag: fixtureCase.lastStartTag,
-    doubleEscaped: fixtureCase.doubleEscaped,
-    xmlViolationMode: fixtureCase.xmlViolationMode,
-    budgets: {
-      maxTextBytes: 200000,
-      maxTokenBytes: 16000,
-      maxParseErrors: 2000,
-      maxTimeMs: 50
-    },
-    debug: {
-      enabled: true,
-      windowCodePoints: 24,
-      lastTokens: 8
-    }
-  });
+  let tokenizeResult;
+  try {
+    tokenizeResult = tokenize(fixtureCase.input, {
+      initialState: fixtureCase.initialState,
+      lastStartTag: fixtureCase.lastStartTag,
+      doubleEscaped: fixtureCase.doubleEscaped,
+      xmlViolationMode: fixtureCase.xmlViolationMode,
+      budgets: {
+        maxTextBytes: 200000,
+        maxTokenBytes: 16000,
+        maxParseErrors: 2000,
+        maxTimeMs: 50
+      },
+      debug: {
+        enabled: true,
+        windowCodePoints: 24,
+        lastTokens: 8
+      }
+    });
+  } catch (error) {
+    failed += 1;
+    failures.push({
+      id: fixtureCase.id,
+      description: fixtureCase.description,
+      unexpectedError: error instanceof Error
+        ? { name: error.name, message: error.message }
+        : { name: "NonError", message: String(error) }
+    });
+    continue;
+  }
 
   const expectedTokens = fixtureCase.output.map((token) => fixtureTokenToComparable(token));
   const actualTokens = normalizeTokenArray(tokenizeResult.tokens);

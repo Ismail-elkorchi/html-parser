@@ -1,7 +1,5 @@
 import { Tokenizer, TokenizerMode } from "../parse5-runtime.js";
 
-import { tokenize as tokenizeLegacy } from "./tokenize-legacy.js";
-
 import type {
   HtmlToken,
   TokenizeOptions,
@@ -259,9 +257,5 @@ function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeRe
 }
 
 export function tokenize(input: string, options: TokenizeOptions = {}): TokenizeResult {
-  try {
-    return tokenizeWithParse5(input, options);
-  } catch {
-    return tokenizeLegacy(input, options);
-  }
+  return tokenizeWithParse5(input, options);
 }

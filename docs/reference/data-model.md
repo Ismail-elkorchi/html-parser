@@ -10,6 +10,10 @@
 
 `parseFragment` returns a `FragmentTree` with the same structure but `kind: "fragment"`.
 
+When tracing is enabled, the token event reports the number of logical tokens
+emitted to the tree builder, coalescing adjacent character chunks and including
+EOF. Fragment token counts reflect the supplied fragment context.
+
 ## Core Node Types
 
 `HtmlNode` is a tagged union:

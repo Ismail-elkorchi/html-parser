@@ -534,13 +534,8 @@ function parseDocumentInternal(
   }
   trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, input.byteLength, budgets);
 
-  const tokenizerBudgets = tokenizerBudgetsFromParseOptions(budgets);
-  const tokenized = tokenizerBudgets ? tokenize(html, { budgets: tokenizerBudgets }) : tokenize(html);
-
-  trace = pushTrace(trace, {
-    kind: "token",
-    count: tokenized.tokens.length
-  }, budgets);
+  let tokenCount = 0;
+  let previousTokenWasCharacter = false;
 
   const insertionModeTransitions: {
     readonly fromMode: string;
@@ -560,6 +555,12 @@ function parseDocumentInternal(
     captureSpans,
     ...(trace
       ? {
+          onToken(kind: "startTag" | "endTag" | "comment" | "doctype" | "character" | "eof"): void {
+            if (kind !== "character" || !previousTokenWasCharacter) {
+              tokenCount += 1;
+            }
+            previousTokenWasCharacter = kind === "character";
+          },
           onInsertionModeTransition(transition: {
             readonly fromMode: string;
             readonly toMode: string;
@@ -580,6 +581,11 @@ function parseDocumentInternal(
         }
       : {})
   });
+
+  trace = pushTrace(trace, {
+    kind: "token",
+    count: tokenCount
+  }, budgets);
 
   const children = built.document.children.map((node) => convertTreeNode(node, assigner, captureSpans));
   const metrics = collectMetrics(children);
@@ -696,13 +702,8 @@ export function parseFragment(
   }, budgets);
   trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, inputByteLength, budgets);
 
-  const tokenizerBudgets = tokenizerBudgetsFromParseOptions(budgets);
-  const tokenized = tokenizerBudgets ? tokenize(html, { budgets: tokenizerBudgets }) : tokenize(html);
-
-  trace = pushTrace(trace, {
-    kind: "token",
-    count: tokenized.tokens.length
-  }, budgets);
+  let tokenCount = 0;
+  let previousTokenWasCharacter = false;
 
   const insertionModeTransitions: {
     readonly fromMode: string;
@@ -723,6 +724,12 @@ export function parseFragment(
     captureSpans,
     ...(trace
       ? {
+          onToken(kind: "startTag" | "endTag" | "comment" | "doctype" | "character" | "eof"): void {
+            if (kind !== "character" || !previousTokenWasCharacter) {
+              tokenCount += 1;
+            }
+            previousTokenWasCharacter = kind === "character";
+          },
           onInsertionModeTransition(transition: {
             readonly fromMode: string;
             readonly toMode: string;
@@ -743,6 +750,11 @@ export function parseFragment(
         }
       : {})
   });
+
+  trace = pushTrace(trace, {
+    kind: "token",
+    count: tokenCount
+  }, budgets);
 
   const children = built.document.children.map((node) => convertTreeNode(node, assigner, captureSpans));
   const metrics = collectMetrics(children);
