@@ -60,7 +60,7 @@ async function main() {
   const suiteResults = [];
   let hasSuiteFailures = false;
 
-  // ADR-006 and ADR-007 enforce mismatch-as-failure for tokenizer and tree conformance.
+  // Every reported conformance mismatch fails the aggregate run.
   for (const conformanceSuite of conformanceSuites) {
     const startedAt = Date.now();
     try {
