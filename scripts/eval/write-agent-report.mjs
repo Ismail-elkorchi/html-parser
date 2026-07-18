@@ -12,7 +12,7 @@ import {
   parse,
   parseFragment,
   textContent,
-  tokenizeStream,
+  tokenizeByteStreamEager,
   visibleText,
   visibleTextTokens,
   visibleTextTokensWithProvenance,
@@ -367,11 +367,7 @@ function evaluateChunkFeature() {
 }
 
 async function collectStreamTokens(chunks, options = {}) {
-  const tokens = [];
-  for await (const token of tokenizeStream(createByteStream(chunks), options)) {
-    tokens.push(token);
-  }
-  return tokens;
+  return tokenizeByteStreamEager(createByteStream(chunks), options);
 }
 
 async function captureTokenBudgetFailure(chunks, options) {
@@ -395,10 +391,10 @@ async function evaluateStreamTokenFeature() {
   const chunks = [encoder.encode("<p>"), encoder.encode("alpha"), encoder.encode("</p>")];
 
   const firstRun = await collectStreamTokens(chunks, {
-    budgets: { maxInputBytes: 1024, maxBufferedBytes: 256 }
+    budgets: { maxInputBytes: 1024, maxEncodingPrescanBytes: 256 }
   });
   const secondRun = await collectStreamTokens(chunks, {
-    budgets: { maxInputBytes: 1024, maxBufferedBytes: 256 }
+    budgets: { maxInputBytes: 1024, maxEncodingPrescanBytes: 256 }
   });
 
   const deterministic = JSON.stringify(firstRun) === JSON.stringify(secondRun);
@@ -407,10 +403,10 @@ async function evaluateStreamTokenFeature() {
 
   const tightChunks = [new Uint8Array(32).fill(0x61)];
   const firstBudgetFailure = await captureTokenBudgetFailure(tightChunks, {
-    budgets: { maxInputBytes: 16, maxBufferedBytes: 16 }
+    budgets: { maxInputBytes: 16, maxEncodingPrescanBytes: 16 }
   });
   const secondBudgetFailure = await captureTokenBudgetFailure(tightChunks, {
-    budgets: { maxInputBytes: 16, maxBufferedBytes: 16 }
+    budgets: { maxInputBytes: 16, maxEncodingPrescanBytes: 16 }
   });
 
   const inputBudgetFailureOk = firstBudgetFailure?.budget === "maxInputBytes";

@@ -3,6 +3,12 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Rename the stream encoding-prefix control to
+  `maxEncodingPrescanBytes`, separate stream-specific option types from
+  non-stream parse options, and report prescan high-water data on stream traces.
+- Replace the misleading token-stream iterator with
+  `tokenizeByteStreamEager()`, which returns one promised token collection after
+  EOF, and document full-document buffering and peak-memory ownership.
 - Validate closed parser option schemas and hard-stop node, depth, parse-error,
   attribute, decoded-output, trace, input, and monotonic-time budgets at the
   first unavailable unit.

@@ -29,14 +29,15 @@ import {
   validateChunkOptions,
   validateOperationOptions,
   validateParseOptions,
-  validateTokenizeStreamOptions,
+  validateParseStreamOptions,
+  validateTokenizeByteStreamEagerOptions,
   validateVisibleTextOptions,
   type OperationContext
 } from "./operation.js";
 
 import type {
   Attribute,
-  BudgetOptions,
+  ParseBudgetOptions,
   Chunk,
   ChunkOptions,
   DocumentTree,
@@ -55,10 +56,12 @@ import type {
   PatchStep,
   ParseError,
   ParseOptions,
+  ParseStreamBudgetOptions,
+  ParseStreamOptions,
   Span,
   SpanProvenance,
   Token,
-  TokenizeStreamOptions,
+  TokenizeByteStreamEagerOptions,
   TraceEvent,
   VisibleTextOptions,
   VisibleTextToken,
@@ -69,7 +72,7 @@ import type {
 
 export type {
   Attribute,
-  BudgetOptions,
+  ParseBudgetOptions,
   CharsToken,
   Chunk,
   ChunkOptions,
@@ -99,13 +102,15 @@ export type {
   PatchStep,
   ParseError,
   ParseOptions,
+  ParseStreamBudgetOptions,
+  ParseStreamOptions,
   Span,
   SpanProvenance,
   StartTagToken,
   Token,
   TokenAttribute,
-  TokenizeStreamBudgetOptions,
-  TokenizeStreamOptions,
+  TokenizeByteStreamEagerBudgetOptions,
+  TokenizeByteStreamEagerOptions,
   TextNode,
   TraceEvent,
   VisibleTextOptions,
@@ -146,7 +151,7 @@ const VOID_ELEMENTS = new Set([
   "track",
   "wbr"
 ]);
-const STREAM_ENCODING_PRESCAN_BYTES = 16_384;
+const DEFAULT_STREAM_ENCODING_PRESCAN_BYTES = 16_384;
 
 class NodeIdAssigner {
   #next: NodeId = 1;
@@ -500,7 +505,7 @@ function treeBudgetsFromParseOptions(budgets: ParseOptions["budgets"] | undefine
 
 function enforceTokenAttributeBudgets(
   attributes: readonly Readonly<{ readonly name: string; readonly value: string }>[],
-  budgets: Pick<BudgetOptions, "maxAttributesPerElement" | "maxAttributeBytes"> | undefined
+  budgets: Pick<ParseBudgetOptions, "maxAttributesPerElement" | "maxAttributeBytes"> | undefined
 ): void {
   enforceBudget(
     "maxAttributesPerElement",
@@ -643,7 +648,8 @@ interface ParseInputContext {
   };
   readonly stream?: {
     readonly bytesRead: number;
-    readonly maxBufferedObserved: number;
+    readonly encodingPrescanBytes: number;
+    readonly encodingPrescanLimitBytes: number;
   };
 }
 
@@ -663,7 +669,7 @@ function stringInputContext(html: string, operation: OperationContext): ParseInp
 
 function parseDocumentInternal(
   html: string,
-  options: ParseOptions,
+  options: ParseOptions | ParseStreamOptions,
   input: ParseInputContext
 ): DocumentTree {
   const operation = input.operation;
@@ -687,16 +693,10 @@ function parseDocumentInternal(
   if (input.stream !== undefined) {
     trace = pushTrace(trace, {
       kind: "stream",
-      bytesRead: input.stream.bytesRead
+      bytesRead: input.stream.bytesRead,
+      encodingPrescanBytes: input.stream.encodingPrescanBytes,
+      encodingPrescanLimitBytes: input.stream.encodingPrescanLimitBytes
     }, budgets, operation);
-    trace = pushBudgetTrace(
-      trace,
-      "maxBufferedBytes",
-      budgets?.maxBufferedBytes,
-      input.stream.maxBufferedObserved,
-      budgets,
-      operation
-    );
   }
   trace = pushBudgetTrace(
     trace,
@@ -1041,7 +1041,8 @@ interface StreamDecodeResult {
   readonly sniff: StreamEncodingSniff;
   readonly totalBytes: number;
   readonly decodedUtf8Bytes: number;
-  readonly maxBufferedObserved: number;
+  readonly encodingPrescanBytes: number;
+  readonly encodingPrescanLimitBytes: number;
 }
 
 interface StreamEncodingSniff {
@@ -1121,7 +1122,10 @@ async function readStreamChunk(
 
 async function decodeStreamToText(
   stream: ReadableStream<Uint8Array>,
-  options: { readonly transportEncodingLabel?: string; readonly budgets?: ParseOptions["budgets"] },
+  options: {
+    readonly transportEncodingLabel?: string;
+    readonly budgets?: ParseStreamBudgetOptions | TokenizeByteStreamEagerOptions["budgets"];
+  },
   operation: OperationContext
 ): Promise<StreamDecodeResult> {
   const budgets = options.budgets;
@@ -1133,13 +1137,13 @@ async function decodeStreamToText(
     throw new HtmlStreamReadError(cause);
   }
   let total = 0;
-  const prescanLimit = Math.max(
-    0,
-    Math.min(STREAM_ENCODING_PRESCAN_BYTES, budgets?.maxBufferedBytes ?? STREAM_ENCODING_PRESCAN_BYTES)
+  const prescanLimit = Math.min(
+    DEFAULT_STREAM_ENCODING_PRESCAN_BYTES,
+    budgets?.maxEncodingPrescanBytes ?? DEFAULT_STREAM_ENCODING_PRESCAN_BYTES
   );
   const pendingBytesBuffer = new Uint8Array(prescanLimit);
   let pendingBytes = 0;
-  let maxBufferedObserved = 0;
+  let encodingPrescanBytes = 0;
   let decoderState: StreamDecoderState | undefined;
   const decodedParts: string[] = [];
   const decodedBudget = new DecodedUtf8BudgetCounter(
@@ -1184,7 +1188,6 @@ async function decodeStreamToText(
   };
 
   try {
-    enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, 0);
     if (prescanLimit === 0) {
       initializeDecoder();
     }
@@ -1210,9 +1213,7 @@ async function decodeStreamToText(
         const bytesToBuffer = Math.min(chunkValue.byteLength, prescanLimit - pendingBytes);
         pendingBytesBuffer.set(chunkValue.subarray(0, bytesToBuffer), pendingBytes);
         pendingBytes += bytesToBuffer;
-        maxBufferedObserved = Math.max(maxBufferedObserved, pendingBytes);
-        enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, pendingBytes);
-
+        encodingPrescanBytes = Math.max(encodingPrescanBytes, pendingBytes);
         if (pendingBytes < prescanLimit) {
           continue;
         }
@@ -1235,7 +1236,8 @@ async function decodeStreamToText(
       sniff: finalState.sniff,
       totalBytes: total,
       decodedUtf8Bytes: decodedBudget.bytes,
-      maxBufferedObserved
+      encodingPrescanBytes,
+      encodingPrescanLimitBytes: prescanLimit
     };
   } catch (error) {
     try {
@@ -1251,15 +1253,15 @@ async function decodeStreamToText(
     reader.releaseLock();
   }
 }/**
- * Tokenizes input deterministically for the `tokenizeStream` public API.
+ * Tokenizes input deterministically for the `tokenizeByteStreamEager` public API.
  */
 
 
-async function* tokenizeDecodedStream(
+async function tokenizeDecodedByteStreamEager(
   stream: ReadableStream<Uint8Array>,
-  options: TokenizeStreamOptions,
+  options: TokenizeByteStreamEagerOptions,
   operation: OperationContext
-): AsyncIterable<Token> {
+): Promise<readonly Token[]> {
   const decoded = await decodeStreamToText(stream, options, operation);
   let parseErrorCount = 0;
   let currentStartTagAttributeCount = 0;
@@ -1300,37 +1302,40 @@ async function* tokenizeDecodedStream(
   });
   operation.checkpoint();
 
+  const tokens: Token[] = [];
   for (const token of tokenized.tokens) {
     operation.checkpoint();
-    yield toToken(token);
+    tokens.push(toToken(token));
   }
+  return tokens;
 }
 
 /**
- * Validates and tokenizes a byte stream with bounded decoding, parser limits,
- * cancellation, and deterministic reader cleanup.
+ * Eagerly reads, decodes, and tokenizes a complete byte stream. The returned
+ * promise resolves to one token collection after EOF and reader release.
  */
-export function tokenizeStream(
+export async function tokenizeByteStreamEager(
   stream: ReadableStream<Uint8Array>,
-  options: TokenizeStreamOptions = {}
-): AsyncIterable<Token> {
+  options: TokenizeByteStreamEagerOptions = {}
+): Promise<readonly Token[]> {
   const startedAt = performance.now();
-  validateTokenizeStreamOptions(options);
+  validateTokenizeByteStreamEagerOptions(options);
   requireReadableByteStream(stream, "input");
   const operation = createOperationContext(options.budgets?.maxTimeMs, options.signal, startedAt);
   operation.checkpoint();
-  return tokenizeDecodedStream(stream, options, operation);
+  return tokenizeDecodedByteStreamEager(stream, options, operation);
 }/**
- * Parses input deterministically for the `parseStream` public API.
+ * Reads and decodes a byte stream through EOF, releases its reader, and then
+ * parses the buffered document deterministically.
  */
 
 
 export async function parseStream(
   stream: ReadableStream<Uint8Array>,
-  options: ParseOptions = {}
+  options: ParseStreamOptions = {}
 ): Promise<DocumentTree> {
   const startedAt = performance.now();
-  validateParseOptions(options);
+  validateParseStreamOptions(options);
   requireReadableByteStream(stream, "input");
   const operation = parseOperationContext(options, startedAt);
   operation.checkpoint();
@@ -1346,7 +1351,8 @@ export async function parseStream(
     },
     stream: {
       bytesRead: decoded.totalBytes,
-      maxBufferedObserved: decoded.maxBufferedObserved
+      encodingPrescanBytes: decoded.encodingPrescanBytes,
+      encodingPrescanLimitBytes: decoded.encodingPrescanLimitBytes
     }
   });
 }

@@ -10,4 +10,9 @@ Node and JSR are versioned together but may expose different subsets. The four
 HTML operational error classes (including cancellation), their structural guards, their reason/name
 types (including `NodeId`), and `HtmlOperationalError` are deliberately exported
 from both roots.
+Both roots expose distinct non-stream and stream option types, the
+`maxEncodingPrescanBytes` retention-cap name, and the promise-returning
+`tokenizeByteStreamEager()` contract. Node calls the budget types
+`ParseBudgetOptions` and `ParseStreamBudgetOptions`; JSR uses `ParseBudgets` and
+`ParseStreamBudgets` while preserving identical fields and semantics.
 See `docs/reference/api-overview.md` for the current parity notes.

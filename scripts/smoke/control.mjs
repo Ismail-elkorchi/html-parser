@@ -13,7 +13,7 @@ import {
   parseFragment,
   parseStream,
   serialize,
-  tokenizeStream
+  tokenizeByteStreamEager
 } from "../../dist/mod.js";
 
 function ensure(condition, message) {
@@ -233,13 +233,12 @@ async function runSmokeAssertions() {
     "parseStream output mismatch vs parseBytes"
   );
 
-  const tokenKinds = [];
-  for await (const token of tokenizeStream(createByteStream([new TextEncoder().encode("<p>smoke</p>")]))) {
-    tokenKinds.push(token.kind);
-  }
+  const tokenKinds = (await tokenizeByteStreamEager(
+    createByteStream([new TextEncoder().encode("<p>smoke</p>")])
+  )).map((token) => token.kind);
   ensure(
     JSON.stringify(tokenKinds) === JSON.stringify(["startTag", "chars", "endTag", "eof"]),
-    "tokenizeStream mismatch"
+    "tokenizeByteStreamEager mismatch"
   );
 
   const outlineResult = outline(parsed);

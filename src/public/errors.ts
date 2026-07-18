@@ -26,7 +26,6 @@ function hasErrorShape(record: UnknownRecord): boolean {
 
 const BUDGET_NAMES: ReadonlySet<string> = new Set<HtmlBudgetName>([
   "maxInputBytes",
-  "maxBufferedBytes",
   "maxDecodedUtf8Bytes",
   "maxNodes",
   "maxDepth",

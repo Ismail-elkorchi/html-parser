@@ -24,12 +24,10 @@ export interface ParseError {
   readonly span?: Span;
 }
 
-/** Inclusive, optional resource limits for one parse operation. */
-export interface BudgetOptions {
+/** Inclusive, optional resource limits shared by text, byte, and fragment parsing. */
+export interface ParseBudgetOptions {
   /** UTF-8 bytes for string input; transport bytes for byte and stream input. */
   readonly maxInputBytes?: number;
-  /** Bytes retained only for stream encoding prescan. */
-  readonly maxBufferedBytes?: number;
   /** UTF-8 bytes produced by decoding, checked before retaining each decoded chunk. */
   readonly maxDecodedUtf8Bytes?: number;
   /** Public root plus input and parser-recovery node allocations. */
@@ -50,20 +48,31 @@ export interface BudgetOptions {
   readonly maxTimeMs?: number;
 }
 
-/** Options accepted by document, byte, fragment, and stream parse entrypoints. */
+/** Options accepted by text, byte, and fragment parse entrypoints. */
 export interface ParseOptions {
   readonly captureSpans?: boolean;
   readonly trace?: boolean;
   readonly transportEncodingLabel?: string;
-  readonly budgets?: BudgetOptions;
+  readonly budgets?: ParseBudgetOptions;
   readonly signal?: AbortSignal;
 }
 
-/** Resource limits that apply to byte-stream decoding and token emission. */
-export type TokenizeStreamBudgetOptions = Pick<
-  BudgetOptions,
+/** Parse limits for byte streams, including bounded encoding-prescan retention. */
+export interface ParseStreamBudgetOptions extends ParseBudgetOptions {
+  /** Transport bytes retained for encoding prescan; zero disables prescan retention. */
+  readonly maxEncodingPrescanBytes?: number;
+}
+
+/** Options accepted by full-document byte-stream parsing. */
+export interface ParseStreamOptions extends Omit<ParseOptions, "budgets"> {
+  readonly budgets?: ParseStreamBudgetOptions;
+}
+
+/** Resource controls that apply to eager byte-stream decoding and tokenization. */
+export type TokenizeByteStreamEagerBudgetOptions = Pick<
+  ParseStreamBudgetOptions,
   | "maxInputBytes"
-  | "maxBufferedBytes"
+  | "maxEncodingPrescanBytes"
   | "maxDecodedUtf8Bytes"
   | "maxParseErrors"
   | "maxAttributesPerElement"
@@ -71,10 +80,10 @@ export type TokenizeStreamBudgetOptions = Pick<
   | "maxTimeMs"
 >;
 
-/** Options accepted by byte-stream tokenization. */
-export interface TokenizeStreamOptions {
+/** Options accepted by eager byte-stream tokenization. */
+export interface TokenizeByteStreamEagerOptions {
   readonly transportEncodingLabel?: string;
-  readonly budgets?: TokenizeStreamBudgetOptions;
+  readonly budgets?: TokenizeByteStreamEagerBudgetOptions;
   readonly signal?: AbortSignal;
 }
 
@@ -187,7 +196,12 @@ export interface TraceBudgetEvent {
 export interface TraceStreamEvent {
   readonly seq: number;
   readonly kind: "stream";
+  /** Total transport bytes read through EOF. */
   readonly bytesRead: number;
+  /** Maximum transport bytes retained simultaneously for encoding prescan. */
+  readonly encodingPrescanBytes: number;
+  /** Effective prescan retention cap after the implementation maximum is applied. */
+  readonly encodingPrescanLimitBytes: number;
 }
 
 export type TraceEvent =
@@ -422,7 +436,6 @@ export interface PatchPlan {
 /** Names of public resource budgets reported by budget failures and trace events. */
 export type HtmlBudgetName =
   | "maxInputBytes"
-  | "maxBufferedBytes"
   | "maxDecodedUtf8Bytes"
   | "maxNodes"
   | "maxDepth"
