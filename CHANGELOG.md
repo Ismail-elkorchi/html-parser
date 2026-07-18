@@ -7,6 +7,7 @@ All notable changes are documented in this file.
 - Upgrade the complete development toolchain and migrate lint configuration to ESLint 10-compatible plugins.
 - Upgrade every GitHub Actions dependency to its latest stable release while retaining immutable commit pins.
 - Remove Dependabot configuration in favor of deliberate, consolidated dependency maintenance.
+- Remove the obsolete AJV override and refresh ESLint's compatible development-only validator.
 
 ## [0.1.1] - 2026-03-04
 - Add OIDC `publish.yml` workflow for npm Trusted Publishing and JSR publish on release events.
