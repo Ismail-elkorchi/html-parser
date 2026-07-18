@@ -5,18 +5,19 @@ import {
 } from "./errors.js";
 
 import type {
-  BudgetOptions,
+  ParseBudgetOptions,
   ChunkOptions,
   OperationOptions,
   ParseOptions,
-  TokenizeStreamBudgetOptions,
-  TokenizeStreamOptions,
+  ParseStreamBudgetOptions,
+  ParseStreamOptions,
+  TokenizeByteStreamEagerBudgetOptions,
+  TokenizeByteStreamEagerOptions,
   VisibleTextOptions
 } from "./types.js";
 
-const BUDGET_KEYS = Object.freeze([
+const PARSE_BUDGET_KEYS = Object.freeze([
   "maxInputBytes",
-  "maxBufferedBytes",
   "maxDecodedUtf8Bytes",
   "maxNodes",
   "maxDepth",
@@ -26,16 +27,20 @@ const BUDGET_KEYS = Object.freeze([
   "maxTraceEvents",
   "maxTraceBytes",
   "maxTimeMs"
-] as const satisfies readonly (keyof BudgetOptions)[]);
-const TOKENIZE_STREAM_BUDGET_KEYS = Object.freeze([
+] as const satisfies readonly (keyof ParseBudgetOptions)[]);
+const PARSE_STREAM_BUDGET_KEYS = Object.freeze([
+  ...PARSE_BUDGET_KEYS,
+  "maxEncodingPrescanBytes"
+] as const satisfies readonly (keyof ParseStreamBudgetOptions)[]);
+const TOKENIZE_BYTE_STREAM_EAGER_BUDGET_KEYS = Object.freeze([
   "maxInputBytes",
-  "maxBufferedBytes",
+  "maxEncodingPrescanBytes",
   "maxDecodedUtf8Bytes",
   "maxParseErrors",
   "maxAttributesPerElement",
   "maxAttributeBytes",
   "maxTimeMs"
-] as const satisfies readonly (keyof TokenizeStreamBudgetOptions)[]);
+] as const satisfies readonly (keyof TokenizeByteStreamEagerBudgetOptions)[]);
 
 const PARSE_OPTION_KEYS = new Set<PropertyKey>([
   "captureSpans",
@@ -44,7 +49,7 @@ const PARSE_OPTION_KEYS = new Set<PropertyKey>([
   "budgets",
   "signal"
 ]);
-const TOKENIZE_STREAM_OPTION_KEYS = new Set<PropertyKey>([
+const TOKENIZE_BYTE_STREAM_EAGER_OPTION_KEYS = new Set<PropertyKey>([
   "transportEncodingLabel",
   "budgets",
   "signal"
@@ -144,7 +149,7 @@ function validateSignal(value: unknown, option: string): void {
 
 function validateBudgets(
   value: unknown,
-  keys: readonly string[] = BUDGET_KEYS
+  keys: readonly string[] = PARSE_BUDGET_KEYS
 ): void {
   if (value === undefined) {
     return;
@@ -176,13 +181,23 @@ export function validateParseOptions(options: ParseOptions): void {
   validateSignal(read(record, "signal", "options.signal"), "options.signal");
 }
 
+/** Validates the complete runtime schema for full-document stream parsing. */
+export function validateParseStreamOptions(options: ParseStreamOptions): void {
+  const record = asClosedRecord(options, "options", PARSE_OPTION_KEYS);
+  validateOptionalBoolean(record, "captureSpans", "options.captureSpans");
+  validateOptionalBoolean(record, "trace", "options.trace");
+  validateOptionalString(record, "transportEncodingLabel", "options.transportEncodingLabel");
+  validateBudgets(read(record, "budgets", "options.budgets"), PARSE_STREAM_BUDGET_KEYS);
+  validateSignal(read(record, "signal", "options.signal"), "options.signal");
+}
+
 /** Validates the complete runtime schema for stream tokenization. */
-export function validateTokenizeStreamOptions(options: TokenizeStreamOptions): void {
-  const record = asClosedRecord(options, "options", TOKENIZE_STREAM_OPTION_KEYS);
+export function validateTokenizeByteStreamEagerOptions(options: TokenizeByteStreamEagerOptions): void {
+  const record = asClosedRecord(options, "options", TOKENIZE_BYTE_STREAM_EAGER_OPTION_KEYS);
   validateOptionalString(record, "transportEncodingLabel", "options.transportEncodingLabel");
   validateBudgets(
     read(record, "budgets", "options.budgets"),
-    TOKENIZE_STREAM_BUDGET_KEYS
+    TOKENIZE_BYTE_STREAM_EAGER_BUDGET_KEYS
   );
   validateSignal(read(record, "signal", "options.signal"), "options.signal");
 }

@@ -51,9 +51,10 @@ maxNodes=20000: ok
 ## Common failure modes
 - `maxInputBytes` is lower than the actual transport payload size, so parsing
   fails before tree construction starts.
-- `maxBufferedBytes` is mistaken for a complete-stream cap. It limits only
-  encoding-prescan retention; use `maxInputBytes` and `maxDecodedUtf8Bytes` for
-  total transport and decoded-output bounds.
+- `maxEncodingPrescanBytes` is added to non-stream `ParseOptions` or mistaken
+  for a complete-stream cap. It is accepted only by stream operations and
+  limits only encoding-prescan retention; use `maxInputBytes` and
+  `maxDecodedUtf8Bytes` for total transport and decoded-output bounds.
 - `maxNodes` or `maxDepth` is sized for happy-path documents instead of real
   hostile inputs.
 - Attribute budgets omit duplicate attempts. Duplicate attributes are counted

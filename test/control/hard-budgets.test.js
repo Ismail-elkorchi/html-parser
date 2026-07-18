@@ -16,14 +16,13 @@ import {
   parseFragment,
   parseStream,
   serialize,
-  tokenizeStream,
+  tokenizeByteStreamEager,
   visibleText,
   walk
 } from "../../dist/mod.js";
 
-const ALL_BUDGETS = [
+const PARSE_BUDGETS = [
   "maxInputBytes",
-  "maxBufferedBytes",
   "maxDecodedUtf8Bytes",
   "maxNodes",
   "maxDepth",
@@ -44,16 +43,8 @@ function assertBudget(error, budget, limit, actual) {
   return true;
 }
 
-async function collectAsync(iterable) {
-  const values = [];
-  for await (const value of iterable) {
-    values.push(value);
-  }
-  return values;
-}
-
 test("parse option schemas reject unknown and invalid limits before work", async () => {
-  for (const budget of ALL_BUDGETS) {
+  for (const budget of PARSE_BUDGETS) {
     for (const invalid of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "1", null]) {
       assert.throws(
         () => parse("x", { budgets: { [budget]: invalid } }),
@@ -86,7 +77,16 @@ test("parse option schemas reject unknown and invalid limits before work", async
     }
   );
   assert.throws(
-    () => tokenizeStream(new ReadableStream(), { budgets: { maxNodes: 1 } }),
+    () => parse("x", { budgets: { maxEncodingPrescanBytes: 1 } }),
+    (error) => {
+      assert.ok(error instanceof HtmlConfigurationError);
+      assert.equal(error.reason, "UNKNOWN_OPTION");
+      assert.equal(error.option, "options.budgets.maxEncodingPrescanBytes");
+      return true;
+    }
+  );
+  await assert.rejects(
+    tokenizeByteStreamEager(new ReadableStream(), { budgets: { maxNodes: 1 } }),
     (error) => {
       assert.ok(error instanceof HtmlConfigurationError);
       assert.equal(error.reason, "UNKNOWN_OPTION");
@@ -148,7 +148,7 @@ test("zero stream prescan retention is valid", async () => {
       controller.close();
     }
   });
-  assert.equal((await parseStream(stream, { budgets: { maxBufferedBytes: 0 } })).kind, "document");
+  assert.equal((await parseStream(stream, { budgets: { maxEncodingPrescanBytes: 0 } })).kind, "document");
 });
 
 test("trace staging stops during parser work instead of retaining an error storm", () => {
@@ -265,11 +265,12 @@ test("stream tokenization stops attempted duplicate and oversized attributes", a
     }
   });
   await assert.rejects(
-    async () => collectAsync(tokenizeStream(duplicate, {
+    tokenizeByteStreamEager(duplicate, {
       budgets: { maxAttributesPerElement: 1 }
-    })),
+    }),
     (error) => assertBudget(error, "maxAttributesPerElement", 1, 2)
   );
+  assert.equal(duplicate.locked, false);
 
   const oversized = new ReadableStream({
     start(controller) {
@@ -278,11 +279,12 @@ test("stream tokenization stops attempted duplicate and oversized attributes", a
     }
   });
   await assert.rejects(
-    async () => collectAsync(tokenizeStream(oversized, {
+    tokenizeByteStreamEager(oversized, {
       budgets: { maxAttributeBytes: 4 }
-    })),
+    }),
     (error) => assertBudget(error, "maxAttributeBytes", 4, 5)
   );
+  assert.equal(oversized.locked, false);
 });
 
 test("abort signals preserve their exact reason and stream cleanup", async () => {
@@ -295,8 +297,7 @@ test("abort signals preserve their exact reason and stream cleanup", async () =>
     () => parseBytes(new Uint8Array(), { signal: controller.signal }),
     () => parseFragment("", "div", { signal: controller.signal }),
     () => serialize(parse(""), { signal: controller.signal }),
-    () => visibleText(parse(""), { signal: controller.signal }),
-    () => tokenizeStream(new ReadableStream(), { signal: controller.signal })
+    () => visibleText(parse(""), { signal: controller.signal })
   ]) {
     assert.throws(operation, (error) => {
       assert.ok(error instanceof HtmlAbortError);
@@ -305,6 +306,15 @@ test("abort signals preserve their exact reason and stream cleanup", async () =>
       return true;
     });
   }
+  await assert.rejects(
+    tokenizeByteStreamEager(new ReadableStream(), { signal: controller.signal }),
+    (error) => {
+      assert.ok(error instanceof HtmlAbortError);
+      assert.equal(isHtmlAbortError(error), true);
+      assert.equal(error.cause, reason);
+      return true;
+    }
+  );
   await assert.rejects(parseStream(new ReadableStream(), { signal: controller.signal }), (error) => {
     assert.ok(error instanceof HtmlAbortError);
     assert.equal(error.cause, reason);

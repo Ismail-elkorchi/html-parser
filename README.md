@@ -66,7 +66,7 @@ const tree = await parseStream(stream, {
   signal: controller.signal,
   budgets: {
     maxInputBytes: 4096,
-    maxBufferedBytes: 512,
+    maxEncodingPrescanBytes: 512,
     maxDecodedUtf8Bytes: 4096,
     maxNodes: 512,
     maxTimeMs: 250
@@ -74,6 +74,12 @@ const tree = await parseStream(stream, {
 });
 console.log(tree.kind);
 ```
+
+`parseStream()` streams transport reads and enforces input/decode limits while
+reading, but it buffers the complete decoded document before parsing. Its
+promise cannot resolve before EOF. Use `maxInputBytes` for transport bytes,
+`maxDecodedUtf8Bytes` for decoded UTF-8 bytes, and
+`maxEncodingPrescanBytes` only for encoding-prescan prefix retention.
 
 ### Example 3: Extract visible text
 

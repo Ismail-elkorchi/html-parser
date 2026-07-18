@@ -11,7 +11,7 @@ Primary JSR runtime exports:
 - `parseStream(stream, options?)`
 - `serialize(input, operationOptions?)`
 - `visibleText(input, options?)`
-- `tokenizeStream(stream, options?)`
+- `tokenizeByteStreamEager(stream, options?)`
 - `HtmlAbortError`, `HtmlBudgetExceededError`, `HtmlConfigurationError`,
   `HtmlPatchPlanningError`, `HtmlStreamReadError`
 - `isHtmlAbortError`, `isHtmlBudgetExceededError`, `isHtmlConfigurationError`,
@@ -19,8 +19,9 @@ Primary JSR runtime exports:
   `isHtmlOperationalError`
 
 Primary JSR type exports:
-- `ParseBudgets`, `ParseOptions`, `TokenizeStreamBudgets`,
-  `TokenizeStreamOptions`, `OperationOptions`
+- `ParseBudgets`, `ParseOptions`, `ParseStreamBudgets`, `ParseStreamOptions`,
+  `TokenizeByteStreamEagerBudgets`, `TokenizeByteStreamEagerOptions`,
+  `OperationOptions`
 - `DocumentTree`, `FragmentTree`, `HtmlNode`, `ParseError`
 - `VisibleTextOptions`, `SerializableHtml`, `VisibleTextInput`, `HtmlToken`
 - `HtmlOperationalError`, `HtmlBudgetName`,
@@ -31,6 +32,8 @@ Primary JSR type exports:
 Node/npm type surface is shipped from `dist/mod.d.ts` (source: `src/public/mod.ts`).
 
 In addition to the shared parse and operational-error surface, Node/npm includes:
+- `ParseBudgetOptions`, `ParseStreamBudgetOptions`, and the shared
+  `ParseStreamOptions` stream contract
 - `visibleTextTokens(...)`
 - `visibleTextTokensWithProvenance(...)`
 - `getParseErrorSpecRef(parseErrorId)`

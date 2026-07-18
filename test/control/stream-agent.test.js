@@ -10,7 +10,7 @@ import {
   parseBytes,
   parseFragment,
   parseStream,
-  tokenizeStream
+  tokenizeByteStreamEager
 } from "../../dist/mod.js";
 
 function createByteStream(byteChunks) {
@@ -65,12 +65,21 @@ test("parseStream caps encoding-prescan memory without rejecting the remainder",
   const stream = createByteStream([new Uint8Array([0x61, 0x62, 0x63])]);
   const parsed = await parseStream(stream, {
     trace: true,
-    budgets: { maxBufferedBytes: 2 }
+    budgets: { maxEncodingPrescanBytes: 2 }
   });
-  const bufferedBudget = parsed.trace.find(
-    (event) => event.kind === "budget" && event.budget === "maxBufferedBytes"
-  );
-  assert.equal(bufferedBudget?.actual, 2);
+  const streamTrace = parsed.trace.find((event) => event.kind === "stream");
+  assert.equal(streamTrace?.encodingPrescanBytes, 2);
+  assert.equal(streamTrace?.encodingPrescanLimitBytes, 2);
+});
+
+test("stream encoding prescan uses its documented implementation maximum", async () => {
+  const bytes = new Uint8Array(20_000).fill(0x61);
+  for (const budgets of [{}, { maxEncodingPrescanBytes: 50_000 }]) {
+    const parsed = await parseStream(createByteStream([bytes]), { trace: true, budgets });
+    const event = parsed.trace.find((entry) => entry.kind === "stream");
+    assert.equal(event?.encodingPrescanBytes, 16_384);
+    assert.equal(event?.encodingPrescanLimitBytes, 16_384);
+  }
 });
 
 test("parseStream budget outcome is independent of upstream chunk boundaries", async () => {
@@ -80,7 +89,7 @@ test("parseStream budget outcome is independent of upstream chunk boundaries", a
     chunks.push(bytes.subarray(offset, offset + 1_024));
   }
 
-  const options = { trace: true, budgets: { maxInputBytes: 30_000, maxBufferedBytes: 16_384 } };
+  const options = { trace: true, budgets: { maxInputBytes: 30_000, maxEncodingPrescanBytes: 16_384 } };
   const chunked = await parseStream(createByteStream(chunks), options);
   const single = await parseStream(createByteStream([bytes]), options);
   assert.deepEqual(chunked, single);
@@ -119,7 +128,7 @@ test("parseStream aborts before extra pulls when maxInputBytes is exceeded", asy
   );
 
   await assert.rejects(
-    parseStream(stream, { budgets: { maxInputBytes: 6, maxBufferedBytes: 64 } }),
+    parseStream(stream, { budgets: { maxInputBytes: 6, maxEncodingPrescanBytes: 64 } }),
     (error) => {
       assert.ok(error instanceof HtmlBudgetExceededError);
       assert.equal(error.budget, "maxInputBytes");
@@ -155,7 +164,7 @@ test("parseStream cancels and releases its reader after budget failures", async 
 });
 
 test("parseStream rejects invalid budgets before reader acquisition", async () => {
-  for (const maxBufferedBytes of [-1, Number.NaN]) {
+  for (const maxEncodingPrescanBytes of [-1, Number.NaN]) {
     let readerAcquisitions = 0;
     const stream = {
       getReader() {
@@ -165,25 +174,51 @@ test("parseStream rejects invalid budgets before reader acquisition", async () =
     };
 
     await assert.rejects(
-      parseStream(stream, { budgets: { maxBufferedBytes } }),
+      parseStream(stream, { budgets: { maxEncodingPrescanBytes } }),
       HtmlConfigurationError
     );
     assert.equal(readerAcquisitions, 0);
   }
 });
 
-test("parseStream and tokenizeStream release their readers after success", async () => {
+test("parseStream and tokenizeByteStreamEager release their readers after success", async () => {
   const parseInput = createByteStream([new TextEncoder().encode("<p>parsed</p>")]);
   await parseStream(parseInput);
   assert.equal(parseInput.locked, false);
 
   const tokenizeInput = createByteStream([new TextEncoder().encode("<p>tokenized</p>")]);
-  const tokens = [];
-  for await (const token of tokenizeStream(tokenizeInput)) {
-    tokens.push(token);
-  }
+  const tokens = await tokenizeByteStreamEager(tokenizeInput);
   assert.ok(tokens.length > 0);
   assert.equal(tokenizeInput.locked, false);
+});
+
+test("eager stream results remain unobservable until EOF", async () => {
+  for (const operation of [
+    (stream) => parseStream(stream),
+    (stream) => tokenizeByteStreamEager(stream)
+  ]) {
+    let controller;
+    const stream = new globalThis.ReadableStream({
+      start(value) {
+        controller = value;
+      }
+    }, { highWaterMark: 0 });
+    controller.enqueue(new TextEncoder().encode("<p>pending"));
+
+    let settled = false;
+    const result = operation(stream).then((value) => {
+      settled = true;
+      return value;
+    });
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 10));
+    assert.equal(settled, false);
+    assert.equal(stream.locked, true);
+
+    controller.close();
+    await result;
+    assert.equal(settled, true);
+    assert.equal(stream.locked, false);
+  }
 });
 
 test("byte and stream traces contain one truthful decode event", async () => {
@@ -200,17 +235,11 @@ test("byte and stream traces contain one truthful decode event", async () => {
   }
 });
 
-test("tokenizeStream yields deterministic token sequence", async () => {
+test("tokenizeByteStreamEager returns a deterministic token sequence", async () => {
   const encoder = new TextEncoder();
   const chunks = [encoder.encode("<p>"), encoder.encode("alpha"), encoder.encode("</p>")];
 
-  const collect = async () => {
-    const tokens = [];
-    for await (const token of tokenizeStream(createByteStream(chunks))) {
-      tokens.push(token);
-    }
-    return tokens;
-  };
+  const collect = () => tokenizeByteStreamEager(createByteStream(chunks));
 
   const first = await collect();
   const second = await collect();
@@ -219,6 +248,32 @@ test("tokenizeStream yields deterministic token sequence", async () => {
     first.map((entry) => entry.kind),
     ["startTag", "chars", "endTag", "eof"]
   );
+});
+
+test("eager tokenization is invariant across chunk patterns and legacy encoding", async () => {
+  const bytes = new Uint8Array([
+    ...asciiBytes("<meta charset=windows-1252><p>"),
+    0xe9,
+    ...asciiBytes("</p>")
+  ]);
+  const patterns = [
+    [...bytes].map((value) => new Uint8Array([value])),
+    [bytes.subarray(0, 7), bytes.subarray(7, 19), bytes.subarray(19)],
+    [bytes]
+  ];
+  const results = [];
+  for (const pattern of patterns) {
+    results.push(await tokenizeByteStreamEager(createByteStream(pattern), {
+      budgets: {
+        maxInputBytes: bytes.byteLength,
+        maxEncodingPrescanBytes: bytes.byteLength,
+        maxDecodedUtf8Bytes: bytes.byteLength + 1
+      }
+    }));
+  }
+  assert.deepEqual(results[0], results[1]);
+  assert.deepEqual(results[1], results[2]);
+  assert.equal(results[0].find((token) => token.kind === "chars")?.value, "é");
 });
 
 test("outline and chunk stay deterministic", () => {

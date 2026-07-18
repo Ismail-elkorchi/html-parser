@@ -23,7 +23,7 @@ import {
   parseFragment as parseFragmentInternal,
   parseStream as parseStreamInternal,
   serialize as serializeInternal,
-  tokenizeStream as tokenizeStreamInternal,
+  tokenizeByteStreamEager as tokenizeByteStreamEagerInternal,
   visibleText as visibleTextInternal
 } from "../src/public/mod.ts";
 
@@ -54,8 +54,6 @@ export type {
 export interface ParseBudgets {
   /** Maximum UTF-8 text bytes or byte/stream transport bytes accepted. */
   readonly maxInputBytes?: number;
-  /** Maximum bytes retained for stream encoding prescan. */
-  readonly maxBufferedBytes?: number;
   /** Maximum UTF-8 bytes in the decoded HTML text. */
   readonly maxDecodedUtf8Bytes?: number;
   /** Maximum public-root and parser node allocations, including recovery nodes. */
@@ -92,11 +90,23 @@ export interface ParseOptions {
   readonly signal?: AbortSignal;
 }
 
-/** Resource limits that apply to byte-stream decoding and token emission. */
-export type TokenizeStreamBudgets = Pick<
-  ParseBudgets,
+/** Parse limits for byte streams, including bounded encoding-prescan retention. */
+export interface ParseStreamBudgets extends ParseBudgets {
+  /** Maximum transport bytes retained for encoding prescan; zero disables it. */
+  readonly maxEncodingPrescanBytes?: number;
+}
+
+/** Options accepted by full-document byte-stream parsing. */
+export interface ParseStreamOptions extends Omit<ParseOptions, "budgets"> {
+  /** Optional parse and stream-retention controls. */
+  readonly budgets?: ParseStreamBudgets;
+}
+
+/** Resource limits that apply to eager byte-stream decoding and tokenization. */
+export type TokenizeByteStreamEagerBudgets = Pick<
+  ParseStreamBudgets,
   | "maxInputBytes"
-  | "maxBufferedBytes"
+  | "maxEncodingPrescanBytes"
   | "maxDecodedUtf8Bytes"
   | "maxParseErrors"
   | "maxAttributesPerElement"
@@ -107,11 +117,11 @@ export type TokenizeStreamBudgets = Pick<
 /**
  * Options accepted by stream tokenization.
  */
-export interface TokenizeStreamOptions {
+export interface TokenizeByteStreamEagerOptions {
   /** Optional transport encoding hint for stream decoding. */
   readonly transportEncodingLabel?: string;
   /** Optional budget controls for stream tokenization. */
-  readonly budgets?: TokenizeStreamBudgets;
+  readonly budgets?: TokenizeByteStreamEagerBudgets;
   /** Optional cancellation signal shared by decode and tokenization. */
   readonly signal?: AbortSignal;
 }
@@ -216,10 +226,10 @@ export type SerializableHtml = DocumentTree | FragmentTree | HtmlNode;
 export type VisibleTextInput = DocumentTree | FragmentTree | HtmlNode;
 
 /**
- * Token emitted by `tokenizeStream`.
+ * Token returned by `tokenizeByteStreamEager` after complete input consumption.
  */
 export interface HtmlToken {
-  /** Token category produced by the streaming tokenizer. */
+  /** Token category produced by eager byte-stream tokenization. */
   readonly kind: "startTag" | "endTag" | "chars" | "comment" | "doctype" | "eof";
   /** Tag or doctype name for name-bearing tokens. */
   readonly name?: string;
@@ -317,8 +327,12 @@ export function parseFragment(
  *
  * @param input Stream of HTML bytes.
  * @param options Parse controls including stream budget limits.
- * `budgets.maxInputBytes` bounds the full stream and `budgets.maxBufferedBytes`
+ * `budgets.maxInputBytes` bounds the full stream and `budgets.maxEncodingPrescanBytes`
  * caps the encoding-prescan memory retained before decoding begins.
+ * The operation consumes through EOF, retains the complete decoded document,
+ * and only then parses it. The reader lock is released before this promise
+ * settles.
+ *
  * @returns Promise resolving to parsed `DocumentTree` with accumulated parse diagnostics.
  * @throws {HtmlStreamReadError} When acquiring or reading the stream fails.
  * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
@@ -338,7 +352,7 @@ export function parseFragment(
  * });
  *
  * const tree = await parseStream(stream, {
- *   budgets: { maxInputBytes: 8_192, maxBufferedBytes: 1_024, maxNodes: 512 }
+ *   budgets: { maxInputBytes: 8_192, maxEncodingPrescanBytes: 1_024, maxNodes: 512 }
  * });
  *
  * console.log(tree.kind);
@@ -346,7 +360,7 @@ export function parseFragment(
  */
 export async function parseStream(
   input: ReadableStream<Uint8Array>,
-  options: ParseOptions = {}
+  options: ParseStreamOptions = {}
 ): Promise<DocumentTree> {
   return parseStreamInternal(input, options as Parameters<typeof parseStreamInternal>[1]);
 }
@@ -396,23 +410,25 @@ export function visibleText(input: VisibleTextInput, options: VisibleTextOptions
 }
 
 /**
- * Tokenizes HTML bytes from a readable stream.
+ * Eagerly tokenizes HTML bytes from a readable stream.
+ *
+ * The complete byte stream is read and decoded before tokenization. No token is
+ * observable before EOF, and the reader lock is released before this promise
+ * settles.
  *
  * @param input Stream of HTML bytes.
  * @param options Stream tokenization controls and budgets.
- * @returns Async iterator yielding parser-compatible HTML tokens in source order.
+ * @returns Promise resolving to all parser-compatible HTML tokens in source order.
  * @throws {HtmlStreamReadError} When acquiring or reading the stream fails.
  * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
  * @throws {HtmlAbortError} When `options.signal` is aborted.
  */
-export async function* tokenizeStream(
+export async function tokenizeByteStreamEager(
   input: ReadableStream<Uint8Array>,
-  options: TokenizeStreamOptions = {}
-): AsyncIterableIterator<HtmlToken> {
-  for await (const token of tokenizeStreamInternal(
+  options: TokenizeByteStreamEagerOptions = {}
+): Promise<readonly HtmlToken[]> {
+  return tokenizeByteStreamEagerInternal(
     input,
-    options as Parameters<typeof tokenizeStreamInternal>[1]
-  )) {
-    yield token;
-  }
+    options as Parameters<typeof tokenizeByteStreamEagerInternal>[1]
+  );
 }

@@ -112,10 +112,9 @@ async function runBrowserSmoke(baseUrl) {
         abortError = error;
       }
 
-      const tokenKinds = [];
-      for await (const token of mod.tokenizeStream(streamFromText(sampleHtml))) {
-        tokenKinds.push(token.kind);
-      }
+      const tokenKinds = (await mod.tokenizeByteStreamEager(
+        streamFromText(sampleHtml)
+      )).map((token) => token.kind);
 
       const stablePayload = {
         serialized,
@@ -135,12 +134,12 @@ async function runBrowserSmoke(baseUrl) {
           typeof mod.parseFragment === "function" &&
           typeof mod.parseStream === "function" &&
           typeof mod.serialize === "function" &&
-          typeof mod.tokenizeStream === "function",
+          typeof mod.tokenizeByteStreamEager === "function",
         parseSerialize: serialized.includes("<p>smoke</p>"),
         parseBytes: bytesSerialized.includes("<p>smoke</p>"),
         parseStream: streamSerialized.includes("<p>smoke</p>"),
         parseFragment: fragment.contextTagName === "section",
-        tokenizeStream: tokenKinds.includes("startTag") && tokenKinds.includes("endTag"),
+        tokenizeByteStreamEager: tokenKinds.includes("startTag") && tokenKinds.includes("endTag"),
         errorGuards: typeof mod.isHtmlBudgetExceededError === "function" &&
           mod.isHtmlBudgetExceededError(budgetError) &&
           budgetError.code === "BUDGET_EXCEEDED" &&

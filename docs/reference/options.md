@@ -1,6 +1,6 @@
 # Options
 
-## Parse APIs (`parse`, `parseBytes`, `parseFragment`, `parseStream`)
+## Common parse APIs (`parse`, `parseBytes`, `parseFragment`)
 
 ### `captureSpans`
 - Type: `boolean`
@@ -20,7 +20,7 @@
 - Optional transport hint used by byte parsing paths.
 
 ### `budgets`
-- Type: `ParseBudgets`
+- Type: `ParseBudgetOptions` on Node/npm; `ParseBudgets` on JSR
 - Default: all limits unset (no budget enforcement unless specified)
 - Every limit is inclusive. A limit must be a finite, non-negative safe integer;
   zero is valid and absence disables that limit.
@@ -31,7 +31,6 @@
 | Key | Unit and enforcement point |
 | --- | --- |
 | `maxInputBytes` | UTF-8 bytes for text input; transport bytes for byte/stream input, checked before parsing or after each stream read |
-| `maxBufferedBytes` | bytes retained for stream encoding prescan only; zero disables prescan retention |
 | `maxDecodedUtf8Bytes` | UTF-8 bytes produced by decoding, checked before retaining each fixed-size decoded chunk |
 | `maxNodes` | public root plus every input/recovery node allocation; fixed fragment scaffolding is excluded |
 | `maxDepth` | tree depth with the public document or fragment root at depth 1; reparented subtrees are rechecked |
@@ -42,9 +41,8 @@
 | `maxTraceBytes` | current serialized trace-size counter when `trace` is enabled |
 | `maxTimeMs` | elapsed monotonic milliseconds shared across decode, parse, conversion, and trace work |
 
-Budget failures report deterministic `actual: limit + 1`, the first unavailable
-unit. A stream failure cancels the reader with the original failure and always
-releases its lock; cancellation failures do not replace that failure.
+Hard-budget failures report deterministic `actual: limit + 1`, the first
+unavailable unit.
 
 ### `signal`
 - Type: `AbortSignal`
@@ -52,24 +50,51 @@ releases its lock; cancellation failures do not replace that failure.
 - Cancels decode, parse, conversion, and trace work. An already-aborted signal
   fails before work starts. `HtmlAbortError.cause` is the exact signal reason.
 
-## `tokenizeStream(stream, options?)`
+## `parseStream(stream, options?)`
+
+- Type: `ParseStreamOptions`; its `budgets` field is
+  `ParseStreamBudgetOptions` on Node/npm and `ParseStreamBudgets` on JSR.
+- It accepts all common parse controls plus `maxEncodingPrescanBytes`.
+- `maxEncodingPrescanBytes` is an inclusive retention cap in transport bytes,
+  not a hard budget that throws on later stream data. Zero disables prescan
+  retention. When absent, the effective implementation cap is 16,384 bytes;
+  larger configured values do not raise that implementation cap.
+- With tracing enabled, the `stream` event reports `bytesRead`, the observed
+  `encodingPrescanBytes` high-water mark, and effective
+  `encodingPrescanLimitBytes`.
+- The operation reads through EOF, retains decoded chunk strings and their
+  joined source text, and then builds the document. Its promise cannot resolve
+  before EOF.
+- Success consumes through EOF and releases the reader lock before resolution.
+  A read/decode failure before EOF initiates cancellation with the original
+  error and releases the lock; a cancellation failure does not replace or delay
+  that failure. Parse or tokenization failures happen after EOF, when the reader
+  has already been released.
+
+## `tokenizeByteStreamEager(stream, options?)`
+
+- Return type: `Promise<readonly Token[]>` on Node/npm and
+  `Promise<readonly HtmlToken[]>` on JSR.
+- The complete byte stream is decoded and tokenized before the promise resolves;
+  no token is observable before EOF.
 
 ### `options.transportEncodingLabel`
 - Type: `string`
 - Default: unset
 
 ### `options.budgets`
-- Type: `TokenizeStreamBudgets`
-- Relevant keys: `maxInputBytes`, `maxBufferedBytes`,
+- Type: `TokenizeByteStreamEagerBudgets`
+- Relevant keys: `maxInputBytes`, `maxEncodingPrescanBytes`,
   `maxDecodedUtf8Bytes`, `maxParseErrors`, `maxAttributesPerElement`,
   `maxAttributeBytes`, and `maxTimeMs`.
 - `maxInputBytes` limits the complete byte stream.
-- `maxBufferedBytes` caps only the encoding prescan; subsequent bytes are decoded
-  without being retained in that buffer.
+- `maxEncodingPrescanBytes` has the same non-throwing prescan-retention semantics
+  and 16,384-byte implementation maximum as `parseStream()`.
 
 ### `options.signal`
 - Type: `AbortSignal`
-- Cancels stream decode and tokenization and releases the reader lock.
+- Cancels stream decode and tokenization. Success or failure releases the reader
+  lock before the returned promise settles.
 
 ## Serialization, traversal, and extraction operation controls
 

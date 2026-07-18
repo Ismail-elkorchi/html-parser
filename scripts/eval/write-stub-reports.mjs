@@ -231,16 +231,18 @@ async function writeBudgets() {
 
   const bufferedTree = await parseStream(
     makeReadableByteStream([new Uint8Array([0x41, 0x42, 0x43])]),
-    { trace: true, budgets: { maxBufferedBytes: 2 } }
+    { trace: true, budgets: { maxEncodingPrescanBytes: 2 } }
   );
-  const bufferedBudget = bufferedTree.trace.find(
-    (event) => event.kind === "budget" && event.budget === "maxBufferedBytes"
-  );
+  const bufferedStream = bufferedTree.trace.find((event) => event.kind === "stream");
   checks.push({
-    id: "budget-max-buffered-bytes-caps-prescan",
-    ok: bufferedBudget?.actual === 2,
-    observed: { actual: bufferedBudget?.actual ?? null },
-    expected: { actual: 2 }
+    id: "stream-encoding-prescan-cap",
+    ok: bufferedStream?.encodingPrescanBytes === 2 &&
+      bufferedStream.encodingPrescanLimitBytes === 2,
+    observed: {
+      retained: bufferedStream?.encodingPrescanBytes ?? null,
+      limit: bufferedStream?.encodingPrescanLimitBytes ?? null
+    },
+    expected: { retained: 2, limit: 2 }
   });
 
   await writeJson("reports/budgets.json", {
@@ -280,17 +282,19 @@ async function writeStream() {
   const tinyChunks = [...tiny].map((value) => new Uint8Array([value]));
   const tinyTree = await parseStream(makeReadableByteStream(tinyChunks), {
     trace: true,
-    budgets: { maxBufferedBytes: 16 }
+    budgets: { maxEncodingPrescanBytes: 16 }
   });
-  const observedBufferedBudget = tinyTree.trace.find(
-    (event) => event.kind === "budget" && event.budget === "maxBufferedBytes"
-  );
+  const observedStream = tinyTree.trace.find((event) => event.kind === "stream");
 
   checks.push({
-    id: "stream-max-buffered-bytes-caps-prescan",
-    ok: observedBufferedBudget?.actual === 16,
-    observed: { actual: observedBufferedBudget?.actual ?? null },
-    expected: { actual: 16 }
+    id: "stream-encoding-prescan-high-water",
+    ok: observedStream?.encodingPrescanBytes === 16 &&
+      observedStream.encodingPrescanLimitBytes === 16,
+    observed: {
+      retained: observedStream?.encodingPrescanBytes ?? null,
+      limit: observedStream?.encodingPrescanLimitBytes ?? null
+    },
+    expected: { retained: 16, limit: 16 }
   });
 
   const pullCounter = { count: 0 };
@@ -299,7 +303,7 @@ async function writeStream() {
   try {
     await parseStream(
       makePullCountStream(inputBudgetChunks, pullCounter),
-      { budgets: { maxInputBytes: 6, maxBufferedBytes: 64 } }
+      { budgets: { maxInputBytes: 6, maxEncodingPrescanBytes: 64 } }
     );
   } catch (error) {
     if (isHtmlBudgetExceededError(error)) {
