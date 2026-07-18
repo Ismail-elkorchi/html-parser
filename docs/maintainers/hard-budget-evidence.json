@@ -20,12 +20,12 @@
         "fixture": "nodes",
         "bounded": false,
         "inputBytes": 96013,
-        "wallMs": 131.336,
-        "cpuMs": 294.821,
-        "heapUsedBeforeBytes": 5600256,
-        "heapUsedAfterBytes": 30660480,
-        "retainedHeapDeltaBytes": 25060224,
-        "peakRssBytes": 106254336,
+        "wallMs": 134.167,
+        "cpuMs": 310.191,
+        "heapUsedBeforeBytes": 5599008,
+        "heapUsedAfterBytes": 14199376,
+        "retainedHeapDeltaBytes": 8600368,
+        "peakRssBytes": 104456192,
         "outcome": {
           "code": "OK"
         },
@@ -35,12 +35,12 @@
         "fixture": "nodes",
         "bounded": true,
         "inputBytes": 96013,
-        "wallMs": 7.88,
-        "cpuMs": 11.06,
-        "heapUsedBeforeBytes": 5599496,
-        "heapUsedAfterBytes": 6118552,
+        "wallMs": 7.301,
+        "cpuMs": 9.727,
+        "heapUsedBeforeBytes": 5599248,
+        "heapUsedAfterBytes": 6118304,
         "retainedHeapDeltaBytes": 519056,
-        "peakRssBytes": 59723776,
+        "peakRssBytes": 59744256,
         "outcome": {
           "code": "BUDGET_EXCEEDED",
           "budget": "maxNodes",
@@ -49,7 +49,7 @@
         },
         "retainedResultKind": null
       },
-      "retainedHeapReductionBytes": 24541168
+      "retainedHeapReductionBytes": 8081312
     },
     {
       "fixture": "attributes",
@@ -57,12 +57,12 @@
         "fixture": "attributes",
         "bounded": false,
         "inputBytes": 168893,
-        "wallMs": 1532.655,
-        "cpuMs": 1620.233,
-        "heapUsedBeforeBytes": 5767224,
-        "heapUsedAfterBytes": 13974592,
-        "retainedHeapDeltaBytes": 8207368,
-        "peakRssBytes": 81633280,
+        "wallMs": 1698.012,
+        "cpuMs": 1778.053,
+        "heapUsedBeforeBytes": 5767496,
+        "heapUsedAfterBytes": 13899720,
+        "retainedHeapDeltaBytes": 8132224,
+        "peakRssBytes": 81416192,
         "outcome": {
           "code": "OK"
         },
@@ -72,12 +72,12 @@
         "fixture": "attributes",
         "bounded": true,
         "inputBytes": 168893,
-        "wallMs": 6.307,
-        "cpuMs": 10.663,
-        "heapUsedBeforeBytes": 5767216,
-        "heapUsedAfterBytes": 7595616,
-        "retainedHeapDeltaBytes": 1828400,
-        "peakRssBytes": 62627840,
+        "wallMs": 5.708,
+        "cpuMs": 9.05,
+        "heapUsedBeforeBytes": 5767536,
+        "heapUsedAfterBytes": 7338600,
+        "retainedHeapDeltaBytes": 1571064,
+        "peakRssBytes": 62894080,
         "outcome": {
           "code": "BUDGET_EXCEEDED",
           "budget": "maxAttributesPerElement",
@@ -86,7 +86,7 @@
         },
         "retainedResultKind": null
       },
-      "retainedHeapReductionBytes": 6378968
+      "retainedHeapReductionBytes": 6561160
     },
     {
       "fixture": "errors",
@@ -94,12 +94,12 @@
         "fixture": "errors",
         "bounded": false,
         "inputBytes": 20000,
-        "wallMs": 25.546,
-        "cpuMs": 58.871,
-        "heapUsedBeforeBytes": 5598712,
-        "heapUsedAfterBytes": 10131024,
-        "retainedHeapDeltaBytes": 4532312,
-        "peakRssBytes": 68280320,
+        "wallMs": 23.118,
+        "cpuMs": 54.037,
+        "heapUsedBeforeBytes": 5599288,
+        "heapUsedAfterBytes": 10151544,
+        "retainedHeapDeltaBytes": 4552256,
+        "peakRssBytes": 68395008,
         "outcome": {
           "code": "OK"
         },
@@ -109,12 +109,12 @@
         "fixture": "errors",
         "bounded": true,
         "inputBytes": 20000,
-        "wallMs": 3.177,
-        "cpuMs": 4.973,
-        "heapUsedBeforeBytes": 5598896,
-        "heapUsedAfterBytes": 5807528,
+        "wallMs": 3.242,
+        "cpuMs": 5.056,
+        "heapUsedBeforeBytes": 5599568,
+        "heapUsedAfterBytes": 5808200,
         "retainedHeapDeltaBytes": 208632,
-        "peakRssBytes": 59895808,
+        "peakRssBytes": 54296576,
         "outcome": {
           "code": "BUDGET_EXCEEDED",
           "budget": "maxParseErrors",
@@ -123,7 +123,7 @@
         },
         "retainedResultKind": null
       },
-      "retainedHeapReductionBytes": 4323680
+      "retainedHeapReductionBytes": 4343624
     },
     {
       "fixture": "decoded-output",
@@ -131,12 +131,12 @@
         "fixture": "decoded-output",
         "bounded": false,
         "inputBytes": 4194304,
-        "wallMs": 554.972,
-        "cpuMs": 718.341,
-        "heapUsedBeforeBytes": 5601552,
-        "heapUsedAfterBytes": 144240992,
-        "retainedHeapDeltaBytes": 138639440,
-        "peakRssBytes": 321003520,
+        "wallMs": 588.782,
+        "cpuMs": 848.859,
+        "heapUsedBeforeBytes": 5598632,
+        "heapUsedAfterBytes": 144237472,
+        "retainedHeapDeltaBytes": 138638840,
+        "peakRssBytes": 331104256,
         "outcome": {
           "code": "OK"
         },
@@ -146,12 +146,12 @@
         "fixture": "decoded-output",
         "bounded": true,
         "inputBytes": 4194304,
-        "wallMs": 2.385,
-        "cpuMs": 4.734,
-        "heapUsedBeforeBytes": 5598464,
-        "heapUsedAfterBytes": 6282424,
+        "wallMs": 2.311,
+        "cpuMs": 4.964,
+        "heapUsedBeforeBytes": 5598936,
+        "heapUsedAfterBytes": 6282896,
         "retainedHeapDeltaBytes": 683960,
-        "peakRssBytes": 64233472,
+        "peakRssBytes": 64049152,
         "outcome": {
           "code": "BUDGET_EXCEEDED",
           "budget": "maxDecodedUtf8Bytes",
@@ -160,7 +160,7 @@
         },
         "retainedResultKind": null
       },
-      "retainedHeapReductionBytes": 137955480
+      "retainedHeapReductionBytes": 137954880
     },
     {
       "fixture": "trace",
@@ -168,12 +168,12 @@
         "fixture": "trace",
         "bounded": false,
         "inputBytes": 2000,
-        "wallMs": 1017.275,
-        "cpuMs": 1029.176,
-        "heapUsedBeforeBytes": 5598824,
-        "heapUsedAfterBytes": 6610008,
-        "retainedHeapDeltaBytes": 1011184,
-        "peakRssBytes": 67670016,
+        "wallMs": 1018.599,
+        "cpuMs": 1028.96,
+        "heapUsedBeforeBytes": 5598808,
+        "heapUsedAfterBytes": 6505168,
+        "retainedHeapDeltaBytes": 906360,
+        "peakRssBytes": 67883008,
         "outcome": {
           "code": "OK"
         },
@@ -183,12 +183,12 @@
         "fixture": "trace",
         "bounded": true,
         "inputBytes": 2000,
-        "wallMs": 3.767,
-        "cpuMs": 5.781,
-        "heapUsedBeforeBytes": 5599168,
-        "heapUsedAfterBytes": 5814400,
+        "wallMs": 4.871,
+        "cpuMs": 6.743,
+        "heapUsedBeforeBytes": 5598800,
+        "heapUsedAfterBytes": 5814032,
         "retainedHeapDeltaBytes": 215232,
-        "peakRssBytes": 59924480,
+        "peakRssBytes": 59895808,
         "outcome": {
           "code": "BUDGET_EXCEEDED",
           "budget": "maxTraceEvents",
@@ -197,7 +197,7 @@
         },
         "retainedResultKind": null
       },
-      "retainedHeapReductionBytes": 795952
+      "retainedHeapReductionBytes": 691128
     }
   ]
 }

@@ -134,7 +134,7 @@ if (workerCase) {
 }
 
 const outputArgument = process.argv.find((argument) => argument.startsWith("--output="));
-const output = outputArgument?.slice(9) ?? "docs/maintainers/hard-budget-evidence.json";
+const output = outputArgument?.slice(9) ?? "reports/hard-budget-evidence.json";
 const fixtureNames = ["nodes", "attributes", "errors", "decoded-output", "trace"];
 const comparisons = [];
 

@@ -13,8 +13,10 @@ the allocating phase rather than after a complete parse.
 - Peak resident memory is the process `maxRSS` high-water mark. This captures
   native and JavaScript process memory but is intentionally not described as a
   parser-only allocation sample.
-- The executable runner is `scripts/bench/run-hard-budget-evidence.mjs`; its
-  machine-readable result is `hard-budget-evidence.json`.
+- The executable runner is `scripts/bench/run-hard-budget-evidence.mjs`; normal
+  test runs write ignored evidence under `reports/`. Refresh the reviewed
+  machine-readable snapshot explicitly with
+  `--output=docs/maintainers/hard-budget-evidence.json`.
 
 ## Results
 
