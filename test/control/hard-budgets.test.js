@@ -44,6 +44,14 @@ function assertBudget(error, budget, limit, actual) {
   return true;
 }
 
+async function collectAsync(iterable) {
+  const values = [];
+  for await (const value of iterable) {
+    values.push(value);
+  }
+  return values;
+}
+
 test("parse option schemas reject unknown and invalid limits before work", async () => {
   for (const budget of ALL_BUDGETS) {
     for (const invalid of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "1", null]) {
@@ -257,7 +265,7 @@ test("stream tokenization stops attempted duplicate and oversized attributes", a
     }
   });
   await assert.rejects(
-    async () => Array.fromAsync(tokenizeStream(duplicate, {
+    async () => collectAsync(tokenizeStream(duplicate, {
       budgets: { maxAttributesPerElement: 1 }
     })),
     (error) => assertBudget(error, "maxAttributesPerElement", 1, 2)
@@ -270,7 +278,7 @@ test("stream tokenization stops attempted duplicate and oversized attributes", a
     }
   });
   await assert.rejects(
-    async () => Array.fromAsync(tokenizeStream(oversized, {
+    async () => collectAsync(tokenizeStream(oversized, {
       budgets: { maxAttributeBytes: 4 }
     })),
     (error) => assertBudget(error, "maxAttributeBytes", 4, 5)
