@@ -114,7 +114,7 @@ async function writeDeterminism() {
 
   const fragmentHashes = [];
   for (let sampleIndex = 0; sampleIndex < 5; sampleIndex += 1) {
-    fragmentHashes.push(sha256(JSON.stringify(parseFragment("beta", "section", { includeSpans: true, trace: true }))));
+    fragmentHashes.push(sha256(JSON.stringify(parseFragment("beta", "section", { captureSpans: true, trace: true }))));
   }
 
   const uniqueDocumentHashes = [...new Set(documentHashes)];
@@ -310,7 +310,7 @@ async function writeStream() {
 
 async function writeAgent() {
   const tracedDocument = parse("agent", { trace: true, budgets: { maxTraceEvents: 20, maxTraceBytes: 4096 } });
-  const documentWithSpans = parse("agent", { includeSpans: true });
+  const documentWithSpans = parse("agent", { captureSpans: true });
   const headingDocument = headingTree();
   const headingOutline = outline(headingDocument);
   const chunkPlan = chunk(headingDocument, { maxChars: 8, maxNodes: 2 });

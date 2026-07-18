@@ -129,25 +129,27 @@ test("parseStream aborts before extra pulls when maxInputBytes is exceeded", asy
   assert.equal(pullCounter.count, 2);
 });
 
-test("parseStream cancels and releases its reader after a budget failure", async () => {
-  let cancellationReason = null;
+test("parseStream cancels and releases its reader after budget failures", async () => {
   const streamFactory = globalThis.ReadableStream;
   if (typeof streamFactory !== "function") {
     throw new Error("ReadableStream is unavailable in this runtime");
   }
 
-  const stream = new streamFactory({
-    start(controller) {
-      controller.enqueue(new Uint8Array(8));
-    },
-    cancel(reason) {
-      cancellationReason = reason;
-    }
-  });
+  for (const budgets of [{ maxInputBytes: 1 }, { maxBufferedBytes: -1 }]) {
+    let cancellationReason = null;
+    const stream = new streamFactory({
+      start(controller) {
+        controller.enqueue(new Uint8Array(8));
+      },
+      cancel(reason) {
+        cancellationReason = reason;
+      }
+    });
 
-  await assert.rejects(parseStream(stream, { budgets: { maxInputBytes: 1 } }), BudgetExceededError);
-  assert.ok(cancellationReason instanceof BudgetExceededError);
-  assert.equal(stream.locked, false);
+    await assert.rejects(parseStream(stream, { budgets }), BudgetExceededError);
+    assert.ok(cancellationReason instanceof BudgetExceededError);
+    assert.equal(stream.locked, false);
+  }
 });
 
 test("parseStream and tokenizeStream release their readers after success", async () => {

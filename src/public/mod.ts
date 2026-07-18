@@ -490,9 +490,10 @@ interface ParseInputContext {
 }
 
 function stringInputContext(html: string): ParseInputContext {
+  const startedAt = Date.now();
   return {
     byteLength: utf8ByteLength(html),
-    startedAt: Date.now(),
+    startedAt,
     decode: {
       source: "input",
       encoding: "utf-8",
@@ -824,7 +825,6 @@ async function decodeStreamToText(
     0,
     Math.min(STREAM_ENCODING_PRESCAN_BYTES, budgets?.maxBufferedBytes ?? STREAM_ENCODING_PRESCAN_BYTES)
   );
-  enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, 0);
   const pendingBytesBuffer = new Uint8Array(prescanLimit);
   let pendingBytes = 0;
   let maxBufferedObserved = 0;
@@ -856,11 +856,12 @@ async function decodeStreamToText(
     return state;
   };
 
-  if (prescanLimit === 0) {
-    initializeDecoder();
-  }
-
   try {
+    enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, 0);
+    if (prescanLimit === 0) {
+      initializeDecoder();
+    }
+
     for (;;) {
       const next = await reader.read();
       if (next.done) {
