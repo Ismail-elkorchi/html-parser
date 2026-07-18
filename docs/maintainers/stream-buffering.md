@@ -8,8 +8,8 @@ evidence, not a claim that full-document parsing is incremental.
 
 - Runner: `scripts/bench/run-stream-buffer-baseline.mjs`
 - Runtime: Node 24.14.0 on Linux x64 with explicit garbage collection
-- Revisions: tagged `v0.1.1` at `d4b0b69`, merged base `7625931`, and the
-  implementation candidate based on `7625931`
+- Revisions: tagged `v0.1.1` at `d4b0b69`, merged base `7625931`, and candidate
+  commit `5983a3e` based on `7625931`
 - Timing/heap fixture: 262,179 transport bytes in 4,096-byte chunks, three
   warmups and seven measured samples
 - Retained heap: median `heapUsed` after the returned tree/token collection is
@@ -49,7 +49,7 @@ and invalid configuration before reader acquisition.
 | --- | ---: | ---: | ---: | ---: |
 | tagged `v0.1.1` | 85.432 ms | 60,390,608 B | 32.921 ms | 28,874,192 B |
 | `7625931` | 66.467 ms | 33,428,128 B | 42.016 ms | 29,341,456 B |
-| candidate | 52.481 ms | 33,435,928 B | 37.183 ms | 29,330,808 B |
+| candidate `5983a3e` | 61.658 ms | 33,439,264 B | 39.602 ms | 29,339,496 B |
 
 The candidate stays effectively flat in retained heap against its merged base
 while making the retention and EOF contracts explicit. These measurements do
