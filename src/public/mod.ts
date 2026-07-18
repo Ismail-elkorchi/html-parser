@@ -179,6 +179,10 @@ function enforceBudget(
   });
 }
 
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
 function eventSize(event: TraceEvent): number {
   return JSON.stringify(event).length;
 }
@@ -314,7 +318,6 @@ function tokenizerBudgetsFromParseOptions(
   }
 
   const next: TokenizerBudgets = {
-    ...(budgets.maxInputBytes !== undefined ? { maxTextBytes: budgets.maxInputBytes } : {}),
     ...(budgets.maxTimeMs !== undefined ? { maxTimeMs: budgets.maxTimeMs } : {})
   };
 
@@ -472,22 +475,64 @@ function collectMetrics(nodes: readonly HtmlNode[]): NodeMetrics {
   return { nodes: totalNodes, maxDepth };
 }
 
-function parseDocumentInternal(html: string, options: ParseOptions = {}): DocumentTree {
+interface ParseInputContext {
+  readonly byteLength: number;
+  readonly startedAt: number;
+  readonly decode: {
+    readonly source: "input" | "sniff";
+    readonly encoding: string;
+    readonly sniffSource: "input" | "bom" | "transport" | "meta" | "default";
+  };
+  readonly stream?: {
+    readonly bytesRead: number;
+    readonly maxBufferedObserved: number;
+  };
+}
+
+function stringInputContext(html: string): ParseInputContext {
   const startedAt = Date.now();
+  return {
+    byteLength: utf8ByteLength(html),
+    startedAt,
+    decode: {
+      source: "input",
+      encoding: "utf-8",
+      sniffSource: "input"
+    }
+  };
+}
+
+function parseDocumentInternal(
+  html: string,
+  options: ParseOptions,
+  input: ParseInputContext
+): DocumentTree {
+  const startedAt = input.startedAt;
   const budgets = options.budgets;
-  const captureSpans = options.captureSpans ?? options.includeSpans ?? false;
+  const captureSpans = options.captureSpans ?? false;
   const assigner = new NodeIdAssigner();
   const documentId = assigner.next();
   let trace: TraceEvent[] | undefined = options.trace ? [] : undefined;
 
-  enforceBudget("maxInputBytes", budgets?.maxInputBytes, html.length);
+  enforceBudget("maxInputBytes", budgets?.maxInputBytes, input.byteLength);
   trace = pushTrace(trace, {
     kind: "decode",
-    source: "input",
-    encoding: "utf-8",
-    sniffSource: "input"
+    ...input.decode
   }, budgets);
-  trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, html.length, budgets);
+  if (input.stream !== undefined) {
+    trace = pushTrace(trace, {
+      kind: "stream",
+      bytesRead: input.stream.bytesRead
+    }, budgets);
+    trace = pushBudgetTrace(
+      trace,
+      "maxBufferedBytes",
+      budgets?.maxBufferedBytes,
+      input.stream.maxBufferedObserved,
+      budgets
+    );
+  }
+  trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, input.byteLength, budgets);
 
   const tokenizerBudgets = tokenizerBudgetsFromParseOptions(budgets);
   const tokenized = tokenizerBudgets ? tokenize(html, { budgets: tokenizerBudgets }) : tokenize(html);
@@ -591,13 +636,14 @@ function parseDocumentInternal(html: string, options: ParseOptions = {}): Docume
 
 
 export function parse(html: string, options: ParseOptions = {}): DocumentTree {
-  return parseDocumentInternal(html, options);
+  return parseDocumentInternal(html, options, stringInputContext(html));
 }/**
  * Parses input deterministically for the `parseBytes` public API.
  */
 
 
 export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): DocumentTree {
+  const startedAt = Date.now();
   enforceBudget("maxInputBytes", options.budgets?.maxInputBytes, bytes.byteLength);
 
   const decoded = decodeHtmlBytes(
@@ -607,30 +653,15 @@ export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): Docum
       : {}
   );
 
-  const parsed = parse(decoded.text, options);
-  if (!parsed.trace) {
-    return parsed;
-  }
-
-  const withDecodeTrace = pushTrace(
-    [...parsed.trace],
-    {
-      kind: "decode",
+  return parseDocumentInternal(decoded.text, options, {
+    byteLength: bytes.byteLength,
+    startedAt,
+    decode: {
       source: "sniff",
       encoding: decoded.sniff.encoding,
       sniffSource: decoded.sniff.source
-    },
-    options.budgets
-  );
-
-  if (!withDecodeTrace) {
-    return parsed;
-  }
-
-  return {
-    ...parsed,
-    trace: withDecodeTrace
-  };
+    }
+  });
 }/**
  * Parses input deterministically for the `parseFragment` public API.
  */
@@ -643,14 +674,15 @@ export function parseFragment(
 ): FragmentTree {
   const startedAt = Date.now();
   const budgets = options.budgets;
-  const captureSpans = options.captureSpans ?? options.includeSpans ?? false;
+  const captureSpans = options.captureSpans ?? false;
   const normalizedContext = contextTagName.trim().toLowerCase();
 
   if (normalizedContext.length === 0) {
     throw new Error("contextTagName must be a non-empty tag name");
   }
 
-  enforceBudget("maxInputBytes", budgets?.maxInputBytes, html.length);
+  const inputByteLength = utf8ByteLength(html);
+  enforceBudget("maxInputBytes", budgets?.maxInputBytes, inputByteLength);
 
   const assigner = new NodeIdAssigner();
   const fragmentId = assigner.next();
@@ -662,7 +694,7 @@ export function parseFragment(
     encoding: "utf-8",
     sniffSource: "input"
   }, budgets);
-  trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, html.length, budgets);
+  trace = pushBudgetTrace(trace, "maxInputBytes", budgets?.maxInputBytes, inputByteLength, budgets);
 
   const tokenizerBudgets = tokenizerBudgetsFromParseOptions(budgets);
   const tokenized = tokenizerBudgets ? tokenize(html, { budgets: tokenizerBudgets }) : tokenize(html);
@@ -766,118 +798,122 @@ export function parseFragment(
 
 interface StreamDecodeResult {
   readonly text: string;
-  readonly sniff: { encoding: string; source: "bom" | "transport" | "meta" | "default" };
+  readonly sniff: StreamEncodingSniff;
   readonly totalBytes: number;
   readonly maxBufferedObserved: number;
 }
 
+interface StreamEncodingSniff {
+  readonly encoding: string;
+  readonly source: "bom" | "transport" | "meta" | "default";
+}
+
+interface StreamDecoderState {
+  readonly decoder: TextDecoder;
+  readonly sniff: StreamEncodingSniff;
+}
+
 async function decodeStreamToText(
   stream: ReadableStream<Uint8Array>,
-  options: { readonly transportEncodingLabel?: string; readonly budgets?: ParseOptions["budgets"] }
+  options: { readonly transportEncodingLabel?: string; readonly budgets?: ParseOptions["budgets"] },
+  startedAt: number
 ): Promise<StreamDecodeResult> {
-  const startedAt = Date.now();
   const budgets = options.budgets;
   const reader = stream.getReader();
   let total = 0;
-  const pendingChunks: Uint8Array[] = [];
+  const prescanLimit = Math.max(
+    0,
+    Math.min(STREAM_ENCODING_PRESCAN_BYTES, budgets?.maxBufferedBytes ?? STREAM_ENCODING_PRESCAN_BYTES)
+  );
+  const pendingBytesBuffer = new Uint8Array(prescanLimit);
   let pendingBytes = 0;
   let maxBufferedObserved = 0;
-  let sniff: { encoding: string; source: "bom" | "transport" | "meta" | "default" } | null = null;
-  let decoder: TextDecoder | undefined;
+  let decoderState: StreamDecoderState | undefined;
   const decodedParts: string[] = [];
   const sniffOptions =
     options.transportEncodingLabel === undefined
-      ? { maxPrescanBytes: STREAM_ENCODING_PRESCAN_BYTES }
+      ? { maxPrescanBytes: prescanLimit }
       : {
           transportEncodingLabel: options.transportEncodingLabel,
-          maxPrescanBytes: STREAM_ENCODING_PRESCAN_BYTES
+          maxPrescanBytes: prescanLimit
         };
 
-  const readPendingBytes = (): Uint8Array => {
-    if (pendingBytes === 0) {
-      return new Uint8Array(0);
+  const appendDecoded = (value: string): void => {
+    if (value.length > 0) {
+      decodedParts.push(value);
     }
-
-    const combined = new Uint8Array(pendingBytes);
-    let offset = 0;
-    for (const chunk of pendingChunks) {
-      combined.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return combined;
   };
 
-  for (;;) {
-    const next = await reader.read();
-    if (next.done) {
-      break;
+  const initializeDecoder = (): StreamDecoderState => {
+    const bufferedBytes = pendingBytesBuffer.subarray(0, pendingBytes);
+    const sniff = sniffHtmlEncoding(bufferedBytes, sniffOptions);
+    const state = {
+      decoder: new TextDecoder(sniff.encoding),
+      sniff
+    };
+    decoderState = state;
+    appendDecoded(state.decoder.decode(bufferedBytes, { stream: true }));
+    return state;
+  };
+
+  try {
+    enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, 0);
+    if (prescanLimit === 0) {
+      initializeDecoder();
     }
 
-    const chunkValue = next.value;
-    total += chunkValue.byteLength;
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) {
+        break;
+      }
 
-    enforceBudget("maxInputBytes", budgets?.maxInputBytes, total);
-    enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
+      const chunkValue = next.value;
+      total += chunkValue.byteLength;
 
-    if (!sniff) {
-      pendingChunks.push(chunkValue);
-      pendingBytes += chunkValue.byteLength;
-      maxBufferedObserved = Math.max(maxBufferedObserved, pendingBytes);
-      enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, pendingBytes);
+      enforceBudget("maxInputBytes", budgets?.maxInputBytes, total);
+      enforceBudget("maxTimeMs", budgets?.maxTimeMs, Date.now() - startedAt);
 
-      if (pendingBytes < STREAM_ENCODING_PRESCAN_BYTES) {
+      if (decoderState === undefined) {
+        const bytesToBuffer = Math.min(chunkValue.byteLength, prescanLimit - pendingBytes);
+        pendingBytesBuffer.set(chunkValue.subarray(0, bytesToBuffer), pendingBytes);
+        pendingBytes += bytesToBuffer;
+        maxBufferedObserved = Math.max(maxBufferedObserved, pendingBytes);
+        enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, pendingBytes);
+
+        if (pendingBytes < prescanLimit) {
+          continue;
+        }
+
+        const activeDecoder = initializeDecoder().decoder;
+        if (bytesToBuffer < chunkValue.byteLength) {
+          appendDecoded(activeDecoder.decode(chunkValue.subarray(bytesToBuffer), { stream: true }));
+        }
         continue;
       }
 
-      const bufferedBytes = readPendingBytes();
-      sniff = sniffHtmlEncoding(bufferedBytes, sniffOptions);
-      decoder = new TextDecoder(sniff.encoding);
-      const decoded = decoder.decode(bufferedBytes, { stream: true });
-      if (decoded.length > 0) {
-        decodedParts.push(decoded);
-      }
-      pendingChunks.length = 0;
-      pendingBytes = 0;
-      continue;
+      appendDecoded(decoderState.decoder.decode(chunkValue, { stream: true }));
     }
 
-    maxBufferedObserved = Math.max(maxBufferedObserved, chunkValue.byteLength);
-    enforceBudget("maxBufferedBytes", budgets?.maxBufferedBytes, chunkValue.byteLength);
-    if (!decoder) {
-      throw new Error("stream decoder unavailable");
+    const finalState = decoderState ?? initializeDecoder();
+    appendDecoded(finalState.decoder.decode());
+
+    return {
+      text: decodedParts.join(""),
+      sniff: finalState.sniff,
+      totalBytes: total,
+      maxBufferedObserved
+    };
+  } catch (error) {
+    try {
+      await reader.cancel(error);
+    } catch {
+      // Preserve the original read, decode, or budget failure.
     }
-
-    const decoded = decoder.decode(chunkValue, { stream: true });
-    if (decoded.length > 0) {
-      decodedParts.push(decoded);
-    }
+    throw error;
+  } finally {
+    reader.releaseLock();
   }
-
-  if (!sniff) {
-    const bufferedBytes = readPendingBytes();
-    sniff = sniffHtmlEncoding(bufferedBytes, sniffOptions);
-    decoder = new TextDecoder(sniff.encoding);
-    const decoded = decoder.decode(bufferedBytes, { stream: true });
-    if (decoded.length > 0) {
-      decodedParts.push(decoded);
-    }
-  }
-
-  if (!decoder) {
-    throw new Error("stream decoder initialization failed");
-  }
-
-  const decodedTail = decoder.decode();
-  if (decodedTail.length > 0) {
-    decodedParts.push(decodedTail);
-  }
-
-  return {
-    text: decodedParts.join(""),
-    sniff,
-    totalBytes: total,
-    maxBufferedObserved
-  };
 }/**
  * Tokenizes input deterministically for the `tokenizeStream` public API.
  */
@@ -887,9 +923,11 @@ export async function* tokenizeStream(
   stream: ReadableStream<Uint8Array>,
   options: TokenizeStreamOptions = {}
 ): AsyncIterable<Token> {
-  const decoded = await decodeStreamToText(stream, options);
+  const startedAt = Date.now();
+  const decoded = await decodeStreamToText(stream, options, startedAt);
   const tokenizerBudgets = tokenizerBudgetsFromParseOptions(options.budgets);
   const tokenized = tokenizerBudgets ? tokenize(decoded.text, { budgets: tokenizerBudgets }) : tokenize(decoded.text);
+  enforceBudget("maxTimeMs", options.budgets?.maxTimeMs, Date.now() - startedAt);
 
   for (const token of tokenized.tokens) {
     yield toToken(token);
@@ -903,36 +941,21 @@ export async function parseStream(
   stream: ReadableStream<Uint8Array>,
   options: ParseOptions = {}
 ): Promise<DocumentTree> {
-  const budgets = options.budgets;
-  const decoded = await decodeStreamToText(stream, options);
-  const parsed = parse(decoded.text, options);
-  if (!parsed.trace) {
-    return parsed;
-  }
-
-  let trace = [...parsed.trace];
-  trace = pushTrace(trace, {
-    kind: "decode",
-    source: "sniff",
-    encoding: decoded.sniff.encoding,
-    sniffSource: decoded.sniff.source
-  }, budgets) ?? trace;
-  trace = pushTrace(trace, {
-    kind: "stream",
-    bytesRead: decoded.totalBytes
-  }, budgets) ?? trace;
-  trace = pushBudgetTrace(
-    trace,
-    "maxBufferedBytes",
-    budgets?.maxBufferedBytes,
-    decoded.maxBufferedObserved,
-    budgets
-  ) ?? trace;
-
-  return {
-    ...parsed,
-    trace
-  };
+  const startedAt = Date.now();
+  const decoded = await decodeStreamToText(stream, options, startedAt);
+  return parseDocumentInternal(decoded.text, options, {
+    byteLength: decoded.totalBytes,
+    startedAt,
+    decode: {
+      source: "sniff",
+      encoding: decoded.sniff.encoding,
+      sniffSource: decoded.sniff.source
+    },
+    stream: {
+      bytesRead: decoded.totalBytes,
+      maxBufferedObserved: decoded.maxBufferedObserved
+    }
+  });
 }
 
 function escapeText(value: string): string {

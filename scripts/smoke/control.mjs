@@ -159,7 +159,7 @@ function normalizeParseError(parseError) {
 async function computeDeterminismHash() {
   const deterministicInput = "<!doctype html><title>x</title><body><p a='1'>txt<span></p></body>";
   const parsed = parse(deterministicInput, {
-    includeSpans: true
+    captureSpans: true
   });
 
   const canonicalPayload = {

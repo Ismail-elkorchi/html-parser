@@ -35,8 +35,7 @@ ul
 ```
 
 ## Common failure modes
-- `INVALID_FRAGMENT_CONTEXT` when the context tag name is invalid for fragment
-  parsing.
+- An `Error` when `contextTagName` is empty.
 - `BudgetExceededError` when `maxInputBytes`, `maxNodes`, or `maxDepth` is too
   low for the fragment.
 - Unexpected structure when the fragment is parsed with the wrong context, such

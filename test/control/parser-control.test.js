@@ -50,3 +50,26 @@ test("budget exceed is structured", () => {
     }
   );
 });
+
+test("string and fragment input budgets measure UTF-8 bytes", () => {
+  const input = "é".repeat(10);
+  for (const parseInput of [
+    () => parse(input, { budgets: { maxInputBytes: 10 } }),
+    () => parseFragment(input, "div", { budgets: { maxInputBytes: 10 } })
+  ]) {
+    assert.throws(parseInput, (error) => {
+      assert.ok(error instanceof BudgetExceededError);
+      assert.equal(error.payload.budget, "maxInputBytes");
+      assert.equal(error.payload.actual, 20);
+      return true;
+    });
+  }
+});
+
+test("byte input budget remains based on transport bytes after legacy decoding", () => {
+  const tree = parseBytes(new Uint8Array([0xe9]), {
+    transportEncodingLabel: "windows-1252",
+    budgets: { maxInputBytes: 1 }
+  });
+  assert.equal(tree.kind, "document");
+});

@@ -7,11 +7,6 @@
 - Default: `false`
 - Includes source spans on nodes and attributes.
 
-### `includeSpans`
-- Type: `boolean`
-- Default: `false`
-- Backward-compatible alias for `captureSpans`.
-
 ### `trace`
 - Type: `boolean`
 - Default: `false`
@@ -27,7 +22,7 @@
 - Default: all limits unset (no budget enforcement unless specified)
 - Supported keys:
   - `maxInputBytes`
-  - `maxBufferedBytes` (stream decode)
+  - `maxBufferedBytes` (maximum encoding-prescan bytes retained by stream decode)
   - `maxNodes`
   - `maxDepth`
   - `maxTraceEvents`
@@ -43,6 +38,9 @@
 ### `options.budgets`
 - Type: `ParseBudgets`
 - Relevant keys: `maxInputBytes`, `maxBufferedBytes`, `maxTimeMs`
+- `maxInputBytes` limits the complete byte stream.
+- `maxBufferedBytes` caps only the encoding prescan; subsequent bytes are decoded
+  without being retained in that buffer.
 
 ## `visibleText(nodeOrTree, options?)`
 

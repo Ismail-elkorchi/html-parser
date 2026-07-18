@@ -28,6 +28,20 @@ async function evalReportHasFailures(reportPath) {
   return failed > 0;
 }
 
+async function requireConformanceFixtures() {
+  const sentinel = "vendor/html5lib-tests/tokenizer/test1.test";
+  try {
+    const fixture = await stat(sentinel);
+    if (fixture.isFile()) return;
+  } catch {
+    // Emit one stable setup error below.
+  }
+  throw new Error(
+    `html5lib conformance fixtures are unavailable (${sentinel}). ` +
+      "Run: git submodule update --init --recursive"
+  );
+}
+
 const conformanceSuites = [
   {
     id: "tokenizer",
@@ -57,6 +71,7 @@ const conformanceSuites = [
 ];
 
 async function main() {
+  await requireConformanceFixtures();
   const suiteResults = [];
   let hasSuiteFailures = false;
 

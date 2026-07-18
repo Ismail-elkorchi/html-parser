@@ -9,6 +9,15 @@ All notable changes are documented in this file.
 - Remove Dependabot configuration in favor of deliberate, consolidated dependency maintenance.
 - Remove the obsolete AJV override and refresh ESLint's compatible development-only validator.
 
+- Make input budgets byte-accurate and stream encoding-prescan limits
+  independent of producer chunk boundaries.
+- Release stream readers on success and failure, and preserve end-to-end time
+  accounting across decoding and parsing.
+- Remove the `includeSpans` compatibility alias and impossible parse-diagnostic
+  variants from the public type surface.
+- Support current and legacy Deno documentation shapes, and add actionable
+  conformance-submodule setup guidance.
+
 ## [0.1.1] - 2026-03-04
 - Add OIDC `publish.yml` workflow for npm Trusted Publishing and JSR publish on release events.
 - Add publish manifest evidence and deterministic tag/version parity checks before publish.

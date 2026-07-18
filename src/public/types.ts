@@ -16,12 +16,7 @@ export interface Attribute {
 }
 
 export interface ParseError {
-  readonly code:
-    | "BUDGET_EXCEEDED"
-    | "STREAM_READ_FAILED"
-    | "UNSUPPORTED_ENCODING"
-    | "INVALID_FRAGMENT_CONTEXT"
-    | "PARSER_ERROR";
+  readonly code: "PARSER_ERROR";
   readonly parseErrorId: string;
   readonly message: string;
   readonly nodeId?: NodeId;
@@ -40,7 +35,6 @@ export interface BudgetOptions {
 
 export interface ParseOptions {
   readonly captureSpans?: boolean;
-  readonly includeSpans?: boolean;
   readonly trace?: boolean;
   readonly transportEncodingLabel?: string;
   readonly budgets?: BudgetOptions;

@@ -104,26 +104,6 @@ function assertBudgetErrorSync(checks, checkId, budgetKey, executeCheck) {
   }
 }
 
-async function assertBudgetErrorAsync(checks, checkId, budgetKey, executeCheck) {
-  try {
-    await executeCheck();
-    checks.push({
-      id: checkId,
-      ok: false,
-      expectedErrorCode: "BUDGET_EXCEEDED",
-      observedErrorCode: "NONE"
-    });
-  } catch (error) {
-    const observedBudgetKey = error instanceof BudgetExceededError ? error.payload.budget : "UNEXPECTED_ERROR";
-    checks.push({
-      id: checkId,
-      ok: observedBudgetKey === budgetKey,
-      expectedErrorCode: budgetKey,
-      observedErrorCode: observedBudgetKey
-    });
-  }
-}
-
 async function writeDeterminism() {
   const cases = [];
 
@@ -134,7 +114,7 @@ async function writeDeterminism() {
 
   const fragmentHashes = [];
   for (let sampleIndex = 0; sampleIndex < 5; sampleIndex += 1) {
-    fragmentHashes.push(sha256(JSON.stringify(parseFragment("beta", "section", { includeSpans: true, trace: true }))));
+    fragmentHashes.push(sha256(JSON.stringify(parseFragment("beta", "section", { captureSpans: true, trace: true }))));
   }
 
   const uniqueDocumentHashes = [...new Set(documentHashes)];
@@ -233,9 +213,18 @@ async function writeBudgets() {
     parse("abcdef", { budgets: { maxTimeMs: -1 } });
   });
 
-  await assertBudgetErrorAsync(checks, "budget-max-buffered-bytes", "maxBufferedBytes", async () => {
-    const stream = makeReadableByteStream([new Uint8Array([0x41, 0x42, 0x43])]);
-    await parseStream(stream, { budgets: { maxBufferedBytes: 2 } });
+  const bufferedTree = await parseStream(
+    makeReadableByteStream([new Uint8Array([0x41, 0x42, 0x43])]),
+    { trace: true, budgets: { maxBufferedBytes: 2 } }
+  );
+  const bufferedBudget = bufferedTree.trace.find(
+    (event) => event.kind === "budget" && event.budget === "maxBufferedBytes"
+  );
+  checks.push({
+    id: "budget-max-buffered-bytes-caps-prescan",
+    ok: bufferedBudget?.actual === 2,
+    observed: { actual: bufferedBudget?.actual ?? null },
+    expected: { actual: 2 }
   });
 
   await writeJson("reports/budgets.json", {
@@ -273,23 +262,19 @@ async function writeStream() {
 
   const tiny = new Uint8Array(40).fill(0x61);
   const tinyChunks = [...tiny].map((value) => new Uint8Array([value]));
-  let observedBudget = "none";
-  let observedActual = -1;
-
-  try {
-    await parseStream(makeReadableByteStream(tinyChunks), { budgets: { maxBufferedBytes: 16 } });
-  } catch (error) {
-    if (error instanceof BudgetExceededError) {
-      observedBudget = error.payload.budget;
-      observedActual = error.payload.actual;
-    }
-  }
+  const tinyTree = await parseStream(makeReadableByteStream(tinyChunks), {
+    trace: true,
+    budgets: { maxBufferedBytes: 16 }
+  });
+  const observedBufferedBudget = tinyTree.trace.find(
+    (event) => event.kind === "budget" && event.budget === "maxBufferedBytes"
+  );
 
   checks.push({
-    id: "stream-max-buffered-bytes-fails-before-overrun",
-    ok: observedBudget === "maxBufferedBytes" && observedActual === 17,
-    observed: { budget: observedBudget, actual: observedActual },
-    expected: { budget: "maxBufferedBytes", actual: 17 }
+    id: "stream-max-buffered-bytes-caps-prescan",
+    ok: observedBufferedBudget?.actual === 16,
+    observed: { actual: observedBufferedBudget?.actual ?? null },
+    expected: { actual: 16 }
   });
 
   const pullCounter = { count: 0 };
@@ -325,7 +310,7 @@ async function writeStream() {
 
 async function writeAgent() {
   const tracedDocument = parse("agent", { trace: true, budgets: { maxTraceEvents: 20, maxTraceBytes: 4096 } });
-  const documentWithSpans = parse("agent", { includeSpans: true });
+  const documentWithSpans = parse("agent", { captureSpans: true });
   const headingDocument = headingTree();
   const headingOutline = outline(headingDocument);
   const chunkPlan = chunk(headingDocument, { maxChars: 8, maxNodes: 2 });

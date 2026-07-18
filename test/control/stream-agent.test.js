@@ -60,31 +60,29 @@ test("parseStream decodes deterministic output", async () => {
   assert.equal(parsed.children[0]?.kind, "element");
 });
 
-test("parseStream enforces maxBufferedBytes budget", async () => {
+test("parseStream caps encoding-prescan memory without rejecting the remainder", async () => {
   const stream = createByteStream([new Uint8Array([0x61, 0x62, 0x63])]);
-  await assert.rejects(
-    parseStream(stream, { budgets: { maxBufferedBytes: 2 } }),
-    (error) => {
-      assert.ok(error instanceof BudgetExceededError);
-      assert.equal(error.payload.budget, "maxBufferedBytes");
-      return true;
-    }
+  const parsed = await parseStream(stream, {
+    trace: true,
+    budgets: { maxBufferedBytes: 2 }
+  });
+  const bufferedBudget = parsed.trace.find(
+    (event) => event.kind === "budget" && event.budget === "maxBufferedBytes"
   );
+  assert.equal(bufferedBudget?.actual, 2);
 });
 
-test("parseStream fails once buffered bytes exceed limit during prescan", async () => {
-  const payload = new Uint8Array(40).fill(0x61);
-  const stream = createByteStream([...payload].map((value) => new Uint8Array([value])));
-  await assert.rejects(
-    parseStream(stream, { budgets: { maxBufferedBytes: 16 } }),
-    (error) => {
-      assert.ok(error instanceof BudgetExceededError);
-      assert.equal(error.payload.budget, "maxBufferedBytes");
-      assert.equal(error.payload.limit, 16);
-      assert.equal(error.payload.actual, 17);
-      return true;
-    }
-  );
+test("parseStream budget outcome is independent of upstream chunk boundaries", async () => {
+  const bytes = new TextEncoder().encode(`<p>${"x".repeat(20_000)}</p>`);
+  const chunks = [];
+  for (let offset = 0; offset < bytes.length; offset += 1_024) {
+    chunks.push(bytes.subarray(offset, offset + 1_024));
+  }
+
+  const options = { trace: true, budgets: { maxInputBytes: 30_000, maxBufferedBytes: 16_384 } };
+  const chunked = await parseStream(createByteStream(chunks), options);
+  const single = await parseStream(createByteStream([bytes]), options);
+  assert.deepEqual(chunked, single);
 });
 
 test("parseStream matches parseBytes for chunked transport with sniffing", async () => {
@@ -129,6 +127,61 @@ test("parseStream aborts before extra pulls when maxInputBytes is exceeded", asy
   );
 
   assert.equal(pullCounter.count, 2);
+});
+
+test("parseStream cancels and releases its reader after budget failures", async () => {
+  const streamFactory = globalThis.ReadableStream;
+  if (typeof streamFactory !== "function") {
+    throw new Error("ReadableStream is unavailable in this runtime");
+  }
+
+  for (const budgets of [
+    { maxInputBytes: 1 },
+    { maxBufferedBytes: -1 },
+    { maxBufferedBytes: Number.NaN }
+  ]) {
+    let cancellationReason = null;
+    const stream = new streamFactory({
+      start(controller) {
+        controller.enqueue(new Uint8Array(8));
+      },
+      cancel(reason) {
+        cancellationReason = reason;
+      }
+    });
+
+    await assert.rejects(parseStream(stream, { budgets }), BudgetExceededError);
+    assert.ok(cancellationReason instanceof BudgetExceededError);
+    assert.equal(stream.locked, false);
+  }
+});
+
+test("parseStream and tokenizeStream release their readers after success", async () => {
+  const parseInput = createByteStream([new TextEncoder().encode("<p>parsed</p>")]);
+  await parseStream(parseInput);
+  assert.equal(parseInput.locked, false);
+
+  const tokenizeInput = createByteStream([new TextEncoder().encode("<p>tokenized</p>")]);
+  const tokens = [];
+  for await (const token of tokenizeStream(tokenizeInput)) {
+    tokens.push(token);
+  }
+  assert.ok(tokens.length > 0);
+  assert.equal(tokenizeInput.locked, false);
+});
+
+test("byte and stream traces contain one truthful decode event", async () => {
+  const bytes = new Uint8Array([0x3c, 0x70, 0x3e, 0xe9, 0x3c, 0x2f, 0x70, 0x3e]);
+  const options = { trace: true, transportEncodingLabel: "windows-1252" };
+  const fromBytes = parseBytes(bytes, options);
+  const fromStream = await parseStream(createByteStream([bytes]), options);
+
+  for (const tree of [fromBytes, fromStream]) {
+    const decodeEvents = tree.trace.filter((event) => event.kind === "decode");
+    assert.equal(decodeEvents.length, 1);
+    assert.equal(decodeEvents[0].source, "sniff");
+    assert.equal(decodeEvents[0].encoding, "windows-1252");
+  }
 });
 
 test("tokenizeStream yields deterministic token sequence", async () => {

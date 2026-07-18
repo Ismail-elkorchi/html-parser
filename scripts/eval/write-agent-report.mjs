@@ -407,17 +407,17 @@ async function evaluateStreamTokenFeature() {
 
   const tightChunks = [new Uint8Array(32).fill(0x61)];
   const firstBudgetFailure = await captureTokenBudgetFailure(tightChunks, {
-    budgets: { maxInputBytes: 1024, maxBufferedBytes: 16 }
+    budgets: { maxInputBytes: 16, maxBufferedBytes: 16 }
   });
   const secondBudgetFailure = await captureTokenBudgetFailure(tightChunks, {
-    budgets: { maxInputBytes: 1024, maxBufferedBytes: 16 }
+    budgets: { maxInputBytes: 16, maxBufferedBytes: 16 }
   });
 
-  const budgetFailureOk = firstBudgetFailure?.budget === "maxBufferedBytes";
+  const inputBudgetFailureOk = firstBudgetFailure?.budget === "maxInputBytes";
   const deterministicBudgetFailure =
     JSON.stringify(firstBudgetFailure) === JSON.stringify(secondBudgetFailure);
 
-  const ok = deterministic && hasRequiredKinds && budgetFailureOk && deterministicBudgetFailure;
+  const ok = deterministic && hasRequiredKinds && inputBudgetFailureOk && deterministicBudgetFailure;
   return {
     ok,
     details: {
@@ -425,7 +425,7 @@ async function evaluateStreamTokenFeature() {
       kinds,
       hasRequiredKinds,
       deterministic,
-      budgetFailureOk,
+      inputBudgetFailureOk,
       deterministicBudgetFailure,
       firstBudgetFailure
     }
