@@ -5,7 +5,7 @@ import {
   applyPatchPlan,
   computePatch,
   parse,
-  PatchPlanningError,
+  HtmlPatchPlanningError,
   serialize
 } from "../../dist/mod.js";
 
@@ -141,9 +141,10 @@ test("computePatch rejects targets with non-input span provenance", () => {
   assert.throws(
     () => computePatch(original, [{ kind: "removeNode", target: impliedNode.id }]),
     (error) => {
-      assert.ok(error instanceof PatchPlanningError);
-      assert.equal(error.payload.code, "NON_INPUT_SPAN_PROVENANCE");
-      assert.equal(error.payload.detail, impliedNode.spanProvenance);
+      assert.ok(error instanceof HtmlPatchPlanningError);
+      assert.equal(error.code, "PATCH_PLANNING_FAILED");
+      assert.equal(error.reason, "NON_INPUT_SPAN_PROVENANCE");
+      assert.equal(error.detail, impliedNode.spanProvenance);
       return true;
     }
   );

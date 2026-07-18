@@ -1,3 +1,4 @@
+/** Deterministic numeric identifier assigned to a node within one parsed tree. */
 export type NodeId = number;
 
 export type NodeKind = "document" | "fragment" | "element" | "text" | "comment" | "doctype";
@@ -137,7 +138,7 @@ export interface TraceParseErrorEvent {
 export interface TraceBudgetEvent {
   readonly seq: number;
   readonly kind: "budget";
-  readonly budget: BudgetExceededPayload["budget"];
+  readonly budget: HtmlBudgetName;
   readonly limit: number | null;
   readonly actual: number;
   readonly status: "ok" | "exceeded";
@@ -340,19 +341,24 @@ export type Edit =
   | InsertHtmlBeforeEdit
   | InsertHtmlAfterEdit;
 
-export interface PatchPlanningErrorPayload {
-  readonly code:
-    | "NODE_NOT_FOUND"
-    | "MISSING_NODE_SPAN"
-    | "NON_INPUT_SPAN_PROVENANCE"
-    | "INVALID_EDIT_TARGET"
-    | "ATTRIBUTE_NOT_FOUND"
-    | "ATTRIBUTE_SPAN_MISSING"
-    | "ELEMENT_START_TAG_NOT_FOUND"
-    | "OVERLAPPING_EDITS";
-  readonly target?: NodeId;
-  readonly detail?: string;
-}
+/** Machine-readable reasons for rejecting parser configuration. */
+export type HtmlConfigurationErrorReason =
+  | "UNKNOWN_OPTION"
+  | "INVALID_VALUE"
+  | "CONFLICTING_OPTIONS";
+
+/** Machine-readable reasons a structural patch cannot be planned or applied. */
+export type HtmlPatchPlanningReason =
+  | "NODE_NOT_FOUND"
+  | "MISSING_NODE_SPAN"
+  | "NON_INPUT_SPAN_PROVENANCE"
+  | "INVALID_EDIT_TARGET"
+  | "ATTRIBUTE_NOT_FOUND"
+  | "ATTRIBUTE_SPAN_MISSING"
+  | "ELEMENT_START_TAG_NOT_FOUND"
+  | "OVERLAPPING_EDITS"
+  | "INVALID_PLAN_SLICE"
+  | "INVALID_PLAN_INSERTION";
 
 export interface PatchSliceStep {
   readonly kind: "slice";
@@ -373,16 +379,12 @@ export interface PatchPlan {
   readonly result: string;
 }
 
-export interface BudgetExceededPayload {
-  readonly code: "BUDGET_EXCEEDED";
-  readonly budget:
-    | "maxInputBytes"
-    | "maxBufferedBytes"
-    | "maxNodes"
-    | "maxDepth"
-    | "maxTraceEvents"
-    | "maxTraceBytes"
-    | "maxTimeMs";
-  readonly limit: number;
-  readonly actual: number;
-}
+/** Names of public resource budgets reported by budget failures and trace events. */
+export type HtmlBudgetName =
+  | "maxInputBytes"
+  | "maxBufferedBytes"
+  | "maxNodes"
+  | "maxDepth"
+  | "maxTraceEvents"
+  | "maxTraceBytes"
+  | "maxTimeMs";

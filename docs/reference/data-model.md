@@ -37,7 +37,10 @@ For JSR-only workflows, iterate over `children` recursively using node `kind` ch
 ## Errors And Budgets
 
 - Non-fatal parser issues are returned in `errors` with stable `parseErrorId` values.
-- Budget violations throw `BudgetExceededError`.
-- Patch planning failures throw `PatchPlanningError`.
+- Budget violations throw `HtmlBudgetExceededError`.
+- Invalid options and required arguments throw `HtmlConfigurationError`.
+- Patch planning/application failures throw `HtmlPatchPlanningError`.
+- Stream acquisition/read failures throw `HtmlStreamReadError` with the
+  original failure as `cause`.
 
 Budget controls live in `ParseOptions.budgets` and bound input bytes, nodes, depth, trace size, and parse time.

@@ -1,38 +1,47 @@
 # Error Model
 
-## `BudgetExceededError`
+Operational failures are thrown. HTML parse diagnostics remain deterministic
+entries in `DocumentTree.errors` or `FragmentTree.errors`; they are never
+returned wrappers for an exception.
 
-Thrown when configured budgets are exceeded.
+Use the exported structural guards at package boundaries. They classify by
+stable direct fields and therefore work across JavaScript realms and duplicate
+installed package copies, where `instanceof` may fail.
 
-Payload fields:
-- `code`: `"BUDGET_EXCEEDED"`
-- `budget`: which budget was exceeded (for example `maxNodes`)
-- `limit`: configured limit
-- `actual`: observed value
+| Class | Stable `code` | Direct fields |
+| --- | --- | --- |
+| `HtmlBudgetExceededError` | `BUDGET_EXCEEDED` | `budget`, `limit`, `actual` |
+| `HtmlConfigurationError` | `INVALID_CONFIGURATION` | `option`, `reason`, `expected` |
+| `HtmlPatchPlanningError` | `PATCH_PLANNING_FAILED` | `reason`, optional `target`, optional `detail` |
+| `HtmlStreamReadError` | `STREAM_READ_FAILED` | `cause` |
 
-## `PatchPlanningError`
+Instances and their direct fields are frozen. There is no nested `payload`
+object. `HtmlStreamReadError.cause` is the exact value thrown while acquiring or
+reading the source stream; cancellation or cleanup failures do not replace it.
+Budget, configuration, parse, callback, and patch failures retain their own
+categories and are not wrapped as stream-read failures.
 
-Thrown when patch planning cannot safely apply an edit.
-
-Payload fields:
-- `code`: stable machine-readable code
-- `target`: optional node id that caused the failure
-
-## Parse errors
-
-`parse`, `parseBytes`, `parseFragment`, and `parseStream` return parse-error arrays.
-Use `getParseErrorSpecRef(parseErrorId)` for stable spec references.
-
-## Handling pattern
+`HtmlConfigurationError.reason` is one of `UNKNOWN_OPTION`, `INVALID_VALUE`, or
+`CONFLICTING_OPTIONS`. `HtmlPatchPlanningError.reason` supplies the specific
+patch failure such as `NODE_NOT_FOUND`, `NON_INPUT_SPAN_PROVENANCE`,
+`OVERLAPPING_EDITS`, `INVALID_PLAN_SLICE`, or `INVALID_PLAN_INSERTION`.
 
 ```ts
-import { BudgetExceededError, PatchPlanningError, parse } from "@ismail-elkorchi/html-parser";
+import {
+  isHtmlBudgetExceededError,
+  isHtmlOperationalError,
+  parse
+} from "@ismail-elkorchi/html-parser";
 
 try {
   parse("<html>", { budgets: { maxNodes: 1 } });
 } catch (error) {
-  if (error instanceof BudgetExceededError || error instanceof PatchPlanningError) {
-    console.error(error.name);
+  if (isHtmlBudgetExceededError(error)) {
+    console.error(error.code, error.budget, error.limit, error.actual);
+  } else if (isHtmlOperationalError(error)) {
+    console.error(error.code);
+  } else {
+    throw error;
   }
 }
 ```

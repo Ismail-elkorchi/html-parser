@@ -27,6 +27,25 @@ import {
   visibleText as visibleTextInternal
 } from "../src/public/mod.ts";
 
+export {
+  HtmlBudgetExceededError,
+  HtmlConfigurationError,
+  HtmlPatchPlanningError,
+  HtmlStreamReadError,
+  isHtmlBudgetExceededError,
+  isHtmlConfigurationError,
+  isHtmlOperationalError,
+  isHtmlPatchPlanningError,
+  isHtmlStreamReadError
+} from "../src/public/errors.ts";
+export type { HtmlOperationalError } from "../src/public/errors.ts";
+export type {
+  HtmlBudgetName,
+  HtmlConfigurationErrorReason,
+  HtmlPatchPlanningReason,
+  NodeId
+} from "../src/public/types.ts";
+
 /**
  * Parse budget controls for bounding CPU/memory usage.
  */
@@ -190,7 +209,7 @@ export interface HtmlToken {
  * @param input HTML source text to parse.
  * @param options Parse controls for spans, tracing, and resource budgets.
  * @returns Parsed `DocumentTree` with nodes and non-fatal parse diagnostics.
- * @throws {Error} When parsing fails fatally or configured budgets are exceeded.
+ * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
  *
  * Security and limits:
  * - Use strict `budgets` for untrusted input.
@@ -218,7 +237,7 @@ export function parse(input: string, options: ParseOptions = {}): DocumentTree {
  * @param input UTF-8 or legacy-encoded bytes.
  * @param options Parse controls for encoding hints, tracing, and budgets.
  * @returns Parsed `DocumentTree` for decoded HTML input.
- * @throws {Error} When decoding/parsing fails or configured budgets are exceeded.
+ * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
  */
 export function parseBytes(input: Uint8Array, options: ParseOptions = {}): DocumentTree {
   return parseBytesInternal(input, options as Parameters<typeof parseBytesInternal>[1]);
@@ -232,7 +251,8 @@ export function parseBytes(input: Uint8Array, options: ParseOptions = {}): Docum
  * Use the real embedding element so recovery behavior matches browser fragment parsing.
  * @param options Parse controls for tracing and budgets.
  * @returns Parsed `FragmentTree` scoped to the requested context with non-fatal diagnostics.
- * @throws {Error} When context is invalid, parsing fails, or budgets are exceeded.
+ * @throws {HtmlConfigurationError} When the fragment context is invalid.
+ * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
  *
  * @example
  * ```ts
@@ -263,7 +283,8 @@ export function parseFragment(
  * `budgets.maxInputBytes` bounds the full stream and `budgets.maxBufferedBytes`
  * caps the encoding-prescan memory retained before decoding begins.
  * @returns Promise resolving to parsed `DocumentTree` with accumulated parse diagnostics.
- * @throws {Error} When stream reading/decoding/parsing fails or budgets are exceeded.
+ * @throws {HtmlStreamReadError} When acquiring or reading the stream fails.
+ * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
  *
  * @example
  * ```ts
@@ -334,7 +355,8 @@ export function visibleText(input: VisibleTextInput, options: VisibleTextOptions
  * @param input Stream of HTML bytes.
  * @param options Stream tokenization controls and budgets.
  * @returns Async iterator yielding parser-compatible HTML tokens in source order.
- * @throws {Error} When stream reading/decoding/tokenization fails or budgets are exceeded.
+ * @throws {HtmlStreamReadError} When acquiring or reading the stream fails.
+ * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
  */
 export async function* tokenizeStream(
   input: ReadableStream<Uint8Array>,

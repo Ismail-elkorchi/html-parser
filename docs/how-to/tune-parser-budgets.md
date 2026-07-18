@@ -10,7 +10,7 @@ forcing callers to guess where the parser will stop.
 
 ## Copy/paste
 ```ts
-import { BudgetExceededError, parse } from "@ismail-elkorchi/html-parser";
+import { isHtmlBudgetExceededError, parse } from "@ismail-elkorchi/html-parser";
 
 const html = "<div>".repeat(20_000);
 
@@ -26,8 +26,8 @@ function run(maxNodes: number) {
     });
     console.log(`maxNodes=${maxNodes}: ok`);
   } catch (error) {
-    if (error instanceof BudgetExceededError) {
-      console.log(`maxNodes=${maxNodes}: ${error.payload.code} ${error.payload.budget}`);
+    if (isHtmlBudgetExceededError(error)) {
+      console.log(`maxNodes=${maxNodes}: ${error.code} ${error.budget}`);
       return;
     }
     throw error;

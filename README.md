@@ -122,7 +122,7 @@ The Node.js package surface is verified against Node 20, 22, and 24.
 
 Parsing is not sanitization. For untrusted input:
 - set strict budgets,
-- handle `BudgetExceededError` explicitly,
+- classify `HtmlBudgetExceededError` with its structural guard,
 - sanitize separately before rendering.
 
 ## Documentation

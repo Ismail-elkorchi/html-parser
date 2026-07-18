@@ -36,7 +36,7 @@ ul
 
 ## Common failure modes
 - An `Error` when `contextTagName` is empty.
-- `BudgetExceededError` when `maxInputBytes`, `maxNodes`, or `maxDepth` is too
+- `HtmlBudgetExceededError` when `maxInputBytes`, `maxNodes`, or `maxDepth` is too
   low for the fragment.
 - Unexpected structure when the fragment is parsed with the wrong context, such
   as table cells parsed outside a table-like context.

@@ -12,20 +12,27 @@ Primary JSR runtime exports:
 - `serialize(input)`
 - `visibleText(input, options?)`
 - `tokenizeStream(stream, options?)`
+- `HtmlBudgetExceededError`, `HtmlConfigurationError`,
+  `HtmlPatchPlanningError`, `HtmlStreamReadError`
+- `isHtmlBudgetExceededError`, `isHtmlConfigurationError`,
+  `isHtmlPatchPlanningError`, `isHtmlStreamReadError`,
+  `isHtmlOperationalError`
 
 Primary JSR type exports:
 - `ParseBudgets`, `ParseOptions`, `TokenizeStreamOptions`
 - `DocumentTree`, `FragmentTree`, `HtmlNode`, `ParseError`
 - `VisibleTextOptions`, `SerializableHtml`, `VisibleTextInput`, `HtmlToken`
+- `HtmlOperationalError`, `HtmlBudgetName`,
+  `HtmlConfigurationErrorReason`, `HtmlPatchPlanningReason`, `NodeId`
 
 ## Node/npm Surface
 
 Node/npm type surface is shipped from `dist/mod.d.ts` (source: `src/public/mod.ts`).
 
-In addition to JSR exports, Node/npm includes:
+In addition to the shared parse and operational-error surface, Node/npm includes:
 - `visibleTextTokens(...)`
 - `visibleTextTokensWithProvenance(...)`
-- `BudgetExceededError`, `PatchPlanningError`, `getParseErrorSpecRef(parseErrorId)`
+- `getParseErrorSpecRef(parseErrorId)`
 - traversal/search helpers (`walk`, `walkElements`, `findById`, `findAllByTagName`, `findAllByAttr`, `textContent`)
 - structural helpers (`outline`, `chunk`)
 - patch planning helpers (`computePatch`, `applyPatchPlan`)
@@ -35,7 +42,8 @@ In addition to JSR exports, Node/npm includes:
 
 - JSR is intentionally slimmer for Deno/JSR consumers.
 - Node/npm exposes the broader authoring and transformation surface.
-- Both surfaces share the same parse model and option types where names overlap.
+- Both surfaces share the same parse model, operational error classes and
+  structural guards, and option types where names overlap.
 
 ## Related
 - [Options](./options.md)

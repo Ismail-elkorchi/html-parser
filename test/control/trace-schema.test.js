@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BudgetExceededError, parse, parseFragment } from "../../dist/mod.js";
+import { HtmlBudgetExceededError, parse, parseFragment } from "../../dist/mod.js";
 
 function tokenCount(result) {
   const event = result.trace?.find((entry) => entry.kind === "token");
@@ -93,8 +93,8 @@ test("trace is bounded by maxTraceEvents", () => {
   assert.throws(
     () => parse("<p>a</p>", { trace: true, budgets: { maxTraceEvents: 3, maxTraceBytes: 4096 } }),
     (error) => {
-      assert.ok(error instanceof BudgetExceededError);
-      assert.equal(error.payload.budget, "maxTraceEvents");
+      assert.ok(error instanceof HtmlBudgetExceededError);
+      assert.equal(error.budget, "maxTraceEvents");
       return true;
     }
   );
