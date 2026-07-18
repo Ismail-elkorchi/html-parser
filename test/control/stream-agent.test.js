@@ -135,7 +135,11 @@ test("parseStream cancels and releases its reader after budget failures", async 
     throw new Error("ReadableStream is unavailable in this runtime");
   }
 
-  for (const budgets of [{ maxInputBytes: 1 }, { maxBufferedBytes: -1 }]) {
+  for (const budgets of [
+    { maxInputBytes: 1 },
+    { maxBufferedBytes: -1 },
+    { maxBufferedBytes: Number.NaN }
+  ]) {
     let cancellationReason = null;
     const stream = new streamFactory({
       start(controller) {
