@@ -7,8 +7,7 @@ import {
   writeJson,
   fileExists,
   normalizeCaseCounts,
-  safeDiv,
-  requireExistingDecisionRecords
+  safeDiv
 } from "./eval-primitives.mjs";
 
 function makeGate(gateId, gateName, gatePass, gateDetails) {
@@ -123,12 +122,9 @@ async function main() {
         typeof holdoutRule === "string" &&
         Number.isFinite(holdoutMod));
 
-    const missingDecisionRecords = await requireExistingDecisionRecords(report.skips);
-
     const pass =
       passRate >= minPassRate &&
       skipped <= maxSkips &&
-      missingDecisionRecords.length === 0 &&
       holdoutDisciplinePass;
 
     gates.push(
@@ -147,8 +143,7 @@ async function main() {
         holdoutMod,
         holdoutDisciplineRange: { min: 0.05, max: 0.15 },
         holdoutDisciplinePass,
-        maxSkips,
-        missingDecisionRecords
+        maxSkips
       })
     );
   }

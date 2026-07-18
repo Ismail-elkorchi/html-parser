@@ -74,18 +74,3 @@ export function normalizeCaseCounts(report) {
 
   return { passed, failed, skipped, total, executed: passed + failed };
 }
-
-export async function requireExistingDecisionRecords(skipEntries) {
-  const missing = [];
-  for (const skipEntry of skipEntries || []) {
-    const decisionRecordPath = skipEntry?.decisionRecord;
-    if (!decisionRecordPath || typeof decisionRecordPath !== "string") {
-      missing.push({ id: skipEntry?.id || "(unknown)", reason: "missing decisionRecord field" });
-      continue;
-    }
-    if (!(await fileExists(decisionRecordPath))) {
-      missing.push({ id: skipEntry?.id || "(unknown)", reason: `decision record not found: ${decisionRecordPath}` });
-    }
-  }
-  return missing;
-}

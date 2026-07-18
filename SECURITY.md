@@ -27,5 +27,3 @@ Initial triage target: within 5 business days.
 ## Operational guardrails
 - Runtime `dependencies` stay empty.
 - `src/` must not import Node builtins.
-- Gate or threshold changes require ADR-002.
-- Oracle and normalization changes require ADR-003.

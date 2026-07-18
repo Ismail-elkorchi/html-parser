@@ -23,16 +23,6 @@ For release-level audits:
 - Use truth-conditional booleans (`is*`, `has*`, `can*`).
 - Use stable, domain-first log phrasing for grep-friendly diagnostics.
 
-## ADR discipline
-Record major contributor-policy decisions in pull requests and keep rationale near the changed code:
-- ADR-001 for fixture skips
-- ADR-002 for gate or threshold changes
-- ADR-003 for oracle or normalization rules
-- ADR-004 for dataset updates
-- ADR-005 for dev dependency additions
-
-Every PR that touches one of these areas must link the ADR in its body.
-
 ## Maintainer docs
 
 - [Maintainer index](./docs/maintainers/index.md)

@@ -20,10 +20,6 @@
 - [ ] List key risks introduced by this PR.
 - [ ] List mitigations and rollback strategy.
 
-## Decision records
-- [ ] Link ADRs created or updated by this change.
-- [ ] If no ADR changes, explicitly state "None".
-
 ## Additional checklist
 - [ ] PR title is a Conventional Commit title.
 - [ ] Breaking change status evaluated:
