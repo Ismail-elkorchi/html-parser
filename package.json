@@ -67,9 +67,6 @@
     "release:notes:dry-run": "node scripts/release/render-notes.mjs --dry-run",
     "changelog:update:dry-run": "node scripts/release/update-changelog.mjs --dry-run"
   },
-  "overrides": {
-    "ajv": "6.14.0"
-  },
   "dependencies": {},
   "devDependencies": {
     "@eslint/js": "10.0.1",
