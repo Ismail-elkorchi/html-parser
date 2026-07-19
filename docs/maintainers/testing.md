@@ -20,6 +20,8 @@ Use narrower commands while iterating:
 | Do owned sources satisfy lint rules? | `npm run lint` |
 | Do production TypeScript sources compile? | `npm run typecheck` |
 | Does the package build? | `npm run build` |
+| Do independent-engine foundation units pass? | `npm run test:engine:unit` |
+| Do independent-engine compile contracts pass? | `npm run test:engine:types` |
 | Do control and regression tests pass? | `npm test` |
 | Does the maintained WPT tree snapshot reproduce its frozen result? | `npm run test:wpt-tree` |
 | Does WPT retain every legacy tree case? | `npm run test:wpt-tree:coverage` |
@@ -31,6 +33,10 @@ Use narrower commands while iterating:
 Runtime tests currently use Node's test runner and live under `test/control`
 and `tests/control`. Build typechecking covers `src/**/*.ts`; do not assume a
 JavaScript test file is a TypeScript contract test.
+
+Independent-engine unit tests live under `test/engine`; compile-only positive
+and negative contracts live under `test/types`. The incomplete engine is built
+for repository tests but is deliberately absent from package artifacts.
 
 ## Parser semantics
 

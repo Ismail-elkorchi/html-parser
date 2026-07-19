@@ -69,6 +69,12 @@ The current large `src/public/mod.ts` and manually duplicated JSR declarations
 are migration debt, not templates. Until they are split, contract changes must
 update npm and JSR surfaces together and run both documentation/type checks.
 
+The replacement engine foundations live under `src/internal/html-engine` while
+they are incomplete. That subtree has no production importer, is excluded from
+npm and JSR artifacts, and is reachable only by repository tests. Its initial
+standards baseline is pinned in code so later implementation work cannot
+silently follow a moving Living Standard revision.
+
 ## Design rules
 
 - Standards conformance takes precedence over historical legacy behavior.

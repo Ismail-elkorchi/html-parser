@@ -58,6 +58,7 @@ async function main() {
   }
 
   const packageManifest = JSON.parse(await readFile("package.json", "utf8"));
+  const jsrManifest = JSON.parse(await readFile("jsr.json", "utf8"));
   const dependencyFieldValid =
     packageManifest.dependencies !== null &&
     typeof packageManifest.dependencies === "object" &&
@@ -140,6 +141,11 @@ async function main() {
     path: entry.path.replace(/^package\//, "")
   }));
   const normalizedPaths = archivedEntries.map((entry) => entry.path);
+  const unpublishedEngineIncluded = normalizedPaths.some((tarPath) =>
+    tarPath.startsWith("dist/internal/html-engine/")
+  );
+  const jsrEngineExcluded = Array.isArray(jsrManifest.exclude) &&
+    jsrManifest.exclude.includes("src/internal/html-engine/**");
 
   const forbiddenIncluded = normalizedPaths.filter((tarPath) =>
     forbiddenPrefixes.some((forbiddenPrefix) => tarPath.startsWith(forbiddenPrefix))
@@ -252,6 +258,8 @@ async function main() {
     thirdPartyNoticesIncluded &&
     legacyManifestIncluded &&
     embeddedLegacyImplementation.matchesSeal &&
+    !unpublishedEngineIncluded &&
+    jsrEngineExcluded &&
     missingDocumentation.length === 0;
 
   const report = {
@@ -270,6 +278,8 @@ async function main() {
     sourceLegacySeal,
     esmOnly,
     exportsOk,
+    unpublishedEngineIncluded,
+    jsrEngineExcluded,
     forbiddenIncluded,
     thirdPartyNoticesIncluded,
     legacyManifestIncluded,

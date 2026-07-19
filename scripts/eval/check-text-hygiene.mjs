@@ -17,6 +17,7 @@ const INCLUDED_PREFIXES = [
 
 const EXCLUDED_PREFIXES = [
   "vendor/",
+  "test/fixtures/upstream/wpt-tree-construction/resources/",
   "node_modules/",
   "tmp/",
   "dist/",
