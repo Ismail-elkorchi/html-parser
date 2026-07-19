@@ -109,12 +109,12 @@ async function writeDeterminism() {
 
   const documentHashes = [];
   for (let sampleIndex = 0; sampleIndex < 5; sampleIndex += 1) {
-    documentHashes.push(sha256(JSON.stringify(parse("<h1>alpha</h1>", { trace: true }))));
+    documentHashes.push(sha256(JSON.stringify(parse("<h1>alpha</h1>", { trace: "events" }))));
   }
 
   const fragmentHashes = [];
   for (let sampleIndex = 0; sampleIndex < 5; sampleIndex += 1) {
-    fragmentHashes.push(sha256(JSON.stringify(parseFragment("beta", "section", { captureSpans: true, trace: true }))));
+    fragmentHashes.push(sha256(JSON.stringify(parseFragment("beta", "section", { captureSpans: true, trace: "events" }))));
   }
 
   const uniqueDocumentHashes = [...new Set(documentHashes)];
@@ -202,11 +202,11 @@ async function writeBudgets() {
   });
 
   assertBudgetErrorSync(checks, "budget-max-trace-events", "maxTraceEvents", () => {
-    parse("abcdef", { trace: true, budgets: { maxTraceEvents: 2 } });
+    parse("abcdef", { trace: "events", budgets: { maxTraceEvents: 2 } });
   });
 
   assertBudgetErrorSync(checks, "budget-max-trace-bytes", "maxTraceBytes", () => {
-    parse("abcdef", { trace: true, budgets: { maxTraceBytes: 20 } });
+    parse("abcdef", { trace: "events", budgets: { maxTraceBytes: 20 } });
   });
 
   assertBudgetErrorSync(checks, "budget-max-time-ms", "maxTimeMs", () => {
@@ -231,9 +231,11 @@ async function writeBudgets() {
 
   const bufferedTree = await parseStream(
     makeReadableByteStream([new Uint8Array([0x41, 0x42, 0x43])]),
-    { trace: true, budgets: { maxEncodingPrescanBytes: 2 } }
+    { trace: "events", budgets: { maxEncodingPrescanBytes: 2 } }
   );
-  const bufferedStream = bufferedTree.trace.find((event) => event.kind === "stream");
+  const bufferedStream = bufferedTree.trace?.mode === "events"
+    ? bufferedTree.trace.events.find((event) => event.kind === "stream")
+    : undefined;
   checks.push({
     id: "stream-encoding-prescan-cap",
     ok: bufferedStream?.encodingPrescanBytes === 2 &&
@@ -281,10 +283,12 @@ async function writeStream() {
   const tiny = new Uint8Array(40).fill(0x61);
   const tinyChunks = [...tiny].map((value) => new Uint8Array([value]));
   const tinyTree = await parseStream(makeReadableByteStream(tinyChunks), {
-    trace: true,
+    trace: "events",
     budgets: { maxEncodingPrescanBytes: 16 }
   });
-  const observedStream = tinyTree.trace.find((event) => event.kind === "stream");
+  const observedStream = tinyTree.trace?.mode === "events"
+    ? tinyTree.trace.events.find((event) => event.kind === "stream")
+    : undefined;
 
   checks.push({
     id: "stream-encoding-prescan-high-water",
@@ -329,12 +333,12 @@ async function writeStream() {
 }
 
 async function writeAgent() {
-  const tracedDocument = parse("agent", { trace: true, budgets: { maxTraceEvents: 20, maxTraceBytes: 4096 } });
+  const tracedDocument = parse("agent", { trace: "events", budgets: { maxTraceEvents: 20, maxTraceBytes: 4096 } });
   const documentWithSpans = parse("agent", { captureSpans: true });
   const headingDocument = headingTree();
   const headingOutline = outline(headingDocument);
   const chunkPlan = chunk(headingDocument, { maxChars: 8, maxNodes: 2 });
-  const traceEvents = Array.isArray(tracedDocument.trace) ? tracedDocument.trace : [];
+  const traceEvents = tracedDocument.trace?.mode === "events" ? tracedDocument.trace.events : [];
   const requiredKinds = new Set(["decode", "token", "insertionModeTransition", "tree-mutation"]);
 
   const traceSchemaOk = traceEvents.every((event) => {

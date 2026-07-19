@@ -59,7 +59,7 @@ function fixture(name) {
       run(mod, input) {
         return mod.parse(
           input,
-          bounded ? { trace: true, budgets: { maxTraceEvents: 128 } } : { trace: true }
+          bounded ? { trace: "events", budgets: { maxTraceEvents: 128 } } : { trace: "events" }
         );
       },
       expectedBudget: "maxTraceEvents",

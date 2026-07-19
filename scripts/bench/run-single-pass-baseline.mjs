@@ -33,7 +33,8 @@ function round(value) {
 }
 
 function traceTokenCount(result) {
-  const event = result.trace?.find((entry) => entry.kind === "token");
+  const events = Array.isArray(result.trace) ? result.trace : result.trace?.events;
+  const event = events?.find((entry) => entry.kind === "token");
   if (!event || typeof event.count !== "number") {
     throw new Error("traced parse did not emit a numeric token count");
   }
@@ -120,9 +121,9 @@ const countFixtures = [
 const tokenCounts = countFixtures.map((fixture) => ({
   name: fixture.name,
   standaloneIncludingEof: tokenizerModule.tokenize(fixture.html).tokens.length,
-  documentIncludingEof: traceTokenCount(publicModule.parse(fixture.html, { trace: true })),
+  documentIncludingEof: traceTokenCount(publicModule.parse(fixture.html, { trace: "events" })),
   fragmentIncludingEof: traceTokenCount(
-    publicModule.parseFragment(fixture.html, fixture.fragmentContext, { trace: true })
+    publicModule.parseFragment(fixture.html, fixture.fragmentContext, { trace: "events" })
   ),
   fragmentContext: fixture.fragmentContext
 }));

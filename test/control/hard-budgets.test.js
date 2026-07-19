@@ -8,6 +8,7 @@ import {
   HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
+  chunk,
   isHtmlAbortError,
   isHtmlBudgetExceededError,
   isHtmlConfigurationError,
@@ -135,9 +136,9 @@ test("zero limits are valid and fail at the first unavailable unit", () => {
     assertBudget(error, "maxAttributeBytes", 0, 1));
   assert.throws(() => parse("", { budgets: { maxTimeMs: 0 } }), (error) =>
     assertBudget(error, "maxTimeMs", 0, 1));
-  assert.throws(() => parse("", { trace: true, budgets: { maxTraceEvents: 0 } }), (error) =>
+  assert.throws(() => parse("", { trace: "events", budgets: { maxTraceEvents: 0 } }), (error) =>
     assertBudget(error, "maxTraceEvents", 0, 1));
-  assert.throws(() => parse("", { trace: true, budgets: { maxTraceBytes: 0 } }), (error) =>
+  assert.throws(() => parse("", { trace: "events", budgets: { maxTraceBytes: 0 } }), (error) =>
     assertBudget(error, "maxTraceBytes", 0, 1));
 });
 
@@ -151,18 +152,18 @@ test("zero stream prescan retention is valid", async () => {
   assert.equal((await parseStream(stream, { budgets: { maxEncodingPrescanBytes: 0 } })).kind, "document");
 });
 
-test("trace staging stops during parser work instead of retaining an error storm", () => {
+test("trace retention stops during parser work instead of retaining an error storm", () => {
   const errorStorm = "\0".repeat(10_000);
   assert.throws(
     () => parse(errorStorm, {
-      trace: true,
+      trace: "events",
       budgets: { maxTraceEvents: 10, maxParseErrors: 1_000 }
     }),
     (error) => assertBudget(error, "maxTraceEvents", 10, 11)
   );
   assert.throws(
     () => parse(errorStorm, {
-      trace: true,
+      trace: "events",
       budgets: { maxTraceBytes: 1_024, maxParseErrors: 1_000 }
     }),
     (error) => assertBudget(error, "maxTraceBytes", 1_024, 1_025)
@@ -475,5 +476,28 @@ test("serialization, traversal, and extraction own independent zero deadlines", 
     () => walk(tree, () => {}, { maxTimeMs: 0 })
   ]) {
     assert.throws(operation, (error) => assertBudget(error, "maxTimeMs", 0, 1));
+  }
+});
+
+test("non-parse operations use one immutable option snapshot", () => {
+  const tree = parse("<main><p>x</p></main>");
+  const operations = [
+    (options) => serialize(tree, options),
+    (options) => visibleText(tree, options),
+    (options) => walk(tree, () => {}, options),
+    (options) => chunk(tree, options)
+  ];
+
+  for (const operation of operations) {
+    const reads = new Map();
+    const options = new Proxy({ maxTimeMs: 1_000 }, {
+      get(target, key, receiver) {
+        reads.set(String(key), (reads.get(String(key)) ?? 0) + 1);
+        return Reflect.get(target, key, receiver);
+      }
+    });
+    operation(options);
+    assert.ok(reads.size > 0);
+    assert.ok([...reads.values()].every((count) => count === 1));
   }
 });

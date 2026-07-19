@@ -26,12 +26,12 @@ import {
 } from "./errors.js";
 import {
   createOperationContext,
-  validateChunkOptions,
-  validateOperationOptions,
-  validateParseOptions,
-  validateParseStreamOptions,
-  validateTokenizeByteStreamEagerOptions,
-  validateVisibleTextOptions,
+  normalizeChunkOptions,
+  normalizeOperationOptions,
+  normalizeParseOptions,
+  normalizeParseStreamOptions,
+  normalizeTokenizeByteStreamEagerOptions,
+  normalizeVisibleTextOptions,
   type OperationContext
 } from "./operation.js";
 
@@ -63,6 +63,10 @@ import type {
   Token,
   TokenizeByteStreamEagerOptions,
   TraceEvent,
+  TraceEventCallback,
+  TraceMode,
+  TraceResult,
+  TraceSummary,
   VisibleTextOptions,
   VisibleTextToken,
   VisibleTextTokenSourceNodeKind,
@@ -111,8 +115,21 @@ export type {
   TokenAttribute,
   TokenizeByteStreamEagerBudgetOptions,
   TokenizeByteStreamEagerOptions,
+  TraceEventCallback,
+  TraceBudgetEvent,
+  TraceDecodeEvent,
+  TraceInsertionModeTransitionEvent,
+  TraceParseErrorEvent,
+  TraceStreamEvent,
+  TraceTokenEvent,
+  TraceTreeMutationEvent,
   TextNode,
   TraceEvent,
+  TraceEventsResult,
+  TraceMode,
+  TraceResult,
+  TraceSummary,
+  TraceSummaryResult,
   VisibleTextOptions,
   VisibleTextToken,
   VisibleTextTokenSourceNodeKind,
@@ -252,10 +269,6 @@ class DecodedUtf8BudgetCounter {
   }
 }
 
-function eventSize(event: TraceEvent): number {
-  return JSON.stringify(event).length;
-}
-
 type TraceEventInput =
   TraceEvent extends infer Event
     ? Event extends { readonly seq: number }
@@ -263,89 +276,116 @@ type TraceEventInput =
       : never
     : never;
 
-function pushTrace(
-  trace: TraceEvent[] | undefined,
-  event: TraceEventInput,
-  budgets: ParseOptions["budgets"] | undefined,
-  operation?: OperationContext
-): TraceEvent[] | undefined {
-  operation?.checkpoint();
-  if (!trace) {
-    return undefined;
+interface TraceFinalMetrics {
+  readonly tokenCount: number;
+  readonly nodeCount: number;
+  readonly maxDepth: number;
+  readonly parseErrorCount: number;
+  readonly encoding: TraceSummary["encoding"];
+  readonly inputBytes: number;
+  readonly decodedUtf8Bytes: number;
+  readonly bytesRead: number | null;
+  readonly encodingPrescanBytes: number | null;
+  readonly encodingPrescanLimitBytes: number | null;
+}
+
+function freezeTraceEvent(seq: number, input: TraceEventInput): TraceEvent {
+  if (input.kind === "insertionModeTransition") {
+    return Object.freeze({
+      seq,
+      ...input,
+      tokenContext: Object.freeze({ ...input.tokenContext })
+    });
   }
-
-  const nextEvent = {
-    seq: trace.length + 1,
-    ...event
-  } as TraceEvent;
-  const next = [...trace, nextEvent];
-  enforceBudget("maxTraceEvents", budgets?.maxTraceEvents, next.length);
-
-  const bytes = next.reduce((total, item) => total + eventSize(item), 0);
-  enforceBudget("maxTraceBytes", budgets?.maxTraceBytes, bytes);
-
-  return next;
+  return Object.freeze({ seq, ...input });
 }
 
-function pushBudgetTrace(
-  trace: TraceEvent[] | undefined,
-  budget: HtmlBudgetName,
-  limit: number | undefined,
-  actual: number,
-  budgets: ParseOptions["budgets"] | undefined,
-  operation?: OperationContext
-): TraceEvent[] | undefined {
-  return pushTrace(trace, {
-    kind: "budget",
-    budget,
-    limit: limit ?? null,
-    actual,
-    status: limit === undefined || actual <= limit ? "ok" : "exceeded"
-  }, budgets, operation);
-}
-
-class PendingTraceBudgetController {
-  readonly #enabled: boolean;
-  readonly #baseEventCount: number;
-  readonly #baseSize: number;
+class TraceSink {
+  readonly #mode: TraceMode;
+  readonly #callback: TraceEventCallback | undefined;
   readonly #budgets: ParseOptions["budgets"] | undefined;
   readonly #operation: OperationContext;
-  #pendingEventCount = 0;
-  #pendingSize = 0;
+  readonly #encoder = new TextEncoder();
+  readonly #events: TraceEvent[] | undefined;
+  readonly #eventKinds = new Set<TraceEvent["kind"]>();
+  #eventCount = 0;
+  #eventUtf8Bytes = 0;
 
   constructor(
-    trace: readonly TraceEvent[] | undefined,
+    mode: TraceMode,
+    callback: TraceEventCallback | undefined,
     budgets: ParseOptions["budgets"] | undefined,
     operation: OperationContext
   ) {
-    this.#enabled = trace !== undefined;
-    this.#baseEventCount = trace?.length ?? 0;
-    this.#baseSize = trace?.reduce((total, event) => total + eventSize(event), 0) ?? 0;
+    this.#mode = mode;
+    this.#callback = callback;
     this.#budgets = budgets;
     this.#operation = operation;
-    if (this.#enabled) {
-      // Token, tree-mutation, node-budget, and depth-budget events are always appended.
-      enforceBudget("maxTraceEvents", budgets?.maxTraceEvents, this.#baseEventCount + 4);
-    }
+    this.#events = mode === "events" ? [] : undefined;
   }
 
-  retain(value: unknown): void {
-    if (!this.#enabled) {
+  get active(): boolean {
+    return this.#mode !== "none" || this.#callback !== undefined;
+  }
+
+  emit(input: TraceEventInput): void {
+    if (!this.active) {
       return;
     }
     this.#operation.checkpoint();
-    this.#pendingEventCount += 1;
-    enforceBudget(
-      "maxTraceEvents",
-      this.#budgets?.maxTraceEvents,
-      this.#baseEventCount + 4 + this.#pendingEventCount
-    );
-    this.#pendingSize += JSON.stringify(value).length;
-    enforceBudget(
-      "maxTraceBytes",
-      this.#budgets?.maxTraceBytes,
-      this.#baseSize + this.#pendingSize
-    );
+    const event = freezeTraceEvent(this.#eventCount + 1, input);
+    const eventBytes = this.#mode === "none"
+      ? 0
+      : this.#encoder.encode(JSON.stringify(event)).byteLength;
+
+    if (this.#events !== undefined) {
+      enforceBudget("maxTraceEvents", this.#budgets?.maxTraceEvents, this.#events.length + 1);
+      enforceBudget(
+        "maxTraceBytes",
+        this.#budgets?.maxTraceBytes,
+        this.#eventUtf8Bytes + eventBytes
+      );
+      this.#events.push(event);
+    }
+
+    this.#eventCount += 1;
+    if (this.#mode !== "none") {
+      this.#eventUtf8Bytes += eventBytes;
+      this.#eventKinds.add(event.kind);
+    }
+    this.#callback?.(event);
+    this.#operation.checkpoint();
+  }
+
+  emitBudget(budget: HtmlBudgetName, limit: number | undefined, actual: number): void {
+    this.emit({
+      kind: "budget",
+      budget,
+      limit: limit ?? null,
+      actual,
+      status: limit === undefined || actual <= limit ? "ok" : "exceeded"
+    });
+  }
+
+  finish(metrics: TraceFinalMetrics): TraceResult | undefined {
+    if (this.#mode === "none") {
+      return undefined;
+    }
+    const summary: TraceSummary = Object.freeze({
+      ...metrics,
+      encoding: Object.freeze({ ...metrics.encoding }),
+      eventCount: this.#eventCount,
+      eventUtf8Bytes: this.#eventUtf8Bytes,
+      eventKinds: Object.freeze([...this.#eventKinds].sort())
+    });
+    if (this.#events === undefined) {
+      return Object.freeze({ mode: "summary", summary });
+    }
+    return Object.freeze({
+      mode: "events",
+      summary,
+      events: Object.freeze(this.#events)
+    });
   }
 }
 
@@ -677,7 +717,12 @@ function parseDocumentInternal(
   const captureSpans = options.captureSpans ?? false;
   const assigner = new NodeIdAssigner();
   const documentId = assigner.next();
-  let trace: TraceEvent[] | undefined = options.trace ? [] : undefined;
+  const traceSink = new TraceSink(
+    options.trace ?? "none",
+    options.onTraceEvent,
+    budgets,
+    operation
+  );
 
   operation.checkpoint();
   enforceBudget("maxInputBytes", budgets?.maxInputBytes, input.byteLength);
@@ -686,51 +731,33 @@ function parseDocumentInternal(
     budgets?.maxDecodedUtf8Bytes,
     input.decodedUtf8ByteLength
   );
-  trace = pushTrace(trace, {
+  traceSink.emit({
     kind: "decode",
     ...input.decode
-  }, budgets, operation);
+  });
   if (input.stream !== undefined) {
-    trace = pushTrace(trace, {
+    traceSink.emit({
       kind: "stream",
       bytesRead: input.stream.bytesRead,
       encodingPrescanBytes: input.stream.encodingPrescanBytes,
       encodingPrescanLimitBytes: input.stream.encodingPrescanLimitBytes
-    }, budgets, operation);
+    });
   }
-  trace = pushBudgetTrace(
-    trace,
+  traceSink.emitBudget(
     "maxInputBytes",
     budgets?.maxInputBytes,
-    input.byteLength,
-    budgets,
-    operation
+    input.byteLength
   );
-  const pendingTrace = new PendingTraceBudgetController(trace, budgets, operation);
 
   let tokenCount = 0;
   let previousTokenWasCharacter = false;
-
-  const insertionModeTransitions: {
-    readonly fromMode: string;
-    readonly toMode: string;
-    readonly tokenType: string | null;
-    readonly tokenTagName: string | null;
-    readonly tokenStartOffset: number | null;
-    readonly tokenEndOffset: number | null;
-  }[] = [];
-  const parseErrorTrace: {
-    readonly code: string;
-    readonly startOffset?: number;
-    readonly endOffset?: number;
-  }[] = [];
 
   const built = buildHtmlTree(html, budgets, {
     captureSpans,
     checkpoint(): void {
       operation.checkpoint();
     },
-    ...(trace
+    ...(traceSink.active
       ? {
           onToken(kind: "startTag" | "endTag" | "comment" | "doctype" | "character" | "eof"): void {
             if (kind !== "character" || !previousTokenWasCharacter) {
@@ -746,25 +773,38 @@ function parseDocumentInternal(
             readonly tokenStartOffset: number | null;
             readonly tokenEndOffset: number | null;
           }): void {
-            pendingTrace.retain(transition);
-            insertionModeTransitions.push(transition);
+            traceSink.emit({
+              kind: "insertionModeTransition",
+              fromMode: transition.fromMode,
+              toMode: transition.toMode,
+              tokenContext: {
+                type: transition.tokenType,
+                tagName: transition.tokenTagName,
+                startOffset: transition.tokenStartOffset,
+                endOffset: transition.tokenEndOffset
+              }
+            });
           },
           onParseError(error: {
             readonly code: string;
             readonly startOffset?: number;
             readonly endOffset?: number;
           }): void {
-            pendingTrace.retain(error);
-            parseErrorTrace.push(error);
+            traceSink.emit({
+              kind: "parseError",
+              parseErrorId: normalizeParseErrorId(error.code),
+              startOffset: typeof error.startOffset === "number" ? error.startOffset : null,
+              endOffset: typeof error.endOffset === "number" ? error.endOffset : null
+            });
           }
         }
       : {})
   });
 
-  trace = pushTrace(trace, {
+  traceSink.emit({
     kind: "token",
     count: tokenCount
-  }, budgets, operation);
+  });
 
   const children = built.document.children.map((node) =>
     convertTreeNode(node, assigner, captureSpans, operation)
@@ -774,47 +814,37 @@ function parseDocumentInternal(
 
   operation.checkpoint();
 
-  trace = pushTrace(trace, {
+  traceSink.emit({
     kind: "tree-mutation",
     nodeCount: totalNodes,
     errorCount: built.errors.length
-  }, budgets, operation);
-
-  for (const transition of insertionModeTransitions) {
-    operation.checkpoint();
-    trace = pushTrace(trace, {
-      kind: "insertionModeTransition",
-      fromMode: transition.fromMode,
-      toMode: transition.toMode,
-      tokenContext: {
-        type: transition.tokenType,
-        tagName: transition.tokenTagName,
-        startOffset: transition.tokenStartOffset,
-        endOffset: transition.tokenEndOffset
-      }
-    }, budgets, operation);
-  }
-
-  for (const treeError of parseErrorTrace) {
-    operation.checkpoint();
-    trace = pushTrace(trace, {
-      kind: "parseError",
-      parseErrorId: normalizeParseErrorId(treeError.code),
-      startOffset: typeof treeError.startOffset === "number" ? treeError.startOffset : null,
-      endOffset: typeof treeError.endOffset === "number" ? treeError.endOffset : null
-    }, budgets, operation);
-  }
-  trace = pushBudgetTrace(trace, "maxNodes", budgets?.maxNodes, totalNodes, budgets, operation);
-  trace = pushBudgetTrace(trace, "maxDepth", budgets?.maxDepth, metrics.maxDepth, budgets, operation);
+  });
+  traceSink.emitBudget("maxNodes", budgets?.maxNodes, totalNodes);
+  traceSink.emitBudget("maxDepth", budgets?.maxDepth, metrics.maxDepth);
 
   const errors = toParseErrors(built.errors, operation);
+  const trace = traceSink.finish({
+    tokenCount,
+    nodeCount: totalNodes,
+    maxDepth: metrics.maxDepth,
+    parseErrorCount: built.errors.length,
+    encoding: {
+      name: input.decode.encoding,
+      source: input.decode.sniffSource
+    },
+    inputBytes: input.byteLength,
+    decodedUtf8Bytes: input.decodedUtf8ByteLength,
+    bytesRead: input.stream?.bytesRead ?? null,
+    encodingPrescanBytes: input.stream?.encodingPrescanBytes ?? null,
+    encodingPrescanLimitBytes: input.stream?.encodingPrescanLimitBytes ?? null
+  });
 
   return {
     id: documentId,
     kind: "document",
     children,
     errors,
-    ...(trace ? { trace } : {})
+    ...(trace === undefined ? {} : { trace })
   };
 }/**
  * Parses input deterministically for the `parse` public API.
@@ -823,13 +853,13 @@ function parseDocumentInternal(
 
 export function parse(html: string, options: ParseOptions = {}): DocumentTree {
   const startedAt = performance.now();
-  validateParseOptions(options);
+  const normalizedOptions = normalizeParseOptions(options);
   requireString(html, "input");
-  const operation = parseOperationContext(options, startedAt);
+  const operation = parseOperationContext(normalizedOptions, startedAt);
   operation.checkpoint();
   const input = stringInputContext(html, operation);
   operation.checkpoint();
-  return parseDocumentInternal(html, options, input);
+  return parseDocumentInternal(html, normalizedOptions, input);
 }/**
  * Parses input deterministically for the `parseBytes` public API.
  */
@@ -837,22 +867,22 @@ export function parse(html: string, options: ParseOptions = {}): DocumentTree {
 
 export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): DocumentTree {
   const startedAt = performance.now();
-  validateParseOptions(options);
+  const normalizedOptions = normalizeParseOptions(options);
   requireByteArray(bytes, "input");
-  const operation = parseOperationContext(options, startedAt);
+  const operation = parseOperationContext(normalizedOptions, startedAt);
   operation.checkpoint();
-  enforceBudget("maxInputBytes", options.budgets?.maxInputBytes, bytes.byteLength);
+  enforceBudget("maxInputBytes", normalizedOptions.budgets?.maxInputBytes, bytes.byteLength);
 
   const decodedBudget = new DecodedUtf8BudgetCounter(
-    options.budgets?.maxDecodedUtf8Bytes,
+    normalizedOptions.budgets?.maxDecodedUtf8Bytes,
     operation
   );
 
   const decoded = decodeHtmlBytes(
     bytes,
     {
-      ...(options.transportEncodingLabel
-        ? { transportEncodingLabel: options.transportEncodingLabel }
+      ...(normalizedOptions.transportEncodingLabel
+        ? { transportEncodingLabel: normalizedOptions.transportEncodingLabel }
         : {}),
       onDecodedChunk(chunk): void {
         decodedBudget.append(chunk);
@@ -861,7 +891,7 @@ export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): Docum
   );
   operation.checkpoint();
 
-  return parseDocumentInternal(decoded.text, options, {
+  return parseDocumentInternal(decoded.text, normalizedOptions, {
     byteLength: bytes.byteLength,
     decodedUtf8ByteLength: decodedBudget.bytes,
     operation,
@@ -882,11 +912,11 @@ export function parseFragment(
   options: ParseOptions = {}
 ): FragmentTree {
   const startedAt = performance.now();
-  validateParseOptions(options);
+  const normalizedOptions = normalizeParseOptions(options);
   requireString(html, "input");
   requireString(contextTagName, "contextTagName");
-  const budgets = options.budgets;
-  const captureSpans = options.captureSpans ?? false;
+  const budgets = normalizedOptions.budgets;
+  const captureSpans = normalizedOptions.captureSpans ?? false;
   const normalizedContext = contextTagName.trim().toLowerCase();
 
   if (normalizedContext.length === 0) {
@@ -897,7 +927,7 @@ export function parseFragment(
     );
   }
 
-  const operation = parseOperationContext(options, startedAt);
+  const operation = parseOperationContext(normalizedOptions, startedAt);
   operation.checkpoint();
 
   const inputByteLength = utf8ByteLength(html);
@@ -906,40 +936,27 @@ export function parseFragment(
 
   const assigner = new NodeIdAssigner();
   const fragmentId = assigner.next();
-  let trace: TraceEvent[] | undefined = options.trace ? [] : undefined;
+  const traceSink = new TraceSink(
+    normalizedOptions.trace ?? "none",
+    normalizedOptions.onTraceEvent,
+    budgets,
+    operation
+  );
 
-  trace = pushTrace(trace, {
+  traceSink.emit({
     kind: "decode",
     source: "input",
     encoding: "utf-8",
     sniffSource: "input"
-  }, budgets, operation);
-  trace = pushBudgetTrace(
-    trace,
+  });
+  traceSink.emitBudget(
     "maxInputBytes",
     budgets?.maxInputBytes,
-    inputByteLength,
-    budgets,
-    operation
+    inputByteLength
   );
-  const pendingTrace = new PendingTraceBudgetController(trace, budgets, operation);
 
   let tokenCount = 0;
   let previousTokenWasCharacter = false;
-
-  const insertionModeTransitions: {
-    readonly fromMode: string;
-    readonly toMode: string;
-    readonly tokenType: string | null;
-    readonly tokenTagName: string | null;
-    readonly tokenStartOffset: number | null;
-    readonly tokenEndOffset: number | null;
-  }[] = [];
-  const parseErrorTrace: {
-    readonly code: string;
-    readonly startOffset?: number;
-    readonly endOffset?: number;
-  }[] = [];
 
   const built = buildHtmlTree(html, budgets, {
     fragmentContextTagName: normalizedContext,
@@ -947,7 +964,7 @@ export function parseFragment(
     checkpoint(): void {
       operation.checkpoint();
     },
-    ...(trace
+    ...(traceSink.active
       ? {
           onToken(kind: "startTag" | "endTag" | "comment" | "doctype" | "character" | "eof"): void {
             if (kind !== "character" || !previousTokenWasCharacter) {
@@ -963,25 +980,38 @@ export function parseFragment(
             readonly tokenStartOffset: number | null;
             readonly tokenEndOffset: number | null;
           }): void {
-            pendingTrace.retain(transition);
-            insertionModeTransitions.push(transition);
+            traceSink.emit({
+              kind: "insertionModeTransition",
+              fromMode: transition.fromMode,
+              toMode: transition.toMode,
+              tokenContext: {
+                type: transition.tokenType,
+                tagName: transition.tokenTagName,
+                startOffset: transition.tokenStartOffset,
+                endOffset: transition.tokenEndOffset
+              }
+            });
           },
           onParseError(error: {
             readonly code: string;
             readonly startOffset?: number;
             readonly endOffset?: number;
           }): void {
-            pendingTrace.retain(error);
-            parseErrorTrace.push(error);
+            traceSink.emit({
+              kind: "parseError",
+              parseErrorId: normalizeParseErrorId(error.code),
+              startOffset: typeof error.startOffset === "number" ? error.startOffset : null,
+              endOffset: typeof error.endOffset === "number" ? error.endOffset : null
+            });
           }
         }
       : {})
   });
 
-  trace = pushTrace(trace, {
+  traceSink.emit({
     kind: "token",
     count: tokenCount
-  }, budgets, operation);
+  });
 
   const children = built.document.children.map((node) =>
     convertTreeNode(node, assigner, captureSpans, operation)
@@ -991,40 +1021,27 @@ export function parseFragment(
 
   operation.checkpoint();
 
-  trace = pushTrace(trace, {
+  traceSink.emit({
     kind: "tree-mutation",
     nodeCount: totalNodes,
     errorCount: built.errors.length
-  }, budgets, operation);
-
-  for (const transition of insertionModeTransitions) {
-    operation.checkpoint();
-    trace = pushTrace(trace, {
-      kind: "insertionModeTransition",
-      fromMode: transition.fromMode,
-      toMode: transition.toMode,
-      tokenContext: {
-        type: transition.tokenType,
-        tagName: transition.tokenTagName,
-        startOffset: transition.tokenStartOffset,
-        endOffset: transition.tokenEndOffset
-      }
-    }, budgets, operation);
-  }
-
-  for (const treeError of parseErrorTrace) {
-    operation.checkpoint();
-    trace = pushTrace(trace, {
-      kind: "parseError",
-      parseErrorId: normalizeParseErrorId(treeError.code),
-      startOffset: typeof treeError.startOffset === "number" ? treeError.startOffset : null,
-      endOffset: typeof treeError.endOffset === "number" ? treeError.endOffset : null
-    }, budgets, operation);
-  }
-  trace = pushBudgetTrace(trace, "maxNodes", budgets?.maxNodes, totalNodes, budgets, operation);
-  trace = pushBudgetTrace(trace, "maxDepth", budgets?.maxDepth, metrics.maxDepth, budgets, operation);
+  });
+  traceSink.emitBudget("maxNodes", budgets?.maxNodes, totalNodes);
+  traceSink.emitBudget("maxDepth", budgets?.maxDepth, metrics.maxDepth);
 
   const errors = toParseErrors(built.errors, operation);
+  const trace = traceSink.finish({
+    tokenCount,
+    nodeCount: totalNodes,
+    maxDepth: metrics.maxDepth,
+    parseErrorCount: built.errors.length,
+    encoding: { name: "utf-8", source: "input" },
+    inputBytes: inputByteLength,
+    decodedUtf8Bytes: inputByteLength,
+    bytesRead: null,
+    encodingPrescanBytes: null,
+    encodingPrescanLimitBytes: null
+  });
 
   return {
     id: fragmentId,
@@ -1032,7 +1049,7 @@ export function parseFragment(
     contextTagName: normalizedContext,
     children,
     errors,
-    ...(trace ? { trace } : {})
+    ...(trace === undefined ? {} : { trace })
   };
 }
 
@@ -1319,11 +1336,15 @@ export async function tokenizeByteStreamEager(
   options: TokenizeByteStreamEagerOptions = {}
 ): Promise<readonly Token[]> {
   const startedAt = performance.now();
-  validateTokenizeByteStreamEagerOptions(options);
+  const normalizedOptions = normalizeTokenizeByteStreamEagerOptions(options);
   requireReadableByteStream(stream, "input");
-  const operation = createOperationContext(options.budgets?.maxTimeMs, options.signal, startedAt);
+  const operation = createOperationContext(
+    normalizedOptions.budgets?.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
-  return tokenizeDecodedByteStreamEager(stream, options, operation);
+  return tokenizeDecodedByteStreamEager(stream, normalizedOptions, operation);
 }/**
  * Reads and decodes a byte stream through EOF, releases its reader, and then
  * parses the buffered document deterministically.
@@ -1335,12 +1356,12 @@ export async function parseStream(
   options: ParseStreamOptions = {}
 ): Promise<DocumentTree> {
   const startedAt = performance.now();
-  validateParseStreamOptions(options);
+  const normalizedOptions = normalizeParseStreamOptions(options);
   requireReadableByteStream(stream, "input");
-  const operation = parseOperationContext(options, startedAt);
+  const operation = parseOperationContext(normalizedOptions, startedAt);
   operation.checkpoint();
-  const decoded = await decodeStreamToText(stream, options, operation);
-  return parseDocumentInternal(decoded.text, options, {
+  const decoded = await decodeStreamToText(stream, normalizedOptions, operation);
+  return parseDocumentInternal(decoded.text, normalizedOptions, {
     byteLength: decoded.totalBytes,
     decodedUtf8ByteLength: decoded.decodedUtf8Bytes,
     operation,
@@ -1403,8 +1424,12 @@ export function serialize(
   options: OperationOptions = {}
 ): string {
   const startedAt = performance.now();
-  validateOperationOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeOperationOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   if (tree.kind === "document" || tree.kind === "fragment") {
     return tree.children.map((child) => serializeNode(child, operation)).join("");
@@ -2096,16 +2121,20 @@ function tokenizeVisibleText(value: string, operation: OperationContext): readon
 
 export function visibleText(nodeOrTree: DocumentTree | FragmentTree | HtmlNode, options: VisibleTextOptions = {}): string {
   const startedAt = performance.now();
-  validateVisibleTextOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeVisibleTextOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   const resolvedOptions: ResolvedVisibleTextOptions = {
     ...DEFAULT_VISIBLE_TEXT_OPTIONS,
-    skipHiddenSubtrees: options.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
-    includeControlValues: options.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
+    skipHiddenSubtrees: normalizedOptions.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
+    includeControlValues: normalizedOptions.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
     includeAccessibleNameFallback:
-      options.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
-    trim: options.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
+      normalizedOptions.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
+    trim: normalizedOptions.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
     operation
   };
   return collectVisibleText(nodeOrTree, resolvedOptions);
@@ -2119,16 +2148,20 @@ export function visibleTextTokens(
   options: VisibleTextOptions = {}
 ): readonly VisibleTextToken[] {
   const startedAt = performance.now();
-  validateVisibleTextOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeVisibleTextOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   const resolvedOptions: ResolvedVisibleTextOptions = {
     ...DEFAULT_VISIBLE_TEXT_OPTIONS,
-    skipHiddenSubtrees: options.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
-    includeControlValues: options.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
+    skipHiddenSubtrees: normalizedOptions.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
+    includeControlValues: normalizedOptions.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
     includeAccessibleNameFallback:
-      options.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
-    trim: options.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
+      normalizedOptions.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
+    trim: normalizedOptions.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
     operation
   };
   return tokenizeVisibleText(collectVisibleText(nodeOrTree, resolvedOptions), operation);
@@ -2142,16 +2175,20 @@ export function visibleTextTokensWithProvenance(
   options: VisibleTextOptions = {}
 ): readonly VisibleTextTokenWithProvenance[] {
   const startedAt = performance.now();
-  validateVisibleTextOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeVisibleTextOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   const resolvedOptions: ResolvedVisibleTextOptions = {
     ...DEFAULT_VISIBLE_TEXT_OPTIONS,
-    skipHiddenSubtrees: options.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
-    includeControlValues: options.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
+    skipHiddenSubtrees: normalizedOptions.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
+    includeControlValues: normalizedOptions.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
     includeAccessibleNameFallback:
-      options.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
-    trim: options.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
+      normalizedOptions.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
+    trim: normalizedOptions.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
     operation
   };
   const { output, sourceChunks } = collectVisibleTextWithSourceChunks(nodeOrTree, resolvedOptions);
@@ -2203,8 +2240,12 @@ export function walk(
   options: OperationOptions = {}
 ): void {
   const startedAt = performance.now();
-  validateOperationOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeOperationOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   for (const entry of iterateNodes(tree.children, 0, operation)) {
     visitor(entry.node, entry.depth);
@@ -2221,8 +2262,12 @@ export function walkElements(
   options: OperationOptions = {}
 ): void {
   const startedAt = performance.now();
-  validateOperationOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeOperationOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   for (const entry of iterateNodes(tree.children, 0, operation)) {
     if (entry.node.kind === "element") {
@@ -2240,8 +2285,12 @@ export function textContent(
   options: OperationOptions = {}
 ): string {
   const startedAt = performance.now();
-  validateOperationOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeOperationOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   return textContentFromNode(node, operation);
 }/**
@@ -2255,8 +2304,12 @@ export function findById(
   options: OperationOptions = {}
 ): HtmlNode | null {
   const startedAt = performance.now();
-  validateOperationOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeOperationOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   for (const entry of iterateNodes(tree.children, 0, operation)) {
     if (entry.node.id === id) {
@@ -2290,8 +2343,12 @@ export function findAllByTagName(
   options: OperationOptions = {}
 ): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
   const startedAt = performance.now();
-  validateOperationOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeOperationOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   return findAllByTagNameIterator(tree, tagName, operation);
 }/**
@@ -2327,8 +2384,12 @@ export function findAllByAttr(
   options: OperationOptions = {}
 ): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
   const startedAt = performance.now();
-  validateOperationOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeOperationOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   return findAllByAttrIterator(tree, name, value, operation);
 }
@@ -2367,8 +2428,12 @@ export function outline(
   options: OperationOptions = {}
 ): Outline {
   const startedAt = performance.now();
-  validateOperationOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeOperationOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
   const entries: OutlineEntry[] = [];
   for (const child of tree.children) {
@@ -2779,12 +2844,16 @@ export function computePatch(originalHtml: string, edits: readonly Edit[]): Patc
 
 export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions = {}): Chunk[] {
   const startedAt = performance.now();
-  validateChunkOptions(options);
-  const operation = createOperationContext(options.maxTimeMs, options.signal, startedAt);
+  const normalizedOptions = normalizeChunkOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
-  const maxChars = options.maxChars ?? 8192;
-  const maxNodes = options.maxNodes ?? 256;
-  const maxBytes = options.maxBytes ?? Number.POSITIVE_INFINITY;
+  const maxChars = normalizedOptions.maxChars ?? 8192;
+  const maxNodes = normalizedOptions.maxNodes ?? 256;
+  const maxBytes = normalizedOptions.maxBytes ?? Number.POSITIVE_INFINITY;
   const textEncoder = new TextEncoder();
   const chunks: Chunk[] = [];
   let activeContent = "";

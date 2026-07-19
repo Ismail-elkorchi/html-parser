@@ -64,10 +64,11 @@ test("parseStream decodes deterministic output", async () => {
 test("parseStream caps encoding-prescan memory without rejecting the remainder", async () => {
   const stream = createByteStream([new Uint8Array([0x61, 0x62, 0x63])]);
   const parsed = await parseStream(stream, {
-    trace: true,
+    trace: "events",
     budgets: { maxEncodingPrescanBytes: 2 }
   });
-  const streamTrace = parsed.trace.find((event) => event.kind === "stream");
+  assert.equal(parsed.trace?.mode, "events");
+  const streamTrace = parsed.trace.events.find((event) => event.kind === "stream");
   assert.equal(streamTrace?.encodingPrescanBytes, 2);
   assert.equal(streamTrace?.encodingPrescanLimitBytes, 2);
 });
@@ -75,8 +76,9 @@ test("parseStream caps encoding-prescan memory without rejecting the remainder",
 test("stream encoding prescan uses its documented implementation maximum", async () => {
   const bytes = new Uint8Array(20_000).fill(0x61);
   for (const budgets of [{}, { maxEncodingPrescanBytes: 50_000 }]) {
-    const parsed = await parseStream(createByteStream([bytes]), { trace: true, budgets });
-    const event = parsed.trace.find((entry) => entry.kind === "stream");
+    const parsed = await parseStream(createByteStream([bytes]), { trace: "events", budgets });
+    assert.equal(parsed.trace?.mode, "events");
+    const event = parsed.trace.events.find((entry) => entry.kind === "stream");
     assert.equal(event?.encodingPrescanBytes, 16_384);
     assert.equal(event?.encodingPrescanLimitBytes, 16_384);
   }
@@ -89,7 +91,7 @@ test("parseStream budget outcome is independent of upstream chunk boundaries", a
     chunks.push(bytes.subarray(offset, offset + 1_024));
   }
 
-  const options = { trace: true, budgets: { maxInputBytes: 30_000, maxEncodingPrescanBytes: 16_384 } };
+  const options = { trace: "events", budgets: { maxInputBytes: 30_000, maxEncodingPrescanBytes: 16_384 } };
   const chunked = await parseStream(createByteStream(chunks), options);
   const single = await parseStream(createByteStream([bytes]), options);
   assert.deepEqual(chunked, single);
@@ -223,12 +225,13 @@ test("eager stream results remain unobservable until EOF", async () => {
 
 test("byte and stream traces contain one truthful decode event", async () => {
   const bytes = new Uint8Array([0x3c, 0x70, 0x3e, 0xe9, 0x3c, 0x2f, 0x70, 0x3e]);
-  const options = { trace: true, transportEncodingLabel: "windows-1252" };
+  const options = { trace: "events", transportEncodingLabel: "windows-1252" };
   const fromBytes = parseBytes(bytes, options);
   const fromStream = await parseStream(createByteStream([bytes]), options);
 
   for (const tree of [fromBytes, fromStream]) {
-    const decodeEvents = tree.trace.filter((event) => event.kind === "decode");
+    assert.equal(tree.trace?.mode, "events");
+    const decodeEvents = tree.trace.events.filter((event) => event.kind === "decode");
     assert.equal(decodeEvents.length, 1);
     assert.equal(decodeEvents[0].source, "sniff");
     assert.equal(decodeEvents[0].encoding, "windows-1252");

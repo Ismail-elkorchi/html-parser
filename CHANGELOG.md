@@ -3,6 +3,9 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Replace boolean trace capture with explicit none/summary/events modes, a
+  synchronous immutable event observer, exact canonical UTF-8 retention
+  budgets, and a linear append-only trace pipeline.
 - Rename the stream encoding-prefix control to
   `maxEncodingPrescanBytes`, separate stream-specific option types from
   non-stream parse options, and report prescan high-water data on stream traces.

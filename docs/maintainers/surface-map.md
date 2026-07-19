@@ -15,4 +15,7 @@ Both roots expose distinct non-stream and stream option types, the
 `tokenizeByteStreamEager()` contract. Node calls the budget types
 `ParseBudgetOptions` and `ParseStreamBudgetOptions`; JSR uses `ParseBudgets` and
 `ParseStreamBudgets` while preserving identical fields and semantics.
+Both roots also expose the same `TraceMode`, immutable event callback, summary,
+and discriminated trace-result types. Event-retention budgets are accepted only
+for `trace: "events"`.
 See `docs/reference/api-overview.md` for the current parity notes.

@@ -168,10 +168,11 @@ const parityFixture = new Uint8Array([
 let prescanCap;
 try {
   const tree = await parseStream(createByteStream([encoder.encode("abcdef")]), {
-    trace: true,
+    trace: "events",
     budgets: { [prescanBudgetName]: 2 }
   });
-  const event = tree.trace?.find((entry) => usesEagerApi
+  const traceEvents = Array.isArray(tree.trace) ? tree.trace : tree.trace?.events;
+  const event = traceEvents?.find((entry) => usesEagerApi
     ? entry.kind === "stream"
     : entry.kind === "budget" && entry.budget === prescanBudgetName);
   prescanCap = {

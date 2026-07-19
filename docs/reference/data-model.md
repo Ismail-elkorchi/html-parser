@@ -6,13 +6,15 @@
 - `kind: "document"`
 - `children: HtmlNode[]`
 - `errors: ParseError[]`
-- optional `trace: TraceEvent[]`
+- optional `trace: TraceResult`, containing either a constant-shape summary or
+  that summary plus an immutable event sequence
 
 `parseFragment` returns a `FragmentTree` with the same structure but `kind: "fragment"`.
 
-When tracing is enabled, the token event reports the number of logical tokens
-emitted to the tree builder, coalescing adjacent character chunks and including
-EOF. Fragment token counts reflect the supplied fragment context.
+The trace summary's `tokenCount` and the retained token event report the number
+of logical tokens emitted to the tree builder, coalescing adjacent character
+chunks and including EOF. Fragment token counts reflect the supplied fragment
+context.
 
 ## Core Node Types
 

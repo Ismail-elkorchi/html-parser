@@ -88,6 +88,8 @@ async function runBrowserSmoke(baseUrl) {
       };
 
       const parsed = mod.parse(sampleHtml, { captureSpans: true });
+      const traceSummary = mod.parse(sampleHtml, { trace: "summary" }).trace;
+      const secondTraceSummary = mod.parse(sampleHtml, { trace: "summary" }).trace;
       const serialized = mod.serialize(parsed);
       const parsedBytes = mod.parseBytes(new TextEncoder().encode(sampleHtml));
       const bytesSerialized = mod.serialize(parsedBytes);
@@ -139,6 +141,11 @@ async function runBrowserSmoke(baseUrl) {
         parseBytes: bytesSerialized.includes("<p>smoke</p>"),
         parseStream: streamSerialized.includes("<p>smoke</p>"),
         parseFragment: fragment.contextTagName === "section",
+        traceSummary: traceSummary?.mode === "summary" &&
+          !("events" in traceSummary) &&
+          traceSummary.summary.eventCount > 0 &&
+          traceSummary.summary.eventKinds.includes("token") &&
+          JSON.stringify(traceSummary) === JSON.stringify(secondTraceSummary),
         tokenizeByteStreamEager: tokenKinds.includes("startTag") && tokenKinds.includes("endTag"),
         errorGuards: typeof mod.isHtmlBudgetExceededError === "function" &&
           mod.isHtmlBudgetExceededError(budgetError) &&

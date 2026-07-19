@@ -40,9 +40,9 @@ export interface ParseBudgetOptions {
   readonly maxAttributesPerElement?: number;
   /** UTF-8 bytes in attempted attribute names and decoded values on one start tag. */
   readonly maxAttributeBytes?: number;
-  /** Trace events retained when tracing is enabled. */
+  /** Retained trace events; valid only with `trace: "events"`. */
   readonly maxTraceEvents?: number;
-  /** Serialized trace bytes retained when tracing is enabled. */
+  /** Canonical retained-event UTF-8 bytes; valid only with `trace: "events"`. */
   readonly maxTraceBytes?: number;
   /** Elapsed milliseconds measured by the monotonic runtime clock. */
   readonly maxTimeMs?: number;
@@ -51,7 +51,10 @@ export interface ParseBudgetOptions {
 /** Options accepted by text, byte, and fragment parse entrypoints. */
 export interface ParseOptions {
   readonly captureSpans?: boolean;
-  readonly trace?: boolean;
+  /** Returned trace retention mode; defaults to `"none"`. */
+  readonly trace?: TraceMode;
+  /** Synchronously observes each immutable trace event without requiring retention. */
+  readonly onTraceEvent?: TraceEventCallback;
   readonly transportEncodingLabel?: string;
   readonly budgets?: ParseBudgetOptions;
   readonly signal?: AbortSignal;
@@ -142,59 +145,100 @@ export type Token =
   | DoctypeToken
   | EofToken;
 
+/** Encoding decision for one parse input. */
 export interface TraceDecodeEvent {
+  /** One-based event order within this parse. */
   readonly seq: number;
+  /** Event discriminator. */
   readonly kind: "decode";
+  /** Whether text was supplied directly or decoded after sniffing. */
   readonly source: "input" | "sniff";
+  /** Selected WHATWG encoding name. */
   readonly encoding: string;
+  /** Evidence source that selected the encoding. */
   readonly sniffSource: "input" | "bom" | "transport" | "meta" | "default";
 }
 
+/** Logical tokenizer output count for the parse5 pass that built the tree. */
 export interface TraceTokenEvent {
+  /** One-based event order within this parse. */
   readonly seq: number;
+  /** Event discriminator. */
   readonly kind: "token";
+  /** Context-aware logical token count, including EOF. */
   readonly count: number;
 }
 
+/** Parser insertion-mode transition and the token that caused it. */
 export interface TraceInsertionModeTransitionEvent {
+  /** One-based event order within this parse. */
   readonly seq: number;
+  /** Event discriminator. */
   readonly kind: "insertionModeTransition";
+  /** Insertion mode before the transition. */
   readonly fromMode: string;
+  /** Insertion mode after the transition. */
   readonly toMode: string;
+  /** Immutable parser-token context for the transition. */
   readonly tokenContext: {
+    /** Internal token category, or null when unavailable. */
     readonly type: string | null;
+    /** Token tag name, or null for non-tag tokens. */
     readonly tagName: string | null;
+    /** Inclusive source start offset, or null when unavailable. */
     readonly startOffset: number | null;
+    /** Exclusive source end offset, or null when unavailable. */
     readonly endOffset: number | null;
   };
 }
 
+/** Aggregate public-tree construction result. */
 export interface TraceTreeMutationEvent {
+  /** One-based event order within this parse. */
   readonly seq: number;
+  /** Event discriminator. */
   readonly kind: "tree-mutation";
+  /** Public root plus descendant node count. */
   readonly nodeCount: number;
+  /** Parser diagnostic count. */
   readonly errorCount: number;
 }
 
+/** Non-fatal HTML parse diagnostic observed during tree construction. */
 export interface TraceParseErrorEvent {
+  /** One-based event order within this parse. */
   readonly seq: number;
+  /** Event discriminator. */
   readonly kind: "parseError";
+  /** Deterministic WHATWG parse-error identifier. */
   readonly parseErrorId: string;
+  /** Inclusive source start offset, or null when unavailable. */
   readonly startOffset: number | null;
+  /** Exclusive source end offset, or null when unavailable. */
   readonly endOffset: number | null;
 }
 
+/** Observed value for one configured or disabled resource budget. */
 export interface TraceBudgetEvent {
+  /** One-based event order within this parse. */
   readonly seq: number;
+  /** Event discriminator. */
   readonly kind: "budget";
+  /** Public budget name. */
   readonly budget: HtmlBudgetName;
+  /** Inclusive configured limit, or null when disabled. */
   readonly limit: number | null;
+  /** Observed value at the trace checkpoint. */
   readonly actual: number;
+  /** Whether the observed value is within the configured limit. */
   readonly status: "ok" | "exceeded";
 }
 
+/** Byte-stream consumption and encoding-prescan retention metrics. */
 export interface TraceStreamEvent {
+  /** One-based event order within this parse. */
   readonly seq: number;
+  /** Event discriminator. */
   readonly kind: "stream";
   /** Total transport bytes read through EOF. */
   readonly bytesRead: number;
@@ -204,6 +248,7 @@ export interface TraceStreamEvent {
   readonly encodingPrescanLimitBytes: number;
 }
 
+/** Immutable structured event observed during one parse operation. */
 export type TraceEvent =
   | TraceDecodeEvent
   | TraceTokenEvent
@@ -212,6 +257,68 @@ export type TraceEvent =
   | TraceParseErrorEvent
   | TraceBudgetEvent
   | TraceStreamEvent;
+
+/** Trace retention policy for one parse operation. */
+export type TraceMode = "none" | "summary" | "events";
+
+/** Synchronous observer invoked once for each immutable trace event. */
+export type TraceEventCallback = (event: TraceEvent) => void;
+
+/** Deterministic constant-size trace counters for one parse operation. */
+export interface TraceSummary {
+  /** Context-aware logical token count, including EOF. */
+  readonly tokenCount: number;
+  /** Public root plus descendant node count. */
+  readonly nodeCount: number;
+  /** Maximum public tree depth, with the public root at depth one. */
+  readonly maxDepth: number;
+  /** Number of non-fatal parser diagnostics. */
+  readonly parseErrorCount: number;
+  /** Selected encoding name and the evidence source that selected it. */
+  readonly encoding: {
+    /** Selected WHATWG encoding name. */
+    readonly name: string;
+    /** Evidence source that selected the encoding. */
+    readonly source: "input" | "bom" | "transport" | "meta" | "default";
+  };
+  /** UTF-8 bytes for text input or transport bytes for byte input. */
+  readonly inputBytes: number;
+  /** UTF-8 bytes in the decoded HTML text. */
+  readonly decodedUtf8Bytes: number;
+  /** Total stream transport bytes, or null for non-stream input. */
+  readonly bytesRead: number | null;
+  /** Stream encoding-prescan high-water bytes, or null for non-stream input. */
+  readonly encodingPrescanBytes: number | null;
+  /** Effective stream encoding-prescan cap, or null for non-stream input. */
+  readonly encodingPrescanLimitBytes: number | null;
+  /** Total observed event count, whether or not events were retained. */
+  readonly eventCount: number;
+  /** Sum of canonical event JSON UTF-8 bytes, with no delimiter. */
+  readonly eventUtf8Bytes: number;
+  /** Lexicographically sorted distinct observed event kinds. */
+  readonly eventKinds: readonly TraceEvent["kind"][];
+}
+
+/** Returned trace data when only fixed-shape counters are retained. */
+export interface TraceSummaryResult {
+  /** Trace-result discriminator. */
+  readonly mode: "summary";
+  /** Immutable counters for the parse operation. */
+  readonly summary: TraceSummary;
+}
+
+/** Returned trace data when the complete event sequence is retained. */
+export interface TraceEventsResult {
+  /** Trace-result discriminator. */
+  readonly mode: "events";
+  /** Immutable counters for the parse operation. */
+  readonly summary: TraceSummary;
+  /** Immutable events in sequence order. */
+  readonly events: readonly TraceEvent[];
+}
+
+/** Returned deterministic trace data for summary and retained-event modes. */
+export type TraceResult = TraceSummaryResult | TraceEventsResult;
 
 export interface TextNode {
   readonly id: NodeId;
@@ -259,7 +366,7 @@ export interface DocumentTree {
   readonly kind: "document";
   readonly children: readonly HtmlNode[];
   readonly errors: readonly ParseError[];
-  readonly trace?: readonly TraceEvent[];
+  readonly trace?: TraceResult;
 }
 
 export interface FragmentTree {
@@ -268,7 +375,7 @@ export interface FragmentTree {
   readonly contextTagName: string;
   readonly children: readonly HtmlNode[];
   readonly errors: readonly ParseError[];
-  readonly trace?: readonly TraceEvent[];
+  readonly trace?: TraceResult;
 }
 
 export interface OutlineEntry {

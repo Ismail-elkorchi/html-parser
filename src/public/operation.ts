@@ -45,6 +45,7 @@ const TOKENIZE_BYTE_STREAM_EAGER_BUDGET_KEYS = Object.freeze([
 const PARSE_OPTION_KEYS = new Set<PropertyKey>([
   "captureSpans",
   "trace",
+  "onTraceEvent",
   "transportEncodingLabel",
   "budgets",
   "signal"
@@ -107,32 +108,51 @@ function read(record: UnknownRecord, key: PropertyKey, option: string): unknown 
   }
 }
 
-function validateOptionalBoolean(record: UnknownRecord, key: string, option: string): void {
-  const value = read(record, key, option);
+function optionalBoolean(value: unknown, option: string): boolean | undefined {
   if (value !== undefined && typeof value !== "boolean") {
     invalidConfiguration(option, "must be a boolean when provided");
   }
+  return value;
 }
 
-function validateOptionalString(record: UnknownRecord, key: string, option: string): void {
-  const value = read(record, key, option);
+function optionalString(value: unknown, option: string): string | undefined {
   if (value !== undefined && (typeof value !== "string" || value.trim().length === 0)) {
     invalidConfiguration(option, "must be a non-empty string when provided");
   }
+  return value;
 }
 
-function validateLimit(value: unknown, option: string): void {
+function isCallable(value: unknown): value is (...args: never[]) => unknown {
+  return typeof value === "function";
+}
+
+function optionalFunction(value: unknown, option: string): ((...args: never[]) => unknown) | undefined {
+  if (value !== undefined && !isCallable(value)) {
+    invalidConfiguration(option, "must be a function when provided");
+  }
+  return value;
+}
+
+function traceMode(value: unknown, option: string): ParseOptions["trace"] {
+  if (value !== undefined && value !== "none" && value !== "summary" && value !== "events") {
+    invalidConfiguration(option, 'must be "none", "summary", or "events" when provided');
+  }
+  return value;
+}
+
+function limit(value: unknown, option: string): number | undefined {
   if (
     value !== undefined &&
     (typeof value !== "number" || !Number.isFinite(value) || !Number.isSafeInteger(value) || value < 0)
   ) {
     invalidConfiguration(option, "must be a finite, non-negative safe integer when provided");
   }
+  return value;
 }
 
-function validateSignal(value: unknown, option: string): void {
+function signal(value: unknown, option: string): AbortSignal | undefined {
   if (value === undefined) {
-    return;
+    return undefined;
   }
   if (typeof value !== "object" || value === null) {
     invalidConfiguration(option, "must be an AbortSignal when provided");
@@ -145,93 +165,175 @@ function validateSignal(value: unknown, option: string): void {
   ) {
     invalidConfiguration(option, "must be an AbortSignal when provided");
   }
+  return value as unknown as AbortSignal;
 }
 
-function validateBudgets(
+function normalizeBudgets(
   value: unknown,
   keys: readonly string[] = PARSE_BUDGET_KEYS
-): void {
+): Readonly<Record<string, number>> | undefined {
   if (value === undefined) {
-    return;
+    return undefined;
   }
   const budgets = asClosedRecord(value, "options.budgets", new Set<PropertyKey>(keys));
+  const normalized: Record<string, number> = {};
   for (const key of keys) {
-    validateLimit(read(budgets, key, `options.budgets.${key}`), `options.budgets.${key}`);
+    const normalizedLimit = limit(
+      read(budgets, key, `options.budgets.${key}`),
+      `options.budgets.${key}`
+    );
+    if (normalizedLimit !== undefined) {
+      normalized[key] = normalizedLimit;
+    }
   }
+  return Object.freeze(normalized);
 }
 
-function validateCommonOperationOptions(
+function normalizeCommonOperationOptions(
   options: unknown,
   allowedKeys: ReadonlySet<PropertyKey>,
   optionName: string
-): UnknownRecord {
+): { readonly record: UnknownRecord; readonly normalized: OperationOptions } {
   const record = asClosedRecord(options, optionName, allowedKeys);
-  validateLimit(read(record, "maxTimeMs", `${optionName}.maxTimeMs`), `${optionName}.maxTimeMs`);
-  validateSignal(read(record, "signal", `${optionName}.signal`), `${optionName}.signal`);
-  return record;
+  const maxTimeMs = limit(
+    read(record, "maxTimeMs", `${optionName}.maxTimeMs`),
+    `${optionName}.maxTimeMs`
+  );
+  const normalizedSignal = signal(
+    read(record, "signal", `${optionName}.signal`),
+    `${optionName}.signal`
+  );
+  return {
+    record,
+    normalized: Object.freeze({
+      ...(maxTimeMs === undefined ? {} : { maxTimeMs }),
+      ...(normalizedSignal === undefined ? {} : { signal: normalizedSignal })
+    })
+  };
 }
 
-/** Validates the complete runtime schema for document and fragment parsing. */
-export function validateParseOptions(options: ParseOptions): void {
+function normalizeParseLikeOptions(
+  options: ParseOptions | ParseStreamOptions,
+  budgetKeys: readonly string[]
+): ParseStreamOptions {
   const record = asClosedRecord(options, "options", PARSE_OPTION_KEYS);
-  validateOptionalBoolean(record, "captureSpans", "options.captureSpans");
-  validateOptionalBoolean(record, "trace", "options.trace");
-  validateOptionalString(record, "transportEncodingLabel", "options.transportEncodingLabel");
-  validateBudgets(read(record, "budgets", "options.budgets"));
-  validateSignal(read(record, "signal", "options.signal"), "options.signal");
+  const captureSpans = optionalBoolean(
+    read(record, "captureSpans", "options.captureSpans"),
+    "options.captureSpans"
+  );
+  const normalizedTrace = traceMode(read(record, "trace", "options.trace"), "options.trace");
+  const onTraceEvent = optionalFunction(
+    read(record, "onTraceEvent", "options.onTraceEvent"),
+    "options.onTraceEvent"
+  ) as ParseOptions["onTraceEvent"];
+  const transportEncodingLabel = optionalString(
+    read(record, "transportEncodingLabel", "options.transportEncodingLabel"),
+    "options.transportEncodingLabel"
+  );
+  const budgets = normalizeBudgets(read(record, "budgets", "options.budgets"), budgetKeys) as
+    | ParseStreamBudgetOptions
+    | undefined;
+  const normalizedSignal = signal(read(record, "signal", "options.signal"), "options.signal");
+  if (
+    normalizedTrace !== "events" &&
+    (budgets?.maxTraceEvents !== undefined || budgets?.maxTraceBytes !== undefined)
+  ) {
+    throw new HtmlConfigurationError(
+      "options.budgets",
+      "CONFLICTING_OPTIONS",
+      'maxTraceEvents and maxTraceBytes require options.trace to be "events"'
+    );
+  }
+  return Object.freeze({
+    ...(captureSpans === undefined ? {} : { captureSpans }),
+    trace: normalizedTrace ?? "none",
+    ...(onTraceEvent === undefined ? {} : { onTraceEvent }),
+    ...(transportEncodingLabel === undefined ? {} : { transportEncodingLabel }),
+    ...(budgets === undefined ? {} : { budgets }),
+    ...(normalizedSignal === undefined ? {} : { signal: normalizedSignal })
+  });
 }
 
-/** Validates the complete runtime schema for full-document stream parsing. */
-export function validateParseStreamOptions(options: ParseStreamOptions): void {
-  const record = asClosedRecord(options, "options", PARSE_OPTION_KEYS);
-  validateOptionalBoolean(record, "captureSpans", "options.captureSpans");
-  validateOptionalBoolean(record, "trace", "options.trace");
-  validateOptionalString(record, "transportEncodingLabel", "options.transportEncodingLabel");
-  validateBudgets(read(record, "budgets", "options.budgets"), PARSE_STREAM_BUDGET_KEYS);
-  validateSignal(read(record, "signal", "options.signal"), "options.signal");
+/** Validates and snapshots document/byte/fragment options exactly once. */
+export function normalizeParseOptions(options: ParseOptions): ParseOptions {
+  return normalizeParseLikeOptions(options, PARSE_BUDGET_KEYS);
 }
 
-/** Validates the complete runtime schema for stream tokenization. */
-export function validateTokenizeByteStreamEagerOptions(options: TokenizeByteStreamEagerOptions): void {
+/** Validates and snapshots full-document stream options exactly once. */
+export function normalizeParseStreamOptions(options: ParseStreamOptions): ParseStreamOptions {
+  return normalizeParseLikeOptions(options, PARSE_STREAM_BUDGET_KEYS);
+}
+
+/** Validates and snapshots eager stream-tokenization options exactly once. */
+export function normalizeTokenizeByteStreamEagerOptions(
+  options: TokenizeByteStreamEagerOptions
+): TokenizeByteStreamEagerOptions {
   const record = asClosedRecord(options, "options", TOKENIZE_BYTE_STREAM_EAGER_OPTION_KEYS);
-  validateOptionalString(record, "transportEncodingLabel", "options.transportEncodingLabel");
-  validateBudgets(
+  const transportEncodingLabel = optionalString(
+    read(record, "transportEncodingLabel", "options.transportEncodingLabel"),
+    "options.transportEncodingLabel"
+  );
+  const budgets = normalizeBudgets(
     read(record, "budgets", "options.budgets"),
     TOKENIZE_BYTE_STREAM_EAGER_BUDGET_KEYS
+  ) as TokenizeByteStreamEagerBudgetOptions | undefined;
+  const normalizedSignal = signal(read(record, "signal", "options.signal"), "options.signal");
+  return Object.freeze({
+    ...(transportEncodingLabel === undefined ? {} : { transportEncodingLabel }),
+    ...(budgets === undefined ? {} : { budgets }),
+    ...(normalizedSignal === undefined ? {} : { signal: normalizedSignal })
+  });
+}
+
+/** Validates and snapshots deadline/cancellation operation options. */
+export function normalizeOperationOptions(options: OperationOptions): OperationOptions {
+  return normalizeCommonOperationOptions(options, OPERATION_OPTION_KEYS, "options").normalized;
+}
+
+/** Validates and snapshots visible-text policy plus operation controls. */
+export function normalizeVisibleTextOptions(options: VisibleTextOptions): VisibleTextOptions {
+  const { record, normalized } = normalizeCommonOperationOptions(
+    options,
+    VISIBLE_TEXT_OPTION_KEYS,
+    "options"
   );
-  validateSignal(read(record, "signal", "options.signal"), "options.signal");
-}
-
-/** Validates deadline/cancellation options used by traversal and serialization. */
-export function validateOperationOptions(options: OperationOptions): void {
-  validateCommonOperationOptions(options, OPERATION_OPTION_KEYS, "options");
-}
-
-/** Validates visible-text policy plus operation controls. */
-export function validateVisibleTextOptions(options: VisibleTextOptions): void {
-  const record = validateCommonOperationOptions(options, VISIBLE_TEXT_OPTION_KEYS, "options");
-  validateOptionalBoolean(record, "skipHiddenSubtrees", "options.skipHiddenSubtrees");
-  validateOptionalBoolean(record, "includeControlValues", "options.includeControlValues");
-  validateOptionalBoolean(
-    record,
-    "includeAccessibleNameFallback",
+  const skipHiddenSubtrees = optionalBoolean(
+    read(record, "skipHiddenSubtrees", "options.skipHiddenSubtrees"),
+    "options.skipHiddenSubtrees"
+  );
+  const includeControlValues = optionalBoolean(
+    read(record, "includeControlValues", "options.includeControlValues"),
+    "options.includeControlValues"
+  );
+  const includeAccessibleNameFallback = optionalBoolean(
+    read(record, "includeAccessibleNameFallback", "options.includeAccessibleNameFallback"),
     "options.includeAccessibleNameFallback"
   );
-  validateOptionalBoolean(record, "trim", "options.trim");
+  const trim = optionalBoolean(read(record, "trim", "options.trim"), "options.trim");
+  return Object.freeze({
+    ...normalized,
+    ...(skipHiddenSubtrees === undefined ? {} : { skipHiddenSubtrees }),
+    ...(includeControlValues === undefined ? {} : { includeControlValues }),
+    ...(includeAccessibleNameFallback === undefined ? {} : { includeAccessibleNameFallback }),
+    ...(trim === undefined ? {} : { trim })
+  });
 }
 
-/** Validates chunk sizing plus operation controls. */
-export function validateChunkOptions(options: ChunkOptions): void {
-  const record = validateCommonOperationOptions(options, CHUNK_OPTION_KEYS, "options");
+/** Validates and snapshots chunk sizing plus operation controls. */
+export function normalizeChunkOptions(options: ChunkOptions): ChunkOptions {
+  const { record, normalized } = normalizeCommonOperationOptions(
+    options,
+    CHUNK_OPTION_KEYS,
+    "options"
+  );
+  const sizing: Partial<Record<"maxChars" | "maxNodes" | "maxBytes", number>> = {};
   for (const key of ["maxChars", "maxNodes", "maxBytes"] as const) {
-    const value = read(record, key, `options.${key}`);
-    if (
-      value !== undefined &&
-      (typeof value !== "number" || !Number.isFinite(value) || value < 0 || !Number.isSafeInteger(value))
-    ) {
-      invalidConfiguration(`options.${key}`, "must be a finite, non-negative safe integer when provided");
+    const normalizedLimit = limit(read(record, key, `options.${key}`), `options.${key}`);
+    if (normalizedLimit !== undefined) {
+      sizing[key] = normalizedLimit;
     }
   }
+  return Object.freeze({ ...normalized, ...sizing });
 }
 
 /** One monotonic deadline and cancellation source shared by an operation's phases. */
