@@ -7,9 +7,13 @@ import { sourceSpan, type SourcePosition, type SourceSpan } from "../positions.j
 import { EngineConfigurationError, type EngineResourceGuard } from "../resource-guard.js";
 import { type HtmlToken } from "../tokens.js";
 
-import { CommentTokenBuilder, DoctypeTokenBuilder, TagTokenBuilder } from "./builders.js";
 import {
-  EngineUnsupportedTokenizerStateError,
+  CommentTokenBuilder,
+  DoctypeTokenBuilder,
+  ProcessingInstructionTokenBuilder,
+  TagTokenBuilder
+} from "./builders.js";
+import {
   type HtmlTokenizerState
 } from "./state.js";
 
@@ -28,8 +32,11 @@ export interface HtmlTokenizerDone {
 
 export type HtmlTokenizerRunResult = HtmlTokenizerNeedMore | HtmlTokenizerDone;
 
+/** States that a test or future parser driver may select before input begins. */
+export type HtmlTokenizerInitialState = TokenizerMode | "cdata-section";
+
 export interface HtmlTokenizerOptions {
-  readonly mode?: TokenizerMode;
+  readonly initialState?: HtmlTokenizerInitialState;
   readonly lastStartTagName?: string | null;
   readonly foreignContent?: boolean;
   readonly observer?: EngineObserver;
@@ -75,6 +82,12 @@ function isAsciiAlpha(value: string): boolean {
   return (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a);
 }
 
+function isAsciiAlphanumeric(value: string): boolean {
+  if (value.length !== 1) return false;
+  const code = value.charCodeAt(0);
+  return isAsciiAlpha(value) || (code >= 0x30 && code <= 0x39);
+}
+
 function isAsciiUpper(value: string): boolean {
   if (value.length !== 1) return false;
   const code = value.charCodeAt(0);
@@ -87,13 +100,14 @@ function asciiLower(value: string): string {
     : value;
 }
 
-function modeState(mode: TokenizerMode): TextState {
-  switch (mode) {
+function initialState(value: HtmlTokenizerInitialState): TextState | "cdata-section-state" {
+  switch (value) {
     case "data": return "data-state";
     case "rcdata": return "rcdata-state";
     case "rawtext": return "rawtext-state";
     case "script-data": return "script-data-state";
     case "plaintext": return "plaintext-state";
+    case "cdata-section": return "cdata-section-state";
   }
 }
 
@@ -108,6 +122,11 @@ function validateMode(value: unknown): TokenizerMode {
     throw new EngineConfigurationError("tokenizer mode", "must be a supported tokenizer mode");
   }
   return value;
+}
+
+function validateInitialState(value: unknown): HtmlTokenizerInitialState {
+  if (value === "cdata-section") return value;
+  return validateMode(value);
 }
 
 function decisionSpan(read: InputCharacter | InputEof): SourceSpan {
@@ -140,8 +159,12 @@ export class HtmlTokenizer implements TokenizerControl {
   #tag: TagTokenBuilder | null = null;
   #comment: CommentTokenBuilder | null = null;
   #doctype: DoctypeTokenBuilder | null = null;
+  #processingInstruction: ProcessingInstructionTokenBuilder | null = null;
   #characterReference: CharacterReferenceConsumer | null = null;
   #characterReferenceReturn: CharacterReferenceReturn | null = null;
+  #lessThanSpan: SourceSpan | null = null;
+  #temporaryBufferParts: string[] = [];
+  #cdataBracketStartUtf16Offset: number | null = null;
 
   constructor(guard: EngineResourceGuard, sink: TokenSink, options: HtmlTokenizerOptions = {}) {
     const unknownSink: unknown = sink;
@@ -158,13 +181,13 @@ export class HtmlTokenizer implements TokenizerControl {
       throw new EngineConfigurationError("tokenizer options", "must be an object");
     }
     const record = unknownOptions as Readonly<Record<PropertyKey, unknown>>;
-    const allowed = new Set<PropertyKey>(["mode", "lastStartTagName", "foreignContent", "observer"]);
+    const allowed = new Set<PropertyKey>(["initialState", "lastStartTagName", "foreignContent", "observer"]);
     for (const key of Reflect.ownKeys(record)) {
       if (!allowed.has(key)) {
         throw new EngineConfigurationError(`tokenizer options.${String(key)}`, "is not supported");
       }
     }
-    const mode = validateMode(options.mode ?? "data");
+    const entry = validateInitialState(options.initialState ?? "data");
     if (
       options.lastStartTagName !== undefined &&
       options.lastStartTagName !== null &&
@@ -180,7 +203,7 @@ export class HtmlTokenizer implements TokenizerControl {
     this.#guard = guard;
     this.#sink = sink;
     this.#observer = options.observer;
-    this.#state = modeState(mode);
+    this.#state = initialState(entry);
     this.#lastStartTagName = options.lastStartTagName ?? null;
     this.#foreignContent = options.foreignContent ?? false;
     this.#cursor = new HtmlInputCursor(guard, (error) => {
@@ -221,7 +244,7 @@ export class HtmlTokenizer implements TokenizerControl {
   setMode(mode: TokenizerMode): void {
     this.#ensureUsable();
     this.#guard.ensureActive();
-    this.#state = modeState(validateMode(mode));
+    this.#state = initialState(validateMode(mode));
   }
 
   setLastStartTagName(name: string | null): void {
@@ -287,6 +310,29 @@ export class HtmlTokenizer implements TokenizerControl {
       case "tag-open-state": return this.#stepTagOpen();
       case "end-tag-open-state": return this.#stepEndTagOpen();
       case "tag-name-state": return this.#stepTagName();
+      case "rcdata-less-than-sign-state": return this.#stepTextLessThan("rcdata");
+      case "rcdata-end-tag-open-state": return this.#stepTextEndTagOpen("rcdata");
+      case "rcdata-end-tag-name-state": return this.#stepTextEndTagName("rcdata-state");
+      case "rawtext-less-than-sign-state": return this.#stepTextLessThan("rawtext");
+      case "rawtext-end-tag-open-state": return this.#stepTextEndTagOpen("rawtext");
+      case "rawtext-end-tag-name-state": return this.#stepTextEndTagName("rawtext-state");
+      case "script-data-less-than-sign-state": return this.#stepScriptDataLessThanSign();
+      case "script-data-end-tag-open-state": return this.#stepTextEndTagOpen("script-data");
+      case "script-data-end-tag-name-state": return this.#stepTextEndTagName("script-data-state");
+      case "script-data-escape-start-state": return this.#stepScriptEscapeStart();
+      case "script-data-escape-start-dash-state": return this.#stepScriptEscapeStartDash();
+      case "script-data-escaped-state": return this.#stepScriptEscaped();
+      case "script-data-escaped-dash-state": return this.#stepScriptEscapedDash();
+      case "script-data-escaped-dash-dash-state": return this.#stepScriptEscapedDashDash();
+      case "script-data-escaped-less-than-sign-state": return this.#stepScriptEscapedLessThanSign();
+      case "script-data-escaped-end-tag-open-state": return this.#stepTextEndTagOpen("script-data-escaped");
+      case "script-data-escaped-end-tag-name-state": return this.#stepTextEndTagName("script-data-escaped-state");
+      case "script-data-double-escape-start-state": return this.#stepScriptDoubleEscapeStart();
+      case "script-data-double-escaped-state": return this.#stepScriptDoubleEscaped();
+      case "script-data-double-escaped-dash-state": return this.#stepScriptDoubleEscapedDash();
+      case "script-data-double-escaped-dash-dash-state": return this.#stepScriptDoubleEscapedDashDash();
+      case "script-data-double-escaped-less-than-sign-state": return this.#stepScriptDoubleEscapedLessThanSign();
+      case "script-data-double-escape-end-state": return this.#stepScriptDoubleEscapeEnd();
       case "before-attribute-name-state": return this.#stepBeforeAttributeName();
       case "attribute-name-state": return this.#stepAttributeName();
       case "after-attribute-name-state": return this.#stepAfterAttributeName();
@@ -324,8 +370,16 @@ export class HtmlTokenizer implements TokenizerControl {
       case "doctype-system-identifier-(single-quoted)-state": return this.#stepDoctypeIdentifier("system", "'");
       case "after-doctype-system-identifier-state": return this.#stepAfterDoctypeSystemIdentifier();
       case "bogus-doctype-state": return this.#stepBogusDoctype();
+      case "cdata-section-state": return this.#stepCdataSection();
+      case "cdata-section-bracket-state": return this.#stepCdataSectionBracket();
+      case "cdata-section-end-state": return this.#stepCdataSectionEnd();
+      case "processing-instruction-open-state": return this.#stepProcessingInstructionOpen();
+      case "processing-instruction-target-state": return this.#stepProcessingInstructionTarget();
+      case "after-processing-instruction-target-state": return this.#stepAfterProcessingInstructionTarget();
+      case "processing-instruction-data-state": return this.#stepProcessingInstructionData();
+      case "processing-instruction-questionable-state": return this.#stepProcessingInstructionQuestionable();
       case "character-reference-state": return this.#stepCharacterReference();
-      default: throw new EngineUnsupportedTokenizerStateError(this.#state);
+      default: throw new Error(`Tokenizer invariant violated: unreachable state ${this.#state}`);
     }
   }
 
@@ -352,7 +406,7 @@ export class HtmlTokenizer implements TokenizerControl {
     if (read.value === "&") {
       this.#startCharacterReference(read, { state: "rcdata-state", context: "text" });
     } else if (read.value === "<") {
-      this.#appendCharacters("", read.span);
+      this.#lessThanSpan = read.span;
       this.#state = "rcdata-less-than-sign-state";
     } else if (read.value === "\0") {
       this.#emitParseError("unexpected-null-character", read.span);
@@ -376,7 +430,7 @@ export class HtmlTokenizer implements TokenizerControl {
     if (read.kind === "need-more-input") return this.#wait(read.position);
     if (read.kind === "eof") return this.#emitEof(read.position);
     if (read.value === "<") {
-      this.#appendCharacters("", read.span);
+      this.#lessThanSpan = read.span;
       this.#state = lessThanState;
     } else if (read.value === "\0") {
       this.#emitParseError("unexpected-null-character", read.span);
@@ -400,6 +454,337 @@ export class HtmlTokenizer implements TokenizerControl {
     return null;
   }
 
+  #stepTextLessThan(family: "rcdata" | "rawtext"): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    const lessThan = this.#requireLessThanSpan();
+    if (read.kind === "character" && read.value === "/") {
+      this.#markupStartUtf16Offset = lessThan.startUtf16Offset;
+      this.#resetTemporaryBuffer();
+      this.#state = family === "rcdata"
+        ? "rcdata-end-tag-open-state"
+        : "rawtext-end-tag-open-state";
+    } else {
+      this.#appendCharacters("<", lessThan);
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#lessThanSpan = null;
+      this.#state = family === "rcdata" ? "rcdata-state" : "rawtext-state";
+    }
+    return null;
+  }
+
+  #stepTextEndTagOpen(
+    family: "rcdata" | "rawtext" | "script-data" | "script-data-escaped"
+  ): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "character" && isAsciiAlpha(read.value)) {
+      this.#tag = new TagTokenBuilder(
+        "end-tag",
+        this.#requireLessThanSpan().startUtf16Offset,
+        this.#guard.beginStartTag()
+      );
+      this.#cursor.reconsumeCurrent();
+      this.#state = this.#textEndTagNameState(family);
+    } else {
+      const endUtf16Offset = read.kind === "character"
+        ? read.span.startUtf16Offset
+        : read.position.utf16Offset;
+      this.#appendCharacters(
+        "</",
+        sourceSpan(this.#requireLessThanSpan().startUtf16Offset, endUtf16Offset)
+      );
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#lessThanSpan = null;
+      this.#resetTemporaryBuffer();
+      this.#state = this.#textFamilyState(family);
+    }
+    return null;
+  }
+
+  #stepTextEndTagName(
+    fallbackState: "rcdata-state" | "rawtext-state" | "script-data-state" | "script-data-escaped-state"
+  ): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "character" && isAsciiAlpha(read.value)) {
+      this.#requireTag().appendName(asciiLower(read.value));
+      this.#temporaryBufferParts.push(read.value);
+      return null;
+    }
+
+    const appropriate = this.#isAppropriateEndTag();
+    if (read.kind === "character" && appropriate) {
+      if (isAsciiWhitespace(read.value)) {
+        this.#lessThanSpan = null;
+        this.#resetTemporaryBuffer();
+        this.#state = "before-attribute-name-state";
+        return null;
+      }
+      if (read.value === "/") {
+        this.#lessThanSpan = null;
+        this.#resetTemporaryBuffer();
+        this.#state = "self-closing-start-tag-state";
+        return null;
+      }
+      if (read.value === ">") {
+        this.#lessThanSpan = null;
+        this.#resetTemporaryBuffer();
+        this.#state = "data-state";
+        this.#emitTag(read.span);
+        return null;
+      }
+    }
+
+    const endUtf16Offset = read.kind === "character"
+      ? read.span.startUtf16Offset
+      : read.position.utf16Offset;
+    this.#appendCharacters(
+      `</${this.#temporaryBuffer()}`,
+      sourceSpan(this.#requireLessThanSpan().startUtf16Offset, endUtf16Offset)
+    );
+    this.#tag = null;
+    this.#lessThanSpan = null;
+    this.#resetTemporaryBuffer();
+    if (read.kind === "character") this.#cursor.reconsumeCurrent();
+    this.#state = fallbackState;
+    return null;
+  }
+
+  #stepScriptDataLessThanSign(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    const lessThan = this.#requireLessThanSpan();
+    if (read.kind === "character" && read.value === "/") {
+      this.#markupStartUtf16Offset = lessThan.startUtf16Offset;
+      this.#resetTemporaryBuffer();
+      this.#state = "script-data-end-tag-open-state";
+    } else if (read.kind === "character" && read.value === "!") {
+      this.#appendCharacters("<!", sourceSpan(lessThan.startUtf16Offset, read.span.endUtf16Offset));
+      this.#lessThanSpan = null;
+      this.#state = "script-data-escape-start-state";
+    } else {
+      this.#appendCharacters("<", lessThan);
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#lessThanSpan = null;
+      this.#state = "script-data-state";
+    }
+    return null;
+  }
+
+  #stepScriptEscapeStart(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "character" && read.value === "-") {
+      this.#appendCharacters("-", read.span);
+      this.#state = "script-data-escape-start-dash-state";
+    } else {
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#state = "script-data-state";
+    }
+    return null;
+  }
+
+  #stepScriptEscapeStartDash(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "character" && read.value === "-") {
+      this.#appendCharacters("-", read.span);
+      this.#state = "script-data-escaped-dash-dash-state";
+    } else {
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#state = "script-data-state";
+    }
+    return null;
+  }
+
+  #stepScriptEscaped(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "eof") return this.#scriptEscapedEof(read);
+    if (read.value === "-") {
+      this.#appendCharacters("-", read.span);
+      this.#state = "script-data-escaped-dash-state";
+    } else if (read.value === "<") {
+      this.#lessThanSpan = read.span;
+      this.#state = "script-data-escaped-less-than-sign-state";
+    } else if (read.value === "\0") {
+      this.#emitParseError("unexpected-null-character", read.span);
+      this.#appendCharacters("\uFFFD", read.span);
+    } else {
+      this.#appendCharacters(read.value, read.span);
+    }
+    return null;
+  }
+
+  #stepScriptEscapedDash(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "eof") return this.#scriptEscapedEof(read);
+    if (read.value === "-") {
+      this.#appendCharacters("-", read.span);
+      this.#state = "script-data-escaped-dash-dash-state";
+    } else if (read.value === "<") {
+      this.#lessThanSpan = read.span;
+      this.#state = "script-data-escaped-less-than-sign-state";
+    } else if (read.value === "\0") {
+      this.#emitParseError("unexpected-null-character", read.span);
+      this.#appendCharacters("\uFFFD", read.span);
+      this.#state = "script-data-escaped-state";
+    } else {
+      this.#appendCharacters(read.value, read.span);
+      this.#state = "script-data-escaped-state";
+    }
+    return null;
+  }
+
+  #stepScriptEscapedDashDash(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "eof") return this.#scriptEscapedEof(read);
+    if (read.value === "-") {
+      this.#appendCharacters("-", read.span);
+    } else if (read.value === "<") {
+      this.#lessThanSpan = read.span;
+      this.#state = "script-data-escaped-less-than-sign-state";
+    } else if (read.value === ">") {
+      this.#appendCharacters(">", read.span);
+      this.#state = "script-data-state";
+    } else if (read.value === "\0") {
+      this.#emitParseError("unexpected-null-character", read.span);
+      this.#appendCharacters("\uFFFD", read.span);
+      this.#state = "script-data-escaped-state";
+    } else {
+      this.#appendCharacters(read.value, read.span);
+      this.#state = "script-data-escaped-state";
+    }
+    return null;
+  }
+
+  #stepScriptEscapedLessThanSign(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    const lessThan = this.#requireLessThanSpan();
+    if (read.kind === "character" && read.value === "/") {
+      this.#markupStartUtf16Offset = lessThan.startUtf16Offset;
+      this.#resetTemporaryBuffer();
+      this.#state = "script-data-escaped-end-tag-open-state";
+    } else if (read.kind === "character" && isAsciiAlpha(read.value)) {
+      this.#resetTemporaryBuffer();
+      this.#appendCharacters("<", lessThan);
+      this.#lessThanSpan = null;
+      this.#cursor.reconsumeCurrent();
+      this.#state = "script-data-double-escape-start-state";
+    } else {
+      this.#appendCharacters("<", lessThan);
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#lessThanSpan = null;
+      this.#state = "script-data-escaped-state";
+    }
+    return null;
+  }
+
+  #stepScriptDoubleEscapeStart(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "character" && this.#isScriptDoubleEscapeDelimiter(read.value)) {
+      this.#state = this.#temporaryBuffer() === "script"
+        ? "script-data-double-escaped-state"
+        : "script-data-escaped-state";
+      this.#appendCharacters(read.value, read.span);
+    } else if (read.kind === "character" && isAsciiAlpha(read.value)) {
+      this.#temporaryBufferParts.push(asciiLower(read.value));
+      this.#appendCharacters(read.value, read.span);
+    } else {
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#state = "script-data-escaped-state";
+    }
+    return null;
+  }
+
+  #stepScriptDoubleEscaped(): StepResult {
+    return this.#stepScriptDoubleEscapedBody("script-data-double-escaped-state");
+  }
+
+  #stepScriptDoubleEscapedDash(): StepResult {
+    return this.#stepScriptDoubleEscapedBody("script-data-double-escaped-dash-state");
+  }
+
+  #stepScriptDoubleEscapedDashDash(): StepResult {
+    return this.#stepScriptDoubleEscapedBody("script-data-double-escaped-dash-dash-state");
+  }
+
+  #stepScriptDoubleEscapedBody(
+    current:
+      | "script-data-double-escaped-state"
+      | "script-data-double-escaped-dash-state"
+      | "script-data-double-escaped-dash-dash-state"
+  ): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "eof") return this.#scriptEscapedEof(read);
+    if (read.value === "-") {
+      this.#appendCharacters("-", read.span);
+      this.#state = current === "script-data-double-escaped-dash-dash-state"
+        ? current
+        : "script-data-double-escaped-dash-state";
+      if (current === "script-data-double-escaped-dash-state") {
+        this.#state = "script-data-double-escaped-dash-dash-state";
+      }
+    } else if (read.value === "<") {
+      this.#appendCharacters("<", read.span);
+      this.#state = "script-data-double-escaped-less-than-sign-state";
+    } else if (read.value === ">" && current === "script-data-double-escaped-dash-dash-state") {
+      this.#appendCharacters(">", read.span);
+      this.#state = "script-data-state";
+    } else if (read.value === "\0") {
+      this.#emitParseError("unexpected-null-character", read.span);
+      this.#appendCharacters("\uFFFD", read.span);
+      this.#state = "script-data-double-escaped-state";
+    } else {
+      this.#appendCharacters(read.value, read.span);
+      this.#state = "script-data-double-escaped-state";
+    }
+    return null;
+  }
+
+  #stepScriptDoubleEscapedLessThanSign(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "character" && read.value === "/") {
+      this.#resetTemporaryBuffer();
+      this.#appendCharacters("/", read.span);
+      this.#state = "script-data-double-escape-end-state";
+    } else {
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#state = "script-data-double-escaped-state";
+    }
+    return null;
+  }
+
+  #stepScriptDoubleEscapeEnd(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "character" && this.#isScriptDoubleEscapeDelimiter(read.value)) {
+      this.#state = this.#temporaryBuffer() === "script"
+        ? "script-data-escaped-state"
+        : "script-data-double-escaped-state";
+      this.#appendCharacters(read.value, read.span);
+    } else if (read.kind === "character" && isAsciiAlpha(read.value)) {
+      this.#temporaryBufferParts.push(asciiLower(read.value));
+      this.#appendCharacters(read.value, read.span);
+    } else {
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#state = "script-data-double-escaped-state";
+    }
+    return null;
+  }
+
+  #scriptEscapedEof(read: InputEof): StepResult {
+    this.#emitParseError("eof-in-script-html-comment-like-text", decisionSpan(read));
+    return this.#emitEof(read.position);
+  }
+
   #stepTagOpen(): StepResult {
     const read = this.#cursor.consume();
     if (read.kind === "need-more-input") return this.#wait(read.position);
@@ -417,6 +802,7 @@ export class HtmlTokenizer implements TokenizerControl {
       this.#cursor.reconsumeCurrent();
       this.#state = "tag-name-state";
     } else if (read.value === "?") {
+      this.#resetTemporaryBuffer();
       this.#state = "processing-instruction-open-state";
     } else {
       this.#emitParseError("invalid-first-character-of-tag-name", read.span);
@@ -1215,6 +1601,163 @@ export class HtmlTokenizer implements TokenizerControl {
     return null;
   }
 
+  #stepCdataSection(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "eof") {
+      this.#emitParseError("eof-in-cdata", decisionSpan(read));
+      return this.#emitEof(read.position);
+    }
+    if (read.value === "]") {
+      this.#cdataBracketStartUtf16Offset = read.span.startUtf16Offset;
+      this.#state = "cdata-section-bracket-state";
+    } else {
+      this.#appendCharacters(read.value, read.span);
+    }
+    return null;
+  }
+
+  #stepCdataSectionBracket(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "character" && read.value === "]") {
+      this.#state = "cdata-section-end-state";
+    } else {
+      const start = this.#requireCdataBracketStart();
+      const end = read.kind === "character"
+        ? read.span.startUtf16Offset
+        : read.position.utf16Offset;
+      this.#appendCharacters("]", sourceSpan(start, end));
+      this.#cdataBracketStartUtf16Offset = null;
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#state = "cdata-section-state";
+    }
+    return null;
+  }
+
+  #stepCdataSectionEnd(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    const start = this.#requireCdataBracketStart();
+    if (read.kind === "character" && read.value === "]") {
+      this.#appendCharacters("]", sourceSpan(start, start + 1));
+      this.#cdataBracketStartUtf16Offset = start + 1;
+    } else if (read.kind === "character" && read.value === ">") {
+      this.#cdataBracketStartUtf16Offset = null;
+      this.#state = "data-state";
+    } else {
+      const end = read.kind === "character"
+        ? read.span.startUtf16Offset
+        : read.position.utf16Offset;
+      this.#appendCharacters("]]", sourceSpan(start, end));
+      this.#cdataBracketStartUtf16Offset = null;
+      if (read.kind === "character") this.#cursor.reconsumeCurrent();
+      this.#state = "cdata-section-state";
+    }
+    return null;
+  }
+
+  #stepProcessingInstructionOpen(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "eof") {
+      this.#emitParseError("eof-in-processing-instruction", decisionSpan(read));
+      return this.#emitEof(read.position);
+    }
+    if (isAsciiAlpha(read.value) || read.value === "_") {
+      this.#cursor.reconsumeCurrent();
+      this.#state = "processing-instruction-target-state";
+    } else {
+      this.#emitParseError("invalid-first-character-of-processing-instruction-target", read.span);
+      this.#convertTemporaryBufferToComment();
+      this.#cursor.reconsumeCurrent();
+      this.#state = "bogus-comment-state";
+    }
+    return null;
+  }
+
+  #stepProcessingInstructionTarget(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "eof") {
+      this.#emitParseError("eof-in-processing-instruction", decisionSpan(read));
+      return this.#emitEof(read.position);
+    }
+    if (isAsciiWhitespace(read.value) || read.value === "?" || read.value === ">") {
+      const target = this.#temporaryBuffer();
+      const normalized = target.toLowerCase();
+      if (normalized === "xml" || normalized === "xml-stylesheet") {
+        this.#emitParseError("disallowed-processing-instruction-target", read.span);
+        this.#convertTemporaryBufferToComment();
+        this.#cursor.reconsumeCurrent();
+        this.#state = "bogus-comment-state";
+      } else {
+        this.#processingInstruction = new ProcessingInstructionTokenBuilder(
+          this.#markupStartUtf16Offset,
+          target
+        );
+        this.#resetTemporaryBuffer();
+        this.#cursor.reconsumeCurrent();
+        this.#state = "after-processing-instruction-target-state";
+      }
+    } else if (isAsciiAlphanumeric(read.value) || read.value === "-" || read.value === "_") {
+      this.#temporaryBufferParts.push(read.value);
+    } else {
+      this.#emitParseError("invalid-processing-instruction-target", read.span);
+      this.#convertTemporaryBufferToComment();
+      this.#cursor.reconsumeCurrent();
+      this.#state = "bogus-comment-state";
+    }
+    return null;
+  }
+
+  #stepAfterProcessingInstructionTarget(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "character" && isAsciiWhitespace(read.value)) return null;
+    if (read.kind === "character") this.#cursor.reconsumeCurrent();
+    this.#state = "processing-instruction-data-state";
+    return null;
+  }
+
+  #stepProcessingInstructionData(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "eof") {
+      this.#emitParseError("eof-in-processing-instruction", decisionSpan(read));
+      this.#processingInstruction = null;
+      return this.#emitEof(read.position);
+    }
+    if (read.value === "?") {
+      this.#state = "processing-instruction-questionable-state";
+    } else if (read.value === ">") {
+      this.#state = "data-state";
+      this.#emitProcessingInstruction(read.span.endUtf16Offset);
+    } else {
+      this.#requireProcessingInstruction().appendData(read.value);
+    }
+    return null;
+  }
+
+  #stepProcessingInstructionQuestionable(): StepResult {
+    const read = this.#cursor.consume();
+    if (read.kind === "need-more-input") return this.#wait(read.position);
+    if (read.kind === "eof") {
+      this.#emitParseError("eof-in-processing-instruction", decisionSpan(read));
+      this.#processingInstruction = null;
+      return this.#emitEof(read.position);
+    }
+    if (read.value === ">") {
+      this.#state = "data-state";
+      this.#emitProcessingInstruction(read.span.endUtf16Offset);
+    } else {
+      this.#requireProcessingInstruction().appendData("?");
+      this.#cursor.reconsumeCurrent();
+      this.#state = "processing-instruction-data-state";
+    }
+    return null;
+  }
+
   #stepCharacterReference(): StepResult {
     const consumer = this.#characterReference;
     const returnContext = this.#characterReferenceReturn;
@@ -1276,6 +1819,12 @@ export class HtmlTokenizer implements TokenizerControl {
   #emitDoctype(endUtf16Offset: number): void {
     const token = this.#requireDoctype().toToken(endUtf16Offset);
     this.#doctype = null;
+    this.#emitToken(token);
+  }
+
+  #emitProcessingInstruction(endUtf16Offset: number): void {
+    const token = this.#requireProcessingInstruction().toToken(endUtf16Offset);
+    this.#processingInstruction = null;
     this.#emitToken(token);
   }
 
@@ -1437,6 +1986,66 @@ export class HtmlTokenizer implements TokenizerControl {
       : "doctype-system-identifier-(single-quoted)-state";
   }
 
+  #textEndTagNameState(
+    family: "rcdata" | "rawtext" | "script-data" | "script-data-escaped"
+  ): HtmlTokenizerState {
+    switch (family) {
+      case "rcdata": return "rcdata-end-tag-name-state";
+      case "rawtext": return "rawtext-end-tag-name-state";
+      case "script-data": return "script-data-end-tag-name-state";
+      case "script-data-escaped": return "script-data-escaped-end-tag-name-state";
+    }
+  }
+
+  #textFamilyState(
+    family: "rcdata" | "rawtext" | "script-data" | "script-data-escaped"
+  ): TextState | "script-data-escaped-state" {
+    switch (family) {
+      case "rcdata": return "rcdata-state";
+      case "rawtext": return "rawtext-state";
+      case "script-data": return "script-data-state";
+      case "script-data-escaped": return "script-data-escaped-state";
+    }
+  }
+
+  #isAppropriateEndTag(): boolean {
+    return this.#lastStartTagName !== null && this.#requireTag().name() === this.#lastStartTagName;
+  }
+
+  #isScriptDoubleEscapeDelimiter(value: string): boolean {
+    return isAsciiWhitespace(value) || value === "/" || value === ">";
+  }
+
+  #temporaryBuffer(): string {
+    return this.#temporaryBufferParts.join("");
+  }
+
+  #resetTemporaryBuffer(): void {
+    this.#temporaryBufferParts = [];
+  }
+
+  #convertTemporaryBufferToComment(): void {
+    this.#comment = new CommentTokenBuilder(
+      this.#markupStartUtf16Offset,
+      `?${this.#temporaryBuffer()}`
+    );
+    this.#resetTemporaryBuffer();
+  }
+
+  #requireLessThanSpan(): SourceSpan {
+    if (this.#lessThanSpan === null) {
+      throw new Error("Tokenizer invariant violated: less-than-sign span is missing");
+    }
+    return this.#lessThanSpan;
+  }
+
+  #requireCdataBracketStart(): number {
+    if (this.#cdataBracketStartUtf16Offset === null) {
+      throw new Error("Tokenizer invariant violated: CDATA bracket position is missing");
+    }
+    return this.#cdataBracketStartUtf16Offset;
+  }
+
   #requireTag(): TagTokenBuilder {
     if (this.#tag === null) throw new Error("Tokenizer invariant violated: current tag is missing");
     return this.#tag;
@@ -1450,6 +2059,13 @@ export class HtmlTokenizer implements TokenizerControl {
   #requireDoctype(): DoctypeTokenBuilder {
     if (this.#doctype === null) throw new Error("Tokenizer invariant violated: current DOCTYPE is missing");
     return this.#doctype;
+  }
+
+  #requireProcessingInstruction(): ProcessingInstructionTokenBuilder {
+    if (this.#processingInstruction === null) {
+      throw new Error("Tokenizer invariant violated: current processing instruction is missing");
+    }
+    return this.#processingInstruction;
   }
 
   #ensureUsable(): void {

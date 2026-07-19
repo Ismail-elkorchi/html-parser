@@ -43,6 +43,14 @@ export interface HtmlCommentToken {
   readonly span: SourceSpan;
 }
 
+/** HTML processing-instruction token retained by the pinned standard. */
+export interface HtmlProcessingInstructionToken {
+  readonly kind: "processing-instruction";
+  readonly target: string;
+  readonly data: string;
+  readonly span: SourceSpan;
+}
+
 /** HTML character token. */
 export interface HtmlCharacterToken {
   readonly kind: "character";
@@ -62,5 +70,6 @@ export type HtmlToken =
   | HtmlStartTagToken
   | HtmlEndTagToken
   | HtmlCommentToken
+  | HtmlProcessingInstructionToken
   | HtmlCharacterToken
   | HtmlEofToken;

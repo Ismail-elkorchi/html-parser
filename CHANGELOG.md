@@ -3,11 +3,12 @@
 All notable changes are documented in this file.
 
 ## Unreleased
-- Add an isolated incremental tokenizer foundation for text modes, tags,
-  attributes, comments, doctypes, synchronous token delivery, EOF, exact
-  diagnostics, and resource limits; integrate the independent character
-  reference consumer and verify every applicable primary and holdout fixture
-  across whole and one-unit chunks.
+- Complete the isolated incremental tokenizer across text end tags, script
+  escaped and double-escaped states, CDATA, processing instructions, exact
+  diagnostics, synchronous parser feedback, and bounded resources; integrate
+  the independent character-reference consumer in text and attribute contexts,
+  and verify all applicable primary and holdout fixtures across adversarial
+  chunk schedules.
 - Generate a compact named-character-reference table from separately pinned
   WHATWG data and add an isolated incremental consumer with longest-match,
   attribute-context, numeric-replacement, exact diagnostic, and resource

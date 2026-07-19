@@ -77,7 +77,8 @@ an oracle's behavior blindly.
 - `npm run test:bench:character-references` records generated-table lookup,
   import-heap, and million-digit numeric-reference evidence.
 - `npm run test:bench:engine-tokenizer` records isolated tokenizer throughput,
-  heap delta, token fingerprints, and deterministic resource counters.
+  heap delta, token fingerprints, and deterministic resource counters across
+  character references, markup, text end tags, and processing instructions.
 - `npm run mutation:pilot` writes a disposable report under `reports/`.
 
 Do not commit generated benchmark or mutation JSON as documentation. Record a

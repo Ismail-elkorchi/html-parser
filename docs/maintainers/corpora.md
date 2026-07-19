@@ -110,13 +110,15 @@ still proves no coverage loss.
 
 The isolated tokenizer runner expands the 14 tokenizer files to 7,036 entry
 mode cases and applies the same visible primary/holdout partition as the legacy
-runner. Its foundational state set currently matches 6,175 primary and 690
-holdout cases. The other 171 cases stop with one of five exact state names:
-CDATA entry, processing-instruction entry, or the RCDATA, RAWTEXT, and script
-less-than-sign states. That classification is a temporary implementation
-boundary, not a skip or a fixture-ID allowlist; `npm run test:engine:tokenizer`
-also requires every outcome to agree under whole-input and one-UTF-16-unit
-chunks.
+runner. The complete isolated tokenizer matches 6,297 primary and 701 holdout
+cases. The other 38 cases exercise processing instructions and retain stale
+comment-token expectations from before the pinned HTML Standard added its five
+processing-instruction states. They are classified by the observed standard
+behavior, not fixture IDs; direct tests cover the typed token, recovery, and
+diagnostics. `npm run test:engine:tokenizer` also requires every token, source
+span, and diagnostic to agree under whole-input, one-UTF-16-unit,
+Unicode-scalar, delimiter, empty-interleaved, and deterministic chunk schedules,
+plus every code-unit partition of focused transition probes.
 
 ## Refresh procedure
 

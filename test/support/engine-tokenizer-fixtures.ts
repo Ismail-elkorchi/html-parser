@@ -1,13 +1,12 @@
 import { readFileSync } from "node:fs";
 
 import {
-  EngineUnsupportedTokenizerStateError,
   HtmlTokenizer,
   createEngineResourceGuard,
   type EngineParseError,
+  type EngineResourceUsage,
   type HtmlToken,
-  type HtmlTokenizerState,
-  type TokenizerMode
+  type HtmlTokenizerInitialState
 } from "../../src/internal/html-engine/mod.js";
 
 const TOKENIZER_FIXTURE_PATHS = Object.freeze([
@@ -57,7 +56,7 @@ export interface EngineTokenizerFixtureCase {
   readonly expectedTokens: readonly FixtureToken[];
   readonly expectedErrorCodes: readonly string[] | null;
   readonly initialState: string;
-  readonly mode: TokenizerMode | "cdata-section";
+  readonly tokenizerInitialState: HtmlTokenizerInitialState;
   readonly lastStartTagName: string | null;
   readonly doubleEscaped: boolean;
   readonly xmlViolationMode: boolean;
@@ -68,10 +67,10 @@ export interface EngineTokenizerFixtureOutcome {
   readonly tokens: readonly HtmlToken[];
   readonly fixtureTokens: readonly FixtureToken[];
   readonly errors: readonly EngineParseError[];
-  readonly unsupportedState: HtmlTokenizerState | null;
+  readonly resources: EngineResourceUsage;
 }
 
-function fixtureMode(initialState: string): TokenizerMode | "cdata-section" {
+function fixtureInitialState(initialState: string): HtmlTokenizerInitialState {
   switch (initialState) {
     case "Data state": return "data";
     case "RCDATA state": return "rcdata";
@@ -110,7 +109,7 @@ export function loadEngineTokenizerFixtures(): readonly EngineTokenizerFixtureCa
             ? null
             : Object.freeze(fixture.errors.map((error) => error.code)),
           initialState,
-          mode: fixtureMode(initialState),
+          tokenizerInitialState: fixtureInitialState(initialState),
           lastStartTagName: fixture.lastStartTag ?? null,
           doubleEscaped: fixture.doubleEscaped ?? false,
           xmlViolationMode: path.endsWith("xmlViolation.test"),
@@ -169,6 +168,9 @@ function toFixtureTokens(
       case "comment":
         comparable.push(["Comment", normalizeCommentData(token.data, fixture)]);
         break;
+      case "processing-instruction":
+        comparable.push(["ProcessingInstruction", token.target, token.data]);
+        break;
       case "start-tag": {
         const attributes: Record<string, string> = {};
         for (const attribute of token.attributes) attributes[attribute.name] = attribute.value;
@@ -200,53 +202,36 @@ export function runEngineTokenizerFixture(
   fixture: EngineTokenizerFixtureCase,
   chunks: readonly string[]
 ): EngineTokenizerFixtureOutcome {
-  if (fixture.mode === "cdata-section") {
-    return Object.freeze({
-      tokens: Object.freeze([]),
-      fixtureTokens: Object.freeze([]),
-      errors: Object.freeze([]),
-      unsupportedState: "cdata-section-state"
-    });
-  }
   const tokens: HtmlToken[] = [];
   const errors: EngineParseError[] = [];
-  try {
-    const tokenizer = new HtmlTokenizer(
-      createEngineResourceGuard({
-        limits: {
-          maxSteps: 1_000_000,
-          maxAttributesPerElement: 10_000,
-          maxAttributeUtf8BytesPerElement: 1_000_000,
-          maxParseErrors: 10_000
-        }
-      }),
-      {
-        accept(token) {
-          tokens.push(token);
-          return { selfClosingAcknowledged: true };
-        }
-      },
-      {
-        mode: fixture.mode,
-        lastStartTagName: fixture.lastStartTagName,
-        observer: { onParseError: (error) => errors.push(error) }
+  const guard = createEngineResourceGuard({
+    limits: {
+      maxSteps: 1_000_000,
+      maxAttributesPerElement: 10_000,
+      maxAttributeUtf8BytesPerElement: 1_000_000,
+      maxParseErrors: 10_000
+    }
+  });
+  const tokenizer = new HtmlTokenizer(
+    guard,
+    {
+      accept(token) {
+        tokens.push(token);
+        return { selfClosingAcknowledged: true };
       }
-    );
-    for (const chunk of chunks) tokenizer.write(chunk);
-    tokenizer.close();
-    return Object.freeze({
-      tokens: Object.freeze(tokens),
-      fixtureTokens: toFixtureTokens(tokens, fixture),
-      errors: Object.freeze(errors),
-      unsupportedState: null
-    });
-  } catch (error) {
-    if (!(error instanceof EngineUnsupportedTokenizerStateError)) throw error;
-    return Object.freeze({
-      tokens: Object.freeze(tokens),
-      fixtureTokens: toFixtureTokens(tokens, fixture),
-      errors: Object.freeze(errors),
-      unsupportedState: error.state
-    });
-  }
+    },
+    {
+      initialState: fixture.tokenizerInitialState,
+      lastStartTagName: fixture.lastStartTagName,
+      observer: { onParseError: (error) => errors.push(error) }
+    }
+  );
+  for (const chunk of chunks) tokenizer.write(chunk);
+  tokenizer.close();
+  return Object.freeze({
+    tokens: Object.freeze(tokens),
+    fixtureTokens: toFixtureTokens(tokens, fixture),
+    errors: Object.freeze(errors),
+    resources: guard.snapshot()
+  });
 }

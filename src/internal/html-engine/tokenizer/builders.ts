@@ -5,6 +5,7 @@ import type {
   HtmlCommentToken,
   HtmlDoctypeToken,
   HtmlEndTagToken,
+  HtmlProcessingInstructionToken,
   HtmlStartTagToken,
   HtmlTokenAttribute
 } from "../tokens.js";
@@ -134,6 +135,10 @@ export class TagTokenBuilder {
     this.#nameParts.push(value);
   }
 
+  name(): string {
+    return this.#nameParts.join("");
+  }
+
   beginAttribute(startUtf16Offset: number): void {
     this.finishAttribute();
     this.#currentAttribute = new AttributeBuilder(startUtf16Offset, this.#resource);
@@ -223,6 +228,32 @@ export class CommentTokenBuilder {
       span: sourceSpan(this.#startUtf16Offset, endUtf16Offset)
     } as const);
     this.#parts = [];
+    return token;
+  }
+}
+
+export class ProcessingInstructionTokenBuilder {
+  readonly #startUtf16Offset: number;
+  readonly #target: string;
+  #dataParts: string[] = [];
+
+  constructor(startUtf16Offset: number, target: string) {
+    this.#startUtf16Offset = startUtf16Offset;
+    this.#target = target;
+  }
+
+  appendData(value: string): void {
+    this.#dataParts.push(value);
+  }
+
+  toToken(endUtf16Offset: number): HtmlProcessingInstructionToken {
+    const token = Object.freeze({
+      kind: "processing-instruction",
+      target: this.#target,
+      data: this.#dataParts.join(""),
+      span: sourceSpan(this.#startUtf16Offset, endUtf16Offset)
+    } as const);
+    this.#dataParts = [];
     return token;
   }
 }
