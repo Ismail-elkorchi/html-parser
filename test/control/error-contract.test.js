@@ -122,11 +122,14 @@ test("configuration, patch, and stream failures use distinct structural categori
   );
 
   assert.throws(
-    () => applyPatchPlan("abc", { steps: [{ kind: "slice", start: 2, end: 1 }], result: "" }),
+    () => applyPatchPlan(
+      parse("abc", { captureSpans: true, sourceRetention: "text" }),
+      { steps: [{ kind: "slice", start: 2, end: 1 }], result: "" }
+    ),
     (error) => {
       assert.ok(error instanceof HtmlPatchPlanningError);
       assert.equal(isHtmlPatchPlanningError(error), true);
-      assert.equal(error.reason, "INVALID_PLAN_SLICE");
+      assert.equal(error.reason, "PLAN_SOURCE_MISMATCH");
       return true;
     }
   );
@@ -159,7 +162,7 @@ test("configuration, patch, and stream failures use distinct structural categori
 });
 
 test("returned parser diagnostics are not operational errors", () => {
-  const result = parse("<div><span></div>");
+  const { tree: result } = parse("<div><span></div>");
   assert.ok(result.errors.length > 0);
   assert.ok(result.errors.every((error) => !isHtmlOperationalError(error)));
 

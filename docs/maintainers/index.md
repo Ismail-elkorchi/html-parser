@@ -10,6 +10,7 @@ Operational and release documentation for maintainers.
 - [Stream-buffering contract evidence](./stream-buffering.md)
 - [Trace-pipeline complexity and retention evidence](./trace-pipeline.md)
 - [Namespace tree-model and deep-stack evidence](./namespace-tree-model.md)
+- [Source-aware parse result evidence](./source-aware-results.md)
 - [Hard-budget evidence data (JSON)](./hard-budget-evidence.json)
 - [Current mutation pilot report (JSON)](./mutation-pilot-report.json)
 - [Baseline mutation pilot report (JSON)](./mutation-pilot-report-baseline.json)

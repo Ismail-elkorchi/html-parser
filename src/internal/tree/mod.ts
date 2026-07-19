@@ -14,6 +14,7 @@ export type {
   TreeNodeDoctype,
   TreeNodeDocument,
   TreeNodeElement,
+  TreeResourceUsage,
   TreeSpan,
   TreeNodeText
 } from "./types.js";

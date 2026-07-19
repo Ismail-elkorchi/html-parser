@@ -45,8 +45,8 @@ import { parse } from "jsr:@ismail-elkorchi/html-parser";
 ```ts
 import { parse } from "@ismail-elkorchi/html-parser";
 
-const tree = parse("<main><h1>Hello</h1></main>");
-console.log(tree.kind);
+const document = parse("<main><h1>Hello</h1></main>");
+console.log(document.tree.kind);
 ```
 
 ### Example 2: Parse streaming bytes
@@ -62,7 +62,7 @@ const stream = new ReadableStream({
 });
 
 const controller = new AbortController();
-const tree = await parseStream(stream, {
+const document = await parseStream(stream, {
   signal: controller.signal,
   budgets: {
     maxInputBytes: 4096,
@@ -72,7 +72,7 @@ const tree = await parseStream(stream, {
     maxTimeMs: 250
   }
 });
-console.log(tree.kind);
+console.log(document.tree.kind, document.metadata.encoding);
 ```
 
 `parseStream()` streams transport reads and enforces input/decode limits while
@@ -86,17 +86,21 @@ promise cannot resolve before EOF. Use `maxInputBytes` for transport bytes,
 ```ts
 import { parse, visibleText } from "@ismail-elkorchi/html-parser";
 
-const tree = parse("<article><h1>Title</h1><p>Hello world.</p></article>");
-console.log(visibleText(tree).trim());
+const document = parse("<article><h1>Title</h1><p>Hello world.</p></article>");
+console.log(visibleText(document.tree).trim());
 ```
 
 ### Example 4: Compute and apply a patch plan
 
 ```ts
-import { applyPatchPlan, computePatch } from "@ismail-elkorchi/html-parser";
+import { applyPatchPlan, computePatch, parse } from "@ismail-elkorchi/html-parser";
 
-const plan = computePatch("<p>Draft</p>", []);
-const patched = applyPatchPlan("<p>Draft</p>", plan);
+const document = parse("<p>Draft</p>", {
+  captureSpans: true,
+  sourceRetention: "text"
+});
+const plan = computePatch(document, []);
+const patched = applyPatchPlan(document, plan);
 console.log(patched);
 ```
 

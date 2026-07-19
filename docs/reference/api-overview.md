@@ -21,10 +21,13 @@ Primary JSR runtime exports:
   helpers
 
 Primary JSR type exports:
-- `ParseBudgets`, `ParseOptions`, `ParseStreamBudgets`, `ParseStreamOptions`,
+- `ParseBudgets`, `ParseOptions`, `ParseBytesOptions`, `ParseFragmentOptions`,
+  `ParseStreamBudgets`, `ParseStreamOptions`, `SourceRetention`,
   `TokenizeByteStreamEagerBudgets`, `TokenizeByteStreamEagerOptions`,
   `OperationOptions`
-- `DocumentTree`, `FragmentTree`, the exact namespace-aware `HtmlNode` union,
+- `ParsedDocument`, `ParsedDocumentMetadata`, `ParseEncodingMetadata`,
+  `ParseResourceUsage`, `DocumentTree`, `FragmentTree`, the exact
+  namespace-aware `HtmlNode` union,
   `Attribute`, `DoctypeExternalId`, `Span`, `SpanProvenance`, and `ParseError`
 - `VisibleTextOptions`, `SerializableHtml`, `VisibleTextInput`, `HtmlToken`
 - `HtmlOperationalError`, `HtmlBudgetName`,
@@ -35,8 +38,8 @@ Primary JSR type exports:
 Node/npm type surface is shipped from `dist/mod.d.ts` (source: `src/public/mod.ts`).
 
 In addition to the shared parse and operational-error surface, Node/npm includes:
-- `ParseBudgetOptions`, `ParseStreamBudgetOptions`, and the shared
-  `ParseStreamOptions` stream contract
+- `ParseBudgetOptions`, `ParseBytesOptions`, `ParseFragmentOptions`,
+  `ParseStreamBudgetOptions`, and the shared `ParseStreamOptions` contract
 - `visibleTextTokens(...)`
 - `visibleTextTokensWithProvenance(...)`
 - `getParseErrorSpecRef(parseErrorId)`
@@ -49,6 +52,7 @@ In addition to the shared parse and operational-error surface, Node/npm includes
 - structural helpers (`outline`, `chunk`)
 - patch planning helpers (`computePatch`, `applyPatchPlan`)
 - span metadata fields including `spanProvenance` on parsed nodes when spans are enabled
+- optional exact decoded-source retention and successful parse resource/encoding metadata
 - per-operation monotonic deadlines and abort signals on serialization,
   traversal, extraction, outlining, and chunking
 

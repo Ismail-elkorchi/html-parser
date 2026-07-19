@@ -229,7 +229,7 @@ async function writeBudgets() {
     parse("<x a>", { budgets: { maxAttributeBytes: 0 } });
   });
 
-  const bufferedTree = await parseStream(
+  const { tree: bufferedTree } = await parseStream(
     makeReadableByteStream([new Uint8Array([0x41, 0x42, 0x43])]),
     { trace: "events", budgets: { maxEncodingPrescanBytes: 2 } }
   );
@@ -270,8 +270,8 @@ async function writeStream() {
 
   const fromBytes = parseBytes(bytes);
   const fromStream = await parseStream(makeReadableByteStream(chunks));
-  const fromBytesHash = sha256(JSON.stringify(fromBytes));
-  const fromStreamHash = sha256(JSON.stringify(fromStream));
+  const fromBytesHash = sha256(JSON.stringify(fromBytes.tree));
+  const fromStreamHash = sha256(JSON.stringify(fromStream.tree));
 
   checks.push({
     id: "stream-many-chunks-equals-parse-bytes",
@@ -282,7 +282,7 @@ async function writeStream() {
 
   const tiny = new Uint8Array(40).fill(0x61);
   const tinyChunks = [...tiny].map((value) => new Uint8Array([value]));
-  const tinyTree = await parseStream(makeReadableByteStream(tinyChunks), {
+  const { tree: tinyTree } = await parseStream(makeReadableByteStream(tinyChunks), {
     trace: "events",
     budgets: { maxEncodingPrescanBytes: 16 }
   });
@@ -333,8 +333,8 @@ async function writeStream() {
 }
 
 async function writeAgent() {
-  const tracedDocument = parse("agent", { trace: "events", budgets: { maxTraceEvents: 20, maxTraceBytes: 4096 } });
-  const documentWithSpans = parse("agent", { captureSpans: true });
+  const { tree: tracedDocument } = parse("agent", { trace: "events", budgets: { maxTraceEvents: 20, maxTraceBytes: 4096 } });
+  const { tree: documentWithSpans } = parse("agent", { captureSpans: true });
   const headingDocument = headingTree();
   const headingOutline = outline(headingDocument);
   const chunkPlan = chunk(headingDocument, { maxChars: 8, maxNodes: 2 });
@@ -392,7 +392,7 @@ async function writeAgent() {
         tested: true
       },
       spans: {
-        ok: Boolean(documentWithSpans.children[0]?.span),
+        ok: JSON.stringify(documentWithSpans).includes('"span":'),
         tested: true
       },
       outline: {

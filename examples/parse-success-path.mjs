@@ -20,7 +20,7 @@ export function runParseSuccessPath() {
     "</article>"
   ].join("\n");
 
-  const tree = parse(html);
+  const { tree } = parse(html);
   assert(tree.kind === "document", "parse should return a document tree");
 
   const text = visibleText(tree).trim();

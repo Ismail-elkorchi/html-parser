@@ -114,4 +114,13 @@ export interface TreeInsertionModeTransition {
 export interface TreeBuildResult {
   readonly document: TreeNodeDocument;
   readonly errors: readonly TreeBuilderError[];
+  readonly resourceUsage: TreeResourceUsage;
+}
+
+export interface TreeResourceUsage {
+  readonly nodes: number;
+  readonly maxDepth: number;
+  readonly parseErrors: number;
+  readonly attributes: number;
+  readonly attributeUtf8Bytes: number;
 }

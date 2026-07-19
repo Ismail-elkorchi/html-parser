@@ -8,9 +8,9 @@
  * // Published package form:
  * // import { parse, visibleText } from "jsr:@ismail-elkorchi/html-parser";
  *
- * const tree = parse("<main><h1>Hello</h1><p>World</p></main>");
- * console.log(tree.kind);
- * console.log(visibleText(tree, { trim: true }));
+ * const document = parse("<main><h1>Hello</h1><p>World</p></main>");
+ * console.log(document.tree.kind);
+ * console.log(visibleText(document.tree, { trim: true }));
  * ```
  *
  * Additional docs:
@@ -115,17 +115,29 @@ export interface ParseBudgets {
 export interface ParseOptions {
   /** Include source span offsets on nodes and attributes. */
   readonly captureSpans?: boolean;
+  /** Exact decoded source retention; defaults to `"none"`. */
+  readonly sourceRetention?: SourceRetention;
   /** Returned trace retention mode; defaults to `"none"`. */
   readonly trace?: TraceMode;
   /** Synchronously observes each immutable trace event without requiring retention. */
   readonly onTraceEvent?: TraceEventCallback;
-  /** Optional transport encoding hint for byte parsing. */
-  readonly transportEncodingLabel?: string;
   /** Optional budget controls for parse/decode operations. */
   readonly budgets?: ParseBudgets;
   /** Optional cancellation signal shared by every parse phase. */
   readonly signal?: AbortSignal;
 }
+
+/** Decoded-source retention for a full-document parse result. */
+export type SourceRetention = "none" | "text";
+
+/** Options accepted by byte parsing. */
+export interface ParseBytesOptions extends ParseOptions {
+  /** Optional transport encoding hint considered during HTML encoding sniffing. */
+  readonly transportEncodingLabel?: string;
+}
+
+/** Options accepted by already-decoded fragment parsing. */
+export type ParseFragmentOptions = Omit<ParseOptions, "sourceRetention">;
 
 /** Parse limits for byte streams, including bounded encoding-prescan retention. */
 export interface ParseStreamBudgets extends ParseBudgets {
@@ -134,7 +146,7 @@ export interface ParseStreamBudgets extends ParseBudgets {
 }
 
 /** Options accepted by full-document byte-stream parsing. */
-export interface ParseStreamOptions extends Omit<ParseOptions, "budgets"> {
+export interface ParseStreamOptions extends Omit<ParseBytesOptions, "budgets"> {
   /** Optional parse and stream-retention controls. */
   readonly budgets?: ParseStreamBudgets;
 }
@@ -306,7 +318,7 @@ export interface ElementNode {
 export type HtmlNode = ElementNode | TextNode | CommentNode | DoctypeNode;
 
 /**
- * Parsed HTML document tree returned by `parse`, `parseBytes`, and `parseStream`.
+ * Parsed HTML document tree nested under `ParsedDocument.tree`.
  */
 export interface DocumentTree {
   /** Stable document node id. */
@@ -319,6 +331,62 @@ export interface DocumentTree {
   readonly errors: readonly ParseError[];
   /** Deterministic summary or retained events when requested by `options.trace`. */
   readonly trace?: TraceResult;
+}
+
+/** Successful full-document parser resource observations. */
+export interface ParseResourceUsage {
+  /** UTF-8 bytes for text input or supplied transport bytes for byte/stream input. */
+  readonly inputBytes: number;
+  /** UTF-8 bytes in the exact decoded source. */
+  readonly decodedUtf8Bytes: number;
+  /** UTF-16 code units in the exact decoded source. */
+  readonly decodedCodeUnits: number;
+  /** Public root plus input and recovery allocations counted by `maxNodes`. */
+  readonly nodes: number;
+  /** Highest parser-assigned depth, with the public root at depth one. */
+  readonly maxDepth: number;
+  /** Parse diagnostics emitted during tree construction. */
+  readonly parseErrors: number;
+  /** Attempted start-tag attributes, including discarded duplicates. */
+  readonly attributes: number;
+  /** UTF-8 bytes in attempted attribute names and decoded values. */
+  readonly attributeUtf8Bytes: number;
+  /** Stream encoding-prescan retained-byte high-water mark; zero otherwise. */
+  readonly encodingPrescanBytes: number;
+  /** Observable trace events emitted by tracing or an observer. */
+  readonly traceEvents: number;
+  /** Canonical event UTF-8 bytes accounted in retained trace modes. */
+  readonly traceUtf8Bytes: number;
+}
+
+/** Encoding evidence produced by the same pipeline that built the tree. */
+export interface ParseEncodingMetadata {
+  /** Selected WHATWG encoding, or null for already-decoded text. */
+  readonly name: string | null;
+  /** Evidence that selected the encoding. */
+  readonly source: "already-decoded" | "bom" | "transport" | "meta" | "default";
+}
+
+/** Deterministic metadata for one full-document parse. */
+export interface ParsedDocumentMetadata {
+  /** Public input variant used by this parse. */
+  readonly inputKind: "text" | "bytes" | "stream";
+  /** Supplied transport bytes, or null for already-decoded text. */
+  readonly transportByteLength: number | null;
+  /** Encoding evidence from the pipeline that built the tree. */
+  readonly encoding: ParseEncodingMetadata;
+  /** Successful deterministic parser resource observations. */
+  readonly resourceUsage: ParseResourceUsage;
+}
+
+/** Canonical result returned by every full-document parse entrypoint. */
+export interface ParsedDocument {
+  /** Parsed document tree. */
+  readonly tree: DocumentTree;
+  /** Exact decoded source when requested; otherwise null. */
+  readonly sourceText: string | null;
+  /** Input, encoding, and resource evidence from this parse. */
+  readonly metadata: ParsedDocumentMetadata;
 }
 
 /**
@@ -473,11 +541,11 @@ export interface HtmlToken {
 }
 
 /**
- * Parses full HTML input into a deterministic document tree.
+ * Parses full HTML input into a deterministic document result.
  *
  * @param input HTML source text to parse.
  * @param options Parse controls for spans, tracing, and resource budgets.
- * @returns Parsed `DocumentTree` with nodes and non-fatal parse diagnostics.
+ * @returns `ParsedDocument` with a tree, optional retained source, and metadata.
  * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
  * @throws {HtmlAbortError} When `options.signal` is aborted.
  *
@@ -489,16 +557,16 @@ export interface HtmlToken {
  * ```ts
  * import { parse } from "./mod.ts";
  *
- * const tree = parse("<article><h1>News</h1><p>Stable output</p></article>", {
+ * const document = parse("<article><h1>News</h1><p>Stable output</p></article>", {
  *   budgets: { maxInputBytes: 8_192, maxNodes: 512, maxDepth: 64 }
  * });
  *
- * console.log(tree.kind);
- * console.log(tree.children.length);
+ * console.log(document.tree.kind);
+ * console.log(document.tree.children.length);
  * ```
  */
-export function parse(input: string, options: ParseOptions = {}): DocumentTree {
-  return parseInternal(input, options as Parameters<typeof parseInternal>[1]);
+export function parse(input: string, options: ParseOptions = {}): ParsedDocument {
+  return parseInternal(input, options as Parameters<typeof parseInternal>[1]) as ParsedDocument;
 }
 
 /**
@@ -506,12 +574,12 @@ export function parse(input: string, options: ParseOptions = {}): DocumentTree {
  *
  * @param input UTF-8 or legacy-encoded bytes.
  * @param options Parse controls for encoding hints, tracing, and budgets.
- * @returns Parsed `DocumentTree` for decoded HTML input.
+ * @returns `ParsedDocument` for decoded HTML input.
  * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
  * @throws {HtmlAbortError} When `options.signal` is aborted.
  */
-export function parseBytes(input: Uint8Array, options: ParseOptions = {}): DocumentTree {
-  return parseBytesInternal(input, options as Parameters<typeof parseBytesInternal>[1]);
+export function parseBytes(input: Uint8Array, options: ParseBytesOptions = {}): ParsedDocument {
+  return parseBytesInternal(input, options as Parameters<typeof parseBytesInternal>[1]) as ParsedDocument;
 }
 
 /**
@@ -538,7 +606,7 @@ export function parseBytes(input: Uint8Array, options: ParseOptions = {}): Docum
 export function parseFragment(
   html: string,
   contextTagName: string,
-  options: ParseOptions = {}
+  options: ParseFragmentOptions = {}
 ): FragmentTree {
   return parseFragmentInternal(
     html,
@@ -558,7 +626,7 @@ export function parseFragment(
  * and only then parses it. The reader lock is released before this promise
  * settles.
  *
- * @returns Promise resolving to parsed `DocumentTree` with accumulated parse diagnostics.
+ * @returns Promise resolving to a `ParsedDocument` with accumulated diagnostics and metadata.
  * @throws {HtmlStreamReadError} When acquiring or reading the stream fails.
  * @throws {HtmlBudgetExceededError} When a configured resource budget is exceeded.
  * @throws {HtmlAbortError} When `options.signal` is aborted.
@@ -576,18 +644,21 @@ export function parseFragment(
  *   }
  * });
  *
- * const tree = await parseStream(stream, {
+ * const document = await parseStream(stream, {
  *   budgets: { maxInputBytes: 8_192, maxEncodingPrescanBytes: 1_024, maxNodes: 512 }
  * });
  *
- * console.log(tree.kind);
+ * console.log(document.tree.kind);
  * ```
  */
 export async function parseStream(
   input: ReadableStream<Uint8Array>,
   options: ParseStreamOptions = {}
-): Promise<DocumentTree> {
-  return parseStreamInternal(input, options as Parameters<typeof parseStreamInternal>[1]);
+): Promise<ParsedDocument> {
+  return parseStreamInternal(
+    input,
+    options as Parameters<typeof parseStreamInternal>[1]
+  ) as Promise<ParsedDocument>;
 }
 
 /**
@@ -623,8 +694,8 @@ export function serialize(input: SerializableHtml, options: OperationOptions = {
  * ```ts
  * import { parse, visibleText } from "./mod.ts";
  *
- * const tree = parse("<main><h1>Hello</h1><p>World</p></main>");
- * console.log(visibleText(tree, { trim: true }));
+ * const document = parse("<main><h1>Hello</h1><p>World</p></main>");
+ * console.log(visibleText(document.tree, { trim: true }));
  * ```
  */
 export function visibleText(input: VisibleTextInput, options: VisibleTextOptions = {}): string {

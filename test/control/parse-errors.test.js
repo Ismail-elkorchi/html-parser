@@ -7,8 +7,8 @@ const PARSE_ERRORS_SECTION_URL = "https://html.spec.whatwg.org/multipage/parsing
 
 test("parse reports deterministic parseErrorId values for malformed markup", () => {
   const malformedHtml = "<div><span></div><p></span>";
-  const firstRun = parse(malformedHtml);
-  const secondRun = parse(malformedHtml);
+  const { tree: firstRun } = parse(malformedHtml);
+  const { tree: secondRun } = parse(malformedHtml);
 
   const firstIds = firstRun.errors.map((entry) => entry.parseErrorId);
   const secondIds = secondRun.errors.map((entry) => entry.parseErrorId);
@@ -20,7 +20,7 @@ test("parse reports deterministic parseErrorId values for malformed markup", () 
 
 test("parse trace parseError events align with parseErrorId", () => {
   const malformedHtml = "<table><tr></table></tr>";
-  const parsed = parse(malformedHtml, { trace: "events" });
+  const { tree: parsed } = parse(malformedHtml, { trace: "events" });
   assert.equal(parsed.trace?.mode, "events");
   const traceIds = parsed.trace.events
     .filter((entry) => entry.kind === "parseError")
@@ -31,7 +31,7 @@ test("parse trace parseError events align with parseErrorId", () => {
 });
 
 test("getParseErrorSpecRef returns stable WHATWG parse-errors section URL", () => {
-  const parsed = parse("<p><div></p>");
+  const { tree: parsed } = parse("<p><div></p>");
   const ids = parsed.errors.map((entry) => entry.parseErrorId);
   assert.ok(ids.length > 0);
 

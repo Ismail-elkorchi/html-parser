@@ -28,6 +28,8 @@ import {
   createOperationContext,
   normalizeChunkOptions,
   normalizeOperationOptions,
+  normalizeParseBytesOptions,
+  normalizeParseFragmentOptions,
   normalizeParseOptions,
   normalizeParseStreamOptions,
   normalizeTokenizeByteStreamEagerOptions,
@@ -55,9 +57,14 @@ import type {
   PatchPlan,
   PatchStep,
   ParseError,
+  ParseBytesOptions,
+  ParseFragmentOptions,
   ParseOptions,
+  ParsedDocument,
+  ParsedDocumentMetadata,
   ParseStreamBudgetOptions,
   ParseStreamOptions,
+  ParseResourceUsage,
   Span,
   SpanProvenance,
   Token,
@@ -106,11 +113,18 @@ export type {
   PatchSliceStep,
   PatchStep,
   ParseError,
+  ParseBytesOptions,
+  ParseFragmentOptions,
   ParseOptions,
+  ParsedDocument,
+  ParsedDocumentMetadata,
+  ParseEncodingMetadata,
+  ParseResourceUsage,
   ParseStreamBudgetOptions,
   ParseStreamOptions,
   Span,
   SpanProvenance,
+  SourceRetention,
   StartTagToken,
   Token,
   TokenAttribute,
@@ -183,6 +197,9 @@ export const XML_NAMESPACE_URI = "http://www.w3.org/XML/1998/namespace";
 /** XMLNS namespace URI used by namespace declaration attributes. */
 export const XMLNS_NAMESPACE_URI = "http://www.w3.org/2000/xmlns/";
 const DEFAULT_STREAM_ENCODING_PRESCAN_BYTES = 16_384;
+const parsedDocumentSources = new WeakMap<object, string | null>();
+const parsedDocumentSpans = new WeakMap<object, boolean>();
+const patchPlanDocuments = new WeakMap<object, ParsedDocument>();
 
 class NodeIdAssigner {
   #next: NodeId = 1;
@@ -337,6 +354,14 @@ class TraceSink {
     return this.#mode !== "none" || this.#callback !== undefined;
   }
 
+  get eventCount(): number {
+    return this.#eventCount;
+  }
+
+  get eventUtf8Bytes(): number {
+    return this.#eventUtf8Bytes;
+  }
+
   emit(input: TraceEventInput): void {
     if (!this.active) {
       return;
@@ -403,7 +428,7 @@ function toPublicSpan(span: TreeSpan | undefined, captureSpans: boolean): Span |
     return undefined;
   }
 
-  return { start: span.start, end: span.end };
+  return Object.freeze({ start: span.start, end: span.end });
 }
 
 function toSpanProvenance(span: TreeSpan | undefined, captureSpans: boolean): SpanProvenance {
@@ -418,7 +443,7 @@ function toAttributes(
   captureSpans: boolean,
   operation: OperationContext
 ): readonly Attribute[] {
-  return attributes.map((attribute) => {
+  return Object.freeze(attributes.map((attribute) => {
     operation.checkpoint();
     const span = toPublicSpan(attribute.span, captureSpans);
     return Object.freeze({
@@ -429,7 +454,7 @@ function toAttributes(
       value: attribute.value,
       ...(span ? { span } : {})
     });
-  });
+  }));
 }
 
 const WHATWG_PARSE_ERRORS_SECTION_URL = "https://html.spec.whatwg.org/multipage/parsing.html#parse-errors";
@@ -462,7 +487,7 @@ function toParseErrors(
   }[],
   operation: OperationContext
 ): readonly ParseError[] {
-  return errors.map((error) => {
+  return Object.freeze(errors.map((error) => {
     operation.checkpoint();
     const hasOffsets =
       typeof error.startOffset === "number" &&
@@ -470,20 +495,20 @@ function toParseErrors(
       error.startOffset >= 0 &&
       error.endOffset >= error.startOffset;
     const parseErrorId = normalizeParseErrorId(error.code);
-    return {
+    return Object.freeze({
       code: "PARSER_ERROR",
       parseErrorId,
       message: error.code,
       ...(hasOffsets
         ? {
-            span: {
+            span: Object.freeze({
               start: error.startOffset,
               end: error.endOffset
-            }
+            })
           }
         : {})
-    };
-  });
+    });
+  }));
 }
 
 function toToken(token: HtmlToken): Token {
@@ -640,17 +665,17 @@ function convertTreeNodes(
     } else if (node.kind === "doctype") {
       publicNode = {
         id: assigner.next(), kind: "doctype", name: node.name,
-        externalId: node.externalId, spanProvenance,
+        externalId: Object.freeze({ ...node.externalId }), spanProvenance,
         ...(span ? { span } : {})
       };
     } else {
-      const children = node.children.map((child) => {
+      const children = Object.freeze(node.children.map((child) => {
         const convertedChild = converted.get(child);
         if (convertedChild === undefined) {
           throw new Error("Tree conversion order invariant violated");
         }
         return convertedChild;
-      });
+      }));
       publicNode = {
         id: assigner.next(), kind: "element",
         namespaceUri: node.namespaceUri,
@@ -662,16 +687,16 @@ function convertTreeNodes(
         ...(span ? { span } : {})
       };
     }
-    converted.set(node, publicNode);
+    converted.set(node, Object.freeze(publicNode));
   }
 
-  return nodes.map((node) => {
+  return Object.freeze(nodes.map((node) => {
     const convertedNode = converted.get(node);
     if (convertedNode === undefined) {
       throw new Error("Tree conversion result invariant violated");
     }
     return convertedNode;
-  });
+  }));
 }
 
 function collectMetrics(nodes: readonly HtmlNode[], operation: OperationContext): NodeMetrics {
@@ -707,8 +732,12 @@ function collectMetrics(nodes: readonly HtmlNode[], operation: OperationContext)
 }
 
 interface ParseInputContext {
+  readonly inputKind: ParsedDocumentMetadata["inputKind"];
   readonly byteLength: number;
   readonly decodedUtf8ByteLength: number;
+  readonly transportByteLength: number | null;
+  readonly metadataEncoding: ParsedDocumentMetadata["encoding"];
+  readonly encodingPrescanBytes: number;
   readonly operation: OperationContext;
   readonly decode: {
     readonly source: "input" | "sniff";
@@ -725,8 +754,15 @@ interface ParseInputContext {
 function stringInputContext(html: string, operation: OperationContext): ParseInputContext {
   const byteLength = utf8ByteLength(html);
   return {
+    inputKind: "text",
     byteLength,
     decodedUtf8ByteLength: byteLength,
+    transportByteLength: null,
+    metadataEncoding: {
+      name: null,
+      source: "already-decoded"
+    },
+    encodingPrescanBytes: 0,
     operation,
     decode: {
       source: "input",
@@ -738,9 +774,9 @@ function stringInputContext(html: string, operation: OperationContext): ParseInp
 
 function parseDocumentInternal(
   html: string,
-  options: ParseOptions | ParseStreamOptions,
+  options: ParseOptions | ParseBytesOptions | ParseStreamOptions,
   input: ParseInputContext
-): DocumentTree {
+): ParsedDocument {
   const operation = input.operation;
   const budgets = options.budgets;
   const captureSpans = options.captureSpans ?? false;
@@ -846,8 +882,8 @@ function parseDocumentInternal(
     nodeCount: totalNodes,
     errorCount: built.errors.length
   });
-  traceSink.emitBudget("maxNodes", budgets?.maxNodes, totalNodes);
-  traceSink.emitBudget("maxDepth", budgets?.maxDepth, metrics.maxDepth);
+  traceSink.emitBudget("maxNodes", budgets?.maxNodes, built.resourceUsage.nodes);
+  traceSink.emitBudget("maxDepth", budgets?.maxDepth, built.resourceUsage.maxDepth);
 
   const errors = toParseErrors(built.errors, operation);
   const trace = traceSink.finish({
@@ -866,19 +902,47 @@ function parseDocumentInternal(
     encodingPrescanLimitBytes: input.stream?.encodingPrescanLimitBytes ?? null
   });
 
-  return {
+  const tree: DocumentTree = Object.freeze({
     id: documentId,
     kind: "document",
     children,
     errors,
     ...(trace === undefined ? {} : { trace })
-  };
+  });
+  const resourceUsage: ParseResourceUsage = Object.freeze({
+    inputBytes: input.byteLength,
+    decodedUtf8Bytes: input.decodedUtf8ByteLength,
+    decodedCodeUnits: html.length,
+    nodes: built.resourceUsage.nodes,
+    maxDepth: built.resourceUsage.maxDepth,
+    parseErrors: built.resourceUsage.parseErrors,
+    attributes: built.resourceUsage.attributes,
+    attributeUtf8Bytes: built.resourceUsage.attributeUtf8Bytes,
+    encodingPrescanBytes: input.encodingPrescanBytes,
+    traceEvents: traceSink.eventCount,
+    traceUtf8Bytes: traceSink.eventUtf8Bytes
+  });
+  const metadata: ParsedDocumentMetadata = Object.freeze({
+    inputKind: input.inputKind,
+    transportByteLength: input.transportByteLength,
+    encoding: Object.freeze({ ...input.metadataEncoding }),
+    resourceUsage
+  });
+  const sourceText = options.sourceRetention === "text" ? html : null;
+  const result: ParsedDocument = Object.freeze({
+    tree,
+    sourceText,
+    metadata
+  });
+  parsedDocumentSources.set(result, sourceText);
+  parsedDocumentSpans.set(result, captureSpans);
+  return result;
 }/**
  * Parses input deterministically for the `parse` public API.
  */
 
 
-export function parse(html: string, options: ParseOptions = {}): DocumentTree {
+export function parse(html: string, options: ParseOptions = {}): ParsedDocument {
   const startedAt = performance.now();
   const normalizedOptions = normalizeParseOptions(options);
   requireString(html, "input");
@@ -892,9 +956,9 @@ export function parse(html: string, options: ParseOptions = {}): DocumentTree {
  */
 
 
-export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): DocumentTree {
+export function parseBytes(bytes: Uint8Array, options: ParseBytesOptions = {}): ParsedDocument {
   const startedAt = performance.now();
-  const normalizedOptions = normalizeParseOptions(options);
+  const normalizedOptions = normalizeParseBytesOptions(options);
   requireByteArray(bytes, "input");
   const operation = parseOperationContext(normalizedOptions, startedAt);
   operation.checkpoint();
@@ -919,8 +983,15 @@ export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): Docum
   operation.checkpoint();
 
   return parseDocumentInternal(decoded.text, normalizedOptions, {
+    inputKind: "bytes",
     byteLength: bytes.byteLength,
     decodedUtf8ByteLength: decodedBudget.bytes,
+    transportByteLength: bytes.byteLength,
+    metadataEncoding: {
+      name: decoded.sniff.encoding,
+      source: decoded.sniff.source
+    },
+    encodingPrescanBytes: 0,
     operation,
     decode: {
       source: "sniff",
@@ -936,10 +1007,10 @@ export function parseBytes(bytes: Uint8Array, options: ParseOptions = {}): Docum
 export function parseFragment(
   html: string,
   contextTagName: string,
-  options: ParseOptions = {}
+  options: ParseFragmentOptions = {}
 ): FragmentTree {
   const startedAt = performance.now();
-  const normalizedOptions = normalizeParseOptions(options);
+  const normalizedOptions = normalizeParseFragmentOptions(options);
   requireString(html, "input");
   requireString(contextTagName, "contextTagName");
   const budgets = normalizedOptions.budgets;
@@ -1051,8 +1122,8 @@ export function parseFragment(
     nodeCount: totalNodes,
     errorCount: built.errors.length
   });
-  traceSink.emitBudget("maxNodes", budgets?.maxNodes, totalNodes);
-  traceSink.emitBudget("maxDepth", budgets?.maxDepth, metrics.maxDepth);
+  traceSink.emitBudget("maxNodes", budgets?.maxNodes, built.resourceUsage.nodes);
+  traceSink.emitBudget("maxDepth", budgets?.maxDepth, built.resourceUsage.maxDepth);
 
   const errors = toParseErrors(built.errors, operation);
   const trace = traceSink.finish({
@@ -1068,14 +1139,14 @@ export function parseFragment(
     encodingPrescanLimitBytes: null
   });
 
-  return {
+  return Object.freeze({
     id: fragmentId,
     kind: "fragment",
     contextTagName: normalizedContext,
     children,
     errors,
     ...(trace === undefined ? {} : { trace })
-  };
+  });
 }
 
 interface StreamDecodeResult {
@@ -1379,7 +1450,7 @@ export async function tokenizeByteStreamEager(
 export async function parseStream(
   stream: ReadableStream<Uint8Array>,
   options: ParseStreamOptions = {}
-): Promise<DocumentTree> {
+): Promise<ParsedDocument> {
   const startedAt = performance.now();
   const normalizedOptions = normalizeParseStreamOptions(options);
   requireReadableByteStream(stream, "input");
@@ -1387,8 +1458,15 @@ export async function parseStream(
   operation.checkpoint();
   const decoded = await decodeStreamToText(stream, normalizedOptions, operation);
   return parseDocumentInternal(decoded.text, normalizedOptions, {
+    inputKind: "stream",
     byteLength: decoded.totalBytes,
     decodedUtf8ByteLength: decoded.decodedUtf8Bytes,
+    transportByteLength: decoded.totalBytes,
+    metadataEncoding: {
+      name: decoded.sniff.encoding,
+      source: decoded.sniff.source
+    },
+    encodingPrescanBytes: decoded.encodingPrescanBytes,
     operation,
     decode: {
       source: "sniff",
@@ -2784,7 +2862,7 @@ function findAttributeInsertOffset(originalHtml: string, closeIndex: number, tag
  */
 
 
-export function applyPatchPlan(originalHtml: string, plan: PatchPlan): string {
+function applyPatchSteps(originalHtml: string, plan: PatchPlan): string {
   let cursor = 0;
   let output = "";
 
@@ -2811,6 +2889,32 @@ export function applyPatchPlan(originalHtml: string, plan: PatchPlan): string {
   }
 
   return output;
+}
+
+function requireParsedDocumentSource(document: ParsedDocument): string {
+  if (!parsedDocumentSources.has(document)) {
+    failPatchPlanning("UNRECOGNIZED_PARSED_DOCUMENT", {
+      detail: "document must be the exact object returned by a full-document parse"
+    });
+  }
+  const source = parsedDocumentSources.get(document);
+  if (source === null || source === undefined) {
+    failPatchPlanning("SOURCE_NOT_RETAINED", {
+      detail: 'parse with sourceRetention: "text" before planning or applying patches'
+    });
+  }
+  return source;
+}
+
+/** Applies a registered patch plan to the exact parsed document that produced it. */
+export function applyPatchPlan(document: ParsedDocument, plan: PatchPlan): string {
+  const originalHtml = requireParsedDocumentSource(document);
+  if (patchPlanDocuments.get(plan) !== document) {
+    failPatchPlanning("PLAN_SOURCE_MISMATCH", {
+      detail: "plan must be applied to the exact parsed document used to create it"
+    });
+  }
+  return applyPatchSteps(originalHtml, plan);
 }
 
 interface PlannedReplacement {
@@ -3007,23 +3111,31 @@ function buildReplacement(
  */
 
 
-export function computePatch(originalHtml: string, edits: readonly Edit[]): PatchPlan {
+export function computePatch(document: ParsedDocument, edits: readonly Edit[]): PatchPlan {
+  const originalHtml = requireParsedDocumentSource(document);
+  if (parsedDocumentSpans.get(document) !== true) {
+    failPatchPlanning("SPANS_NOT_CAPTURED", {
+      detail: "parse with captureSpans: true before planning patches"
+    });
+  }
+
   if (edits.length === 0) {
     const steps: readonly PatchStep[] = Object.freeze([
       Object.freeze({ kind: "slice", start: 0, end: originalHtml.length })
     ]);
 
-    return Object.freeze({
+    const plan = Object.freeze({
       steps,
       result: originalHtml
     });
+    patchPlanDocuments.set(plan, document);
+    return plan;
   }
 
-  const parsed = parse(originalHtml, { captureSpans: true });
   const spanByNode = new Map<NodeId, IndexedNodeSpan>();
   const nodeById = new Map<NodeId, HtmlNode>();
-  indexNodeSpans(parsed.children, spanByNode);
-  indexNodes(parsed.children, nodeById);
+  indexNodeSpans(document.tree.children, spanByNode);
+  indexNodes(document.tree.children, nodeById);
 
   const replacements = edits.map((edit, sourceIndex) =>
     buildReplacement(originalHtml, nodeById, spanByNode, edit, sourceIndex)
@@ -3089,12 +3201,14 @@ export function computePatch(originalHtml: string, edits: readonly Edit[]): Patc
   }
 
   const frozenSteps = Object.freeze(steps.map((step) => Object.freeze(step)));
-  const result = applyPatchPlan(originalHtml, { steps: frozenSteps, result: "" });
+  const result = applyPatchSteps(originalHtml, { steps: frozenSteps, result: "" });
 
-  return Object.freeze({
+  const plan = Object.freeze({
     steps: frozenSteps,
     result
   });
+  patchPlanDocuments.set(plan, document);
+  return plan;
 }/**
  * Provides deterministic public behavior for `chunk`.
  */

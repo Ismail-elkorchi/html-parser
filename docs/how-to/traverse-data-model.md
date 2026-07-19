@@ -21,7 +21,7 @@ import {
   walkElements
 } from "@ismail-elkorchi/html-parser";
 
-const documentTree = parse(`
+const { tree: documentTree } = parse(`
   <main>
     <article data-kind="news"><h1>Launch</h1><p>Stable docs</p></article>
     <article data-kind="note"><h1>Heads up</h1></article>

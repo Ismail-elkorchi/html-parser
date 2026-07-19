@@ -1,6 +1,6 @@
 # Options
 
-## Common parse APIs (`parse`, `parseBytes`, `parseFragment`)
+## Common parse controls
 
 ### `captureSpans`
 - Type: `boolean`
@@ -23,11 +23,6 @@
   requiring returned event retention. Exceptions escape unchanged and stop the
   parse. Cancellation is checked before and after each callback. A callback may
   start an independent nested parse.
-
-### `transportEncodingLabel`
-- Type: `string`
-- Default: unset
-- Optional transport hint used by byte parsing paths.
 
 ### `budgets`
 - Type: `ParseBudgetOptions` on Node/npm; `ParseBudgets` on JSR
@@ -62,6 +57,51 @@ unavailable unit.
 - Default: unset
 - Cancels decode, parse, conversion, and trace work. An already-aborted signal
   fails before work starts. `HtmlAbortError.cause` is the exact signal reason.
+
+## Full-document results and source retention
+
+`parse`, `parseBytes`, and `parseStream` return
+`{ tree, sourceText, metadata }`. `tree` is the parsed `DocumentTree`.
+`sourceText` is always present and is `null` unless `sourceRetention: "text"`
+is selected. In that mode it is the exact decoded text whose UTF-16 offsets
+are used by captured spans.
+
+### `sourceRetention`
+- Type: `"none" | "text"`
+- Default: `"none"`
+- Accepted by full-document entrypoints only. `parseFragment` rejects it.
+
+`metadata` reports the input kind, transport byte length, encoding evidence,
+and a `resourceUsage` object. Resource usage includes input bytes, decoded
+UTF-8 bytes and UTF-16 code units, all node allocations counted by `maxNodes`,
+highest parser-assigned depth, emitted parse errors, attempted attributes and
+their UTF-8 bytes, encoding-prescan high-water bytes, and observable trace
+event/byte totals.
+
+Text input is already decoded. `parse()` therefore rejects
+`transportEncodingLabel` and reports
+`{ name: null, source: "already-decoded" }`. `parseBytes()` and
+`parseStream()` accept `transportEncodingLabel` and report the encoding choice
+from the same sniff/decode pipeline that built the tree.
+
+```ts
+import { parseBytes, parseStream } from "@ismail-elkorchi/html-parser";
+
+// A browser session can consume the parser-owned decoded source without
+// teeing and independently decoding the response.
+declare const responseBody: ReadableStream<Uint8Array>;
+const browserDocument = await parseStream(responseBody, {
+  sourceRetention: "text"
+});
+console.log(browserDocument.sourceText, browserDocument.metadata.encoding);
+
+// A crawler with complete response bytes can use the same result shape.
+declare const responseBytes: Uint8Array;
+const crawlerDocument = parseBytes(responseBytes, {
+  sourceRetention: "text"
+});
+console.log(crawlerDocument.tree.errors, crawlerDocument.metadata.resourceUsage);
+```
 
 ## `parseStream(stream, options?)`
 
@@ -100,15 +140,18 @@ enable those budgets.
 import { parse, type TraceEvent } from "@ismail-elkorchi/html-parser";
 
 const observedKinds = new Set<TraceEvent["kind"]>();
-const tree = parse("<main><p>indexed</p></main>", {
+const document = parse("<main><p>indexed</p></main>", {
   trace: "summary",
   onTraceEvent(event) {
     observedKinds.add(event.kind);
   }
 });
 
-if (tree.trace?.mode === "summary") {
-  console.log(tree.trace.summary.tokenCount, tree.trace.summary.eventKinds);
+if (document.tree.trace?.mode === "summary") {
+  console.log(
+    document.tree.trace.summary.tokenCount,
+    document.tree.trace.summary.eventKinds
+  );
 }
 ```
 
@@ -175,13 +218,17 @@ reused for later traversal or serialization.
 
 ## Node/npm-only patch APIs
 
-### `computePatch(originalHtml, edits)`
-- Generates deterministic patch steps over input spans.
-- Throws `HtmlPatchPlanningError` for invalid targets, non-input spans, or
-  invalid plan steps.
+### `computePatch(document, edits)`
+- Accepts the exact `ParsedDocument` returned by a full-document parse with
+  both `captureSpans: true` and `sourceRetention: "text"`.
+- Generates deterministic patch steps directly from that tree and source; it
+  never reparses.
+- Rejects forged/cloned results, source-less results, missing span capture,
+  invalid targets, and non-input spans with `HtmlPatchPlanningError`.
 
-### `applyPatchPlan(originalHtml, plan)`
-- Applies a computed patch plan to produce final HTML.
+### `applyPatchPlan(document, plan)`
+- Applies a computed plan only to the exact `ParsedDocument` object that
+  produced it. A cloned plan or a plan from another parse is rejected.
 
 ## Related
 - [API overview](./api-overview.md)

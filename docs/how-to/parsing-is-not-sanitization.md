@@ -13,7 +13,7 @@ structure and text extraction, but it does not make hostile HTML safe to render.
 import { parse, visibleText } from "@ismail-elkorchi/html-parser";
 
 const unsafeHtml = `<img src="x" onerror="alert(1)"><p>Hello</p>`;
-const tree = parse(unsafeHtml);
+const { tree } = parse(unsafeHtml);
 
 console.log(visibleText(tree, { trim: true }));
 console.log(tree.children.length > 0);

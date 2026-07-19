@@ -29,18 +29,18 @@ function findFirst(nodes, predicate) {
 
 export function runPatchPlanUpdate() {
   const original = '<p class="state">before</p>';
-  const parsed = parse(original, { captureSpans: true });
-  const paragraph = findFirst(parsed.children, (node) => node.kind === "element" && node.tagName === "p");
+  const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
+  const paragraph = findFirst(parsed.tree.children, (node) => node.kind === "element" && node.tagName === "p");
   assert(paragraph, "expected a paragraph node");
   const textNode = findFirst(paragraph.children, (node) => node.kind === "text");
   assert(textNode, "expected a paragraph text node");
 
-  const patch = computePatch(original, [
+  const patch = computePatch(parsed, [
     { kind: "setAttr", target: paragraph.id, name: "class", value: "updated" },
     { kind: "replaceText", target: textNode.id, value: "after" }
   ]);
 
-  const replayed = serialize(parse(patch.result));
+  const replayed = serialize(parse(patch.result).tree);
   assert(replayed.includes('class="updated"'), "patch should update class attribute");
   assert(replayed.includes("after"), "patch should update text content");
   return replayed;

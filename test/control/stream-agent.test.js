@@ -56,14 +56,14 @@ function asciiBytes(value) {
 
 test("parseStream decodes deterministic output", async () => {
   const stream = createByteStream([new Uint8Array([0x61, 0x62]), new Uint8Array([0x63])]);
-  const parsed = await parseStream(stream);
+  const { tree: parsed } = await parseStream(stream);
   assert.equal(parsed.kind, "document");
   assert.equal(parsed.children[0]?.kind, "element");
 });
 
 test("parseStream caps encoding-prescan memory without rejecting the remainder", async () => {
   const stream = createByteStream([new Uint8Array([0x61, 0x62, 0x63])]);
-  const parsed = await parseStream(stream, {
+  const { tree: parsed } = await parseStream(stream, {
     trace: "events",
     budgets: { maxEncodingPrescanBytes: 2 }
   });
@@ -76,7 +76,7 @@ test("parseStream caps encoding-prescan memory without rejecting the remainder",
 test("stream encoding prescan uses its documented implementation maximum", async () => {
   const bytes = new Uint8Array(20_000).fill(0x61);
   for (const budgets of [{}, { maxEncodingPrescanBytes: 50_000 }]) {
-    const parsed = await parseStream(createByteStream([bytes]), { trace: "events", budgets });
+    const { tree: parsed } = await parseStream(createByteStream([bytes]), { trace: "events", budgets });
     assert.equal(parsed.trace?.mode, "events");
     const event = parsed.trace.events.find((entry) => entry.kind === "stream");
     assert.equal(event?.encodingPrescanBytes, 16_384);
@@ -106,7 +106,10 @@ test("parseStream matches parseBytes for chunked transport with sniffing", async
   const fromBytes = parseBytes(bytes);
   const fromStream = await parseStream(stream);
 
-  assert.deepEqual(fromStream, fromBytes);
+  assert.deepEqual(fromStream.tree, fromBytes.tree);
+  assert.equal(fromStream.sourceText, fromBytes.sourceText);
+  assert.deepEqual(fromStream.metadata.encoding, fromBytes.metadata.encoding);
+  assert.equal(fromStream.metadata.transportByteLength, fromBytes.metadata.transportByteLength);
 });
 
 test("parseStream matches parseBytes across many deterministic chunks", async () => {
@@ -119,7 +122,10 @@ test("parseStream matches parseBytes across many deterministic chunks", async ()
 
   const fromBytes = parseBytes(bytes);
   const fromStream = await parseStream(createByteStream(chunks));
-  assert.deepEqual(fromStream, fromBytes);
+  assert.deepEqual(fromStream.tree, fromBytes.tree);
+  assert.equal(fromStream.sourceText, fromBytes.sourceText);
+  assert.deepEqual(fromStream.metadata.encoding, fromBytes.metadata.encoding);
+  assert.equal(fromStream.metadata.transportByteLength, fromBytes.metadata.transportByteLength);
 });
 
 test("parseStream aborts before extra pulls when maxInputBytes is exceeded", async () => {
@@ -229,7 +235,7 @@ test("byte and stream traces contain one truthful decode event", async () => {
   const fromBytes = parseBytes(bytes, options);
   const fromStream = await parseStream(createByteStream([bytes]), options);
 
-  for (const tree of [fromBytes, fromStream]) {
+  for (const { tree } of [fromBytes, fromStream]) {
     assert.equal(tree.trace?.mode, "events");
     const decodeEvents = tree.trace.events.filter((event) => event.kind === "decode");
     assert.equal(decodeEvents.length, 1);
@@ -280,7 +286,7 @@ test("eager tokenization is invariant across chunk patterns and legacy encoding"
 });
 
 test("outline and chunk stay deterministic", () => {
-  const parsed = parse("<h1>a</h1><h2>b</h2>");
+  const { tree: parsed } = parse("<h1>a</h1><h2>b</h2>");
   const firstOutline = outline(parsed);
   const secondOutline = outline(parsed);
   assert.deepEqual(firstOutline, secondOutline);

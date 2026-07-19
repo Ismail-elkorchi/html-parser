@@ -30,8 +30,10 @@ over an already-aborted signal and occurs before stream-reader acquisition.
 
 `HtmlConfigurationError.reason` is one of `UNKNOWN_OPTION`, `INVALID_VALUE`, or
 `CONFLICTING_OPTIONS`. `HtmlPatchPlanningError.reason` supplies the specific
-patch failure such as `NODE_NOT_FOUND`, `NON_INPUT_SPAN_PROVENANCE`,
-`OVERLAPPING_EDITS`, `INVALID_PLAN_SLICE`, or `INVALID_PLAN_INSERTION`.
+patch failure. Identity/source prerequisites use
+`UNRECOGNIZED_PARSED_DOCUMENT`, `SOURCE_NOT_RETAINED`, `SPANS_NOT_CAPTURED`,
+or `PLAN_SOURCE_MISMATCH`; edit failures include `NODE_NOT_FOUND`,
+`NON_INPUT_SPAN_PROVENANCE`, and `OVERLAPPING_EDITS`.
 
 ```ts
 import {

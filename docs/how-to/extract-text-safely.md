@@ -21,7 +21,7 @@ const input = `
 `;
 
 try {
-  const tree = parse(input, {
+  const { tree } = parse(input, {
     budgets: {
       maxInputBytes: 8_192,
       maxNodes: 512,

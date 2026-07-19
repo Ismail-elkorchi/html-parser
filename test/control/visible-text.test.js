@@ -45,7 +45,7 @@ test("visibleText and visibleTextTokens match fixture snapshots", async () => {
       readFile(join(fixtureDir, "expected.tokens.json"), "utf8")
     ]);
 
-    const parsed = parse(inputHtml, { captureSpans: true });
+    const { tree: parsed } = parse(inputHtml, { captureSpans: true });
     const firstText = visibleText(parsed);
     const secondText = visibleText(parsed);
     const expectedVisibleText = expectedText.replace(/\n$/, "");
@@ -72,7 +72,7 @@ test("visibleText fallback fixture corpus remains deterministic", async () => {
       readFile(join(fixtureDir, "expected.fallback.tokens.json"), "utf8")
     ]);
 
-    const parsed = parse(inputHtml, { captureSpans: true });
+    const { tree: parsed } = parse(inputHtml, { captureSpans: true });
     const expectedDefaultVisibleText = expectedDefaultText.replace(/\n$/, "");
     const expectedFallbackVisibleText = expectedFallbackText.replace(/\n$/, "");
     const defaultValue = visibleText(parsed);
@@ -132,7 +132,7 @@ test("visibleText optional accessible-name fallback is opt-in", () => {
     "</main>"
   ].join("");
 
-  const parsed = parse(html);
+  const { tree: parsed } = parse(html);
   const baseline = visibleText(parsed);
   const variant = visibleText(parsed, {
     includeAccessibleNameFallback: true
@@ -143,7 +143,7 @@ test("visibleText optional accessible-name fallback is opt-in", () => {
 });
 
 test("accessible-name fallback applies to input aria-label only", () => {
-  const parsed = parse([
+  const { tree: parsed } = parse([
     "<main>",
     "<a href=\"/x\" aria-label=\"Primary\" title=\"Secondary\"></a>",
     "<button aria-label=\"Action\" title=\"Ignored\"></button>",
@@ -158,8 +158,8 @@ test("accessible-name fallback applies to input aria-label only", () => {
 });
 
 test("visibleTextTokensWithProvenance is deterministic and reconstructs visible text", () => {
-  const parsedA = parse("<main><p>A <img alt=\"B\"></p><table><tr><td>x</td><td>y</td></tr></table></main>");
-  const parsedB = parse("<main><p>A <img alt=\"B\"></p><table><tr><td>x</td><td>y</td></tr></table></main>");
+  const { tree: parsedA } = parse("<main><p>A <img alt=\"B\"></p><table><tr><td>x</td><td>y</td></tr></table></main>");
+  const { tree: parsedB } = parse("<main><p>A <img alt=\"B\"></p><table><tr><td>x</td><td>y</td></tr></table></main>");
   const provenanceA = visibleTextTokensWithProvenance(parsedA);
   const provenanceB = visibleTextTokensWithProvenance(parsedB);
   const text = visibleText(parsedA);

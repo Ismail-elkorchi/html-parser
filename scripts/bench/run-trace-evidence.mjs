@@ -32,11 +32,12 @@ function round(value) {
 }
 
 function eventsFromResult(result) {
-  if (Array.isArray(result.trace)) {
-    return result.trace;
+  const tree = result?.tree ?? result;
+  if (Array.isArray(tree.trace)) {
+    return tree.trace;
   }
-  if (result.trace?.mode === "events") {
-    return result.trace.events;
+  if (tree.trace?.mode === "events") {
+    return tree.trace.events;
   }
   throw new Error("event trace result is unavailable");
 }
@@ -126,8 +127,10 @@ if (contract === "current") {
     );
     summary.push({
       inputCodeUnits: size,
-      eventCount: measured.result.trace?.summary.eventCount ?? null,
-      returnedTraceUtf8Bytes: encoder.encode(JSON.stringify(measured.result.trace)).byteLength,
+      eventCount: (measured.result?.tree ?? measured.result).trace?.summary.eventCount ?? null,
+      returnedTraceUtf8Bytes: encoder.encode(
+        JSON.stringify((measured.result?.tree ?? measured.result).trace)
+      ).byteLength,
       medianElapsedMs: measured.medianElapsedMs,
       medianRetainedHeapDeltaBytes: measured.medianRetainedHeapDeltaBytes
     });

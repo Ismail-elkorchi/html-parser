@@ -77,7 +77,7 @@ function normalizeLibraryNode(node) {
 }
 
 function normalizeLibrary(html) {
-  const tree = parse(html);
+  const { tree } = parse(html);
   return tree.children.map((child) => normalizeLibraryNode(child));
 }
 

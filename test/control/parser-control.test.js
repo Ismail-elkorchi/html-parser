@@ -18,7 +18,7 @@ test("deterministic node ids for identical input", () => {
 
 test("parse bytes baseline", () => {
   const bytes = new Uint8Array([0x3c, 0x62, 0x3e, 0x78, 0x3c, 0x2f, 0x62, 0x3e]);
-  const tree = parseBytes(bytes);
+  const { tree } = parseBytes(bytes);
   assert.equal(tree.kind, "document");
   assert.equal(tree.children[0].kind, "element");
 });
@@ -36,7 +36,7 @@ test("deterministic fragment ids for identical input", () => {
 });
 
 test("serialize reflects full document tree", () => {
-  const tree = parse("content");
+  const { tree } = parse("content");
   assert.equal(serialize(tree), "<html><head></head><body>content</body></html>");
 });
 
@@ -67,7 +67,7 @@ test("string and fragment input budgets measure UTF-8 bytes", () => {
 });
 
 test("byte input budget remains based on transport bytes after legacy decoding", () => {
-  const tree = parseBytes(new Uint8Array([0xe9]), {
+  const { tree } = parseBytes(new Uint8Array([0xe9]), {
     transportEncodingLabel: "windows-1252",
     budgets: { maxInputBytes: 1 }
   });

@@ -3,6 +3,10 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Return one `ParsedDocument` from all full-document entrypoints with optional
+  exact decoded-source retention, encoding evidence, and successful resource
+  observations; freeze parser-owned trees and require patch plans to retain the
+  exact parse-result identity.
 - Preserve element and attribute namespace identity, expose shared HTML and
   exact-namespace query helpers, and align Node/npm and JSR tree types.
 - Replace ambiguous optional doctype identifiers with an exact external-ID

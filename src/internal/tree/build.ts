@@ -17,6 +17,7 @@ import type {
   TreeNodeDoctype,
   TreeNodeElement,
   TreeNodeText,
+  TreeResourceUsage,
   TreeSpan,
   TreeTokenDetails,
   TreeTokenKind
@@ -153,6 +154,9 @@ class TreeBudgetController {
   readonly #encoder = new TextEncoder();
   #nodeCount: number;
   #parseErrorCount = 0;
+  #maxDepth = 0;
+  #attributeCount = 0;
+  #attributeUtf8Bytes = 0;
   #currentStartTagAttributeCount = 0;
   #currentStartTagAttributeBytes = 0;
   #afterEof = false;
@@ -195,10 +199,23 @@ class TreeBudgetController {
     this.checkpoint();
     if (start) {
       this.#currentStartTagAttributeCount += 1;
+      this.#attributeCount += 1;
       this.#enforce("maxAttributesPerElement", this.#currentStartTagAttributeCount);
     }
-    this.#currentStartTagAttributeBytes += this.#encoder.encode(value).byteLength;
+    const bytes = this.#encoder.encode(value).byteLength;
+    this.#currentStartTagAttributeBytes += bytes;
+    this.#attributeUtf8Bytes += bytes;
     this.#enforce("maxAttributeBytes", this.#currentStartTagAttributeBytes);
+  }
+
+  resourceUsage(): TreeResourceUsage {
+    return {
+      nodes: this.#nodeCount,
+      maxDepth: this.#maxDepth,
+      parseErrors: this.#parseErrorCount,
+      attributes: this.#attributeCount,
+      attributeUtf8Bytes: this.#attributeUtf8Bytes
+    };
   }
 
   createRecoveryElement(tagName: string, namespaceURI: string): Parse5Element {
@@ -236,6 +253,9 @@ class TreeBudgetController {
 
   #enforce(budget: TreeBudgetName, actual: number): void {
     this.checkpoint();
+    if (budget === "maxDepth") {
+      this.#maxDepth = Math.max(this.#maxDepth, actual);
+    }
     const limit = this.#budgets?.[budget];
     if (limit !== undefined && actual > limit) {
       throw new TreeBudgetExceededError(budget, limit, limit + 1);
@@ -682,7 +702,10 @@ function parseTree(
   options: TreeBuildOptions,
   errors: TreeBuilderError[],
   doctypeTokens: TreeTokenDetails[]
-): Parse5Document | Parse5DocumentFragment {
+): {
+  readonly parsed: Parse5Document | Parse5DocumentFragment;
+  readonly resourceUsage: TreeResourceUsage;
+} {
   const controller = new TreeBudgetController(
     budgets,
     options.checkpoint,
@@ -758,7 +781,7 @@ function parseTree(
     parsed = parse(input, parseOptions) as Parse5Document;
   }
   patchSelectAdoptionCompatibility(parsed, controller);
-  return parsed;
+  return { parsed, resourceUsage: controller.resourceUsage() };
 }
 
 function doctypeExternalId(
@@ -981,7 +1004,7 @@ export function buildTreeFromHtml(
 ): TreeBuildResult {
   const errors: TreeBuilderError[] = [];
   const doctypeTokens: TreeTokenDetails[] = [];
-  const parsed = parseTree(input, budgets, options, errors, doctypeTokens);
+  const { parsed, resourceUsage } = parseTree(input, budgets, options, errors, doctypeTokens);
 
   const state: BuildState = {
     captureSpans: options.captureSpans ?? false,
@@ -996,7 +1019,8 @@ export function buildTreeFromHtml(
       kind: "document",
       children
     },
-    errors
+    errors,
+    resourceUsage
   };
 }
 
