@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { serializeFixtureTokenStream } from "../../dist/internal/serializer/mod.js";
 import { buildTreeFromHtml, normalizeTree } from "../../dist/internal/tree/mod.js";
 
 test("frameset fragment context keeps frame node after unmatched close tag", () => {
@@ -20,9 +19,4 @@ test("frameset fragment context keeps frame node after unmatched close tag", () 
   );
 
   assert.equal(normalizeTree(built.document), "| <frame>");
-});
-
-test("serializer omits trailing optional dd end tag but keeps dt end tag", () => {
-  assert.equal(serializeFixtureTokenStream([["EndTag", "dd"]], {}), "");
-  assert.equal(serializeFixtureTokenStream([["EndTag", "dt"]], {}), "</dt>");
 });

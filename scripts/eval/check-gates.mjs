@@ -254,7 +254,7 @@ async function main() {
   }
 
   const textExtractionDocsExist = await fileExists("docs/querying-and-text.md");
-  const textExtractionTestsExist = await fileExists("test/control/visible-text.test.js");
+  const textExtractionTestsExist = await fileExists("test/behavior/visible-text.test.js");
 
   const fixtureRoot = "test/fixtures/visible-text/v1";
   let fixtureCaseCount = 0;
@@ -343,7 +343,7 @@ async function main() {
   }
 
   const parseErrorDocsExists = await fileExists("docs/limits-errors-and-safety.md");
-  const parseErrorTestsExists = await fileExists("test/control/parse-errors.test.js");
+  const parseErrorTestsExists = await fileExists("test/behavior/parse-errors.test.js");
   const agentParseErrorFeaturePresent = Boolean(agentReport?.features?.parseErrorId);
   const agentParseErrorFeatureOk = Boolean(agentReport?.features?.parseErrorId?.ok);
   const parseErrorGatePass =
@@ -430,7 +430,7 @@ async function main() {
 
   const specMarkdown = await readFile("docs/data-model.md", "utf8");
   const spanProvenanceDocumented = specMarkdown.includes("spanProvenance");
-  const spansPatchTestsExist = await fileExists("test/control/spans-patch.test.js");
+  const spansPatchTestsExist = await fileExists("test/behavior/spans-patch.test.js");
   const spanProvenanceGatePass =
     spanProvenancePresent &&
     spanProvenanceValuesOk &&

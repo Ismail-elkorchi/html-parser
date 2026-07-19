@@ -6,7 +6,7 @@ import {
   parseTreeDatFixtures,
   TREE_DAT_NAMESPACES,
   TreeDatFormatError
-} from "../../scripts/conformance/tree-dat.mjs";
+} from "../support/tree-dat.mjs";
 
 test("tree .dat reader preserves raw input and fragment namespace identity", () => {
   const content = [

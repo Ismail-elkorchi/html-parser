@@ -4,25 +4,18 @@ import path from "node:path";
 import { TextDecoder } from "node:util";
 
 import { buildTreeFromHtml, normalizeTree } from "../../dist/internal/tree/mod.js";
+import { TREE_FIXTURE_FILES } from "../../test/support/fixture-sources.mjs";
 import { nowIso, writeJson } from "../eval/eval-primitives.mjs";
 import {
   expandTreeDatCases,
   parseTreeDatFixtures,
   TREE_DAT_NAMESPACES
-} from "./tree-dat.mjs";
-import { verifyWptTreeCorpus } from "./wpt-tree-corpus.mjs";
+} from "../../test/support/tree-dat.mjs";
+import { verifyWptTreeCorpus } from "../../test/support/wpt-tree-corpus.mjs";
 
 const BASELINE_PATH = "test/fixtures/conformance/wpt-tree-legacy-result.json";
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
-const LEGACY_TREE_FILES = [
-  "vendor/html5lib-tests/tree-construction/tests1.dat",
-  "vendor/html5lib-tests/tree-construction/tests2.dat",
-  "vendor/html5lib-tests/tree-construction/tests3.dat",
-  "vendor/html5lib-tests/tree-construction/tests4.dat",
-  "vendor/html5lib-tests/tree-construction/tests5.dat",
-  "vendor/html5lib-tests/tree-construction/tests6.dat"
-];
 const SCRIPT_EXECUTION_CASES = new Map([
   ["resources/scripted_adoption01.dat#1", "requires-live-dom-mutation"],
   ["resources/scripted_ark.dat#1", "requires-live-dom-mutation"],
@@ -290,7 +283,7 @@ async function compareLegacyCoverage(baseCases) {
   const requireLegacyCoverage = process.argv.includes("--require-legacy-coverage");
   let legacyCorpusAvailable = false;
   try {
-    legacyCorpusAvailable = (await stat(LEGACY_TREE_FILES[0])).isFile();
+    legacyCorpusAvailable = (await stat(TREE_FIXTURE_FILES[0])).isFile();
   } catch {
     if (requireLegacyCoverage) {
       throw new Error(
@@ -310,7 +303,7 @@ async function compareLegacyCoverage(baseCases) {
   const semanticDifferences = [];
   const expectationChanges = [];
   let oldCases = 0;
-  for (const legacyPath of LEGACY_TREE_FILES) {
+  for (const legacyPath of TREE_FIXTURE_FILES) {
     const legacyContent = await readFile(legacyPath, "utf8");
     const legacyCases = parseTreeDatFixtures(legacyContent, legacyPath);
     for (const legacyCase of legacyCases) {

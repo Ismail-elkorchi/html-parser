@@ -9,9 +9,9 @@ git submodule update --init --recursive
 
 ## Everyday changes
 
-Run `npm run check:fast`. It covers linting, strict TypeScript compilation,
-control tests, required documentation checks, JSR documentation quality, and
-repository examples.
+Run `npm run check:fast`. It covers linting, production and test TypeScript
+compilation, behavior and engine tests, type contracts, required documentation
+checks, JSR documentation quality, and repository examples.
 
 Use narrower commands while iterating:
 
@@ -21,8 +21,10 @@ Use narrower commands while iterating:
 | Do production TypeScript sources compile? | `npm run typecheck` |
 | Does the package build? | `npm run build` |
 | Do independent-engine foundation units pass? | `npm run test:engine:unit` |
-| Do independent-engine compile contracts pass? | `npm run test:engine:types` |
-| Do control and regression tests pass? | `npm test` |
+| Do all compiled TypeScript runtime tests pass? | `npm run test:runtime` |
+| Do compile-only API contracts pass? | `npm run test:types` |
+| Do production behavior and regression tests pass? | `npm run test:behavior` |
+| Does the normal local test set pass? | `npm test` |
 | Does the maintained WPT tree snapshot reproduce its frozen result? | `npm run test:wpt-tree` |
 | Does WPT retain every legacy tree case? | `npm run test:wpt-tree:coverage` |
 | Do documentation links and API names stay valid? | `npm run docs:check` |
@@ -30,13 +32,20 @@ Use narrower commands while iterating:
 | Do repository examples execute? | `npm run examples:run` |
 | Is the packed npm artifact correct? | `npm run pack:check` |
 
-Runtime tests currently use Node's test runner and live under `test/control`
-and `tests/control`. Build typechecking covers `src/**/*.ts`; do not assume a
-JavaScript test file is a TypeScript contract test.
+All tests live under one `test` root. `test/behavior` owns public and current
+production regressions, `test/engine` owns replacement-engine units,
+`test/conformance` owns focused fixture-adapter behavior, `test/contracts`
+owns compile-only positive and deliberate negative type contracts,
+`test/support` owns fixture adapters/readers, and `test/fixtures` owns checked-in
+data. Differential, fuzz, benchmark, and corpus-scale conformance drivers stay
+in their matching `scripts` subdirectories because they are executable test
+programs rather than Node test modules.
 
-Independent-engine unit tests live under `test/engine`; compile-only positive
-and negative contracts live under `test/types`. The incomplete engine is built
-for repository tests but is deliberately absent from package artifacts.
+TypeScript runtime tests compile with `tsconfig.test-runtime.json` into the
+disposable `tmp/test-runtime` tree before Node executes them. Type contracts use
+the separate no-emit `tsconfig.type-tests.json`; keep `@ts-expect-error` cases
+there, not in runtime tests. The incomplete engine and compiled test output are
+deliberately absent from package artifacts.
 
 ## Parser semantics
 

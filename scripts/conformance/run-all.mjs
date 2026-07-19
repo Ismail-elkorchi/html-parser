@@ -1,6 +1,10 @@
 import { spawn } from "node:child_process";
 import { stat } from "node:fs/promises";
 
+import {
+  ALL_HTML5LIB_FIXTURE_FILES,
+  requireFixtureFiles
+} from "../../test/support/fixture-sources.mjs";
 import { nowIso, readJson, writeJson } from "../eval/eval-primitives.mjs";
 
 function actRunNodeScript(scriptPath) {
@@ -26,20 +30,6 @@ async function evalReportHasFailures(reportPath) {
   const failed = Number(report?.cases?.failed || 0);
 
   return failed > 0;
-}
-
-async function requireConformanceFixtures() {
-  const sentinel = "vendor/html5lib-tests/tokenizer/test1.test";
-  try {
-    const fixture = await stat(sentinel);
-    if (fixture.isFile()) return;
-  } catch {
-    // Emit one stable setup error below.
-  }
-  throw new Error(
-    `html5lib conformance fixtures are unavailable (${sentinel}). ` +
-      "Run: git submodule update --init --recursive"
-  );
 }
 
 const conformanceSuites = [
@@ -71,7 +61,7 @@ const conformanceSuites = [
 ];
 
 async function main() {
-  await requireConformanceFixtures();
+  await requireFixtureFiles(ALL_HTML5LIB_FIXTURE_FILES);
   const suiteResults = [];
   let hasSuiteFailures = false;
 

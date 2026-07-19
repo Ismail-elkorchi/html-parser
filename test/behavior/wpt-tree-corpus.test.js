@@ -8,7 +8,7 @@ import {
   verifyWptTreeCorpus,
   WptTreeCorpusError,
   WPT_TREE_CORPUS_ROOT
-} from "../../scripts/conformance/wpt-tree-corpus.mjs";
+} from "../support/wpt-tree-corpus.mjs";
 
 const EXPECTED_COMMIT = "e4ea1706fa708c3ac4523c534a65160d1ab20db8";
 const EXPECTED_COMPOSITE = "9bf2315b5c8836b0d1bc7375cbabc746f9891735dc958491b99a1855b7cb2acc";

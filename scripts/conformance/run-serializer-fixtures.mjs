@@ -1,15 +1,11 @@
 import { readFile } from "node:fs/promises";
 
+import {
+  requireFixtureFiles,
+  SERIALIZER_FIXTURE_FILES
+} from "../../test/support/fixture-sources.mjs";
+import { serializeFixtureTokenStream } from "../../tmp/test-runtime/test/support/fixture-serializer.js";
 import { writeJson } from "../eval/eval-primitives.mjs";
-import { serializeFixtureTokenStream } from "../../dist/internal/serializer/mod.js";
-
-const SERIALIZER_FILES = [
-  "vendor/html5lib-tests/serializer/core.test",
-  "vendor/html5lib-tests/serializer/options.test",
-  "vendor/html5lib-tests/serializer/whitespace.test",
-  "vendor/html5lib-tests/serializer/optionaltags.test",
-  "vendor/html5lib-tests/serializer/injectmeta.test"
-];
 
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
@@ -23,7 +19,8 @@ function computeHoldout(fixtureId) {
 }
 
 const serializerCases = [];
-for (const fixturePath of SERIALIZER_FILES) {
+await requireFixtureFiles(SERIALIZER_FIXTURE_FILES);
+for (const fixturePath of SERIALIZER_FIXTURE_FILES) {
   const fixtureFile = JSON.parse(await readFile(fixturePath, "utf8"));
   for (let caseIndex = 0; caseIndex < (fixtureFile.tests ?? []).length; caseIndex += 1) {
     const fixtureCase = fixtureFile.tests[caseIndex];

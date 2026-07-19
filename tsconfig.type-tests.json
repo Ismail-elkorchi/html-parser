@@ -5,6 +5,6 @@
   },
   "include": [
     "src/internal/html-engine/**/*.ts",
-    "test/types/html-engine-foundations.type-test.ts"
+    "test/contracts/types/**/*.type-test.ts"
   ]
 }

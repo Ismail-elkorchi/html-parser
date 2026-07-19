@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "tmp/test-runtime",
+    "types": ["node"],
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "test/engine/**/*.test.ts",
+    "test/conformance/**/*.test.ts",
+    "test/support/**/*.ts"
+  ],
+  "exclude": ["test/contracts/**"]
+}

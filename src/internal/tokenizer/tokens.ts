@@ -83,8 +83,6 @@ export interface TokenizeOptions {
   readonly debug?: TokenizerDebugOptions;
   readonly initialState?: TokenizerInitialState;
   readonly lastStartTag?: string;
-  readonly doubleEscaped?: boolean;
-  readonly xmlViolationMode?: boolean;
 }
 
 export interface TokenizerDebugSnapshot {

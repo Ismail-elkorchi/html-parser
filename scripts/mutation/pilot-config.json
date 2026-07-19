@@ -1,30 +1,76 @@
 {
-  "targetFile": "dist/internal/encoding/sniff.js",
-  "testCommand": ["node", "--test", "test/control/encoding-sniff.test.js"],
-  "mutants": [
+  "targets": [
     {
-      "id": "alias-windows1252",
-      "description": "Disable latin1/latin-1/us-ascii alias mapping to windows-1252.",
-      "search": "if (WINDOWS_1252_ALIASES.has(normalized)) {",
-      "replace": "if (false && WINDOWS_1252_ALIASES.has(normalized)) {"
+      "targetFile": "dist/internal/encoding/sniff.js",
+      "testCommand": ["node", "--test", "test/behavior/encoding-sniff.test.js"],
+      "mutants": [
+        {
+          "id": "encoding-alias-windows1252",
+          "description": "Disable latin1/latin-1/us-ascii alias mapping to windows-1252.",
+          "search": "if (WINDOWS_1252_ALIASES.has(normalized)) {",
+          "replace": "if (false && WINDOWS_1252_ALIASES.has(normalized)) {"
+        },
+        {
+          "id": "encoding-meta-utf16-fallback",
+          "description": "Disable canonical UTF-16 to UTF-8 fallback after TextDecoder label normalization.",
+          "search": "if ((source === \"meta\" || source === \"transport\") && encoding.startsWith(\"utf-16\")) {",
+          "replace": "if (false && (source === \"meta\" || source === \"transport\") && encoding.startsWith(\"utf-16\")) {"
+        },
+        {
+          "id": "encoding-strip-comments-disabled",
+          "description": "Disable HTML comment stripping during prescan.",
+          "search": "const scan = stripHtmlComments(decodeLatin1(bytes.subarray(0, scanSize)));",
+          "replace": "const scan = decodeLatin1(bytes.subarray(0, scanSize));"
+        },
+        {
+          "id": "encoding-bom-utf8-disabled",
+          "description": "Disable UTF-8 BOM detection.",
+          "search": "if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {",
+          "replace": "if (false && bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {"
+        }
+      ]
     },
     {
-      "id": "meta-utf16-fallback",
-      "description": "Disable canonical UTF-16 to UTF-8 fallback after TextDecoder label normalization.",
-      "search": "if ((source === \"meta\" || source === \"transport\") && encoding.startsWith(\"utf-16\")) {",
-      "replace": "if (false && (source === \"meta\" || source === \"transport\") && encoding.startsWith(\"utf-16\")) {"
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/input-cursor.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/unit/foundations.test.js"],
+      "mutants": [
+        {
+          "id": "cursor-crlf-width",
+          "description": "Consume CRLF as one source code unit instead of two.",
+          "search": "if (second === 0x0a)\n                width = 2;",
+          "replace": "if (second === 0x0a)\n                width = 1;"
+        },
+        {
+          "id": "cursor-surrogate-pair",
+          "description": "Disable leading-surrogate pair recognition.",
+          "search": "else if (isLeadingSurrogate(first)) {",
+          "replace": "else if (false && isLeadingSurrogate(first)) {"
+        },
+        {
+          "id": "cursor-preprocessing-diagnostics",
+          "description": "Disable input preprocessing diagnostics.",
+          "search": "if (parseErrorCode !== null) {",
+          "replace": "if (false && parseErrorCode !== null) {"
+        }
+      ]
     },
     {
-      "id": "strip-comments-disabled",
-      "description": "Disable HTML comment stripping during prescan.",
-      "search": "const scan = stripHtmlComments(decodeLatin1(bytes.subarray(0, scanSize)));",
-      "replace": "const scan = decodeLatin1(bytes.subarray(0, scanSize));"
-    },
-    {
-      "id": "bom-utf8-disabled",
-      "description": "Disable UTF-8 BOM detection branch.",
-      "search": "if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {",
-      "replace": "if (false && bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {"
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/resource-guard.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/unit/foundations.test.js"],
+      "mutants": [
+        {
+          "id": "guard-abort-checkpoint",
+          "description": "Disable abort checks at resource checkpoints.",
+          "search": "if (signal?.aborted === true)",
+          "replace": "if (false && signal?.aborted === true)"
+        },
+        {
+          "id": "guard-step-limit",
+          "description": "Disable the engine step limit.",
+          "search": "checkLimit(\"maxSteps\", actual);",
+          "replace": "if (false) checkLimit(\"maxSteps\", actual);"
+        }
+      ]
     }
   ]
 }

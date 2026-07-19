@@ -22,7 +22,6 @@ import type {
   TreeTokenDetails,
   TreeTokenKind
 } from "./types.js";
-import type { HtmlToken } from "../tokenizer/tokens.js";
 
 const CONTEXT_DOCUMENT_HTML =
   "<!doctype html><html><head><title>x</title></head><body><table><tbody><tr><td></td></tr><caption></caption><colgroup></colgroup></table><frameset></frameset></body></html>";
@@ -929,74 +928,6 @@ function convertNodes(nodes: readonly Parse5ChildNode[], state: BuildState): rea
   return result;
 }
 
-function escapeAttributeValue(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-}
-
-function escapeTextForReparse(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function quoteDoctypeIdentifier(value: string): string {
-  if (!value.includes('"')) {
-    return `"${value}"`;
-  }
-  if (!value.includes("'")) {
-    return `'${value}'`;
-  }
-  throw new Error("DOCTYPE identifier cannot be serialized losslessly");
-}
-
-function serializeTokens(tokens: readonly HtmlToken[]): string {
-  const parts: string[] = [];
-
-  for (const token of tokens) {
-    if (token.type === "EOF") {
-      continue;
-    }
-
-    if (token.type === "StartTag") {
-      const attributes = Object.entries(token.attributes)
-        .map(([name, value]) => `${name}="${escapeAttributeValue(value)}"`)
-        .join(" ");
-
-      const start = attributes.length > 0 ? `<${token.name} ${attributes}` : `<${token.name}`;
-      parts.push(token.selfClosing ? `${start}/>` : `${start}>`);
-      continue;
-    }
-
-    if (token.type === "EndTag") {
-      parts.push(`</${token.name}>`);
-      continue;
-    }
-
-    if (token.type === "Character") {
-      parts.push(escapeTextForReparse(token.data));
-      continue;
-    }
-
-    if (token.type === "Comment") {
-      parts.push(`<!--${token.data}-->`);
-      continue;
-    }
-
-    if (token.publicId !== null) {
-      const systemId = token.systemId === null ? "" : ` ${quoteDoctypeIdentifier(token.systemId)}`;
-      parts.push(`<!DOCTYPE ${token.name} PUBLIC ${quoteDoctypeIdentifier(token.publicId)}${systemId}>`);
-      continue;
-    }
-
-    if (token.systemId !== null) {
-      parts.push(`<!DOCTYPE ${token.name} SYSTEM ${quoteDoctypeIdentifier(token.systemId)}>`);
-      continue;
-    }
-
-    parts.push(`<!DOCTYPE ${token.name}>`);
-  }
-
-  return parts.join("");
-}
-
 export function buildTreeFromHtml(
   input: string,
   budgets?: TreeBudgets,
@@ -1022,9 +953,4 @@ export function buildTreeFromHtml(
     errors,
     resourceUsage
   };
-}
-
-export function buildTreeFromTokens(tokens: readonly HtmlToken[], budgets?: TreeBudgets): TreeBuildResult {
-  const html = serializeTokens(tokens);
-  return buildTreeFromHtml(html, budgets);
 }

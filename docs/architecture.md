@@ -75,6 +75,11 @@ npm and JSR artifacts, and is reachable only by repository tests. Its initial
 standards baseline is pinned in code so later implementation work cannot
 silently follow a moving Living Standard revision.
 
+Test-only fixture conventions, serializers, corpus readers, and integrity
+checks live under `test/support`. Production source must not export helpers for
+adapting third-party fixture formats; conformance runners adapt those formats at
+the test boundary.
+
 ## Design rules
 
 - Standards conformance takes precedence over historical legacy behavior.

@@ -1,13 +1,11 @@
 import { readFile } from "node:fs/promises";
 
-import { writeJson } from "../eval/eval-primitives.mjs";
 import { sniffHtmlEncoding } from "../../dist/internal/encoding/sniff.js";
-
-const ENCODING_FIXTURE_FILES = [
-  "vendor/html5lib-tests/encoding/tests1.dat",
-  "vendor/html5lib-tests/encoding/tests2.dat",
-  "vendor/html5lib-tests/encoding/test-yahoo-jp.dat"
-];
+import {
+  ENCODING_FIXTURE_FILES,
+  requireFixtureFiles
+} from "../../test/support/fixture-sources.mjs";
+import { writeJson } from "../eval/eval-primitives.mjs";
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
 
@@ -84,6 +82,7 @@ function normalizeExpected(label) {
 }
 
 const allCases = [];
+await requireFixtureFiles(ENCODING_FIXTURE_FILES);
 for (const fixturePath of ENCODING_FIXTURE_FILES) {
   const content = await readFile(fixturePath, "utf8");
   allCases.push(...parseDatFixtures(content, fixturePath));

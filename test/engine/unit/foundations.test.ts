@@ -4,14 +4,20 @@ import test from "node:test";
 import {
   HTML_PARSE_ERROR_CODES,
   HTML_STANDARD_REVISION,
+  EngineAbortError,
+  EngineConfigurationError,
+  EngineResourceLimitError,
   HtmlInputCursor,
   createEngineResourceGuard,
   createParseError,
-  runEngineFoundationDriver
-} from "../../../dist/internal/html-engine/mod.js";
+  runEngineFoundationDriver,
+  type EngineDocumentDriverConfiguration,
+  type EngineParseError,
+  type InputRead
+} from "../../../src/internal/html-engine/mod.js";
 
-function drain(cursor) {
-  const reads = [];
+function drain(cursor: HtmlInputCursor): InputRead[] {
+  const reads: InputRead[] = [];
   for (;;) {
     const read = cursor.consume();
     reads.push(read);
@@ -19,16 +25,16 @@ function drain(cursor) {
   }
 }
 
-test("foundation pins the current HTML parse-error vocabulary", () => {
+void test("foundation pins the current HTML parse-error vocabulary", () => {
   assert.equal(HTML_STANDARD_REVISION, "56674fb3ac40279141a202e5d19b84f30d99854d");
   assert.equal(HTML_PARSE_ERROR_CODES.length, 52);
   assert.equal(new Set(HTML_PARSE_ERROR_CODES).size, HTML_PARSE_ERROR_CODES.length);
   assert.ok(HTML_PARSE_ERROR_CODES.includes("eof-in-processing-instruction"));
 });
 
-test("input cursor normalizes newlines and retains original UTF-16 spans", () => {
+void test("input cursor normalizes newlines and retains original UTF-16 spans", () => {
   const guard = createEngineResourceGuard();
-  const errors = [];
+  const errors: EngineParseError[] = [];
   const cursor = new HtmlInputCursor(guard, (error) => errors.push(error));
 
   cursor.write("A\r");
@@ -70,8 +76,8 @@ test("input cursor normalizes newlines and retains original UTF-16 spans", () =>
   assert.deepEqual(cursor.consume(), { kind: "eof", position: { utf16Offset: 6 } });
 });
 
-test("input cursor waits across surrogate chunks and reports preprocessing errors once", () => {
-  const observed = [];
+void test("input cursor waits across surrogate chunks and reports preprocessing errors once", () => {
+  const observed: EngineParseError[] = [];
   const cursor = new HtmlInputCursor(createEngineResourceGuard(), (error) => observed.push(error));
   cursor.write("😀\ud800");
 
@@ -113,7 +119,7 @@ test("input cursor waits across surrogate chunks and reports preprocessing error
   );
 });
 
-test("resource limits fail before committing the unavailable unit", () => {
+void test("resource limits fail before committing the unavailable unit", () => {
   const guard = createEngineResourceGuard({
     limits: {
       maxSteps: 8,
@@ -127,9 +133,9 @@ test("resource limits fail before committing the unavailable unit", () => {
 
   guard.reserveNode(2);
   assert.throws(
-    () => guard.reserveNode(2),
+    () => { guard.reserveNode(2); },
     (error) =>
-      error.code === "ENGINE_RESOURCE_LIMIT_EXCEEDED" &&
+      error instanceof EngineResourceLimitError &&
       error.resource === "maxNodes" &&
       error.limit === 1 &&
       error.actual === 2
@@ -140,28 +146,36 @@ test("resource limits fail before committing the unavailable unit", () => {
   attributes.beginAttribute();
   attributes.appendCodePoint("é");
   assert.throws(
-    () => attributes.appendCodePoint("é"),
+    () => { attributes.appendCodePoint("é"); },
     (error) =>
-      error.code === "ENGINE_RESOURCE_LIMIT_EXCEEDED" &&
+      error instanceof EngineResourceLimitError &&
       error.resource === "maxAttributeUtf8BytesPerElement" &&
       error.actual === 4
   );
   assert.equal(guard.snapshot().attributeUtf8Bytes, 2);
 });
 
-test("every foundation resource counter enforces zero and exact boundaries", () => {
+void test("every foundation resource counter enforces zero and exact boundaries", () => {
   const zeroSteps = createEngineResourceGuard({ limits: { maxSteps: 0 } });
   assert.throws(
-    () => zeroSteps.checkpoint(),
-    (error) => error.resource === "maxSteps" && error.limit === 0 && error.actual === 1
+    () => { zeroSteps.checkpoint(); },
+    (error) =>
+      error instanceof EngineResourceLimitError &&
+      error.resource === "maxSteps" &&
+      error.limit === 0 &&
+      error.actual === 1
   );
   assert.equal(zeroSteps.snapshot().steps, 0);
 
   const depth = createEngineResourceGuard({ limits: { maxDepth: 1 } });
   depth.reserveNode(1);
   assert.throws(
-    () => depth.reserveNode(2),
-    (error) => error.resource === "maxDepth" && error.limit === 1 && error.actual === 2
+    () => { depth.reserveNode(2); },
+    (error) =>
+      error instanceof EngineResourceLimitError &&
+      error.resource === "maxDepth" &&
+      error.limit === 1 &&
+      error.actual === 2
   );
   assert.deepEqual(depth.snapshot(), {
     steps: 2,
@@ -174,8 +188,12 @@ test("every foundation resource counter enforces zero and exact boundaries", () 
 
   const parseErrors = createEngineResourceGuard({ limits: { maxParseErrors: 0 } });
   assert.throws(
-    () => parseErrors.reserveParseError(),
-    (error) => error.resource === "maxParseErrors" && error.limit === 0 && error.actual === 1
+    () => { parseErrors.reserveParseError(); },
+    (error) =>
+      error instanceof EngineResourceLimitError &&
+      error.resource === "maxParseErrors" &&
+      error.limit === 0 &&
+      error.actual === 1
   );
   assert.equal(parseErrors.snapshot().parseErrors, 0);
 
@@ -183,22 +201,25 @@ test("every foundation resource counter enforces zero and exact boundaries", () 
   const tag = attributeCount.beginStartTag();
   tag.beginAttribute();
   assert.throws(
-    () => tag.beginAttribute(),
+    () => { tag.beginAttribute(); },
     (error) =>
-      error.resource === "maxAttributesPerElement" && error.limit === 1 && error.actual === 2
+      error instanceof EngineResourceLimitError &&
+      error.resource === "maxAttributesPerElement" &&
+      error.limit === 1 &&
+      error.actual === 2
   );
   assert.equal(attributeCount.snapshot().attributes, 1);
 
   assert.throws(
-    () => tag.appendCodePoint("ab"),
-    (error) => error.code === "INVALID_ENGINE_CONFIGURATION"
+    () => { tag.appendCodePoint("ab"); },
+    (error) => error instanceof EngineConfigurationError
   );
 });
 
-test("configuration, abort, deadlines, and observers stop before extra work", () => {
+void test("configuration, abort, deadlines, and observers stop before extra work", () => {
   assert.throws(
     () => createEngineResourceGuard({ limits: { maxSteps: Number.NaN } }),
-    (error) => error.code === "INVALID_ENGINE_CONFIGURATION"
+    (error) => error instanceof EngineConfigurationError
   );
 
   const reason = Object.freeze({ reason: "stop" });
@@ -206,8 +227,8 @@ test("configuration, abort, deadlines, and observers stop before extra work", ()
   controller.abort(reason);
   const aborted = createEngineResourceGuard({ signal: controller.signal });
   assert.throws(
-    () => aborted.checkpoint(),
-    (error) => error.code === "ENGINE_ABORTED" && error.cause === reason
+    () => { aborted.checkpoint(); },
+    (error) => error instanceof EngineAbortError && error.cause === reason
   );
   assert.equal(aborted.snapshot().steps, 0);
 
@@ -217,9 +238,9 @@ test("configuration, abort, deadlines, and observers stop before extra work", ()
     startedAt: 10
   });
   assert.throws(
-    () => deadline.checkpoint(),
+    () => { deadline.checkpoint(); },
     (error) =>
-      error.code === "ENGINE_RESOURCE_LIMIT_EXCEEDED" &&
+      error instanceof EngineResourceLimitError &&
       error.resource === "maxTimeMs" &&
       error.actual === 1
   );
@@ -232,14 +253,15 @@ test("configuration, abort, deadlines, and observers stop before extra work", ()
     { startUtf16Offset: 0, endUtf16Offset: 1 }
   );
   assert.ok(Object.isFrozen(diagnostic));
+  const runWithUnknownOptions = runEngineFoundationDriver as (options: unknown) => unknown;
   assert.throws(
     () =>
-      runEngineFoundationDriver({
+      runWithUnknownOptions({
         inputChunks: [],
         parser: { kind: "document", scriptingMode: "inert" },
         unknown: true
       }),
-    (error) => error.code === "INVALID_ENGINE_CONFIGURATION"
+    (error) => error instanceof EngineConfigurationError
   );
   assert.throws(
     () =>
@@ -256,7 +278,7 @@ test("configuration, abort, deadlines, and observers stop before extra work", ()
   );
 });
 
-test("test driver is explicit, deterministic, and does not claim a parser result", () => {
+void test("test driver is explicit, deterministic, and does not claim a parser result", () => {
   const result = runEngineFoundationDriver({
     inputChunks: ["<p>", "x</p>"],
     parser: {
@@ -277,9 +299,12 @@ test("test driver is explicit, deterministic, and does not claim a parser result
   assert.ok(Object.isFrozen(result.inputCharacters));
 });
 
-test("foundation preprocessing is invariant across adversarial chunk boundaries", () => {
+void test("foundation preprocessing is invariant across adversarial chunk boundaries", () => {
   const input = "A\r\n😀\ud800X\r\ufdd0\u000b\u0000Z";
-  const parser = { kind: "document", scriptingMode: "disabled" };
+  const parser = {
+    kind: "document",
+    scriptingMode: "disabled"
+  } satisfies EngineDocumentDriverConfiguration;
   const whole = runEngineFoundationDriver({ inputChunks: [input], parser });
   const chunked = runEngineFoundationDriver({ inputChunks: input.split(""), parser });
 

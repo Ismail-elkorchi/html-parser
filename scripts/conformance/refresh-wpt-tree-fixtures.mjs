@@ -4,8 +4,8 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "no
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { expandTreeDatCases, parseTreeDatFixtures } from "./tree-dat.mjs";
-import { WPT_TREE_CORPUS_ROOT } from "./wpt-tree-corpus.mjs";
+import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
+import { WPT_TREE_CORPUS_ROOT } from "../../test/support/wpt-tree-corpus.mjs";
 
 const WPT_REPOSITORY = "https://github.com/web-platform-tests/wpt.git";
 const WPT_RESOURCE_ROOT = "html/syntax/parsing/resources";
