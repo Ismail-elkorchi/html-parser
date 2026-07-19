@@ -1,10 +1,14 @@
 import { failInternalState, requireInternalValue } from "../foundation/internal-state-error.js";
 
+import { ActiveFormattingList } from "./active-formatting-list.js";
 import { createTreeBuilderParseError } from "./diagnostics.js";
 import { documentModeForDoctype, type HtmlDocumentMode } from "./doctype-mode.js";
 import { HTML_NAMESPACE } from "./namespaces.js";
 import { OpenElementStack } from "./open-element-stack.js";
 
+import type {
+  ActiveFormattingEntry
+} from "./active-formatting-list.js";
 import type { EngineParseError } from "./diagnostics.js";
 import type {
   EngineObserver,
@@ -73,18 +77,6 @@ export interface HtmlTreeBuilderState {
   readonly finished: boolean;
 }
 
-interface ActiveFormattingElementEntry {
-  readonly kind: "element";
-  readonly element: HtmlTreeElement;
-  readonly token: HtmlStartTagToken;
-}
-
-interface ActiveFormattingMarker {
-  readonly kind: "marker";
-}
-
-type ActiveFormattingEntry = ActiveFormattingElementEntry | ActiveFormattingMarker;
-
 const ASCII_WHITESPACE = /^[\t\n\f\r ]+$/u;
 
 const BLOCK_START_TAGS = new Set([
@@ -111,6 +103,9 @@ const AFTER_HEAD_IMPLYING_END_TAGS = new Set(["body", "html", "br"]);
 const HEAD_NOSCRIPT_DELEGATE_TAGS = new Set([
   "basefont", "bgsound", "link", "meta", "noframes", "style"
 ]);
+const IN_BODY_IGNORED_START_TAGS = new Set([
+  "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr"
+]);
 const IMPLIED_END_TAGS = new Set(["dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt", "rtc"]);
 const BODY_END_ALLOWED_OPEN_ELEMENTS = new Set([
   "dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt", "rtc", "tbody", "td",
@@ -118,7 +113,7 @@ const BODY_END_ALLOWED_OPEN_ELEMENTS = new Set([
 ]);
 
 const DEFAULT_SCOPE_BOUNDARIES = new Set([
-  "applet", "caption", "html", "table", "td", "th", "marquee", "object", "template"
+  "applet", "caption", "html", "table", "td", "th", "marquee", "object", "select", "template"
 ]);
 const LIST_ITEM_SCOPE_ADDITIONS = new Set(["ol", "ul"]);
 const BUTTON_SCOPE_ADDITIONS = new Set(["button"]);
@@ -190,8 +185,8 @@ export class HtmlTreeBuilder implements TokenSink {
   readonly #scriptingMode: NonExecutingScriptingMode;
   readonly #observer: EngineObserver | undefined;
   readonly #onParseError: (error: EngineParseError) => void;
-  readonly #openElements = new OpenElementStack();
-  readonly #activeFormatting: ActiveFormattingEntry[] = [];
+  readonly #openElements: OpenElementStack;
+  readonly #activeFormatting: ActiveFormattingList;
   readonly #templateInsertionModes: InsertionMode[] = [];
   #tokenizer: TokenizerControl | null = null;
   #insertionMode: InsertionMode = "initial";
@@ -210,6 +205,8 @@ export class HtmlTreeBuilder implements TokenSink {
     this.#scriptingMode = options.scriptingMode;
     this.#observer = options.observer;
     this.#onParseError = options.onParseError;
+    this.#openElements = new OpenElementStack(options.resources);
+    this.#activeFormatting = new ActiveFormattingList(options.resources);
   }
 
   connectTokenizer(tokenizer: TokenizerControl): void {
@@ -539,6 +536,11 @@ export class HtmlTreeBuilder implements TokenSink {
         this.#ignoreNextLineFeed = false;
         if (token.data === "\n") return null;
       }
+      if (token.data === "\u0000") {
+        this.#parseError(token, "in-body");
+        return null;
+      }
+      this.#reconstructActiveFormatting();
       this.#insertCharacter(token);
       if (!isWhitespaceToken(token)) this.#framesetOk = false;
       return null;
@@ -590,13 +592,17 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "frameset") throw new HtmlTreeBuilderPendingFeatureError("frameset", "in-body");
+    if (IN_BODY_IGNORED_START_TAGS.has(name)) {
+      this.#parseError(token, "in-body");
+      return null;
+    }
     if (BLOCK_START_TAGS.has(name)) {
-      this.#closeParagraphIfInButtonScope();
+      this.#closeParagraphIfInButtonScope(token);
       this.#insertElement(token);
       return null;
     }
     if (HEADING_TAGS.has(name)) {
-      this.#closeParagraphIfInButtonScope();
+      this.#closeParagraphIfInButtonScope(token);
       const current = this.#currentNode();
       if (HEADING_TAGS.has(current.localName)) {
         this.#parseError(token, "in-body");
@@ -606,7 +612,7 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "pre" || name === "listing") {
-      this.#closeParagraphIfInButtonScope();
+      this.#closeParagraphIfInButtonScope(token);
       this.#insertElement(token);
       this.#ignoreNextLineFeed = true;
       this.#framesetOk = false;
@@ -617,26 +623,26 @@ export class HtmlTreeBuilder implements TokenSink {
         this.#parseError(token, "in-body");
         return null;
       }
-      this.#closeParagraphIfInButtonScope();
+      this.#closeParagraphIfInButtonScope(token);
       this.#formElement = this.#insertElement(token);
       return null;
     }
     if (name === "li") {
       this.#framesetOk = false;
-      this.#closeListItemIfOpen("li", token);
-      this.#closeParagraphIfInButtonScope();
+      this.#closePriorListItem("li", token);
+      this.#closeParagraphIfInButtonScope(token);
       this.#insertElement(token);
       return null;
     }
     if (name === "dd" || name === "dt") {
       this.#framesetOk = false;
-      this.#closeListItemIfOpen(name, token);
-      this.#closeParagraphIfInButtonScope();
+      this.#closePriorListItem(name, token);
+      this.#closeParagraphIfInButtonScope(token);
       this.#insertElement(token);
       return null;
     }
     if (name === "plaintext") {
-      this.#closeParagraphIfInButtonScope();
+      this.#closeParagraphIfInButtonScope(token);
       this.#insertElement(token);
       this.#tokenizerControl().setMode("plaintext");
       return null;
@@ -647,29 +653,78 @@ export class HtmlTreeBuilder implements TokenSink {
         this.#generateImpliedEndTags();
         this.#popThrough("button");
       }
+      this.#reconstructActiveFormatting();
       this.#insertElement(token);
       this.#framesetOk = false;
       return null;
     }
-    if (FORMATTING_TAGS.has(name)) {
+    if (name === "a") {
+      const activeLink = this.#activeFormatting.lastElementWithTagName("a");
+      if (activeLink !== null) {
+        this.#parseError(token, "in-body");
+        this.#runAdoptionAgency(token);
+        this.#activeFormatting.removeElement(activeLink.element);
+        if (this.#openElements.includes(activeLink.element)) {
+          this.#removeOpenElement(activeLink.element);
+        }
+      }
+      this.#reconstructActiveFormatting();
       const element = this.#insertElement(token);
-      this.#activeFormatting.push(Object.freeze({ kind: "element", element, token }));
+      this.#activeFormatting.pushElement(element, token);
+      return null;
+    }
+    if (name === "nobr") {
+      this.#reconstructActiveFormatting();
+      if (this.#hasInScope("nobr", "default")) {
+        this.#parseError(token, "in-body");
+        this.#runAdoptionAgency(token);
+        this.#reconstructActiveFormatting();
+      }
+      const element = this.#insertElement(token);
+      this.#activeFormatting.pushElement(element, token);
+      return null;
+    }
+    if (FORMATTING_TAGS.has(name)) {
+      this.#reconstructActiveFormatting();
+      const element = this.#insertElement(token);
+      this.#activeFormatting.pushElement(element, token);
       return null;
     }
     if (name === "applet" || name === "marquee" || name === "object") {
+      this.#reconstructActiveFormatting();
       this.#insertElement(token);
-      this.#activeFormatting.push(Object.freeze({ kind: "marker" }));
+      this.#activeFormatting.pushMarker();
       this.#framesetOk = false;
       return null;
     }
     if (name === "table") throw new HtmlTreeBuilderPendingFeatureError("table", "in-body");
-    if (name === "select" || name === "optgroup" || name === "option") {
+    if (name === "select") {
       throw new HtmlTreeBuilderPendingFeatureError("select", "in-body");
+    }
+    if (name === "optgroup") {
+      if (this.#hasInScope("select", "default")) {
+        this.#generateImpliedEndTags();
+        if (this.#hasInScope("option", "default") || this.#hasInScope("optgroup", "default")) {
+          this.#parseError(token, "in-body");
+        }
+      } else if (this.#currentNode().localName === "option") {
+        this.#popCurrent();
+      }
+      this.#reconstructActiveFormatting();
+      this.#insertElement(token);
+      return null;
+    }
+    if (name === "option") {
+      if (this.#currentNode().localName === "option") this.#popCurrent();
+      this.#reconstructActiveFormatting();
+      this.#insertElement(token);
+      return null;
     }
     if (name === "math" || name === "svg") {
       throw new HtmlTreeBuilderPendingFeatureError("foreign-content", "in-body");
     }
     if (name === "area" || name === "br" || name === "embed" || name === "img" || name === "keygen" || name === "wbr") {
+      this.#reconstructActiveFormatting();
       this.#insertElement(token);
       this.#popCurrent();
       if (token.selfClosing) acknowledge();
@@ -677,6 +732,7 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "input") {
+      this.#reconstructActiveFormatting();
       this.#insertElement(token);
       this.#popCurrent();
       if (token.selfClosing) acknowledge();
@@ -691,7 +747,7 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "hr") {
-      this.#closeParagraphIfInButtonScope();
+      this.#closeParagraphIfInButtonScope(token);
       this.#insertElement(token);
       this.#popCurrent();
       if (token.selfClosing) acknowledge();
@@ -710,7 +766,7 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "xmp") {
-      this.#closeParagraphIfInButtonScope();
+      this.#closeParagraphIfInButtonScope(token);
       this.#insertTextElement(token, "rawtext");
       this.#framesetOk = false;
       return null;
@@ -725,9 +781,18 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "rb" || name === "rtc" || name === "rp" || name === "rt") {
+      if (this.#hasInScope("ruby", "default")) {
+        this.#generateImpliedEndTags(name === "rp" || name === "rt" ? "rtc" : null);
+        const currentName = this.#currentNode().localName;
+        const expected = name === "rp" || name === "rt"
+          ? currentName === "rtc" || currentName === "ruby"
+          : currentName === "ruby";
+        if (!expected) this.#parseError(token, "in-body");
+      }
       this.#insertElement(token);
       return null;
     }
+    this.#reconstructActiveFormatting();
     this.#insertElement(token);
     return null;
   }
@@ -766,10 +831,15 @@ export class HtmlTreeBuilder implements TokenSink {
     if (name === "form") {
       const form = this.#formElement;
       this.#formElement = null;
-      if (form === null || !this.#openElements.includes(form)) {
+      if (
+        form === null ||
+        !this.#openElements.hasElementInScope(form, DEFAULT_SCOPE_BOUNDARIES)
+      ) {
         this.#parseError(token, "in-body");
         return null;
       }
+      this.#generateImpliedEndTags();
+      if (this.#currentNode() !== form) this.#parseError(token, "in-body");
       this.#removeOpenElement(form);
       return null;
     }
@@ -778,7 +848,7 @@ export class HtmlTreeBuilder implements TokenSink {
         this.#parseError(token, "in-body");
         this.#insertElement(syntheticStartTag("p", token), false);
       }
-      this.#closeParagraph();
+      this.#closeParagraph(token);
       return null;
     }
     if (name === "li") {
@@ -808,12 +878,13 @@ export class HtmlTreeBuilder implements TokenSink {
         return null;
       }
       this.#generateImpliedEndTags();
-      if (this.#currentNode() !== heading) this.#parseError(token, "in-body");
+      if (this.#currentNode().localName !== name) this.#parseError(token, "in-body");
       this.#popThroughElement(heading);
       return null;
     }
     if (FORMATTING_TAGS.has(name)) {
-      return this.#genericEndTag(token);
+      this.#runAdoptionAgency(token);
+      return null;
     }
     if (name === "applet" || name === "marquee" || name === "object") {
       if (!this.#hasInScope(name, "default")) {
@@ -833,7 +904,7 @@ export class HtmlTreeBuilder implements TokenSink {
     return this.#genericEndTag(token);
   }
 
-  #genericEndTag(token: HtmlEndTagToken): null {
+  #genericEndTag(token: HtmlStartTagToken | HtmlEndTagToken): null {
     for (let index = this.#openElements.length - 1; index >= 0; index -= 1) {
       const node = this.#openElements.at(index);
       if (node === null) continue;
@@ -852,6 +923,10 @@ export class HtmlTreeBuilder implements TokenSink {
   }
 
   #inText(token: HtmlToken): InsertionMode | null {
+    if (this.#ignoreNextLineFeed) {
+      this.#ignoreNextLineFeed = false;
+      if (token.kind === "character" && token.data === "\n") return null;
+    }
     if (token.kind === "character") {
       this.#insertCharacter(token);
       return null;
@@ -959,8 +1034,8 @@ export class HtmlTreeBuilder implements TokenSink {
     return element;
   }
 
-  #insertAtAppropriateLocation(node: HtmlTreeNode): void {
-    const parent = this.#appropriateParent();
+  #insertAtAppropriateLocation(node: HtmlTreeNode, overrideTarget?: HtmlTreeElement): void {
+    const parent = overrideTarget ?? this.#appropriateParent();
     this.#model.append(parent, node);
   }
 
@@ -1051,16 +1126,17 @@ export class HtmlTreeBuilder implements TokenSink {
     }
   }
 
-  #closeParagraphIfInButtonScope(): void {
-    if (this.#hasInScope("p", "button")) this.#closeParagraph();
+  #closeParagraphIfInButtonScope(token: HtmlToken): void {
+    if (this.#hasInScope("p", "button")) this.#closeParagraph(token);
   }
 
-  #closeParagraph(): void {
+  #closeParagraph(token: HtmlToken): void {
     this.#generateImpliedEndTags("p");
+    if (this.#currentNode().localName !== "p") this.#parseError(token, "in-body");
     this.#popThrough("p");
   }
 
-  #closeListItemIfOpen(name: "li" | "dd" | "dt", token: HtmlToken): void {
+  #closePriorListItem(name: "li" | "dd" | "dt", token: HtmlToken): void {
     for (let index = this.#openElements.length - 1; index >= 0; index -= 1) {
       const node = this.#openElements.at(index);
       if (node === null) continue;
@@ -1082,6 +1158,142 @@ export class HtmlTreeBuilder implements TokenSink {
     return this.#openElements.hasInScope(HTML_NAMESPACE, name, boundaries);
   }
 
+  #reconstructActiveFormatting(): void {
+    let entry = this.#activeFormatting.last();
+    if (
+      entry === null ||
+      entry.kind === "marker" ||
+      this.#openElements.includes(entry.element)
+    ) {
+      return;
+    }
+
+    for (;;) {
+      this.#resources.checkpoint();
+      const previous = this.#activeFormatting.previous(entry);
+      if (
+        previous === null ||
+        previous.kind === "marker" ||
+        this.#openElements.includes(previous.element)
+      ) {
+        break;
+      }
+      entry = previous;
+    }
+
+    while (entry !== null) {
+      this.#resources.checkpoint();
+      if (entry.kind !== "element") {
+        failInternalState("TREE_BUILDER_FORMATTING_ENTRY_MISSING");
+      }
+      const element = this.#insertElement(entry.token);
+      const replacement = this.#activeFormatting.replace(entry, element);
+      entry = this.#activeFormatting.next(replacement);
+    }
+  }
+
+  #runAdoptionAgency(token: HtmlStartTagToken | HtmlEndTagToken): void {
+    const subject = token.name;
+    const current = this.#currentNode();
+    if (
+      current.namespaceUri === HTML_NAMESPACE &&
+      current.localName === subject &&
+      !this.#activeFormatting.includesElement(current)
+    ) {
+      this.#popCurrent();
+      return;
+    }
+
+    for (let outer = 0; outer < 8; outer += 1) {
+      this.#resources.checkpoint();
+      const formattingEntry = this.#activeFormatting.lastElementWithTagName(subject);
+      if (formattingEntry === null) {
+        this.#genericEndTag(token);
+        return;
+      }
+      const formattingElement = formattingEntry.element;
+      if (!this.#openElements.includes(formattingElement)) {
+        this.#parseError(token, "in-body");
+        this.#activeFormatting.removeElement(formattingElement);
+        return;
+      }
+      if (!this.#openElements.hasElementInScope(formattingElement, DEFAULT_SCOPE_BOUNDARIES)) {
+        this.#parseError(token, "in-body");
+        return;
+      }
+      if (formattingElement !== this.#currentNode()) this.#parseError(token, "in-body");
+
+      const formattingStackIndex = this.#openElements.indexOf(formattingElement);
+      let furthestBlock: HtmlTreeElement | null = null;
+      for (let index = formattingStackIndex + 1; index < this.#openElements.length; index += 1) {
+        this.#resources.checkpoint();
+        const candidate = this.#openElements.at(index);
+        if (candidate !== null && this.#isSpecial(candidate)) {
+          furthestBlock = candidate;
+          break;
+        }
+      }
+      if (furthestBlock === null) {
+        this.#popThroughElement(formattingElement);
+        this.#activeFormatting.removeElement(formattingElement);
+        return;
+      }
+
+      const commonAncestor = requireInternalValue(
+        this.#openElements.at(formattingStackIndex - 1),
+        "TREE_BUILDER_STACK_ENTRY_MISSING"
+      );
+      let bookmark: ActiveFormattingEntry | null = formattingEntry;
+      let lastNode = furthestBlock;
+      let nodeIndex = this.#openElements.indexOf(furthestBlock);
+
+      for (let inner = 1; ; inner += 1) {
+        this.#resources.checkpoint();
+        nodeIndex -= 1;
+        const node = requireInternalValue(
+          this.#openElements.at(nodeIndex),
+          "TREE_BUILDER_STACK_ENTRY_MISSING"
+        );
+        if (node === formattingElement) break;
+
+        let activeEntry = this.#activeFormatting.entryForElement(node);
+        if (inner > 3 && activeEntry !== null) {
+          if (bookmark === activeEntry) bookmark = this.#activeFormatting.next(activeEntry);
+          this.#activeFormatting.remove(activeEntry);
+          activeEntry = null;
+        }
+        if (activeEntry === null) {
+          this.#openElements.remove(node);
+          continue;
+        }
+
+        const replacement = this.#createElement(activeEntry.token);
+        const replacementEntry = this.#activeFormatting.replace(activeEntry, replacement);
+        this.#openElements.replace(node, replacement);
+        if (lastNode === furthestBlock) {
+          bookmark = this.#activeFormatting.next(replacementEntry);
+        }
+        this.#model.append(replacement, lastNode);
+        lastNode = replacement;
+      }
+
+      this.#insertAtAppropriateLocation(lastNode, commonAncestor);
+      const replacementFormatting = this.#createElement(formattingEntry.token);
+      this.#model.moveChildren(furthestBlock, replacementFormatting);
+      this.#model.append(furthestBlock, replacementFormatting);
+
+      if (bookmark === formattingEntry) bookmark = this.#activeFormatting.next(formattingEntry);
+      this.#activeFormatting.remove(formattingEntry);
+      this.#activeFormatting.insertElementBefore(
+        bookmark,
+        replacementFormatting,
+        formattingEntry.token
+      );
+      this.#openElements.remove(formattingElement);
+      this.#openElements.insertAfter(furthestBlock, replacementFormatting);
+    }
+  }
+
   #lastInScope(names: ReadonlySet<string>): HtmlTreeElement | null {
     return this.#openElements.lastInScope(
       HTML_NAMESPACE,
@@ -1101,8 +1313,6 @@ export class HtmlTreeBuilder implements TokenSink {
   }
 
   #clearFormattingToMarker(): void {
-    while (this.#activeFormatting.length > 0) {
-      if (this.#activeFormatting.pop()?.kind === "marker") return;
-    }
+    this.#activeFormatting.clearToMarker();
   }
 }

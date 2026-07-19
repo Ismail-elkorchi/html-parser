@@ -169,7 +169,7 @@ export class HtmlTokenizer implements TokenizerControl {
   #characterParts: string[] = [];
   #characterStartUtf16Offset: number | null = null;
   #characterEndUtf16Offset: number | null = null;
-  #characterCategory: "ascii-whitespace" | "line-feed" | "other" | null = null;
+  #characterCategory: "ascii-whitespace" | "line-feed" | "null" | "other" | null = null;
   #tag: TagTokenBuilder | null = null;
   #comment: CommentTokenBuilder | null = null;
   #doctype: DoctypeTokenBuilder | null = null;
@@ -1869,6 +1869,7 @@ export class HtmlTokenizer implements TokenizerControl {
     if (value.length === 0) return;
     const category = value === "\n"
       ? "line-feed"
+      : value === "\u0000" ? "null"
       : /^[\t\f\r ]+$/u.test(value) ? "ascii-whitespace" : "other";
     if (
       this.#characterStartUtf16Offset !== null &&
@@ -1883,7 +1884,7 @@ export class HtmlTokenizer implements TokenizerControl {
     }
     this.#characterEndUtf16Offset = span.endUtf16Offset;
     this.#characterParts.push(value);
-    if (category === "line-feed") this.#flushCharacters();
+    if (category === "line-feed" || category === "null") this.#flushCharacters();
   }
 
   #flushCharacters(): void {

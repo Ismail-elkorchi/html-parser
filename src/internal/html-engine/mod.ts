@@ -9,6 +9,12 @@ export {
   type HtmlElementNamespaceUri
 } from "./namespaces.js";
 export {
+  ActiveFormattingList,
+  type ActiveFormattingElementEntry,
+  type ActiveFormattingEntry,
+  type ActiveFormattingMarker
+} from "./active-formatting-list.js";
+export {
   CharacterReferenceConsumer,
   type CharacterReferenceConsumerMetrics,
   type CharacterReferenceConsumerOptions,

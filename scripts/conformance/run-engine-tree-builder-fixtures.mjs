@@ -13,16 +13,41 @@ import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tre
 
 const FIXTURE_ROOT = "test/fixtures/upstream/wpt-tree-construction/resources";
 const ASSIGNMENTS = Object.freeze({
-  "blocks.dat": Object.freeze({ first: 1, last: 8 }),
+  "adoption01.dat": Object.freeze({ cases: Object.freeze([1, 2, 3, 4, 5, 7, 8, 9, 10, 14, 15, 16, 17]) }),
+  "adoption02.dat": Object.freeze({ cases: Object.freeze([1, 2]) }),
+  "blocks.dat": Object.freeze({ first: 1, last: 48 }),
   "comments01.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
   "doctype01.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
   "inbody01.dat": Object.freeze({ first: 1, last: 4 }),
   "main-element.dat": Object.freeze({ first: 1, last: 2 }),
   "noscript01.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
   "processing-instructions.dat": Object.freeze({ first: 1, last: 24 }),
+  "plain-text-unsafe.dat": Object.freeze({ cases: Object.freeze([8, 9]) }),
   "scriptdata01.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
-  "search-element.dat": Object.freeze({ first: 1, last: 2 })
+  "search-element.dat": Object.freeze({ first: 1, last: 2 }),
+  "ruby.dat": Object.freeze({ first: 1, last: 21 }),
+  "tests2.dat": Object.freeze({ cases: Object.freeze([5]) }),
+  "tests3.dat": Object.freeze({ cases: Object.freeze([17, 18, 19, 20, 21, 22]) }),
+  "tests6.dat": Object.freeze({ cases: Object.freeze([2]) }),
+  "tests15.dat": Object.freeze({ cases: Object.freeze([2, 3]) }),
+  "tests19.dat": Object.freeze({
+    cases: Object.freeze([
+      2, 3, 4, 5, 6, 7,
+      9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+      22, 23, 24, 30, 89, 92, 96, 97, 98, 99, 100, 101, 102, 103
+    ])
+  }),
+  "tests26.dat": Object.freeze({ cases: Object.freeze([1, 2, 5, 6, 7, 8, 9, 10, 15, 16]) }),
+  "tests25.dat": Object.freeze({ cases: Object.freeze([7, 10]) }),
+  "tricky01.dat": Object.freeze({ cases: Object.freeze([1]) }),
+  "void-in-phrasing.dat": Object.freeze({ first: 1, last: 13 })
 });
+
+function isAssigned(caseNumber, assignment) {
+  return "cases" in assignment
+    ? assignment.cases.includes(caseNumber)
+    : caseNumber >= assignment.first && caseNumber <= assignment.last;
+}
 
 function quote(value) {
   return `"${value}"`;
@@ -66,11 +91,16 @@ function serializeNode(node, level, lines) {
     return;
   }
   lines.push(`| ${indentation}<${elementName(node)}>`);
+  const attributes = [];
   for (let index = 0; index < node.attributeCount; index += 1) {
     const attribute = node.attributeAt(index);
     if (attribute !== null) {
-      lines.push(`| ${"  ".repeat(level + 1)}${attributeName(attribute)}=${quote(attribute.value)}`);
+      attributes.push({ name: attributeName(attribute), value: attribute.value });
     }
+  }
+  attributes.sort((left, right) => left.name.localeCompare(right.name));
+  for (const attribute of attributes) {
+    lines.push(`| ${"  ".repeat(level + 1)}${attribute.name}=${quote(attribute.value)}`);
   }
 }
 
@@ -110,8 +140,7 @@ for (const [fileName, assignment] of Object.entries(ASSIGNMENTS)) {
   const cases = parseTreeDatFixtures(content, filePath)
     .filter((fixtureCase) =>
       fixtureCase.fragmentContext === null &&
-      fixtureCase.caseNumber >= assignment.first &&
-      fixtureCase.caseNumber <= assignment.last
+      isAssigned(fixtureCase.caseNumber, assignment)
     );
   for (const fixtureCase of expandTreeDatCases(cases, { includeModeInId: true })) {
     executed += 1;

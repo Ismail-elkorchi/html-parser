@@ -85,6 +85,10 @@ an oracle's behavior blindly.
   construction, traversal, validation, heap, and resource evidence.
 - `npm run test:bench:engine-tree-builder` records immediate parsing for deep,
   whitespace-boundary-heavy, and error-heavy document inputs.
+- `npm run test:bench:engine-formatting` records indexed Noah-family handling,
+  full reconstruction, repeated adoption, and first-unavailable-step evidence.
+- `npm run test:browser-diff:engine-formatting` compares focused independent
+  formatting/recovery trees with every locally available browser engine.
 - `npm run mutation:pilot` writes a disposable report under `reports/`.
 
 Do not commit generated benchmark or mutation JSON as documentation. Record a

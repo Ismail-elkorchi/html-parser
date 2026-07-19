@@ -33,6 +33,11 @@ interface HtmlTreeContainer {
   childAt(index: number): HtmlTreeNode | null;
 }
 
+interface SubtreeDepthAssignment {
+  readonly state: NodeState;
+  readonly depth: number | null;
+}
+
 interface HtmlTreeNodeBase {
   readonly identity: HtmlTreeNodeIdentity;
   readonly parent: HtmlTreeParent | null;
@@ -485,8 +490,13 @@ export class HtmlTreeModel {
     }
 
     const parentDepth = this.#parentDepth(target);
+    const depthAssignments = this.#prepareSubtreeDepths(
+      node,
+      parentDepth === null ? null : parentDepth + 1
+    );
     if (parentDepth !== null) {
-      this.#resources.observeDepth(parentDepth + this.#subtreeHeight(node));
+      this.#resources.observeDepth(parentDepth + depthAssignments.maxRelativeDepth);
+      this.#authorizeDepthApplication(depthAssignments.assignments);
     } else {
       this.#resources.checkpoint();
     }
@@ -500,7 +510,7 @@ export class HtmlTreeModel {
     }
     targetState.children.splice(insertionIndex, 0, node);
     nodeState.parent = target;
-    this.#setSubtreeDepth(node, parentDepth === null ? null : parentDepth + 1);
+    this.#applySubtreeDepths(depthAssignments.assignments);
 
     if (oldParent !== null) this.#emit("node-detached", node.identity.serial, oldParentSerial);
     this.#emit("node-inserted", node.identity.serial, this.#observableParentSerial(target));
@@ -514,11 +524,60 @@ export class HtmlTreeModel {
     const parentState = this.#parentState(parent);
     const index = parentState.children.indexOf(node);
     if (index < 0) fail("TREE_MODEL_REFERENCE_NOT_CHILD");
+    const depthAssignments = this.#prepareSubtreeDepths(node, null);
     parentState.children.splice(index, 1);
     nodeState.parent = null;
-    this.#setSubtreeDepth(node, null);
+    this.#applySubtreeDepths(depthAssignments.assignments);
     this.#emit("node-detached", node.identity.serial, this.#observableParentSerial(parent));
     return true;
+  }
+
+  /** Moves one element's semantic children to another element in linear mutation order. */
+  moveChildren(source: HtmlTreeElement, destination: HtmlTreeElement): number {
+    this.#elementState(source);
+    this.#elementState(destination);
+    if (source === destination) fail("TREE_MODEL_ANCESTOR_CYCLE");
+    const sourceParent = this.insertionParent(source);
+    const destinationParent = this.insertionParent(destination);
+    const sourceState = this.#parentState(sourceParent);
+    const destinationState = this.#parentState(destinationParent);
+    const children = [...sourceState.children];
+    const destinationDepth = this.#parentDepth(destinationParent);
+    const childDepthAssignments: SubtreeDepthAssignment[][] = [];
+
+    for (const child of children) {
+      this.#resources.checkpoint();
+      if (this.#subtreeContainsParent(child, destinationParent)) fail("TREE_MODEL_ANCESTOR_CYCLE");
+      const depthAssignments = this.#prepareSubtreeDepths(
+        child,
+        destinationDepth === null ? null : destinationDepth + 1
+      );
+      if (destinationDepth !== null) {
+        this.#resources.observeDepth(destinationDepth + depthAssignments.maxRelativeDepth);
+      }
+      childDepthAssignments.push(depthAssignments.assignments);
+    }
+
+    for (const assignments of childDepthAssignments) {
+      this.#resources.checkpoint();
+      if (destinationDepth !== null) this.#authorizeDepthApplication(assignments);
+    }
+
+    sourceState.children.length = 0;
+    for (let index = 0; index < children.length; index += 1) {
+      const child = children[index];
+      const assignments = childDepthAssignments[index];
+      if (child === undefined || assignments === undefined) {
+        fail("TREE_MODEL_REFERENCE_NOT_CHILD");
+      }
+      const state = this.#nodeState(child);
+      state.parent = destinationParent;
+      destinationState.children.push(child);
+      this.#applySubtreeDepths(assignments);
+      this.#emit("node-detached", child.identity.serial, this.#observableParentSerial(sourceParent));
+      this.#emit("node-inserted", child.identity.serial, this.#observableParentSerial(destinationParent));
+    }
+    return children.length;
   }
 
   adoptAttributes(element: HtmlTreeElement, attributes: readonly HtmlTreeAttributeInput[]): number {
@@ -733,39 +792,43 @@ export class HtmlTreeModel {
     return this.#parentState(element.templateContents ?? node).children;
   }
 
-  #subtreeHeight(node: HtmlTreeNode): number {
-    let height = 1;
-    const stack: Array<{ readonly node: HtmlTreeNode; readonly depth: number }> = [
-      { node, depth: 1 }
+  #prepareSubtreeDepths(
+    node: HtmlTreeNode,
+    depth: number | null
+  ): { readonly assignments: SubtreeDepthAssignment[]; readonly maxRelativeDepth: number } {
+    const assignments: SubtreeDepthAssignment[] = [];
+    let maxRelativeDepth = 1;
+    const stack: Array<{
+      readonly node: HtmlTreeNode;
+      readonly depth: number | null;
+      readonly relativeDepth: number;
+    }> = [
+      { node, depth, relativeDepth: 1 }
     ];
     const visited = new Set<number>();
     while (stack.length > 0) {
+      this.#resources.checkpoint();
       const entry = stack.pop();
       if (entry === undefined) break;
-      this.#nodeState(entry.node);
+      const state = this.#nodeState(entry.node);
       if (visited.has(entry.node.identity.serial)) fail("TREE_MODEL_ANCESTOR_CYCLE");
       visited.add(entry.node.identity.serial);
-      height = Math.max(height, entry.depth);
+      assignments.push({ state, depth: entry.depth });
+      maxRelativeDepth = Math.max(maxRelativeDepth, entry.relativeDepth);
+      const childDepth = entry.depth === null ? null : entry.depth + 1;
       for (const child of this.#semanticChildren(entry.node)) {
-        stack.push({ node: child, depth: entry.depth + 1 });
+        stack.push({ node: child, depth: childDepth, relativeDepth: entry.relativeDepth + 1 });
       }
     }
-    return height;
+    return { assignments, maxRelativeDepth };
   }
 
-  #setSubtreeDepth(node: HtmlTreeNode, depth: number | null): void {
-    const stack: Array<{ readonly node: HtmlTreeNode; readonly depth: number | null }> = [
-      { node, depth }
-    ];
-    while (stack.length > 0) {
-      const entry = stack.pop();
-      if (entry === undefined) break;
-      this.#nodeState(entry.node).depth = entry.depth;
-      const nextDepth = entry.depth === null ? null : entry.depth + 1;
-      for (const child of this.#semanticChildren(entry.node)) {
-        stack.push({ node: child, depth: nextDepth });
-      }
-    }
+  #authorizeDepthApplication(assignments: readonly SubtreeDepthAssignment[]): void {
+    for (let index = 0; index < assignments.length; index += 1) this.#resources.checkpoint();
+  }
+
+  #applySubtreeDepths(assignments: readonly SubtreeDepthAssignment[]): void {
+    for (const assignment of assignments) assignment.state.depth = assignment.depth;
   }
 
   #subtreeContainsParent(node: HtmlTreeNode, parent: HtmlTreeParent): boolean {
@@ -773,6 +836,7 @@ export class HtmlTreeModel {
     const target = parent.kind === "template-contents" ? parent.host : parent;
     const stack: HtmlTreeNode[] = [node];
     while (stack.length > 0) {
+      this.#resources.checkpoint();
       const current = stack.pop();
       if (current === undefined) break;
       if (current === target) return true;

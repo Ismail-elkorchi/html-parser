@@ -3,6 +3,9 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Implement independent active-formatting reconstruction, Noah-family limits,
+  bounded adoption recovery, and related in-body form/list/button/ruby rules on
+  direct typed tree mutations, with indexed state and browser/WPT evidence.
 - Add the independent engine's synchronous document driver and basic HTML tree
   construction through in-body/text/after-body modes, including complete
   DOCTYPE mode selection, indexed scope queries, typed unnamed diagnostics,

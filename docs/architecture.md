@@ -80,6 +80,12 @@ current document driver builds the direct internal tree without a token batch
 or adapter; insertion-mode families not implemented yet fail explicitly rather
 than returning a plausible but knowingly incorrect tree.
 
+Formatting recovery is also mutation-time state, not a post-parse correction:
+a marker-generation-aware active-formatting list owns Noah-family and subject
+indexes, while the open-element stack owns scope and bounded random access.
+Reconstruction and adoption create and move nodes only through the direct tree
+model, with every unbounded scan or subtree move charged to the shared guard.
+
 Private state contradictions use the shared internal foundation error and
 machine-readable reasons; they are library defects, not public operational
 errors. Production TypeScript may not throw unclassified generic `Error`

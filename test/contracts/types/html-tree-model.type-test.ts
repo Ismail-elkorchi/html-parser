@@ -1,6 +1,7 @@
 import {
   HTML_NAMESPACE,
   XML_NAMESPACE,
+  ActiveFormattingList,
   HtmlTreeModel,
   createEngineResourceGuard,
   type HtmlAttributeNamespaceUri,
@@ -31,6 +32,21 @@ const element = model.createElement({
 const parent: HtmlTreeParent = model.root;
 const node: HtmlTreeNode = element;
 const instruction: HtmlTreeNode = model.createProcessingInstruction("target", "data");
+const formatting = new ActiveFormattingList(createEngineResourceGuard());
+const formattingEntry = formatting.pushElement(element, {
+  kind: "start-tag",
+  name: "p",
+  attributes: [],
+  selfClosing: false,
+  span: { startUtf16Offset: 0, endUtf16Offset: 3 }
+});
+const destination = model.createElement({
+  namespaceUri: HTML_NAMESPACE,
+  prefix: null,
+  localName: "div",
+  qualifiedName: "div"
+});
+model.moveChildren(element, destination);
 const externalId: HtmlTreeDoctypeExternalId = {
   kind: "public",
   publicIdentifier: "",
@@ -39,6 +55,7 @@ const externalId: HtmlTreeDoctypeExternalId = {
 void parent;
 void node;
 void instruction;
+void formattingEntry;
 void externalId;
 
 // @ts-expect-error - private identities cannot be reused as public NodeId values.
@@ -55,6 +72,12 @@ void invalidParent;
 
 // @ts-expect-error - tree node identities are immutable.
 element.identity.serial = 2;
+
+// @ts-expect-error - formatting entries are immutable creation records.
+formattingEntry.element = destination;
+
+// @ts-expect-error - bulk child movement is deliberately element-to-element.
+model.moveChildren(model.root, destination);
 
 // @ts-expect-error - a public numeric node id is not an internal identity.
 const privateIdentity = 1 as NodeId satisfies typeof element.identity;
