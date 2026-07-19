@@ -20,8 +20,9 @@ test("parse reports deterministic parseErrorId values for malformed markup", () 
 
 test("parse trace parseError events align with parseErrorId", () => {
   const malformedHtml = "<table><tr></table></tr>";
-  const parsed = parse(malformedHtml, { trace: true });
-  const traceIds = (parsed.trace ?? [])
+  const parsed = parse(malformedHtml, { trace: "events" });
+  assert.equal(parsed.trace?.mode, "events");
+  const traceIds = parsed.trace.events
     .filter((entry) => entry.kind === "parseError")
     .map((entry) => entry.parseErrorId);
 

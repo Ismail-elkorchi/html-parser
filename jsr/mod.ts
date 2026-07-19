@@ -26,6 +26,13 @@ import {
   tokenizeByteStreamEager as tokenizeByteStreamEagerInternal,
   visibleText as visibleTextInternal
 } from "../src/public/mod.ts";
+import type {
+  TraceEvent,
+  TraceEventCallback,
+  TraceMode,
+  TraceResult,
+  TraceSummary
+} from "../src/public/types.ts";
 
 export {
   HtmlAbortError,
@@ -45,7 +52,21 @@ export type {
   HtmlBudgetName,
   HtmlConfigurationErrorReason,
   HtmlPatchPlanningReason,
-  NodeId
+  NodeId,
+  TraceBudgetEvent,
+  TraceDecodeEvent,
+  TraceEvent,
+  TraceEventCallback,
+  TraceEventsResult,
+  TraceInsertionModeTransitionEvent,
+  TraceMode,
+  TraceParseErrorEvent,
+  TraceResult,
+  TraceStreamEvent,
+  TraceSummary,
+  TraceSummaryResult,
+  TraceTokenEvent,
+  TraceTreeMutationEvent
 } from "../src/public/types.ts";
 
 /**
@@ -66,9 +87,9 @@ export interface ParseBudgets {
   readonly maxAttributesPerElement?: number;
   /** Maximum attempted name/value UTF-8 bytes on one start tag. */
   readonly maxAttributeBytes?: number;
-  /** Maximum trace event count. */
+  /** Maximum retained trace event count; valid only with `trace: "events"`. */
   readonly maxTraceEvents?: number;
-  /** Maximum serialized trace size in bytes. */
+  /** Maximum retained canonical event JSON bytes; valid only with `trace: "events"`. */
   readonly maxTraceBytes?: number;
   /** Maximum parse/decode elapsed time measured by a monotonic clock. */
   readonly maxTimeMs?: number;
@@ -80,8 +101,10 @@ export interface ParseBudgets {
 export interface ParseOptions {
   /** Include source span offsets on nodes and attributes. */
   readonly captureSpans?: boolean;
-  /** Emit structured parser trace events. */
-  readonly trace?: boolean;
+  /** Returned trace retention mode; defaults to `"none"`. */
+  readonly trace?: TraceMode;
+  /** Synchronously observes each immutable trace event without requiring retention. */
+  readonly onTraceEvent?: TraceEventCallback;
   /** Optional transport encoding hint for byte parsing. */
   readonly transportEncodingLabel?: string;
   /** Optional budget controls for parse/decode operations. */
@@ -197,6 +220,8 @@ export interface DocumentTree {
   readonly children: readonly HtmlNode[];
   /** Structured parse diagnostics associated with this parse result. */
   readonly errors: readonly ParseError[];
+  /** Deterministic summary or retained events when requested by `options.trace`. */
+  readonly trace?: TraceResult;
 }
 
 /**
@@ -213,6 +238,8 @@ export interface FragmentTree {
   readonly children: readonly HtmlNode[];
   /** Structured parse diagnostics associated with this parse result. */
   readonly errors: readonly ParseError[];
+  /** Deterministic summary or retained events when requested by `options.trace`. */
+  readonly trace?: TraceResult;
 }
 
 /**

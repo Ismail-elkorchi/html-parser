@@ -328,8 +328,8 @@ async function main() {
     exportedGetParseErrorSpecRef = typeof publicModule.getParseErrorSpecRef === "function";
 
     const malformedHtml = "<div><span></div><p></span>";
-    const firstRun = publicModule.parse(malformedHtml, { trace: true });
-    const secondRun = publicModule.parse(malformedHtml, { trace: true });
+    const firstRun = publicModule.parse(malformedHtml, { trace: "events" });
+    const secondRun = publicModule.parse(malformedHtml, { trace: "events" });
     const firstIds = firstRun.errors.map((entry) => entry.parseErrorId);
     const secondIds = secondRun.errors.map((entry) => entry.parseErrorId);
     parseErrorIdsPresent = firstIds.length > 0 && firstIds.every((entry) => typeof entry === "string" && entry.length > 0);

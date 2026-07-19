@@ -195,7 +195,7 @@ function generateStructuredHtml(seed, runIndex) {
 function parseWithProfile(html, budgetProfile) {
   if (budgetProfile === "tight") {
     return parse(html, {
-      trace: true,
+      trace: "events",
       budgets: {
         maxInputBytes: 2048,
         maxNodes: 40,
@@ -208,7 +208,7 @@ function parseWithProfile(html, budgetProfile) {
   }
 
   return parse(html, {
-    trace: true,
+    trace: "events",
     budgets: {
       maxInputBytes: 8192,
       maxNodes: 256,

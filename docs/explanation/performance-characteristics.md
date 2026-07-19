@@ -16,6 +16,9 @@ Key characteristics:
   public conversion, serialization, traversal, and extraction. A stream
   deadline also interrupts a pending read.
 - Deterministic serialization and traversal helpers.
+- Trace events are accounted and appended in one pass. Summary mode retains
+  fixed-shape counters instead of the event sequence; callback-only observation
+  retains no public trace result.
 
 Benchmark and profiling commands:
 
@@ -42,7 +45,8 @@ a successful `parseStream()` call, these components can coexist:
 3. the joined decoded source string;
 4. the parse5 tree and its parser/tokenizer working state;
 5. the public tree while conversion is in progress;
-6. trace arrays when tracing is enabled; and
+6. a trace event array only in `trace: "events"` mode (summary and callback-only
+   modes do not retain it); and
 7. any later serialization or extraction output owned by the caller's next
    operation.
 

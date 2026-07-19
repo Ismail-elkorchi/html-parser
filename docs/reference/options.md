@@ -8,11 +8,21 @@
 - Includes source spans on nodes and attributes.
 
 ### `trace`
-- Type: `boolean`
-- Default: `false`
-- Adds structured trace events for decode/token/parse/budget stages.
+- Type: `"none" | "summary" | "events"`
+- Default: `"none"`
+- `"summary"` returns deterministic constant-shape counters without retaining
+  individual events. `"events"` returns the same summary plus the immutable
+  event sequence. `"none"` omits `tree.trace`.
 - Token events count logical context-aware tokens consumed by tree construction,
   coalescing adjacent character chunks and including EOF.
+
+### `onTraceEvent`
+- Type: `(event: TraceEvent) => void`
+- Default: unset
+- Synchronously receives each deeply immutable event in sequence order without
+  requiring returned event retention. Exceptions escape unchanged and stop the
+  parse. Cancellation is checked before and after each callback. A callback may
+  start an independent nested parse.
 
 ### `transportEncodingLabel`
 - Type: `string`
@@ -27,6 +37,9 @@
 - Option objects and `budgets` are closed schemas. Unknown keys and invalid
   values throw `HtmlConfigurationError` before parsing or stream-reader
   acquisition.
+- Accepted option fields and nested budget values are read once and retained in
+  an immutable operation snapshot before work begins. `AbortSignal` state
+  remains live so cancellation can still occur during work.
 
 | Key | Unit and enforcement point |
 | --- | --- |
@@ -37,8 +50,8 @@
 | `maxParseErrors` | emitted parse errors, stopped at the first excess error |
 | `maxAttributesPerElement` | attempted start-tag attributes, including duplicates discarded later |
 | `maxAttributeBytes` | UTF-8 bytes in attempted normalized names and decoded values on one start tag; markup syntax is excluded |
-| `maxTraceEvents` | retained trace events when `trace` is enabled |
-| `maxTraceBytes` | current serialized trace-size counter when `trace` is enabled |
+| `maxTraceEvents` | retained trace events; valid only with `trace: "events"` |
+| `maxTraceBytes` | UTF-8 bytes of each retained event's canonical `JSON.stringify` form, with no delimiter; valid only with `trace: "events"` |
 | `maxTimeMs` | elapsed monotonic milliseconds shared across decode, parse, conversion, and trace work |
 
 Hard-budget failures report deterministic `actual: limit + 1`, the first
@@ -59,7 +72,7 @@ unavailable unit.
   not a hard budget that throws on later stream data. Zero disables prescan
   retention. When absent, the effective implementation cap is 16,384 bytes;
   larger configured values do not raise that implementation cap.
-- With tracing enabled, the `stream` event reports `bytesRead`, the observed
+- In `"events"` mode (or through `onTraceEvent`), the `stream` event reports `bytesRead`, the observed
   `encodingPrescanBytes` high-water mark, and effective
   `encodingPrescanLimitBytes`.
 - The operation reads through EOF, retains decoded chunk strings and their
@@ -70,6 +83,34 @@ unavailable unit.
   error and releases the lock; a cancellation failure does not replace or delay
   that failure. Parse or tokenization failures happen after EOF, when the reader
   has already been released.
+
+## Trace result shape
+
+`trace: "summary"` returns `{ mode: "summary", summary }`. `trace: "events"`
+returns `{ mode: "events", summary, events }`. The summary includes token,
+node, depth, error, encoding, input/decode byte, stream-prescan, event-count,
+canonical event-byte, and sorted event-kind fields. Summary shape is fixed;
+only numeric/string values and the finite event-kind set vary with input.
+
+Trace retention budgets are configuration errors unless the selected mode is
+`"events"`. `onTraceEvent` alone does not retain events and therefore does not
+enable those budgets.
+
+```ts
+import { parse, type TraceEvent } from "@ismail-elkorchi/html-parser";
+
+const observedKinds = new Set<TraceEvent["kind"]>();
+const tree = parse("<main><p>indexed</p></main>", {
+  trace: "summary",
+  onTraceEvent(event) {
+    observedKinds.add(event.kind);
+  }
+});
+
+if (tree.trace?.mode === "summary") {
+  console.log(tree.trace.summary.tokenCount, tree.trace.summary.eventKinds);
+}
+```
 
 ## `tokenizeByteStreamEager(stream, options?)`
 

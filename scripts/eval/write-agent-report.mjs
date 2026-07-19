@@ -70,7 +70,7 @@ function createByteStream(chunks) {
 function evaluateTraceFeature() {
   const html = "<!doctype html><table><tr><td>x</td></tr></table>";
   const parseOptions = {
-    trace: true,
+    trace: "events",
     budgets: {
       maxInputBytes: 2048,
       maxTraceEvents: 64,
@@ -80,8 +80,8 @@ function evaluateTraceFeature() {
 
   const firstRun = parse(html, parseOptions);
   const secondRun = parse(html, parseOptions);
-  const firstTrace = Array.isArray(firstRun.trace) ? firstRun.trace : [];
-  const secondTrace = Array.isArray(secondRun.trace) ? secondRun.trace : [];
+  const firstTrace = firstRun.trace?.mode === "events" ? firstRun.trace.events : [];
+  const secondTrace = secondRun.trace?.mode === "events" ? secondRun.trace.events : [];
 
   const distinctKinds = [...new Set(firstTrace.map((event) => event.kind))];
   const hasAtLeastThreeKinds = distinctKinds.length >= 3;
@@ -90,20 +90,20 @@ function evaluateTraceFeature() {
   const deterministic = JSON.stringify(firstTrace) === JSON.stringify(secondTrace);
 
   const malformed = parse("<div><span></div>", {
-    trace: true,
+    trace: "events",
     budgets: {
       maxInputBytes: 2048,
       maxTraceEvents: 128,
       maxTraceBytes: 8192
     }
   });
-  const malformedTrace = Array.isArray(malformed.trace) ? malformed.trace : [];
+  const malformedTrace = malformed.trace?.mode === "events" ? malformed.trace.events : [];
   const hasParseErrorEvent = malformedTrace.some((event) => event.kind === "parseError");
 
   let tightBudgetError = null;
   try {
     parse(html, {
-      trace: true,
+      trace: "events",
       budgets: {
         maxInputBytes: 2048,
         maxTraceEvents: 1,
@@ -487,14 +487,14 @@ function evaluateVisibleTextFeature() {
 
 function evaluateParseErrorIdFeature() {
   const malformedHtml = "<div><span></div><p></span>";
-  const firstRun = parse(malformedHtml, { trace: true });
-  const secondRun = parse(malformedHtml, { trace: true });
+  const firstRun = parse(malformedHtml, { trace: "events" });
+  const secondRun = parse(malformedHtml, { trace: "events" });
 
   const firstIds = firstRun.errors.map((entry) => entry.parseErrorId);
   const secondIds = secondRun.errors.map((entry) => entry.parseErrorId);
   const idsPresent = firstIds.length > 0 && firstIds.every((id) => typeof id === "string" && id.length > 0);
   const deterministic = JSON.stringify(firstIds) === JSON.stringify(secondIds);
-  const traceIds = (firstRun.trace ?? [])
+  const traceIds = (firstRun.trace?.mode === "events" ? firstRun.trace.events : [])
     .filter((event) => event.kind === "parseError")
     .map((event) => event.parseErrorId);
   const traceAligned = traceIds.every((id) => typeof id === "string" && id.length > 0);
