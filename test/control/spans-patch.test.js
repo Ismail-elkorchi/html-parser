@@ -28,7 +28,7 @@ function findNode(nodes, predicate) {
 
 test("captureSpans attaches source offsets for elements and attributes", () => {
   const html = "<!doctype html><html><body><p class=\"x\">Hi</p></body></html>";
-  const parsed = parse(html, { captureSpans: true });
+  const { tree: parsed } = parse(html, { captureSpans: true });
   const paragraph = findNode(
     parsed.children,
     (node) => node.kind === "element" && node.tagName === "p"
@@ -46,7 +46,7 @@ test("captureSpans attaches source offsets for elements and attributes", () => {
 });
 
 test("implied wrappers expose inferred span provenance", () => {
-  const parsed = parse("<p>x</p>", { captureSpans: true });
+  const { tree: parsed } = parse("<p>x</p>", { captureSpans: true });
   const impliedNode = findNode(
     parsed.children,
     (node) =>
@@ -62,13 +62,13 @@ test("implied wrappers expose inferred span provenance", () => {
 
 test("computePatch supports deterministic structural edit plans", () => {
   const original = "<div><p class=\"x\">one</p><p>two</p></div>";
-  const parsed = parse(original, { captureSpans: true });
+  const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
   const firstParagraph = findNode(
-    parsed.children,
+    parsed.tree.children,
     (node) => node.kind === "element" && node.tagName === "p" && serialize(node) === "<p class=\"x\">one</p>"
   );
   const firstText = findNode(
-    parsed.children,
+    parsed.tree.children,
     (node) => node.kind === "text" && node.value === "one"
   );
 
@@ -80,56 +80,56 @@ test("computePatch supports deterministic structural edit plans", () => {
     { kind: "setAttr", target: firstParagraph.id, name: "class", value: "y" },
     { kind: "insertHtmlAfter", target: firstParagraph.id, html: "<hr>" }
   ];
-  const firstPlan = computePatch(original, edits);
-  const secondPlan = computePatch(original, edits);
+  const firstPlan = computePatch(parsed, edits);
+  const secondPlan = computePatch(parsed, edits);
   assert.deepEqual(firstPlan, secondPlan);
 
-  const patched = applyPatchPlan(original, firstPlan);
+  const patched = applyPatchPlan(parsed, firstPlan);
   assert.equal(patched, "<div><p class=\"y\">uno</p><hr><p>two</p></div>");
 
   const patchedTree = parse(patched);
   const expectedTree = parse("<div><p class=\"y\">uno</p><hr><p>two</p></div>");
-  assert.equal(serialize(patchedTree), serialize(expectedTree));
+  assert.equal(serialize(patchedTree.tree), serialize(expectedTree.tree));
 });
 
 test("computePatch edits attributes without rewriting full nodes", () => {
   const original = "<div><p class=\"x\" data-k=\"v\">one</p></div>";
-  const parsed = parse(original, { captureSpans: true });
+  const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
   const paragraph = findNode(
-    parsed.children,
+    parsed.tree.children,
     (node) => node.kind === "element" && node.tagName === "p"
   );
 
   assert.ok(paragraph);
 
-  const plan = computePatch(original, [{ kind: "removeAttr", target: paragraph.id, name: "class" }]);
-  const patched = applyPatchPlan(original, plan);
+  const plan = computePatch(parsed, [{ kind: "removeAttr", target: paragraph.id, name: "class" }]);
+  const patched = applyPatchPlan(parsed, plan);
   assert.equal(patched, "<div><p data-k=\"v\">one</p></div>");
 });
 
 test("computePatch supports insertHtmlBefore with removeNode", () => {
   const original = "<ul><li>a</li><li>b</li></ul>";
-  const parsed = parse(original, { captureSpans: true });
+  const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
   const secondItem = findNode(
-    parsed.children,
+    parsed.tree.children,
     (node) => node.kind === "element" && node.tagName === "li" && serialize(node) === "<li>b</li>"
   );
 
   assert.ok(secondItem);
 
-  const plan = computePatch(original, [
+  const plan = computePatch(parsed, [
     { kind: "insertHtmlBefore", target: secondItem.id, html: "<li>x</li>" },
     { kind: "removeNode", target: secondItem.id }
   ]);
-  const patched = applyPatchPlan(original, plan);
+  const patched = applyPatchPlan(parsed, plan);
   assert.equal(patched, "<ul><li>a</li><li>x</li></ul>");
 });
 
 test("computePatch rejects targets with non-input span provenance", () => {
   const original = "<p>x</p>";
-  const parsed = parse(original, { captureSpans: true });
+  const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
   const impliedNode = findNode(
-    parsed.children,
+    parsed.tree.children,
     (node) =>
       node.kind === "element" &&
       (node.tagName === "html" || node.tagName === "body") &&
@@ -139,7 +139,7 @@ test("computePatch rejects targets with non-input span provenance", () => {
   assert.ok(impliedNode);
 
   assert.throws(
-    () => computePatch(original, [{ kind: "removeNode", target: impliedNode.id }]),
+    () => computePatch(parsed, [{ kind: "removeNode", target: impliedNode.id }]),
     (error) => {
       assert.ok(error instanceof HtmlPatchPlanningError);
       assert.equal(error.code, "PATCH_PLANNING_FAILED");

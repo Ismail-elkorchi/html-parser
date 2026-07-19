@@ -23,6 +23,9 @@ Key characteristics:
 - Trace events are accounted and appended in one pass. Summary mode retains
   fixed-shape counters instead of the event sequence; callback-only observation
   retains no public trace result.
+- Full-document results expose successful resource observations collected by
+  the owning decode/parser pass. Exact decoded source is retained only when
+  `sourceRetention: "text"` is requested.
 
 Benchmark and profiling commands:
 
@@ -48,7 +51,7 @@ a successful `parseStream()` call, these components can coexist:
 1. up to the effective encoding-prescan cap in a transport-byte buffer;
 2. decoded chunk strings whose aggregate UTF-8 size is bounded only when
    `maxDecodedUtf8Bytes` is configured;
-3. the joined decoded source string;
+3. the joined decoded source string (retained in the result only when requested);
 4. the parse5 tree and its parser/tokenizer working state;
 5. the public tree while conversion is in progress;
 6. a trace event array only in `trace: "events"` mode (summary and callback-only

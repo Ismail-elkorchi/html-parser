@@ -127,7 +127,7 @@ if (workerCase) {
           actual: failure.actual
         }
       : { code: "OK" },
-    retainedResultKind: retainedResult?.kind ?? null
+    retainedResultKind: retainedResult?.tree?.kind ?? retainedResult?.kind ?? null
   };
   process.stdout.write(`${JSON.stringify(report)}\n`);
   process.exit(0);

@@ -163,7 +163,7 @@ async function computeDeterminismHash() {
   const deterministicInput = "<!doctype html><title>x</title><body><p a='1'>txt<span></p></body>";
   const parsed = parse(deterministicInput, {
     captureSpans: true
-  });
+  }).tree;
 
   const canonicalPayload = {
     node: normalizeNode(parsed),
@@ -196,14 +196,14 @@ function createByteStream(byteChunks) {
 }
 
 async function runSmokeAssertions() {
-  const parsed = parse("<p>smoke</p>");
+  const { tree: parsed } = parse("<p>smoke</p>");
   ensure(parsed.kind === "document", "parse root type mismatch");
   ensure(
     serialize(parsed) === "<html><head></head><body><p>smoke</p></body></html>",
     "parse output mismatch"
   );
 
-  const fromBytes = parseBytes(new Uint8Array([0x68, 0x74, 0x6d, 0x6c]));
+  const { tree: fromBytes } = parseBytes(new Uint8Array([0x68, 0x74, 0x6d, 0x6c]));
   ensure(
     serialize(fromBytes) === "<html><head></head><body>html</body></html>",
     "parseBytes decoding mismatch"
@@ -224,10 +224,10 @@ async function runSmokeAssertions() {
     0x6f, 0x77, 0x73, 0x2d, 0x31, 0x32, 0x35, 0x32, 0x3e, 0x3c, 0x70, 0x3e, 0xe9, 0x3c, 0x2f, 0x70, 0x3e
   ]);
 
-  const streamResult = await parseStream(
+  const streamResult = (await parseStream(
     createByteStream([sampleBytes.subarray(0, 9), sampleBytes.subarray(9, 21), sampleBytes.subarray(21)])
-  );
-  const bytesResult = parseBytes(sampleBytes);
+  )).tree;
+  const bytesResult = parseBytes(sampleBytes).tree;
   ensure(
     JSON.stringify(streamResult) === JSON.stringify(bytesResult),
     "parseStream output mismatch vs parseBytes"

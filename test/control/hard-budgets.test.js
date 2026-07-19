@@ -95,9 +95,9 @@ test("parse option schemas reject unknown and invalid limits before work", async
       return true;
     }
   );
-  assert.throws(() => serialize(parse(""), { unknown: true }), HtmlConfigurationError);
-  assert.throws(() => visibleText(parse(""), { unknown: true }), HtmlConfigurationError);
-  assert.throws(() => walk(parse(""), () => {}, { maxTimeMs: -1 }), HtmlConfigurationError);
+  assert.throws(() => serialize(parse("").tree, { unknown: true }), HtmlConfigurationError);
+  assert.throws(() => visibleText(parse("").tree, { unknown: true }), HtmlConfigurationError);
+  assert.throws(() => walk(parse("").tree, () => {}, { maxTimeMs: -1 }), HtmlConfigurationError);
 
   const controller = new globalThis.AbortController();
   controller.abort("already cancelled");
@@ -121,7 +121,7 @@ test("parse option schemas reject unknown and invalid limits before work", async
 });
 
 test("zero limits are valid and fail at the first unavailable unit", () => {
-  assert.equal(parse("", { budgets: { maxInputBytes: 0, maxDecodedUtf8Bytes: 0 } }).kind, "document");
+  assert.equal(parse("", { budgets: { maxInputBytes: 0, maxDecodedUtf8Bytes: 0 } }).tree.kind, "document");
   assert.throws(() => parse("x", { budgets: { maxInputBytes: 0 } }), (error) =>
     assertBudget(error, "maxInputBytes", 0, 1));
   assert.throws(() => parse("", { budgets: { maxNodes: 0 } }), (error) =>
@@ -149,7 +149,7 @@ test("zero stream prescan retention is valid", async () => {
       controller.close();
     }
   });
-  assert.equal((await parseStream(stream, { budgets: { maxEncodingPrescanBytes: 0 } })).kind, "document");
+  assert.equal((await parseStream(stream, { budgets: { maxEncodingPrescanBytes: 0 } })).tree.kind, "document");
 });
 
 test("trace retention stops during parser work instead of retaining an error storm", () => {
@@ -172,7 +172,7 @@ test("trace retention stops during parser work instead of retaining an error sto
 
 test("tree construction enforces node, depth, parse-error, and attribute budgets", () => {
   const html = "<!doctype html><p>x</p>";
-  assert.equal(parse(html, { budgets: { maxNodes: 7, maxDepth: 5, maxParseErrors: 0 } }).kind, "document");
+  assert.equal(parse(html, { budgets: { maxNodes: 7, maxDepth: 5, maxParseErrors: 0 } }).tree.kind, "document");
   assert.throws(() => parse(html, { budgets: { maxNodes: 6 } }), (error) =>
     assertBudget(error, "maxNodes", 6, 7));
   assert.throws(() => parse(html, { budgets: { maxDepth: 4 } }), (error) =>
@@ -181,14 +181,14 @@ test("tree construction enforces node, depth, parse-error, and attribute budgets
     assertBudget(error, "maxParseErrors", 0, 1));
 
   assert.equal(
-    parse("<!doctype html><x a b>", { budgets: { maxAttributesPerElement: 2 } }).kind,
+    parse("<!doctype html><x a b>", { budgets: { maxAttributesPerElement: 2 } }).tree.kind,
     "document"
   );
   assert.throws(
     () => parse("<x a b>", { budgets: { maxAttributesPerElement: 1 } }),
     (error) => assertBudget(error, "maxAttributesPerElement", 1, 2)
   );
-  assert.equal(parse("<!doctype html><x é=€>", { budgets: { maxAttributeBytes: 5 } }).kind, "document");
+  assert.equal(parse("<!doctype html><x é=€>", { budgets: { maxAttributeBytes: 5 } }).tree.kind, "document");
   assert.throws(
     () => parse("<x é=€>", { budgets: { maxAttributeBytes: 4 } }),
     (error) => assertBudget(error, "maxAttributeBytes", 4, 5)
@@ -207,7 +207,7 @@ test("tree construction enforces node, depth, parse-error, and attribute budgets
   );
 
   const recovered = "<select><b><option>x</select><option>y";
-  assert.equal(parse(recovered, { budgets: { maxNodes: 11, maxDepth: 7 } }).kind, "document");
+  assert.equal(parse(recovered, { budgets: { maxNodes: 11, maxDepth: 7 } }).tree.kind, "document");
   assert.throws(() => parse(recovered, { budgets: { maxNodes: 10 } }), (error) =>
     assertBudget(error, "maxNodes", 10, 11));
   assert.throws(() => parse(recovered, { budgets: { maxDepth: 6 } }), (error) =>
@@ -215,7 +215,7 @@ test("tree construction enforces node, depth, parse-error, and attribute budgets
 });
 
 test("decoded UTF-8 budgets are exact for text, bytes, streams, and lone surrogates", async () => {
-  assert.equal(parse("é", { budgets: { maxDecodedUtf8Bytes: 2 } }).kind, "document");
+  assert.equal(parse("é", { budgets: { maxDecodedUtf8Bytes: 2 } }).tree.kind, "document");
   assert.throws(() => parse("é", { budgets: { maxDecodedUtf8Bytes: 1 } }), (error) =>
     assertBudget(error, "maxDecodedUtf8Bytes", 1, 2));
   assert.throws(() => parse("\ud800", { budgets: { maxDecodedUtf8Bytes: 2 } }), (error) =>
@@ -226,7 +226,7 @@ test("decoded UTF-8 budgets are exact for text, bytes, streams, and lone surroga
     parseBytes(windows1252Euro, {
       transportEncodingLabel: "windows-1252",
       budgets: { maxDecodedUtf8Bytes: 3 }
-    }).kind,
+    }).tree.kind,
     "document"
   );
   assert.throws(
@@ -297,8 +297,8 @@ test("abort signals preserve their exact reason and stream cleanup", async () =>
     () => parse("x", { signal: controller.signal }),
     () => parseBytes(new Uint8Array(), { signal: controller.signal }),
     () => parseFragment("", "div", { signal: controller.signal }),
-    () => serialize(parse(""), { signal: controller.signal }),
-    () => visibleText(parse(""), { signal: controller.signal })
+    () => serialize(parse("").tree, { signal: controller.signal }),
+    () => visibleText(parse("").tree, { signal: controller.signal })
   ]) {
     assert.throws(operation, (error) => {
       assert.ok(error instanceof HtmlAbortError);
@@ -450,7 +450,7 @@ test("stream cancellation failures never replace the original budget or deadline
 });
 
 test("traversal observes cancellation triggered by a callback", () => {
-  const tree = parse("<!doctype html><main><p>a</p><p>b</p></main>");
+  const { tree } = parse("<!doctype html><main><p>a</p><p>b</p></main>");
   const reason = "visitor stop";
   const controller = new globalThis.AbortController();
   let visits = 0;
@@ -469,7 +469,7 @@ test("traversal observes cancellation triggered by a callback", () => {
 });
 
 test("serialization, traversal, and extraction own independent zero deadlines", () => {
-  const tree = parse("<!doctype html><main><p>x</p></main>");
+  const { tree } = parse("<!doctype html><main><p>x</p></main>");
   for (const operation of [
     () => serialize(tree, { maxTimeMs: 0 }),
     () => visibleText(tree, { maxTimeMs: 0 }),
@@ -480,7 +480,7 @@ test("serialization, traversal, and extraction own independent zero deadlines", 
 });
 
 test("non-parse operations use one immutable option snapshot", () => {
-  const tree = parse("<main><p>x</p></main>");
+  const { tree } = parse("<main><p>x</p></main>");
   const operations = [
     (options) => serialize(tree, options),
     (options) => visibleText(tree, options),

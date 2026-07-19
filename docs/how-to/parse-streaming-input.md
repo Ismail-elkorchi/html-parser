@@ -28,9 +28,10 @@ const options = {
   }
 } satisfies ParseStreamOptions;
 
-const tree = await parseStream(stream, options);
+const document = await parseStream(stream, options);
 
-console.log(tree.kind, tree.children.length);
+console.log(document.tree.kind, document.tree.children.length);
+console.log(document.metadata.encoding);
 ```
 
 Expected output:

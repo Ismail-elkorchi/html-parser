@@ -12,7 +12,7 @@ import {
 } from "../../dist/mod.js";
 
 test("walk and walkElements are deterministic", () => {
-  const tree = parse("<article id=\"a\"><h1>x</h1><p data-role=\"lead\">hello</p><p>world</p></article>");
+  const { tree } = parse("<article id=\"a\"><h1>x</h1><p data-role=\"lead\">hello</p><p>world</p></article>");
 
   const firstWalk = [];
   walk(tree, (node, depth) => {
@@ -40,7 +40,7 @@ test("walk and walkElements are deterministic", () => {
 });
 
 test("textContent and find helpers return expected nodes", () => {
-  const tree = parse("<section id=\"root\"><h1>x</h1><p data-role=\"lead\">hello</p><p>world</p></section>");
+  const { tree } = parse("<section id=\"root\"><h1>x</h1><p data-role=\"lead\">hello</p><p>world</p></section>");
 
   const sections = [...findAllByTagName(tree, "section")];
   assert.equal(sections.length, 1);

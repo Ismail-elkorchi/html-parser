@@ -87,14 +87,14 @@ async function runBrowserSmoke(baseUrl) {
         });
       };
 
-      const parsed = mod.parse(sampleHtml, { captureSpans: true });
-      const traceSummary = mod.parse(sampleHtml, { trace: "summary" }).trace;
-      const secondTraceSummary = mod.parse(sampleHtml, { trace: "summary" }).trace;
+      const parsed = mod.parse(sampleHtml, { captureSpans: true }).tree;
+      const traceSummary = mod.parse(sampleHtml, { trace: "summary" }).tree.trace;
+      const secondTraceSummary = mod.parse(sampleHtml, { trace: "summary" }).tree.trace;
       const serialized = mod.serialize(parsed);
-      const parsedBytes = mod.parseBytes(new TextEncoder().encode(sampleHtml));
+      const parsedBytes = mod.parseBytes(new TextEncoder().encode(sampleHtml)).tree;
       const bytesSerialized = mod.serialize(parsedBytes);
       const fragment = mod.parseFragment("child", "section");
-      const streamParsed = await mod.parseStream(streamFromText(sampleHtml));
+      const streamParsed = (await mod.parseStream(streamFromText(sampleHtml))).tree;
       const streamSerialized = mod.serialize(streamParsed);
 
       let budgetError = null;

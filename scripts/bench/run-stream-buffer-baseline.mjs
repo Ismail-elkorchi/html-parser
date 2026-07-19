@@ -158,6 +158,7 @@ const prescanBudgetName = usesEagerApi
   ? "maxEncodingPrescanBytes"
   : "maxBufferedBytes";
 const encoder = new TextEncoder();
+const treeOf = (result) => result?.tree ?? result;
 const fixture = encoder.encode(`<!doctype html><main><p>${"alpha é 漢字 ".repeat(16_384)}</p></main>`);
 const parityFixture = new Uint8Array([
   ...encoder.encode("<meta charset=windows-1252><p>"),
@@ -167,10 +168,10 @@ const parityFixture = new Uint8Array([
 
 let prescanCap;
 try {
-  const tree = await parseStream(createByteStream([encoder.encode("abcdef")]), {
+  const tree = treeOf(await parseStream(createByteStream([encoder.encode("abcdef")]), {
     trace: "events",
     budgets: { [prescanBudgetName]: 2 }
-  });
+  }));
   const traceEvents = Array.isArray(tree.trace) ? tree.trace : tree.trace?.events;
   const event = traceEvents?.find((entry) => usesEagerApi
     ? entry.kind === "stream"
@@ -195,7 +196,7 @@ for (const [name, chunks] of [
   ["seven-byte", byteChunks(parityFixture, 7)],
   ["oversized", [parityFixture]]
 ]) {
-  parseByPattern[name] = serialize(await parseStream(createByteStream(chunks)));
+  parseByPattern[name] = serialize(treeOf(await parseStream(createByteStream(chunks))));
   tokensByPattern[name] = await tokenizeAll(tokenize, createByteStream(chunks));
 }
 

@@ -78,8 +78,8 @@ function evaluateTraceFeature() {
     }
   };
 
-  const firstRun = parse(html, parseOptions);
-  const secondRun = parse(html, parseOptions);
+  const { tree: firstRun } = parse(html, parseOptions);
+  const { tree: secondRun } = parse(html, parseOptions);
   const firstTrace = firstRun.trace?.mode === "events" ? firstRun.trace.events : [];
   const secondTrace = secondRun.trace?.mode === "events" ? secondRun.trace.events : [];
 
@@ -89,7 +89,7 @@ function evaluateTraceFeature() {
   const hasInsertionModeTransition = firstTrace.some((event) => event.kind === "insertionModeTransition");
   const deterministic = JSON.stringify(firstTrace) === JSON.stringify(secondTrace);
 
-  const malformed = parse("<div><span></div>", {
+  const { tree: malformed } = parse("<div><span></div>", {
     trace: "events",
     budgets: {
       maxInputBytes: 2048,
@@ -149,7 +149,7 @@ function evaluateTraceFeature() {
 
 function evaluateSpansFeature() {
   const html = "<p>x</p><div id=\"root\">hello <span>world</span></div>";
-  const parsed = parse(html, { captureSpans: true });
+  const { tree: parsed } = parse(html, { captureSpans: true });
 
   const firstElement = findFirstNode(parsed.children, (node) => node.kind === "element" && node.span !== undefined);
   const firstText = findFirstNode(parsed.children, (node) => node.kind === "text");
@@ -193,7 +193,8 @@ function evaluateSpansFeature() {
 
 function evaluatePatchFeature() {
   const source = "<div id=\"root\"><p class=\"x\">alpha</p><p>beta</p></div>";
-  const sourceTree = parse(source, { captureSpans: true });
+  const sourceDocument = parse(source, { captureSpans: true, sourceRetention: "text" });
+  const sourceTree = sourceDocument.tree;
   const firstParagraph = findFirstNode(
     sourceTree.children,
     (node) => node.kind === "element" && node.tagName === "p"
@@ -223,10 +224,10 @@ function evaluatePatchFeature() {
     { kind: "insertHtmlAfter", target: firstParagraph.id, html: "<hr>" }
   ];
 
-  const patchPlanA = computePatch(source, edits);
-  const patchPlanB = computePatch(source, edits);
-  const patchedHtml = applyPatchPlan(source, patchPlanA);
-  const patchedTree = parse(patchedHtml);
+  const patchPlanA = computePatch(sourceDocument, edits);
+  const patchPlanB = computePatch(sourceDocument, edits);
+  const patchedHtml = applyPatchPlan(sourceDocument, patchPlanA);
+  const { tree: patchedTree } = parse(patchedHtml);
 
   const patchedParagraph = findFirstNode(
     patchedTree.children,
@@ -255,7 +256,7 @@ function evaluatePatchFeature() {
   );
   if (impliedNode) {
     try {
-      computePatch(source, [{ kind: "removeNode", target: impliedNode.id }]);
+      computePatch(sourceDocument, [{ kind: "removeNode", target: impliedNode.id }]);
     } catch (error) {
       if (isHtmlPatchPlanningError(error)) {
         structuredErrorOk =
@@ -283,8 +284,8 @@ function evaluatePatchFeature() {
 
 function evaluateOutlineFeature() {
   const html = "<article id=\"a\"><h1>Main</h1><h2>Sub</h2><p data-role=\"lead\">text</p></article>";
-  const firstTree = parse(html);
-  const secondTree = parse(html);
+  const { tree: firstTree } = parse(html);
+  const { tree: secondTree } = parse(html);
   const firstOutline = outline(firstTree);
   const secondOutline = outline(secondTree);
 
@@ -430,8 +431,8 @@ async function evaluateStreamTokenFeature() {
 
 function evaluateVisibleTextFeature() {
   const html = "<article><p>A <img alt=\"B\"></p><table><tr><td>x</td><td>y</td></tr></table></article>";
-  const treeA = parse(html);
-  const treeB = parse(html);
+  const { tree: treeA } = parse(html);
+  const { tree: treeB } = parse(html);
 
   const textA = visibleText(treeA);
   const textB = visibleText(treeB);
@@ -487,8 +488,8 @@ function evaluateVisibleTextFeature() {
 
 function evaluateParseErrorIdFeature() {
   const malformedHtml = "<div><span></div><p></span>";
-  const firstRun = parse(malformedHtml, { trace: "events" });
-  const secondRun = parse(malformedHtml, { trace: "events" });
+  const { tree: firstRun } = parse(malformedHtml, { trace: "events" });
+  const { tree: secondRun } = parse(malformedHtml, { trace: "events" });
 
   const firstIds = firstRun.errors.map((entry) => entry.parseErrorId);
   const secondIds = secondRun.errors.map((entry) => entry.parseErrorId);

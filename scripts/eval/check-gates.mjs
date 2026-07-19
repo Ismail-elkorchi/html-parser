@@ -328,8 +328,8 @@ async function main() {
     exportedGetParseErrorSpecRef = typeof publicModule.getParseErrorSpecRef === "function";
 
     const malformedHtml = "<div><span></div><p></span>";
-    const firstRun = publicModule.parse(malformedHtml, { trace: "events" });
-    const secondRun = publicModule.parse(malformedHtml, { trace: "events" });
+    const { tree: firstRun } = publicModule.parse(malformedHtml, { trace: "events" });
+    const { tree: secondRun } = publicModule.parse(malformedHtml, { trace: "events" });
     const firstIds = firstRun.errors.map((entry) => entry.parseErrorId);
     const secondIds = secondRun.errors.map((entry) => entry.parseErrorId);
     parseErrorIdsPresent = firstIds.length > 0 && firstIds.every((entry) => typeof entry === "string" && entry.length > 0);
@@ -383,7 +383,11 @@ async function main() {
   let patchRejectsNonInputSpan = false;
   try {
     const publicModule = await import(pathToFileURL(resolve("dist/mod.js")).href);
-    const parsed = publicModule.parse("<p>x</p>", { captureSpans: true });
+    const parsedDocument = publicModule.parse("<p>x</p>", {
+      captureSpans: true,
+      sourceRetention: "text"
+    });
+    const parsed = parsedDocument.tree;
     const nodes = [];
     const stack = [...parsed.children];
     while (stack.length > 0) {
@@ -415,7 +419,7 @@ async function main() {
 
     if (nonInputNode) {
       try {
-        publicModule.computePatch("<p>x</p>", [{ kind: "removeNode", target: nonInputNode.id }]);
+        publicModule.computePatch(parsedDocument, [{ kind: "removeNode", target: nonInputNode.id }]);
       } catch (error) {
         patchRejectsNonInputSpan =
           publicModule.isHtmlPatchPlanningError(error) &&

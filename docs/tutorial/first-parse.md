@@ -7,9 +7,9 @@ This tutorial gets you from install to deterministic parse output in under five 
 ```ts
 import { parse } from "@ismail-elkorchi/html-parser";
 
-const tree = parse("<article><h1>Hello</h1><p>World</p></article>");
-console.log(tree.kind);
-console.log(tree.children.length);
+const document = parse("<article><h1>Hello</h1><p>World</p></article>");
+console.log(document.tree.kind);
+console.log(document.tree.children.length);
 ```
 
 Expected output:
@@ -24,8 +24,8 @@ document
 ```ts
 import { parse, visibleText } from "@ismail-elkorchi/html-parser";
 
-const tree = parse("<article><h1>Hello</h1><p>World</p></article>");
-console.log(visibleText(tree).trim());
+const document = parse("<article><h1>Hello</h1><p>World</p></article>");
+console.log(visibleText(document.tree).trim());
 ```
 
 Expected output:
@@ -39,14 +39,14 @@ Hello World
 ```ts
 import { parse, serialize } from "@ismail-elkorchi/html-parser";
 
-const tree = parse("<main><p>Stable</p></main>");
-console.log(serialize(tree));
+const document = parse("<main><p>Stable</p></main>");
+console.log(serialize(document.tree));
 ```
 
 Expected output:
 
 ```txt
-<main><p>Stable</p></main>
+<html><head></head><body><main><p>Stable</p></main></body></html>
 ```
 
 ## Step 4: Run bundled examples

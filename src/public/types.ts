@@ -58,17 +58,30 @@ export interface ParseBudgetOptions {
   readonly maxTimeMs?: number;
 }
 
-/** Options accepted by text, byte, and fragment parse entrypoints. */
+/** Decoded-source retention for a full-document parse result. */
+export type SourceRetention = "none" | "text";
+
+/** Options accepted by already-decoded full-document text parsing. */
 export interface ParseOptions {
   readonly captureSpans?: boolean;
+  /** Exact decoded source retention; defaults to `"none"`. */
+  readonly sourceRetention?: SourceRetention;
   /** Returned trace retention mode; defaults to `"none"`. */
   readonly trace?: TraceMode;
   /** Synchronously observes each immutable trace event without requiring retention. */
   readonly onTraceEvent?: TraceEventCallback;
-  readonly transportEncodingLabel?: string;
   readonly budgets?: ParseBudgetOptions;
   readonly signal?: AbortSignal;
 }
+
+/** Options accepted by full-document byte parsing. */
+export interface ParseBytesOptions extends ParseOptions {
+  /** Optional transport encoding label considered during HTML encoding sniffing. */
+  readonly transportEncodingLabel?: string;
+}
+
+/** Options accepted by already-decoded fragment parsing. */
+export type ParseFragmentOptions = Omit<ParseOptions, "sourceRetention">;
 
 /** Parse limits for byte streams, including bounded encoding-prescan retention. */
 export interface ParseStreamBudgetOptions extends ParseBudgetOptions {
@@ -77,7 +90,7 @@ export interface ParseStreamBudgetOptions extends ParseBudgetOptions {
 }
 
 /** Options accepted by full-document byte-stream parsing. */
-export interface ParseStreamOptions extends Omit<ParseOptions, "budgets"> {
+export interface ParseStreamOptions extends Omit<ParseBytesOptions, "budgets"> {
   readonly budgets?: ParseStreamBudgetOptions;
 }
 
@@ -395,6 +408,62 @@ export interface DocumentTree {
   readonly trace?: TraceResult;
 }
 
+/** Successful full-document parser resource observations. */
+export interface ParseResourceUsage {
+  /** UTF-8 bytes for text input; supplied transport bytes for byte/stream input. */
+  readonly inputBytes: number;
+  /** UTF-8 bytes in the exact decoded source. */
+  readonly decodedUtf8Bytes: number;
+  /** UTF-16 code units in the exact decoded source. */
+  readonly decodedCodeUnits: number;
+  /** Public root plus all input and recovery allocations counted by `maxNodes`. */
+  readonly nodes: number;
+  /** Highest parser-assigned depth, with the public root at depth one. */
+  readonly maxDepth: number;
+  /** Parse diagnostics emitted while constructing the tree. */
+  readonly parseErrors: number;
+  /** Attempted start-tag attributes, including duplicates later discarded. */
+  readonly attributes: number;
+  /** UTF-8 bytes in attempted attribute names and decoded values. */
+  readonly attributeUtf8Bytes: number;
+  /** Stream encoding-prescan retained-byte high-water mark; zero otherwise. */
+  readonly encodingPrescanBytes: number;
+  /** Observable trace events emitted; zero when tracing and observation are disabled. */
+  readonly traceEvents: number;
+  /** Canonical UTF-8 event bytes accounted in summary/event trace modes. */
+  readonly traceUtf8Bytes: number;
+}
+
+/** Encoding evidence produced by the same pipeline that built the tree. */
+export interface ParseEncodingMetadata {
+  /** Selected encoding, or null for already-decoded text input. */
+  readonly name: string | null;
+  /** Evidence that selected the encoding. */
+  readonly source: "already-decoded" | "bom" | "transport" | "meta" | "default";
+}
+
+/** Deterministic metadata for one full-document parse. */
+export interface ParsedDocumentMetadata {
+  /** Public input variant used for this parse. */
+  readonly inputKind: "text" | "bytes" | "stream";
+  /** Bytes supplied to a byte/stream API, or null for already-decoded text. */
+  readonly transportByteLength: number | null;
+  /** Encoding decision from the owning parse pipeline. */
+  readonly encoding: ParseEncodingMetadata;
+  /** Successful deterministic resource observations. */
+  readonly resourceUsage: ParseResourceUsage;
+}
+
+/** Canonical result returned by every full-document parse entrypoint. */
+export interface ParsedDocument {
+  /** Parsed document tree. */
+  readonly tree: DocumentTree;
+  /** Exact decoded input when `sourceRetention: "text"`; otherwise null. */
+  readonly sourceText: string | null;
+  /** Input, encoding, and resource evidence from this parse. */
+  readonly metadata: ParsedDocumentMetadata;
+}
+
 export interface FragmentTree {
   readonly id: NodeId;
   readonly kind: "fragment";
@@ -536,6 +605,10 @@ export type HtmlConfigurationErrorReason =
 
 /** Machine-readable reasons a structural patch cannot be planned or applied. */
 export type HtmlPatchPlanningReason =
+  | "UNRECOGNIZED_PARSED_DOCUMENT"
+  | "SOURCE_NOT_RETAINED"
+  | "SPANS_NOT_CAPTURED"
+  | "PLAN_SOURCE_MISMATCH"
   | "NODE_NOT_FOUND"
   | "MISSING_NODE_SPAN"
   | "NON_INPUT_SPAN_PROVENANCE"

@@ -134,7 +134,7 @@ async function loadFixtures() {
   for (const id of ids) {
     const htmlPath = resolve(FIXTURE_ROOT, id, "input.html");
     const html = await readFile(htmlPath, "utf8");
-    const expected = visibleText(parse(html));
+    const expected = visibleText(parse(html).tree);
     fixtures.push({ id, htmlPath, html, expected });
   }
   return fixtures;

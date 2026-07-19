@@ -8,6 +8,8 @@ import type {
   ParseBudgetOptions,
   ChunkOptions,
   OperationOptions,
+  ParseBytesOptions,
+  ParseFragmentOptions,
   ParseOptions,
   ParseStreamBudgetOptions,
   ParseStreamOptions,
@@ -42,14 +44,23 @@ const TOKENIZE_BYTE_STREAM_EAGER_BUDGET_KEYS = Object.freeze([
   "maxTimeMs"
 ] as const satisfies readonly (keyof TokenizeByteStreamEagerBudgetOptions)[]);
 
-const PARSE_OPTION_KEYS = new Set<PropertyKey>([
+const PARSE_COMMON_OPTION_KEYS = [
   "captureSpans",
   "trace",
   "onTraceEvent",
-  "transportEncodingLabel",
   "budgets",
   "signal"
+] as const;
+const PARSE_OPTION_KEYS = new Set<PropertyKey>([
+  ...PARSE_COMMON_OPTION_KEYS,
+  "sourceRetention"
 ]);
+const PARSE_BYTES_OPTION_KEYS = new Set<PropertyKey>([
+  ...PARSE_COMMON_OPTION_KEYS,
+  "sourceRetention",
+  "transportEncodingLabel"
+]);
+const PARSE_FRAGMENT_OPTION_KEYS = new Set<PropertyKey>(PARSE_COMMON_OPTION_KEYS);
 const TOKENIZE_BYTE_STREAM_EAGER_OPTION_KEYS = new Set<PropertyKey>([
   "transportEncodingLabel",
   "budgets",
@@ -140,6 +151,13 @@ function traceMode(value: unknown, option: string): ParseOptions["trace"] {
   return value;
 }
 
+function sourceRetention(value: unknown, option: string): ParseOptions["sourceRetention"] {
+  if (value !== undefined && value !== "none" && value !== "text") {
+    invalidConfiguration(option, 'must be "none" or "text" when provided');
+  }
+  return value;
+}
+
 function limit(value: unknown, option: string): number | undefined {
   if (
     value !== undefined &&
@@ -213,10 +231,15 @@ function normalizeCommonOperationOptions(
 }
 
 function normalizeParseLikeOptions(
-  options: ParseOptions | ParseStreamOptions,
-  budgetKeys: readonly string[]
+  options: ParseOptions | ParseBytesOptions | ParseFragmentOptions | ParseStreamOptions,
+  budgetKeys: readonly string[],
+  allowedKeys: ReadonlySet<PropertyKey>,
+  capabilities: {
+    readonly sourceRetention: boolean;
+    readonly transportEncoding: boolean;
+  }
 ): ParseStreamOptions {
-  const record = asClosedRecord(options, "options", PARSE_OPTION_KEYS);
+  const record = asClosedRecord(options, "options", allowedKeys);
   const captureSpans = optionalBoolean(
     read(record, "captureSpans", "options.captureSpans"),
     "options.captureSpans"
@@ -226,10 +249,15 @@ function normalizeParseLikeOptions(
     read(record, "onTraceEvent", "options.onTraceEvent"),
     "options.onTraceEvent"
   ) as ParseOptions["onTraceEvent"];
-  const transportEncodingLabel = optionalString(
-    read(record, "transportEncodingLabel", "options.transportEncodingLabel"),
-    "options.transportEncodingLabel"
-  );
+  const normalizedSourceRetention = capabilities.sourceRetention
+    ? sourceRetention(read(record, "sourceRetention", "options.sourceRetention"), "options.sourceRetention")
+    : undefined;
+  const transportEncodingLabel = capabilities.transportEncoding
+    ? optionalString(
+        read(record, "transportEncodingLabel", "options.transportEncodingLabel"),
+        "options.transportEncodingLabel"
+      )
+    : undefined;
   const budgets = normalizeBudgets(read(record, "budgets", "options.budgets"), budgetKeys) as
     | ParseStreamBudgetOptions
     | undefined;
@@ -246,6 +274,9 @@ function normalizeParseLikeOptions(
   }
   return Object.freeze({
     ...(captureSpans === undefined ? {} : { captureSpans }),
+    ...(capabilities.sourceRetention
+      ? { sourceRetention: normalizedSourceRetention ?? "none" }
+      : {}),
     trace: normalizedTrace ?? "none",
     ...(onTraceEvent === undefined ? {} : { onTraceEvent }),
     ...(transportEncodingLabel === undefined ? {} : { transportEncodingLabel }),
@@ -256,12 +287,42 @@ function normalizeParseLikeOptions(
 
 /** Validates and snapshots document/byte/fragment options exactly once. */
 export function normalizeParseOptions(options: ParseOptions): ParseOptions {
-  return normalizeParseLikeOptions(options, PARSE_BUDGET_KEYS);
+  return normalizeParseLikeOptions(
+    options,
+    PARSE_BUDGET_KEYS,
+    PARSE_OPTION_KEYS,
+    { sourceRetention: true, transportEncoding: false }
+  );
+}
+
+/** Validates and snapshots full-document byte options exactly once. */
+export function normalizeParseBytesOptions(options: ParseBytesOptions): ParseBytesOptions {
+  return normalizeParseLikeOptions(
+    options,
+    PARSE_BUDGET_KEYS,
+    PARSE_BYTES_OPTION_KEYS,
+    { sourceRetention: true, transportEncoding: true }
+  );
+}
+
+/** Validates and snapshots already-decoded fragment options exactly once. */
+export function normalizeParseFragmentOptions(options: ParseFragmentOptions): ParseFragmentOptions {
+  return normalizeParseLikeOptions(
+    options,
+    PARSE_BUDGET_KEYS,
+    PARSE_FRAGMENT_OPTION_KEYS,
+    { sourceRetention: false, transportEncoding: false }
+  );
 }
 
 /** Validates and snapshots full-document stream options exactly once. */
 export function normalizeParseStreamOptions(options: ParseStreamOptions): ParseStreamOptions {
-  return normalizeParseLikeOptions(options, PARSE_STREAM_BUDGET_KEYS);
+  return normalizeParseLikeOptions(
+    options,
+    PARSE_STREAM_BUDGET_KEYS,
+    PARSE_BYTES_OPTION_KEYS,
+    { sourceRetention: true, transportEncoding: true }
+  );
 }
 
 /** Validates and snapshots eager stream-tokenization options exactly once. */

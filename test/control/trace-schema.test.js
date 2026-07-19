@@ -14,8 +14,9 @@ import {
 const encoder = new TextEncoder();
 
 function eventTrace(result) {
-  assert.equal(result.trace?.mode, "events");
-  return result.trace.events;
+  const tree = "tree" in result ? result.tree : result;
+  assert.equal(tree.trace?.mode, "events");
+  return tree.trace.events;
 }
 
 function tokenCount(result) {
@@ -25,14 +26,14 @@ function tokenCount(result) {
 }
 
 test("trace defaults to no returned data and rejects the removed boolean contract", () => {
-  assert.equal(Object.hasOwn(parse("<p>x</p>"), "trace"), false);
+  assert.equal(Object.hasOwn(parse("<p>x</p>").tree, "trace"), false);
   assert.throws(() => parse("x", { trace: true }), HtmlConfigurationError);
   assert.throws(() => parse("x", { trace: false }), HtmlConfigurationError);
   assert.throws(() => parse("x", { onTraceEvent: true }), HtmlConfigurationError);
 });
 
 test("event mode emits immutable structured events and a matching summary", () => {
-  const traced = parse("<!doctype html><table><tr><td>a</td></tr>outside<tr><td>b</td></tr></table>", {
+  const { tree: traced } = parse("<!doctype html><table><tr><td>a</td></tr>outside<tr><td>b</td></tr></table>", {
     trace: "events",
     budgets: {
       maxTraceEvents: 128,
@@ -98,8 +99,8 @@ test("event mode emits immutable structured events and a matching summary", () =
 
 test("summary mode returns constant-shape counters without retained events", () => {
   const html = "<table><tr><td>x</table>";
-  const summaryResult = parse(html, { trace: "summary" });
-  const eventsResult = parse(html, { trace: "events" });
+  const { tree: summaryResult } = parse(html, { trace: "summary" });
+  const { tree: eventsResult } = parse(html, { trace: "events" });
 
   assert.equal(summaryResult.trace?.mode, "summary");
   assert.equal(Object.hasOwn(summaryResult.trace ?? {}, "events"), false);
@@ -120,7 +121,7 @@ test("trace counts logical parser tokens once, including EOF", () => {
 });
 
 test("trace includes parseError events for malformed input", () => {
-  const traced = parse("<div><span></div>", { trace: "events" });
+  const { tree: traced } = parse("<div><span></div>", { trace: "events" });
   const parseErrorEvents = eventTrace(traced).filter((entry) => entry.kind === "parseError");
   assert.ok(parseErrorEvents.length >= 1);
   assert.equal(traced.trace.summary.parseErrorCount, traced.errors.length);
@@ -129,7 +130,7 @@ test("trace includes parseError events for malformed input", () => {
 test("observer receives the same events synchronously without requiring retention", () => {
   const observed = [];
   let returned = false;
-  const result = parse("<p>x</p>", {
+  const { tree: result } = parse("<p>x</p>", {
     onTraceEvent(event) {
       assert.equal(returned, false);
       observed.push(event);
@@ -143,7 +144,7 @@ test("observer receives the same events synchronously without requiring retentio
   assert.ok(observed.every((event) => Object.isFrozen(event)));
 
   const retainedObserved = [];
-  const retained = parse("<p>x</p>", {
+  const { tree: retained } = parse("<p>x</p>", {
     trace: "events",
     onTraceEvent(event) {
       retainedObserved.push(event);
@@ -183,12 +184,12 @@ test("observer exceptions and callback-triggered aborts escape immediately", () 
 test("observer can start an independent nested parse", () => {
   let nested;
   let invoked = false;
-  const outer = parse("<main>x</main>", {
+  const { tree: outer } = parse("<main>x</main>", {
     trace: "summary",
     onTraceEvent() {
       if (!invoked) {
         invoked = true;
-        nested = parse("<aside>y</aside>", { trace: "summary" });
+        nested = parse("<aside>y</aside>", { trace: "summary" }).tree;
       }
     }
   });
@@ -212,7 +213,7 @@ test("trace retention budgets require event mode and fail at the first unavailab
     (error) => error instanceof HtmlBudgetExceededError && error.budget === "maxTraceBytes"
   );
 
-  const multibyte = parse("<html><x-é></x-é></html>", { trace: "events" });
+  const { tree: multibyte } = parse("<html><x-é></x-é></html>", { trace: "events" });
   assert.equal(multibyte.trace?.mode, "events");
   const exactBytes = multibyte.trace.summary.eventUtf8Bytes;
   assert.equal(

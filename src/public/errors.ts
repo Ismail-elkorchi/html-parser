@@ -44,6 +44,10 @@ const CONFIGURATION_REASONS: ReadonlySet<string> = new Set<HtmlConfigurationErro
 ]);
 
 const PATCH_REASONS: ReadonlySet<string> = new Set<HtmlPatchPlanningReason>([
+  "UNRECOGNIZED_PARSED_DOCUMENT",
+  "SOURCE_NOT_RETAINED",
+  "SPANS_NOT_CAPTURED",
+  "PLAN_SOURCE_MISMATCH",
   "NODE_NOT_FOUND",
   "MISSING_NODE_SPAN",
   "NON_INPUT_SPAN_PROVENANCE",

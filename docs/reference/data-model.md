@@ -2,7 +2,13 @@
 
 ## Parse Output Shape
 
-`parse` and `parseBytes` return a `DocumentTree`:
+`parse`, `parseBytes`, and `parseStream` return one `ParsedDocument` shape:
+
+- `tree: DocumentTree`
+- `sourceText: string | null`, populated only with `sourceRetention: "text"`
+- `metadata: ParsedDocumentMetadata`
+
+The nested `DocumentTree` contains:
 - `kind: "document"`
 - `children: HtmlNode[]`
 - `errors: ParseError[]`
@@ -10,6 +16,23 @@
   that summary plus an immutable event sequence
 
 `parseFragment` returns a `FragmentTree` with the same structure but `kind: "fragment"`.
+
+`metadata` records the input kind, transport byte length, encoding evidence,
+and successful resource observations from the exact pipeline that built the
+tree. Text input is already decoded, so its encoding is
+`{ name: null, source: "already-decoded" }` and its transport byte length is
+`null`. Byte and stream input report the selected WHATWG encoding and whether
+it came from a BOM, transport label, meta declaration, or the default.
+
+`metadata.resourceUsage` reports input and decoded sizes, parser allocations,
+maximum assigned depth, parse errors, attempted attributes and their UTF-8
+bytes, stream prescan high-water bytes, and observable trace events/bytes.
+These are successful observations, not a second set of limits.
+
+Parser-owned results, trees, nodes, attributes, spans, diagnostics, and their
+arrays are frozen. The readonly TypeScript model therefore has the same
+runtime semantics, and patch identity cannot be changed by mutating a parsed
+node after registration.
 
 The trace summary's `tokenCount` and the retained token event report the number
 of logical tokens emitted to the tree builder, coalescing adjacent character
@@ -72,7 +95,7 @@ does not depend on the JavaScript call-stack limit.
 
 ## Serialization
 
-`serialize(documentOrNode)` emits normalized HTML text from a parsed tree or
+`serialize(documentTreeOrNode)` emits normalized HTML text from a parsed tree or
 node subtree. It emits correct `PUBLIC` and `SYSTEM` document type syntax and
 applies HTML void-element rules only in the HTML namespace. Foreign elements
 whose local names happen to be `source`, `param`, or another HTML void name keep

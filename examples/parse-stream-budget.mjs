@@ -22,7 +22,7 @@ export async function runParseStreamBudget() {
     }
   });
 
-  const tree = await parseStream(stream, {
+  const { tree } = await parseStream(stream, {
     budgets: {
       maxInputBytes: 1024,
       maxEncodingPrescanBytes: 256,

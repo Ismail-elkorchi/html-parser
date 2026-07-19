@@ -33,7 +33,8 @@ function round(value) {
 }
 
 function traceTokenCount(result) {
-  const events = Array.isArray(result.trace) ? result.trace : result.trace?.events;
+  const tree = result?.tree ?? result;
+  const events = Array.isArray(tree.trace) ? tree.trace : tree.trace?.events;
   const event = events?.find((entry) => entry.kind === "token");
   if (!event || typeof event.count !== "number") {
     throw new Error("traced parse did not emit a numeric token count");

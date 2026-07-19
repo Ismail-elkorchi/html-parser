@@ -15,6 +15,10 @@ Both roots expose distinct non-stream and stream option types, the
 `tokenizeByteStreamEager()` contract. Node calls the budget types
 `ParseBudgetOptions` and `ParseStreamBudgetOptions`; JSR uses `ParseBudgets` and
 `ParseStreamBudgets` while preserving identical fields and semantics.
+Both roots return the same `ParsedDocument` shape from text, byte, and stream
+full-document parsing, including optional exact decoded source plus encoding
+and successful resource metadata. `parseFragment()` remains a direct
+`FragmentTree` result. Text and fragment types exclude transport-only options.
 Both roots also expose the same `TraceMode`, immutable event callback, summary,
 and discriminated trace-result types. Event-retention budgets are accepted only
 for `trace: "events"`.

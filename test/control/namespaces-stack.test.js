@@ -47,7 +47,7 @@ test("tree nodes retain namespace identity and adjusted foreign attributes", () 
     "<math><mi>x</mi></math>",
     "</main>"
   ].join("");
-  const tree = parse(html, { captureSpans: true });
+  const { tree } = parse(html, { captureSpans: true });
 
   const main = only(findAllByTagName(tree, "MAIN"));
   assert.equal(main.namespaceUri, HTML_NAMESPACE_URI);
@@ -106,13 +106,13 @@ test("doctype external identifiers preserve missing and explicit empty states", 
   ];
 
   for (const [input, expectedExternalId, expectedPrefix] of cases) {
-    const tree = parse(input);
+    const { tree } = parse(input);
     const doctype = tree.children.find((node) => node.kind === "doctype");
     assert.ok(doctype);
     assert.deepEqual(doctype.externalId, expectedExternalId);
     const output = serialize(tree);
     assert.ok(output.startsWith(expectedPrefix));
-    const reparsed = parse(output);
+    const { tree: reparsed } = parse(output);
     assert.deepEqual(
       reparsed.children.find((node) => node.kind === "doctype")?.externalId,
       expectedExternalId
@@ -132,13 +132,13 @@ test("doctype external identifiers preserve missing and explicit empty states", 
 });
 
 test("foreign elements named like HTML void elements retain children and end tags", () => {
-  const output = serialize(parse("<svg><source><title>x</title></source><param>y</param></svg>"));
+  const output = serialize(parse("<svg><source><title>x</title></source><param>y</param></svg>").tree);
   assert.match(output, /<svg><source><title>x<\/title><\/source><param>y<\/param><\/svg>/);
 });
 
 test("captured spans use decoded UTF-16 offsets and inferred nodes have no span", () => {
   const html = "😀<p A=1 disabled>x</p>";
-  const tree = parse(html, { captureSpans: true });
+  const { tree } = parse(html, { captureSpans: true });
   const paragraph = only(findAllByTagName(tree, "p"));
   assert.ok(paragraph.span);
   assert.equal(paragraph.span.start, 2);
@@ -155,7 +155,7 @@ test("captured spans use decoded UTF-16 offsets and inferred nodes have no span"
 test("deep parsed and caller-built trees remain stack-safe across the public surface", () => {
   const depth = 5_000;
   const input = `${"<div>".repeat(depth)}x${"</div>".repeat(depth)}`;
-  const parsed = parse(input, {
+  const { tree: parsed } = parse(input, {
     budgets: {
       maxInputBytes: input.length,
       maxDecodedUtf8Bytes: input.length,
@@ -222,14 +222,14 @@ test("deep normalization, internal serialization, and patch indexing use explici
   assert.equal(serializeTreeDocument(internalDocument).includes("x"), true);
 
   const input = `${"<div>".repeat(depth)}x${"</div>".repeat(depth)}`;
-  const parsed = parse(input, { captureSpans: true });
+  const parsed = parse(input, { captureSpans: true, sourceRetention: "text" });
   let textNode = null;
-  walk(parsed, (node) => {
+  walk(parsed.tree, (node) => {
     if (node.kind === "text") {
       textNode = node;
     }
   });
   assert.ok(textNode);
-  const plan = computePatch(input, [{ kind: "replaceText", target: textNode.id, value: "y" }]);
+  const plan = computePatch(parsed, [{ kind: "replaceText", target: textNode.id, value: "y" }]);
   assert.equal(plan.steps.some((step) => step.kind === "insert" && step.text === "y"), true);
 });

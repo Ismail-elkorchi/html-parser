@@ -53,13 +53,13 @@ function summarizeStepResult(stepName, result) {
 function createRuntimeSmokeScript(packageName) {
   return `import { parse, parseBytes, parseFragment, parseStream, serialize } from "${packageName}";
 
-const tree = parse("<p>ok</p>");
-if (serialize(tree).length === 0) {
+const document = parse("<p>ok</p>");
+if (serialize(document.tree).length === 0) {
   throw new Error("serialize returned empty output");
 }
 
-const bytesTree = parseBytes(new Uint8Array([0x3c, 0x70, 0x3e, 0x78, 0x3c, 0x2f, 0x70, 0x3e]));
-if (bytesTree.kind !== "document") {
+const bytesDocument = parseBytes(new Uint8Array([0x3c, 0x70, 0x3e, 0x78, 0x3c, 0x2f, 0x70, 0x3e]));
+if (bytesDocument.tree.kind !== "document") {
   throw new Error("parseBytes did not return a document tree");
 }
 
@@ -76,7 +76,7 @@ const stream = new ReadableStream({
 });
 
 const streamed = await parseStream(stream);
-if (streamed.kind !== "document") {
+if (streamed.tree.kind !== "document") {
   throw new Error("parseStream did not return a document tree");
 }
 
