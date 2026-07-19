@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { writeJson } from "../eval/eval-primitives.mjs";
 import { buildTreeFromHtml, normalizeTree } from "../../dist/internal/tree/mod.js";
+import { expandTreeDatCases, parseTreeDatFixtures } from "./tree-dat.mjs";
 
 const TREE_FILES = [
   "vendor/html5lib-tests/tree-construction/tests1.dat",
@@ -23,108 +24,6 @@ function computeHoldout(fixtureId) {
     hash = (Math.imul(hash, 31) + fixtureId.charCodeAt(charIndex)) >>> 0;
   }
   return hash % HOLDOUT_MOD === 0;
-}
-
-function parseDatFixtureFile(content, fixtureFilePath) {
-  const lines = content.split(/\r?\n/);
-  const parsedFixtureCases = [];
-  let section = "";
-  let current = null;
-
-  const pushCurrent = () => {
-    if (current === null) {
-      return;
-    }
-
-    if (current.data.length === 0 && current.documentLines.length === 0) {
-      current = null;
-      section = "";
-      return;
-    }
-
-    parsedFixtureCases.push({
-      id: `${fixtureFilePath}#${parsedFixtureCases.length + 1}`,
-      data: current.data,
-      expected: current.documentLines.join("\n"),
-      fragmentContextTagName: current.fragmentContextTagName,
-      scriptingEnabled: current.scriptingEnabled
-    });
-
-    current = null;
-    section = "";
-  };
-
-  for (const line of lines) {
-    if (line === "#data") {
-      pushCurrent();
-      current = {
-        data: "",
-        documentLines: [],
-        fragmentContextTagName: undefined,
-        scriptingEnabled: true
-      };
-      section = "data";
-      continue;
-    }
-
-    if (current === null) {
-      continue;
-    }
-
-    if (line === "#errors" || line === "#new-errors") {
-      section = "errors";
-      continue;
-    }
-
-    if (line === "#document") {
-      section = "document";
-      continue;
-    }
-
-    if (line === "#document-fragment") {
-      section = "fragment";
-      continue;
-    }
-
-    if (line === "#script-on") {
-      current.scriptingEnabled = true;
-      section = "";
-      continue;
-    }
-
-    if (line === "#script-off") {
-      current.scriptingEnabled = false;
-      section = "";
-      continue;
-    }
-
-    if (line.startsWith("#")) {
-      section = "";
-      continue;
-    }
-
-    if (section === "data") {
-      if (current.data.length > 0) {
-        current.data += "\n";
-      }
-      current.data += line;
-      continue;
-    }
-
-    if (section === "document") {
-      current.documentLines.push(line);
-      continue;
-    }
-
-    if (section === "fragment") {
-      if (current.fragmentContextTagName === undefined) {
-        current.fragmentContextTagName = line.trim().toLowerCase();
-      }
-    }
-  }
-
-  pushCurrent();
-  return parsedFixtureCases;
 }
 
 function normalizeFixtureOutput(value) {
@@ -162,7 +61,11 @@ async function writeDivergenceRecord(caseId, inputHtml, expectedTree, actualTree
 const allTests = [];
 for (const fixturePath of TREE_FILES) {
   const fixtureData = await readFile(fixturePath, "utf8");
-  allTests.push(...parseDatFixtureFile(fixtureData, fixturePath));
+  const baseCases = parseTreeDatFixtures(fixtureData, fixturePath);
+  allTests.push(...expandTreeDatCases(baseCases, {
+    unspecifiedModes: [true],
+    includeModeInId: false
+  }));
 }
 
 let passed = 0;
@@ -186,7 +89,7 @@ for (const testCase of allTests) {
       maxAttributeBytes: 65536
     },
     {
-      fragmentContextTagName: testCase.fragmentContextTagName,
+      fragmentContextTagName: testCase.fragmentContext?.localName,
       scriptingEnabled: testCase.scriptingEnabled
     }
   );
@@ -208,7 +111,7 @@ for (const testCase of allTests) {
 
   failures.push({
     id: testCase.id,
-    fragmentContextTagName: testCase.fragmentContextTagName ?? null,
+    fragmentContextTagName: testCase.fragmentContext?.localName ?? null,
     scriptingEnabled: testCase.scriptingEnabled,
     treeErrors: treeBuildResult.errors.slice(0, 10)
   });

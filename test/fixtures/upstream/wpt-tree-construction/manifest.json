@@ -1,0 +1,520 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/web-platform-tests/wpt.git",
+  "commit": "e4ea1706fa708c3ac4523c534a65160d1ab20db8",
+  "sourceRoot": "html/syntax/parsing/resources",
+  "license": "BSD-3-Clause",
+  "statistics": {
+    "fixtureFiles": 61,
+    "fixtureBytes": 470005,
+    "baseCases": 1934,
+    "executionVariants": 3828
+  },
+  "files": [
+    {
+      "kind": "license",
+      "path": "LICENSE.md",
+      "upstreamPath": "LICENSE.md",
+      "bytes": 1500,
+      "sha256": "5fac07febb0e2a97fb0d7b0def149ec08b642e1ba4b9c345283ab1cbd2af6570",
+      "gitBlob": "39c46d03ac2988226f949ee7ab3c7347d5481bd8"
+    },
+    {
+      "kind": "format",
+      "path": "resources/README.md",
+      "upstreamPath": "html/syntax/parsing/resources/README.md",
+      "bytes": 4655,
+      "sha256": "b3b9b8a2d9bdff3b9989e979e1f037176a02875ca7b2e01db7bcce70031fdd49",
+      "gitBlob": "5a428760cf55cf681dc3c805913cd7255e160d1e"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/adoption01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/adoption01.dat",
+      "bytes": 6084,
+      "sha256": "b2aba05bd1d832f73a0c6103b3c8b151b283bab7c56887274d81f3a062c4963e",
+      "gitBlob": "38f98efded0ae8a4f096f4c1cebba64a914241ea"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/adoption02.dat",
+      "upstreamPath": "html/syntax/parsing/resources/adoption02.dat",
+      "bytes": 1035,
+      "sha256": "b73bf9b375e8ee4b1e4364a7d6fec4eaf862930c26fdbdb59b87b75e468fd3dd",
+      "gitBlob": "acd388547a1eca204384d2220e5397a4ad865780"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/blocks.dat",
+      "upstreamPath": "html/syntax/parsing/resources/blocks.dat",
+      "bytes": 9688,
+      "sha256": "e3b7da1b57a4ec6991443dfc7ab3270f41d0f5959092a49be3e0edca0dae2104",
+      "gitBlob": "a1a9c75218865eaad103a1cbb77263e566868ad2"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/comments01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/comments01.dat",
+      "bytes": 3502,
+      "sha256": "79a7a42412b6dc48fa0c779dd8ba48d4d50033e7e9e417619288eec1e59d8db2",
+      "gitBlob": "4b9ff95711ee97b6971afb88abd310fc4b3183b7"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/doctype01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/doctype01.dat",
+      "bytes": 9076,
+      "sha256": "f3a286c09d729eeed9aa63e0aec13ab12336af04590c169543e6d1e1ef4723b2",
+      "gitBlob": "9efdaf704bc3c55a36db4cad06e1b323d51486bf"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/domjs-unsafe.dat",
+      "upstreamPath": "html/syntax/parsing/resources/domjs-unsafe.dat",
+      "bytes": 10356,
+      "sha256": "eef4fb719e027ffaadfb854787d172893850fc561c29efe72d90c5bfa3c8b7ac",
+      "gitBlob": "0a1b10f96d9d62a67d631c640cf0bd68637da63d"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/entities01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/entities01.dat",
+      "bytes": 17640,
+      "sha256": "b73605caac5aed5656184ab8db3f08edff5457ac3186cb04afa28384bca955e3",
+      "gitBlob": "9bacebea050d93acf8ddea2bac5d9e4dbd3efbdf"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/entities02.dat",
+      "upstreamPath": "html/syntax/parsing/resources/entities02.dat",
+      "bytes": 4952,
+      "sha256": "f4e0cd461204b0184709be040c00811b776fbde1a6d002bb1c75d02056d9e54a",
+      "gitBlob": "74965a35f76509d1cd5306112e8d51851d1d6fef"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/foreign-fragment.dat",
+      "upstreamPath": "html/syntax/parsing/resources/foreign-fragment.dat",
+      "bytes": 9082,
+      "sha256": "73e1785753c66420c067e5b29f89b17e7ebe1079687a512040ef19c6d42ac2c2",
+      "gitBlob": "e562c6b8ff62c32ccefcf4c4666a1c9dfb45dd85"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/html5test-com.dat",
+      "upstreamPath": "html/syntax/parsing/resources/html5test-com.dat",
+      "bytes": 5612,
+      "sha256": "1c8de3bc441460bdc2aba36d89f31b708d69b4d6c80f060f22c0264d502d5b42",
+      "gitBlob": "dca5e975ffbe3170f98952256e0b22a8d7808d5f"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/inbody01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/inbody01.dat",
+      "bytes": 836,
+      "sha256": "cb722f2853ec9613b71ea68e8bb26f474cc450b64612930591ab2656406222fe",
+      "gitBlob": "10f6520f6fe0c64ac57ebee89bdbbbeac1a3849c"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/isindex.dat",
+      "upstreamPath": "html/syntax/parsing/resources/isindex.dat",
+      "bytes": 774,
+      "sha256": "d152de773e276a07a1cfc91e93f01f3ce52c447c110192f2828dab51be2721b6",
+      "gitBlob": "733f82ea8eef7314b41711d938e056f75a440ca1"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/main-element.dat",
+      "upstreamPath": "html/syntax/parsing/resources/main-element.dat",
+      "bytes": 727,
+      "sha256": "d56e382994e1a5228ddb2ea49a5ff51ab68487f9a8f79ad34bcad05d40dc1e8f",
+      "gitBlob": "4b103bb0fa34ce745afe2a995c8020a90018bfa0"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/math.dat",
+      "upstreamPath": "html/syntax/parsing/resources/math.dat",
+      "bytes": 1862,
+      "sha256": "3c2ecc07272c175676ecfafa0cf6e18e74c3293075703702a4b7929fcb0d07bd",
+      "gitBlob": "d6a8ae56f24f4608c57bbb497c08e19831746ac6"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/menuitem-element.dat",
+      "upstreamPath": "html/syntax/parsing/resources/menuitem-element.dat",
+      "bytes": 4015,
+      "sha256": "08e5e25f38bbc181c840ce5c5203b2566dc03129aeaf105ca2311645d40aae4d",
+      "gitBlob": "f7c8e2c3ca74eb1468ce76170d536cbceb70819c"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/namespace-sensitivity.dat",
+      "upstreamPath": "html/syntax/parsing/resources/namespace-sensitivity.dat",
+      "bytes": 518,
+      "sha256": "318fbc9926eddf5863524f1503c711ddaea93b55bcbd1eaab71b7e354ddfeb09",
+      "gitBlob": "050dca752284fbbee72942aa156cc260f784e5c2"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/noscript01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/noscript01.dat",
+      "bytes": 4619,
+      "sha256": "e82449304a6371c14ed490384b6d814b7b1eeb1022dbc5caa2045fc8400655d7",
+      "gitBlob": "ec3496ce92fee5878f3455025978c09624cf693a"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/pending-spec-changes-plain-text-unsafe.dat",
+      "upstreamPath": "html/syntax/parsing/resources/pending-spec-changes-plain-text-unsafe.dat",
+      "bytes": 927,
+      "sha256": "f45151f8dc7a4fe1a4b36710cf33606ff43cc98a42f1d2f085a77680683b0c99",
+      "gitBlob": "2c546d40b8b1d8a918878a64d19d36dc7fe29204"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/pending-spec-changes.dat",
+      "upstreamPath": "html/syntax/parsing/resources/pending-spec-changes.dat",
+      "bytes": 851,
+      "sha256": "a6b7c4ecccabe70de2f24184245e4a73a8d12ed44ee658c3d5d25cce04c9d27f",
+      "gitBlob": "1647d7f23a96e03d085c03e6a7c87ddd439c0d2d"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/plain-text-unsafe.dat",
+      "upstreamPath": "html/syntax/parsing/resources/plain-text-unsafe.dat",
+      "bytes": 11496,
+      "sha256": "0de31dbbf37ba3fa00c2b5ffcc81b87da86b178b8a877b79f79f5378ed3caca5",
+      "gitBlob": "ac7d1f72877244bc5309995b521316b7e3d027ec"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/processing-instructions.dat",
+      "upstreamPath": "html/syntax/parsing/resources/processing-instructions.dat",
+      "bytes": 11495,
+      "sha256": "c408d94b644156590ff5ee552b5f53423fea5aba2fd69e22b8aa0689d627b5b9",
+      "gitBlob": "095f13a91f7aca7dec9ed5c1f391061f6f81d401"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/quirks01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/quirks01.dat",
+      "bytes": 1170,
+      "sha256": "b6717cc15d4ed573ccf6755bc9d52073e675b4d09f23bde07961e27592b9717c",
+      "gitBlob": "bc58de5ca0b6f77461708fff88b06c2f5a4d3780"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/ruby.dat",
+      "upstreamPath": "html/syntax/parsing/resources/ruby.dat",
+      "bytes": 4471,
+      "sha256": "5ae76ac4570d40e6648066798dd3ff729231bec98d3e010fdd67e0257f23a742",
+      "gitBlob": "f4e5e4e48d72f3cd67a56766d898ea5b9f4ce338"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/scriptdata01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/scriptdata01.dat",
+      "bytes": 6624,
+      "sha256": "e32ea3adc3d68c90e62ea50b3a41bf80369d1491958532bf00787b3509667322",
+      "gitBlob": "6abcb6571cf59aa10984e3dced97932f35f74065"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/scripted_adoption01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/scripted_adoption01.dat",
+      "bytes": 296,
+      "sha256": "1203be63238a6effc9cc47e3c9b1fa9a0c7e0126a2f78916514afed2d46f42d8",
+      "gitBlob": "5cc0f07496a658ef7a91dbcdb652f88e212e93d1"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/scripted_ark.dat",
+      "upstreamPath": "html/syntax/parsing/resources/scripted_ark.dat",
+      "bytes": 631,
+      "sha256": "93365261fd9ea7dd9242613b57c23dba94e66bfd837a5d928f725bed81012dd0",
+      "gitBlob": "feebeadba1d8a08a136be74ccfe9352587026989"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/scripted_webkit01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/scripted_webkit01.dat",
+      "bytes": 603,
+      "sha256": "9d84f68ffd6e8b7b3924c9211280a70a888576b49074654cc9708236834afc58",
+      "gitBlob": "3e71c1baccc9bc26200de9d17698f10f01224a6e"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/search-element.dat",
+      "upstreamPath": "html/syntax/parsing/resources/search-element.dat",
+      "bytes": 741,
+      "sha256": "30be0e9e8cbeea825e0323a7a3a518ab88f44fcada9b4f82b0cc7bbeb9334b76",
+      "gitBlob": "2866d7ece907ead900d375ca4f680ca4a55df511"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/svg.dat",
+      "upstreamPath": "html/syntax/parsing/resources/svg.dat",
+      "bytes": 1606,
+      "sha256": "4c819b8dbdfbd98cfbce9a535a304b0a16597eb29ccc04077131a62810f309cd",
+      "gitBlob": "a452e7afa00d3bc62cf0af746a6375d4eec6c39e"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tables01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tables01.dat",
+      "bytes": 7041,
+      "sha256": "bfd4a53246e3acc527c8bb214cc743082e19260e72365001aad3f1d8f4bd08dc",
+      "gitBlob": "40798881618870966bce094d37b5ebd158911952"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/template.dat",
+      "upstreamPath": "html/syntax/parsing/resources/template.dat",
+      "bytes": 25142,
+      "sha256": "74bc8308e673589d81b63eb71411a6f8ecea6fd6af649b5802c22615b7102a03",
+      "gitBlob": "45fb507c6b9d63564ff423fc8c47e214564a5642"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests1.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests1.dat",
+      "bytes": 39777,
+      "sha256": "86426574ac5c936179a30d9fc4b0edf891c8be92ed8d9b24670f235044a75a8d",
+      "gitBlob": "df2fd19c6f9647dab642d11cea2b1736bb07248e"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests10.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests10.dat",
+      "bytes": 16458,
+      "sha256": "2d2624a819c323661e396d864ac23440053127b5ea7adb44a5904f5ceee5fa64",
+      "gitBlob": "3b311e4e03cd861cfd13391682ef0cb7d39962d0"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests11.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests11.dat",
+      "bytes": 17679,
+      "sha256": "276190e2a7b97e8fcf3bd863a4b4b5346b555a8336c00143cb1d0e8956b94a07",
+      "gitBlob": "b9901e79ec4054762a2bdf134b991dea8829b009"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests12.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests12.dat",
+      "bytes": 1612,
+      "sha256": "e6c506cea74979a0d6ca47f6b175c7b6177d6e57db708920a89694e31dfd8a42",
+      "gitBlob": "63107d277b6a7f1597155ad2527868bbc2c323de"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests14.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests14.dat",
+      "bytes": 1067,
+      "sha256": "d151b2426f38de40a5d4ae726e2a56dbc7742a9b1c95299d60c1e2e0fdad1f98",
+      "gitBlob": "a08b7649ebab76276be3c38d19e75bb9598e5731"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests15.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests15.dat",
+      "bytes": 3649,
+      "sha256": "ef784ece74cbd760da3a6947aaf4478810246b73c753f25a04be4d11dd806b2d",
+      "gitBlob": "93d06a871708a2929e900c331adec80d3697709e"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests16.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests16.dat",
+      "bytes": 46454,
+      "sha256": "3350be682713afc1f6dad37059f2551709497a3643c38c26e1fe36fd07d23745",
+      "gitBlob": "05f34c13e33d3329ee9a4acdbc29d14c84d7d7c5"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests17.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests17.dat",
+      "bytes": 2819,
+      "sha256": "0567680775f58a5b2ad24e234f41d53f68fb2fc3ef7809bebaec0920e2f13c89",
+      "gitBlob": "1c472d1dc1eb8901912449ac00937650f0e69465"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests18.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests18.dat",
+      "bytes": 12119,
+      "sha256": "5d0019ae43bb4e0b0da9f2e1d57ac0618a607bd8a1324b163ec7a23a1dc120f3",
+      "gitBlob": "a3bb69a16ef57fef47ced9bc3593a68e89e7d0f1"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests19.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests19.dat",
+      "bytes": 22988,
+      "sha256": "a9316b1eb4d2821a18e2c840394c6218bfcdb598857b92631490d9c3c1840ce4",
+      "gitBlob": "20cdeabcc83c63610814598ceed6c21391967421"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests2.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests2.dat",
+      "bytes": 13193,
+      "sha256": "9cf76b5f4890065c04fc82ae828379a55b85cbe76f584fb1ef23dcef0a77b86b",
+      "gitBlob": "9232edde3091880495754475f98377a25c682639"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests20.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests20.dat",
+      "bytes": 13524,
+      "sha256": "07f7661690c4cd7cc0bbb0f1b9c1e1d65135e07c4dde8bbf106692f687e7d33d",
+      "gitBlob": "80c57d1aaa7219c70f5eb63e0625525492a1a828"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests21.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests21.dat",
+      "bytes": 5092,
+      "sha256": "b1a67420c79a5131002fefc987084ffb6b6094a3a74b272c6f545a47df06452c",
+      "gitBlob": "a926b1384e9798fd7ba7e1620b3a2de541ed9bc0"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests22.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests22.dat",
+      "bytes": 4243,
+      "sha256": "78488328181d0f82f34b1a5e9e456ff7c713b3ff86dab6ace1530f6f07d5370d",
+      "gitBlob": "31e6d9e331042da8dc42c1d46776691ff30f1fb3"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests23.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests23.dat",
+      "bytes": 3478,
+      "sha256": "2e4752ff4ef898e4a0cf9a450e481440095163d45075a662846a062552afe148",
+      "gitBlob": "49e4a4ace58be40162fbeb8c900a4c0053fa8b58"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests24.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests24.dat",
+      "bytes": 929,
+      "sha256": "fdd5c21f60f42235ded224a03e7182d289088328f460525adaf3c14e772a24ac",
+      "gitBlob": "f6dc7eb48a53d7417418f8827c9a24031b5edcd7"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests25.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests25.dat",
+      "bytes": 3586,
+      "sha256": "f2e08fda6d15a08faf9ff0001ec38560d942069cee6b4e264aeedbbacde7da8d",
+      "gitBlob": "5bb369b262660dd58d1ae606717cab6359b3c421"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests26.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests26.dat",
+      "bytes": 8865,
+      "sha256": "d55d24dfca2444fba759d59346cbab21f7e70340dbb14e2c7af8da3d44abd4ab",
+      "gitBlob": "1ba2be2dc86699794285b2481b87c54efeb89004"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests3.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests3.dat",
+      "bytes": 4601,
+      "sha256": "c4b4d8e0ea3d978c49d1e6a985d427164858b71ec980153c4526ed0c398f43b9",
+      "gitBlob": "c7583d99e8b698287e1a45042126485c42d3c174"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests4.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests4.dat",
+      "bytes": 1041,
+      "sha256": "e6003a52e1cbffc361eca7c739cdd4459074ac8c59766d1eb171b9c9eb42f517",
+      "gitBlob": "4f0cf70e28cea9be6bc0b47de3ba515b32516949"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests5.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests5.dat",
+      "bytes": 3160,
+      "sha256": "bf80b927082290541781844906abdcb72f091488f7a11e8b7d9ac00076dd4fce",
+      "gitBlob": "1ef8cae421386e5d1faaae4a2be85c267aa8f9b8"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests6.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests6.dat",
+      "bytes": 11065,
+      "sha256": "be16c74d2a9862283262968439c95b9bfce6182ea61055a3c886c28d14f3e01a",
+      "gitBlob": "8c36dd3d56c0573112e770f0dc7239fa957d1654"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests7.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests7.dat",
+      "bytes": 7339,
+      "sha256": "aeb9569589c809b1a563c0b163173e8cf980a6a4028cb7c210f19c181b56999a",
+      "gitBlob": "aa7e16b408e2e68e0c94c998505980d7aa7b99e1"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests8.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests8.dat",
+      "bytes": 2664,
+      "sha256": "f3c8b1baece162e7e8c394540cdf9057266bb738bb0ad539a9d9b2f9d365f162",
+      "gitBlob": "d532801e497da812cc7eb2ac89bdc9299829a33e"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests9.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests9.dat",
+      "bytes": 10391,
+      "sha256": "857820f088506a6d20ea6acefbf19c0a6c4de87a39b24988878066397516b36f",
+      "gitBlob": "1456324ffc21f3c2c10c2e8aa7ada6b3a5edd62d"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tests_innerHTML_1.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tests_innerHTML_1.dat",
+      "bytes": 11205,
+      "sha256": "acb9f835119e302d33204f437d54637a84ae26608ccb7bc961c6f7f44202a44c",
+      "gitBlob": "09e0456f0f12d4564fed2f89e349549d990c163d"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/tricky01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/tricky01.dat",
+      "bytes": 6690,
+      "sha256": "3fb6d24c5e371860d096ef07f5fff38be3ceaa85f1239bee35cce548b596198a",
+      "gitBlob": "753502a2619e0ba75fcb93957c6d2e544183f561"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/void-in-phrasing.dat",
+      "upstreamPath": "html/syntax/parsing/resources/void-in-phrasing.dat",
+      "bytes": 1890,
+      "sha256": "c8855173aca8ecbd218abc26db34a631393ce0285fffebffdaf69b8bdd6224e9",
+      "gitBlob": "b7dbd1e7cec2a8420cd50006edfc9790414034b5"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/webkit01.dat",
+      "upstreamPath": "html/syntax/parsing/resources/webkit01.dat",
+      "bytes": 14034,
+      "sha256": "063ca232535a792fa238ae769eeb0ddcc9bd2ee961d3da327ca134612d35d93c",
+      "gitBlob": "fc7f5c80e07e4b1f4833dcbda5fef2df1b2291b2"
+    },
+    {
+      "kind": "fixture",
+      "path": "resources/webkit02.dat",
+      "upstreamPath": "html/syntax/parsing/resources/webkit02.dat",
+      "bytes": 14921,
+      "sha256": "03b215350d352faf110df2cc6eac23a44a7f70945b4ea962f0b17bed103459f7",
+      "gitBlob": "47a3c5713ea8646ca4c825846969b150cdf28154"
+    }
+  ],
+  "compositeSha256": "9bf2315b5c8836b0d1bc7375cbabc746f9891735dc958491b99a1855b7cb2acc"
+}
