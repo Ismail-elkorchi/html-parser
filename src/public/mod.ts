@@ -83,6 +83,7 @@ export type {
   CommentNode,
   DoctypeToken,
   DocumentTree,
+  DoctypeExternalId,
   DoctypeNode,
   Edit,
   ElementVisitor,
@@ -168,6 +169,19 @@ const VOID_ELEMENTS = new Set([
   "track",
   "wbr"
 ]);
+
+/** HTML namespace URI assigned by the tree builder. */
+export const HTML_NAMESPACE_URI = "http://www.w3.org/1999/xhtml";
+/** SVG namespace URI assigned by the tree builder. */
+export const SVG_NAMESPACE_URI = "http://www.w3.org/2000/svg";
+/** MathML namespace URI assigned by the tree builder. */
+export const MATHML_NAMESPACE_URI = "http://www.w3.org/1998/Math/MathML";
+/** XLink namespace URI used by adjusted foreign attributes. */
+export const XLINK_NAMESPACE_URI = "http://www.w3.org/1999/xlink";
+/** XML namespace URI used by adjusted foreign attributes. */
+export const XML_NAMESPACE_URI = "http://www.w3.org/XML/1998/namespace";
+/** XMLNS namespace URI used by namespace declaration attributes. */
+export const XMLNS_NAMESPACE_URI = "http://www.w3.org/2000/xmlns/";
 const DEFAULT_STREAM_ENCODING_PRESCAN_BYTES = 16_384;
 
 class NodeIdAssigner {
@@ -183,19 +197,6 @@ class NodeIdAssigner {
 interface NodeMetrics {
   readonly nodes: number;
   readonly maxDepth: number;
-}
-
-function normalizeAttributes(attributes: readonly Attribute[]): readonly Attribute[] {
-  return [...attributes];
-}
-
-function toPublicTagName(internalName: string): string {
-  const separator = internalName.indexOf(" ");
-  if (separator === -1) {
-    return internalName;
-  }
-
-  return internalName.slice(separator + 1);
 }
 
 function enforceBudget(
@@ -214,6 +215,14 @@ function requireString(value: unknown, option: string): asserts value is string 
   if (typeof value !== "string") {
     throw new HtmlConfigurationError(option, "INVALID_VALUE", "must be a string");
   }
+}
+
+function asciiLowercase(value: string): string {
+  return value.replace(/[A-Z]/g, (character) => character.toLowerCase());
+}
+
+function isHtmlElement(node: HtmlNode): node is Extract<HtmlNode, { kind: "element" }> {
+  return node.kind === "element" && node.namespaceUri === HTML_NAMESPACE_URI;
 }
 
 function requireByteArray(value: unknown, option: string): asserts value is Uint8Array {
@@ -413,6 +422,9 @@ function toAttributes(
     operation.checkpoint();
     const span = toPublicSpan(attribute.span, captureSpans);
     return Object.freeze({
+      namespaceUri: attribute.namespaceUri,
+      prefix: attribute.prefix,
+      localName: attribute.localName,
       name: attribute.name,
       value: attribute.value,
       ...(span ? { span } : {})
@@ -579,98 +591,115 @@ function buildHtmlTree(
   }
 }
 
-function convertTreeNode(
-  node: TreeNode,
+function convertTreeNodes(
+  nodes: readonly TreeNode[],
   assigner: NodeIdAssigner,
   captureSpans: boolean,
   operation: OperationContext
-): HtmlNode {
-  operation.checkpoint();
-  if (node.kind === "text") {
-    const span = toPublicSpan(node.span, captureSpans);
-    const spanProvenance = toSpanProvenance(node.span, captureSpans);
-    return {
-      id: assigner.next(),
-      kind: "text",
-      value: node.value,
-      spanProvenance,
-      ...(span ? { span } : {})
-    };
-  }
-
-  if (node.kind === "comment") {
-    const span = toPublicSpan(node.span, captureSpans);
-    const spanProvenance = toSpanProvenance(node.span, captureSpans);
-    return {
-      id: assigner.next(),
-      kind: "comment",
-      value: node.value,
-      spanProvenance,
-      ...(span ? { span } : {})
-    };
-  }
-
-  if (node.kind === "doctype") {
-    const span = toPublicSpan(node.span, captureSpans);
-    const spanProvenance = toSpanProvenance(node.span, captureSpans);
-    return {
-      id: assigner.next(),
-      kind: "doctype",
-      name: node.name,
-      ...(node.publicId.length > 0 ? { publicId: node.publicId } : {}),
-      ...(node.systemId.length > 0 ? { systemId: node.systemId } : {}),
-      spanProvenance,
-      ...(span ? { span } : {})
-    };
-  }
-
-  const span = toPublicSpan(node.span, captureSpans);
-  const spanProvenance = toSpanProvenance(node.span, captureSpans);
-  const children = node.children.map((child) =>
-    convertTreeNode(child, assigner, captureSpans, operation)
-  );
-  const attributes = normalizeAttributes(toAttributes(node.attributes, captureSpans, operation));
-
-  return {
-    id: assigner.next(),
-    kind: "element",
-    tagName: toPublicTagName(node.name),
-    attributes,
-    children,
-    spanProvenance,
-    ...(span ? { span } : {})
-  };
-}
-
-function collectMetricsForNode(node: HtmlNode, depth: number, operation: OperationContext): NodeMetrics {
-  operation.checkpoint();
-  if (node.kind !== "element") {
-    return { nodes: 1, maxDepth: depth };
-  }
-
-  let nodes = 1;
-  let maxDepth = depth;
-
-  for (const child of node.children) {
-    const childMetrics = collectMetricsForNode(child, depth + 1, operation);
-    nodes += childMetrics.nodes;
-    if (childMetrics.maxDepth > maxDepth) {
-      maxDepth = childMetrics.maxDepth;
+): readonly HtmlNode[] {
+  const converted = new WeakMap<object, HtmlNode>();
+  const stack: { readonly node: TreeNode; readonly exiting: boolean }[] = [];
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index];
+    if (node !== undefined) {
+      stack.push({ node, exiting: false });
     }
   }
 
-  return { nodes, maxDepth };
+  while (stack.length > 0) {
+    const frame = stack.pop();
+    if (frame === undefined) {
+      continue;
+    }
+    operation.checkpoint();
+    const { node } = frame;
+    if (node.kind === "element" && !frame.exiting) {
+      stack.push({ node, exiting: true });
+      for (let index = node.children.length - 1; index >= 0; index -= 1) {
+        const child = node.children[index];
+        if (child !== undefined) {
+          stack.push({ node: child, exiting: false });
+        }
+      }
+      continue;
+    }
+
+    const span = toPublicSpan(node.span, captureSpans);
+    const spanProvenance = toSpanProvenance(node.span, captureSpans);
+    let publicNode: HtmlNode;
+    if (node.kind === "text") {
+      publicNode = {
+        id: assigner.next(), kind: "text", value: node.value, spanProvenance,
+        ...(span ? { span } : {})
+      };
+    } else if (node.kind === "comment") {
+      publicNode = {
+        id: assigner.next(), kind: "comment", value: node.value, spanProvenance,
+        ...(span ? { span } : {})
+      };
+    } else if (node.kind === "doctype") {
+      publicNode = {
+        id: assigner.next(), kind: "doctype", name: node.name,
+        externalId: node.externalId, spanProvenance,
+        ...(span ? { span } : {})
+      };
+    } else {
+      const children = node.children.map((child) => {
+        const convertedChild = converted.get(child);
+        if (convertedChild === undefined) {
+          throw new Error("Tree conversion order invariant violated");
+        }
+        return convertedChild;
+      });
+      publicNode = {
+        id: assigner.next(), kind: "element",
+        namespaceUri: node.namespaceUri,
+        prefix: node.prefix,
+        localName: node.localName,
+        tagName: node.name,
+        attributes: toAttributes(node.attributes, captureSpans, operation),
+        children, spanProvenance,
+        ...(span ? { span } : {})
+      };
+    }
+    converted.set(node, publicNode);
+  }
+
+  return nodes.map((node) => {
+    const convertedNode = converted.get(node);
+    if (convertedNode === undefined) {
+      throw new Error("Tree conversion result invariant violated");
+    }
+    return convertedNode;
+  });
 }
 
 function collectMetrics(nodes: readonly HtmlNode[], operation: OperationContext): NodeMetrics {
   let totalNodes = 0;
   let maxDepth = 1;
 
-  for (const node of nodes) {
-    const metrics = collectMetricsForNode(node, 2, operation);
-    totalNodes += metrics.nodes;
-    if (metrics.maxDepth > maxDepth) {
-      maxDepth = metrics.maxDepth;
+  const stack: { readonly node: HtmlNode; readonly depth: number }[] = [];
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index];
+    if (node !== undefined) {
+      stack.push({ node, depth: 2 });
+    }
+  }
+  while (stack.length > 0) {
+    const entry = stack.pop();
+    if (entry === undefined) {
+      continue;
+    }
+    operation.checkpoint();
+    totalNodes += 1;
+    maxDepth = Math.max(maxDepth, entry.depth);
+    if (entry.node.kind === "element") {
+      for (let index = entry.node.children.length - 1; index >= 0; index -= 1) {
+        const child = entry.node.children[index];
+        if (child !== undefined) {
+          stack.push({ node: child, depth: entry.depth + 1 });
+        }
+      }
     }
   }
 
@@ -806,9 +835,7 @@ function parseDocumentInternal(
     count: tokenCount
   });
 
-  const children = built.document.children.map((node) =>
-    convertTreeNode(node, assigner, captureSpans, operation)
-  );
+  const children = convertTreeNodes(built.document.children, assigner, captureSpans, operation);
   const metrics = collectMetrics(children, operation);
   const totalNodes = metrics.nodes + 1;
 
@@ -1013,9 +1040,7 @@ export function parseFragment(
     count: tokenCount
   });
 
-  const children = built.document.children.map((node) =>
-    convertTreeNode(node, assigner, captureSpans, operation)
-  );
+  const children = convertTreeNodes(built.document.children, assigner, captureSpans, operation);
   const metrics = collectMetrics(children, operation);
   const totalNodes = metrics.nodes + 1;
 
@@ -1386,34 +1411,83 @@ function escapeAttribute(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
-function serializeNode(node: HtmlNode, operation: OperationContext): string {
-  operation.checkpoint();
-  if (node.kind === "text") {
-    return escapeText(node.value);
+function quoteDoctypeIdentifier(value: string): string {
+  if (!value.includes('"')) {
+    return `"${value}"`;
   }
-
-  if (node.kind === "comment") {
-    return `<!--${node.value}-->`;
+  if (!value.includes("'")) {
+    return `'${value}'`;
   }
+  throw new HtmlConfigurationError(
+    "tree",
+    "INVALID_VALUE",
+    "DOCTYPE identifiers containing both quote characters cannot be serialized losslessly"
+  );
+}
 
-  if (node.kind === "doctype") {
-    if (node.publicId !== undefined || node.systemId !== undefined) {
-      const publicId = node.publicId ?? "";
-      const systemId = node.systemId ?? "";
-      return `<!DOCTYPE ${node.name} "${publicId}" "${systemId}">`;
-    }
+function serializeDoctype(node: Extract<HtmlNode, { kind: "doctype" }>): string {
+  if (node.externalId.kind === "none") {
     return `<!DOCTYPE ${node.name}>`;
   }
-
-  const attributes = node.attributes.map((entry) => `${entry.name}="${escapeAttribute(entry.value)}"`).join(" ");
-  const open = attributes.length > 0 ? `<${node.tagName} ${attributes}>` : `<${node.tagName}>`;
-
-  if (VOID_ELEMENTS.has(node.tagName)) {
-    return open;
+  if (node.externalId.kind === "system") {
+    return `<!DOCTYPE ${node.name} SYSTEM ${quoteDoctypeIdentifier(node.externalId.systemId)}>`;
   }
+  const systemId = node.externalId.systemId === null
+    ? ""
+    : ` ${quoteDoctypeIdentifier(node.externalId.systemId)}`;
+  return `<!DOCTYPE ${node.name} PUBLIC ${quoteDoctypeIdentifier(node.externalId.publicId)}${systemId}>`;
+}
 
-  const body = node.children.map((child) => serializeNode(child, operation)).join("");
-  return `${open}${body}</${node.tagName}>`;
+function serializeNodes(nodes: readonly HtmlNode[], operation: OperationContext): string {
+  type Action = { readonly kind: "node"; readonly node: HtmlNode } |
+    { readonly kind: "text"; readonly value: string };
+  const parts: string[] = [];
+  const stack: Action[] = [];
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index];
+    if (node !== undefined) {
+      stack.push({ kind: "node", node });
+    }
+  }
+  while (stack.length > 0) {
+    const action = stack.pop();
+    if (action === undefined) {
+      continue;
+    }
+    operation.checkpoint();
+    if (action.kind === "text") {
+      parts.push(action.value);
+      continue;
+    }
+    const node = action.node;
+    if (node.kind === "text") {
+      parts.push(escapeText(node.value));
+    } else if (node.kind === "comment") {
+      parts.push(`<!--${node.value}-->`);
+    } else if (node.kind === "doctype") {
+      parts.push(serializeDoctype(node));
+    } else {
+      const attributes = node.attributes
+        .map((entry) => `${entry.name}="${escapeAttribute(entry.value)}"`)
+        .join(" ");
+      const open = attributes.length > 0
+        ? `<${node.tagName} ${attributes}>`
+        : `<${node.tagName}>`;
+      parts.push(open);
+      const isHtmlVoid = node.namespaceUri === HTML_NAMESPACE_URI &&
+        VOID_ELEMENTS.has(asciiLowercase(node.localName));
+      if (!isHtmlVoid) {
+        stack.push({ kind: "text", value: `</${node.tagName}>` });
+        for (let index = node.children.length - 1; index >= 0; index -= 1) {
+          const child = node.children[index];
+          if (child !== undefined) {
+            stack.push({ kind: "node", node: child });
+          }
+        }
+      }
+    }
+  }
+  return parts.join("");
 }/**
  * Serializes data deterministically for the `serialize` public API.
  */
@@ -1432,30 +1506,43 @@ export function serialize(
   );
   operation.checkpoint();
   if (tree.kind === "document" || tree.kind === "fragment") {
-    return tree.children.map((child) => serializeNode(child, operation)).join("");
+    return serializeNodes(tree.children, operation);
   }
 
-  return serializeNode(tree, operation);
+  return serializeNodes([tree], operation);
 }
 
 function textContentFromNode(
   node: DocumentTree | FragmentTree | HtmlNode,
   operation: OperationContext
 ): string {
-  operation.checkpoint();
-  if (node.kind === "document" || node.kind === "fragment") {
-    return node.children.map((child) => textContentFromNode(child, operation)).join("");
+  const roots = node.kind === "document" || node.kind === "fragment" ? node.children : [node];
+  const parts: string[] = [];
+  const stack: HtmlNode[] = [];
+  for (let index = roots.length - 1; index >= 0; index -= 1) {
+    const root = roots[index];
+    if (root !== undefined) {
+      stack.push(root);
+    }
   }
-
-  if (node.kind === "text") {
-    return node.value;
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === undefined) {
+      continue;
+    }
+    operation.checkpoint();
+    if (current.kind === "text") {
+      parts.push(current.value);
+    } else if (current.kind === "element") {
+      for (let index = current.children.length - 1; index >= 0; index -= 1) {
+        const child = current.children[index];
+        if (child !== undefined) {
+          stack.push(child);
+        }
+      }
+    }
   }
-
-  if (node.kind !== "element") {
-    return "";
-  }
-
-  return node.children.map((child) => textContentFromNode(child, operation)).join("");
+  return parts.join("");
 }
 
 const VISIBLE_TEXT_SKIP_TAGS = new Set(["head", "script", "style", "template", "title", "optgroup", "option"]);
@@ -1533,14 +1620,55 @@ function normalizeBooleanAttribute(value: string | undefined): boolean {
   return normalized === "" || normalized === "true" || normalized === "1";
 }
 
-function attributeValue(node: Extract<HtmlNode, { kind: "element" }>, name: string): string | undefined {
-  const target = name.toLowerCase();
+/** Returns an unnamespaced HTML attribute value using ASCII case-insensitive matching. */
+export function getAttributeValue(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  name: string
+): string | undefined {
+  if (node.namespaceUri !== HTML_NAMESPACE_URI) {
+    return undefined;
+  }
+  const target = asciiLowercase(name);
   for (const attribute of node.attributes) {
-    if (attribute.name.toLowerCase() === target) {
+    if (attribute.namespaceUri === null && asciiLowercase(attribute.localName) === target) {
       return attribute.value;
     }
   }
   return undefined;
+}
+
+/** Tests for an unnamespaced HTML attribute using ASCII case-insensitive matching. */
+export function hasAttribute(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  name: string
+): boolean {
+  return getAttributeValue(node, name) !== undefined;
+}
+
+/** Returns an attribute value by exact namespace URI and local name. */
+export function getAttributeValueNS(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  namespaceUri: string | null,
+  localName: string
+): string | undefined {
+  return node.attributes.find((attribute) =>
+    attribute.namespaceUri === namespaceUri && attribute.localName === localName
+  )?.value;
+}
+
+/** Tests for an attribute by exact namespace URI and local name. */
+export function hasAttributeNS(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  namespaceUri: string | null,
+  localName: string
+): boolean {
+  return getAttributeValueNS(node, namespaceUri, localName) !== undefined;
+}
+
+function attributeValue(node: Extract<HtmlNode, { kind: "element" }>, name: string): string | undefined {
+  return node.namespaceUri === HTML_NAMESPACE_URI
+    ? getAttributeValue(node, name)
+    : getAttributeValueNS(node, null, name);
 }
 
 function shouldSkipHiddenSubtree(
@@ -1671,179 +1799,193 @@ function appendVisibleText(
   }
 }
 
-function collectNoscriptRawMarkup(
+function noscriptFallbackChildren(
   node: Extract<HtmlNode, { kind: "element" }>,
-  parts: string[],
-  options: ResolvedVisibleTextOptions,
-  preserveWhitespace: boolean,
-  sourceChunks?: VisibleTextSourceChunk[]
-): boolean {
+  options: ResolvedVisibleTextOptions
+): readonly HtmlNode[] | null {
   options.operation.checkpoint();
   if (node.tagName.toLowerCase() !== "noscript") {
-    return false;
+    return null;
   }
 
   if (node.children.length !== 1) {
-    return false;
+    return null;
   }
 
   const onlyChild = node.children[0];
   if (!onlyChild || onlyChild.kind !== "text") {
-    return false;
+    return null;
   }
 
   const rawMarkup = onlyChild.value;
   if (!rawMarkup.includes("<") || !rawMarkup.includes(">")) {
-    return false;
+    return null;
   }
 
   const fallbackFragment = parseFragment(rawMarkup, "body");
   options.operation.checkpoint();
-  for (const child of fallbackFragment.children) {
-    collectVisibleTextFromNode(child, parts, options, preserveWhitespace, sourceChunks, "noscript-fallback");
-  }
-  return true;
+  return fallbackFragment.children;
 }
 
-function collectVisibleTextFromNode(
-  node: HtmlNode,
+function collectVisibleTextNodes(
+  roots: readonly HtmlNode[],
   parts: string[],
   options: ResolvedVisibleTextOptions,
-  preserveWhitespace: boolean,
-  sourceChunks?: VisibleTextSourceChunk[],
-  sourceRoleOverride: VisibleTextTokenSourceRole | null = null
+  sourceChunks?: VisibleTextSourceChunk[]
 ): void {
-  options.operation.checkpoint();
-  if (node.kind === "text") {
-    appendVisibleText(
-      parts,
-      normalizeVisibleTextSegment(node.value, preserveWhitespace),
-      sourceChunks,
-      sourceMetaFromNode(node, sourceRoleOverride ?? "text-node")
-    );
-    return;
-  }
-
-  if (node.kind !== "element") {
-    return;
-  }
-
-  if (shouldSkipHiddenSubtree(node, options)) {
-    return;
-  }
-
-  const tagName = node.tagName.toLowerCase();
-  const fallbackName = accessibleNameFallback(node, options);
-  if (VISIBLE_TEXT_SKIP_TAGS.has(tagName)) {
-    return;
-  }
-
-  if (collectNoscriptRawMarkup(node, parts, options, preserveWhitespace, sourceChunks)) {
-    return;
-  }
-
-  if (tagName === "br") {
-    appendVisibleText(parts, "\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
-    return;
-  }
-
-  if (tagName === "img" && options.includeControlValues) {
-    const alt = attributeValue(node, "alt");
-    if (alt && alt.length > 0) {
-      appendVisibleText(
-        parts,
-        normalizeVisibleTextSegment(alt, false),
-        sourceChunks,
-        sourceMetaFromNode(node, sourceRoleOverride ?? "img-alt")
-      );
-    }
-    return;
-  }
-
-  if (tagName === "input" && options.includeControlValues) {
-    const type = (attributeValue(node, "type") ?? "text").toLowerCase();
-    if (type !== "hidden") {
-      const value = attributeValue(node, "value");
-      if (VISIBLE_TEXT_INPUT_VALUE_TAG_TYPES.has(type) && value && value.length > 0) {
-        appendVisibleText(
-          parts,
-          normalizeVisibleTextSegment(value, false),
-          sourceChunks,
-          sourceMetaFromNode(node, sourceRoleOverride ?? "input-value")
-        );
-        return;
-      }
-      if (fallbackName) {
-        appendVisibleText(
-          parts,
-          normalizeVisibleTextSegment(fallbackName, false),
-          sourceChunks,
-          sourceMetaFromNode(node, sourceRoleOverride ?? "input-aria-label")
-        );
+  type VisitAction = {
+    readonly kind: "visit";
+    readonly node: HtmlNode;
+    readonly preserveWhitespace: boolean;
+    readonly sourceRoleOverride: VisibleTextTokenSourceRole | null;
+  };
+  type AppendAction = {
+    readonly kind: "append";
+    readonly node: HtmlNode;
+    readonly value: string;
+    readonly sourceRole: VisibleTextTokenSourceRole;
+  };
+  type Action = VisitAction | AppendAction;
+  const stack: Action[] = [];
+  const pushVisits = (
+    nodes: readonly HtmlNode[],
+    preserveWhitespace: boolean,
+    sourceRoleOverride: VisibleTextTokenSourceRole | null
+  ): void => {
+    for (let index = nodes.length - 1; index >= 0; index -= 1) {
+      const node = nodes[index];
+      if (node !== undefined) {
+        stack.push({ kind: "visit", node, preserveWhitespace, sourceRoleOverride });
       }
     }
-    return;
-  }
+  };
+  pushVisits(roots, false, null);
 
-  if (tagName === "select") {
-    return;
-  }
-
-  if (tagName === "button" && options.includeControlValues) {
-    const value = attributeValue(node, "value");
-    if (value && value.length > 0) {
+  while (stack.length > 0) {
+    const action = stack.pop();
+    if (action === undefined) {
+      continue;
+    }
+    options.operation.checkpoint();
+    if (action.kind === "append") {
       appendVisibleText(
         parts,
-        normalizeVisibleTextSegment(value, false),
+        action.value,
         sourceChunks,
-        sourceMetaFromNode(node, sourceRoleOverride ?? "button-value")
+        sourceMetaFromNode(action.node, action.sourceRole)
       );
-      return;
+      continue;
     }
-  }
-
-  if (tagName === "tr") {
-    appendVisibleText(parts, "\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
-    let seenTableCell = false;
-    for (const child of node.children) {
-      if (child.kind === "element") {
-        const childTagName = child.tagName.toLowerCase();
-        if (childTagName === "td" || childTagName === "th") {
-          if (seenTableCell) {
-            appendVisibleText(parts, "\t", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
+    const { node, preserveWhitespace, sourceRoleOverride } = action;
+    if (node.kind === "text") {
+      stack.push({
+        kind: "append",
+        node,
+        value: normalizeVisibleTextSegment(node.value, preserveWhitespace),
+        sourceRole: sourceRoleOverride ?? "text-node"
+      });
+      continue;
+    }
+    if (node.kind !== "element" || shouldSkipHiddenSubtree(node, options)) {
+      continue;
+    }
+    const tagName = node.tagName.toLowerCase();
+    if (VISIBLE_TEXT_SKIP_TAGS.has(tagName)) {
+      continue;
+    }
+    const fallbackChildren = noscriptFallbackChildren(node, options);
+    if (fallbackChildren !== null) {
+      pushVisits(fallbackChildren, preserveWhitespace, "noscript-fallback");
+      continue;
+    }
+    const structuralRole = sourceRoleOverride ?? "structure-break";
+    if (tagName === "br") {
+      stack.push({ kind: "append", node, value: "\n", sourceRole: structuralRole });
+      continue;
+    }
+    if (tagName === "img" && options.includeControlValues) {
+      const alt = attributeValue(node, "alt");
+      if (alt && alt.length > 0) {
+        stack.push({
+          kind: "append", node, value: normalizeVisibleTextSegment(alt, false),
+          sourceRole: sourceRoleOverride ?? "img-alt"
+        });
+      }
+      continue;
+    }
+    if (tagName === "input" && options.includeControlValues) {
+      const type = (attributeValue(node, "type") ?? "text").toLowerCase();
+      if (type !== "hidden") {
+        const value = attributeValue(node, "value");
+        if (VISIBLE_TEXT_INPUT_VALUE_TAG_TYPES.has(type) && value && value.length > 0) {
+          stack.push({
+            kind: "append", node, value: normalizeVisibleTextSegment(value, false),
+            sourceRole: sourceRoleOverride ?? "input-value"
+          });
+        } else {
+          const fallbackName = accessibleNameFallback(node, options);
+          if (fallbackName) {
+            stack.push({
+              kind: "append", node, value: normalizeVisibleTextSegment(fallbackName, false),
+              sourceRole: sourceRoleOverride ?? "input-aria-label"
+            });
           }
-          collectVisibleTextFromNode(child, parts, options, preserveWhitespace, sourceChunks, sourceRoleOverride);
-          seenTableCell = true;
-          continue;
         }
       }
-      collectVisibleTextFromNode(child, parts, options, preserveWhitespace, sourceChunks, sourceRoleOverride);
+      continue;
     }
-    appendVisibleText(parts, "\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
-    return;
-  }
-
-  if (tagName === "td" || tagName === "th") {
-    for (const child of node.children) {
-      collectVisibleTextFromNode(child, parts, options, preserveWhitespace, sourceChunks, sourceRoleOverride);
+    if (tagName === "select") {
+      continue;
     }
-    return;
-  }
-
-  const childPreserveWhitespace = preserveWhitespace || tagName === "pre" || tagName === "textarea";
-  const blockBreakBefore = tagName === "p" || VISIBLE_TEXT_BLOCK_BREAK_TAGS.has(tagName);
-  if (blockBreakBefore) {
-    appendVisibleText(parts, "\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
-  }
-  for (const child of node.children) {
-    collectVisibleTextFromNode(child, parts, options, childPreserveWhitespace, sourceChunks, sourceRoleOverride);
-  }
-  if (tagName === "p") {
-    appendVisibleText(parts, "\n\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
-    return;
-  }
-  if (blockBreakBefore) {
-    appendVisibleText(parts, "\n", sourceChunks, sourceMetaFromNode(node, sourceRoleOverride ?? "structure-break"));
+    if (tagName === "button" && options.includeControlValues) {
+      const value = attributeValue(node, "value");
+      if (value && value.length > 0) {
+        stack.push({
+          kind: "append", node, value: normalizeVisibleTextSegment(value, false),
+          sourceRole: sourceRoleOverride ?? "button-value"
+        });
+        continue;
+      }
+    }
+    if (tagName === "tr") {
+      const actions: Action[] = [
+        { kind: "append", node, value: "\n", sourceRole: structuralRole }
+      ];
+      let seenTableCell = false;
+      for (const child of node.children) {
+        const childTagName = child.kind === "element" ? child.tagName.toLowerCase() : "";
+        if ((childTagName === "td" || childTagName === "th") && seenTableCell) {
+          actions.push({ kind: "append", node, value: "\t", sourceRole: structuralRole });
+        }
+        actions.push({ kind: "visit", node: child, preserveWhitespace, sourceRoleOverride });
+        if (childTagName === "td" || childTagName === "th") {
+          seenTableCell = true;
+        }
+      }
+      actions.push({ kind: "append", node, value: "\n", sourceRole: structuralRole });
+      for (let index = actions.length - 1; index >= 0; index -= 1) {
+        const next = actions[index];
+        if (next !== undefined) {
+          stack.push(next);
+        }
+      }
+      continue;
+    }
+    if (tagName === "td" || tagName === "th") {
+      pushVisits(node.children, preserveWhitespace, sourceRoleOverride);
+      continue;
+    }
+    const childPreserveWhitespace = preserveWhitespace || tagName === "pre" || tagName === "textarea";
+    const blockBreakBefore = tagName === "p" || VISIBLE_TEXT_BLOCK_BREAK_TAGS.has(tagName);
+    if (tagName === "p") {
+      stack.push({ kind: "append", node, value: "\n\n", sourceRole: structuralRole });
+    } else if (blockBreakBefore) {
+      stack.push({ kind: "append", node, value: "\n", sourceRole: structuralRole });
+    }
+    pushVisits(node.children, childPreserveWhitespace, sourceRoleOverride);
+    if (blockBreakBefore) {
+      stack.push({ kind: "append", node, value: "\n", sourceRole: structuralRole });
+    }
   }
 }
 
@@ -1853,13 +1995,10 @@ function collectVisibleText(
 ): string {
   options.operation.checkpoint();
   const parts: string[] = [];
-  if (nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment") {
-    for (const child of nodeOrTree.children) {
-      collectVisibleTextFromNode(child, parts, options, false);
-    }
-  } else {
-    collectVisibleTextFromNode(nodeOrTree, parts, options, false);
-  }
+  const roots = nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment"
+    ? nodeOrTree.children
+    : [nodeOrTree];
+  collectVisibleTextNodes(roots, parts, options);
   return normalizeVisibleTextOutput(parts.join(""), options);
 }
 
@@ -1870,13 +2009,10 @@ function collectVisibleTextWithSourceChunks(
   options.operation.checkpoint();
   const parts: string[] = [];
   const sourceChunks: VisibleTextSourceChunk[] = [];
-  if (nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment") {
-    for (const child of nodeOrTree.children) {
-      collectVisibleTextFromNode(child, parts, options, false, sourceChunks);
-    }
-  } else {
-    collectVisibleTextFromNode(nodeOrTree, parts, options, false, sourceChunks);
-  }
+  const roots = nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment"
+    ? nodeOrTree.children
+    : [nodeOrTree];
+  collectVisibleTextNodes(roots, parts, options, sourceChunks);
   return {
     output: normalizeVisibleTextOutput(parts.join(""), options),
     sourceChunks
@@ -2222,11 +2358,27 @@ function* iterateNodes(
   depth: number,
   operation: OperationContext
 ): IterableIterator<{ readonly node: HtmlNode; readonly depth: number }> {
-  for (const node of nodes) {
+  const stack: { readonly node: HtmlNode; readonly depth: number }[] = [];
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index];
+    if (node !== undefined) {
+      stack.push({ node, depth });
+    }
+  }
+  while (stack.length > 0) {
+    const entry = stack.pop();
+    if (entry === undefined) {
+      continue;
+    }
     operation.checkpoint();
-    yield { node, depth };
-    if (node.kind === "element") {
-      yield* iterateNodes(node.children, depth + 1, operation);
+    yield entry;
+    if (entry.node.kind === "element") {
+      for (let index = entry.node.children.length - 1; index >= 0; index -= 1) {
+        const child = entry.node.children[index];
+        if (child !== undefined) {
+          stack.push({ node: child, depth: entry.depth + 1 });
+        }
+      }
     }
   }
 }/**
@@ -2328,9 +2480,9 @@ function* findAllByTagNameIterator(
   tagName: string,
   operation: OperationContext
 ): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
-  const normalized = tagName.toLowerCase();
+  const normalized = asciiLowercase(tagName);
   for (const entry of iterateNodes(tree.children, 0, operation)) {
-    if (entry.node.kind === "element" && entry.node.tagName.toLowerCase() === normalized) {
+    if (isHtmlElement(entry.node) && asciiLowercase(entry.node.localName) === normalized) {
       yield entry.node;
     }
   }
@@ -2355,6 +2507,43 @@ export function findAllByTagName(
  * Traverses parsed data deterministically for the `findAllByAttr` public API.
  */
 
+function* findAllByTagNameNSIterator(
+  tree: DocumentTree | FragmentTree,
+  namespaceUri: string,
+  localName: string,
+  operation: OperationContext
+): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
+  for (const entry of iterateNodes(tree.children, 0, operation)) {
+    if (
+      entry.node.kind === "element" &&
+      entry.node.namespaceUri === namespaceUri &&
+      entry.node.localName === localName
+    ) {
+      yield entry.node;
+    }
+  }
+}
+
+/** Finds elements by exact namespace URI and local name. */
+export function findAllByTagNameNS(
+  tree: DocumentTree | FragmentTree,
+  namespaceUri: string,
+  localName: string,
+  options: OperationOptions = {}
+): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
+  const startedAt = performance.now();
+  requireString(namespaceUri, "namespaceUri");
+  requireString(localName, "localName");
+  const normalizedOptions = normalizeOperationOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
+  operation.checkpoint();
+  return findAllByTagNameNSIterator(tree, namespaceUri, localName, operation);
+}
+
 
 function* findAllByAttrIterator(
   tree: DocumentTree | FragmentTree,
@@ -2362,13 +2551,17 @@ function* findAllByAttrIterator(
   value: string | undefined,
   operation: OperationContext
 ): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
+  const normalizedName = asciiLowercase(name);
   for (const entry of iterateNodes(tree.children, 0, operation)) {
-    if (entry.node.kind !== "element") {
+    if (!isHtmlElement(entry.node)) {
       continue;
     }
 
     const matched = entry.node.attributes.some(
-      (attribute) => attribute.name === name && (value === undefined || attribute.value === value)
+      (attribute) =>
+        attribute.namespaceUri === null &&
+        asciiLowercase(attribute.localName) === normalizedName &&
+        (value === undefined || attribute.value === value)
     );
     if (matched) {
       yield entry.node;
@@ -2394,31 +2587,52 @@ export function findAllByAttr(
   return findAllByAttrIterator(tree, name, value, operation);
 }
 
-function collectOutlineNodes(
-  node: HtmlNode,
-  depth: number,
-  entries: OutlineEntry[],
+function* findAllByAttrNSIterator(
+  tree: DocumentTree | FragmentTree,
+  namespaceUri: string | null,
+  localName: string,
+  value: string | undefined,
   operation: OperationContext
-): void {
+): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
+  for (const entry of iterateNodes(tree.children, 0, operation)) {
+    if (entry.node.kind !== "element") {
+      continue;
+    }
+    const matched = entry.node.attributes.some((attribute) =>
+      attribute.namespaceUri === namespaceUri &&
+      attribute.localName === localName &&
+      (value === undefined || attribute.value === value)
+    );
+    if (matched) {
+      yield entry.node;
+    }
+  }
+}
+
+/** Finds elements carrying an attribute with an exact expanded name. */
+export function findAllByAttrNS(
+  tree: DocumentTree | FragmentTree,
+  namespaceUri: string | null,
+  localName: string,
+  value?: string,
+  options: OperationOptions = {}
+): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
+  const startedAt = performance.now();
+  if (namespaceUri !== null) {
+    requireString(namespaceUri, "namespaceUri");
+  }
+  requireString(localName, "localName");
+  const normalizedOptions = normalizeOperationOptions(options);
+  const operation = createOperationContext(
+    normalizedOptions.maxTimeMs,
+    normalizedOptions.signal,
+    startedAt
+  );
   operation.checkpoint();
-  if (node.kind !== "element") {
-    return;
-  }
+  return findAllByAttrNSIterator(tree, namespaceUri, localName, value, operation);
+}
 
-  const normalized = node.tagName.toLowerCase();
-  if (/^h[1-6]$/.test(normalized) || normalized === "section" || normalized === "article") {
-    entries.push({
-      nodeId: node.id,
-      depth,
-      tagName: node.tagName,
-      text: textContentFromNode(node, operation).slice(0, 200)
-    });
-  }
-
-  for (const child of node.children) {
-    collectOutlineNodes(child, depth + 1, entries, operation);
-  }
-}/**
+/**
  * Provides deterministic public behavior for `outline`.
  */
 
@@ -2436,20 +2650,44 @@ export function outline(
   );
   operation.checkpoint();
   const entries: OutlineEntry[] = [];
-  for (const child of tree.children) {
-    collectOutlineNodes(child, 0, entries, operation);
+  for (const entry of iterateNodes(tree.children, 0, operation)) {
+    if (!isHtmlElement(entry.node)) {
+      continue;
+    }
+    const normalized = asciiLowercase(entry.node.localName);
+    if (/^h[1-6]$/.test(normalized) || normalized === "section" || normalized === "article") {
+      entries.push({
+        nodeId: entry.node.id,
+        depth: entry.depth,
+        tagName: entry.node.tagName,
+        text: textContentFromNode(entry.node, operation).slice(0, 200)
+      });
+    }
   }
 
   return { entries };
 }
 
 function countNodes(node: HtmlNode, operation: OperationContext): number {
-  operation.checkpoint();
-  if (node.kind !== "element") {
-    return 1;
+  let count = 0;
+  const stack: HtmlNode[] = [node];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === undefined) {
+      continue;
+    }
+    operation.checkpoint();
+    count += 1;
+    if (current.kind === "element") {
+      for (let index = current.children.length - 1; index >= 0; index -= 1) {
+        const child = current.children[index];
+        if (child !== undefined) {
+          stack.push(child);
+        }
+      }
+    }
   }
-
-  return 1 + node.children.reduce((total, child) => total + countNodes(child, operation), 0);
+  return count;
 }
 
 interface IndexedNodeSpan {
@@ -2458,23 +2696,43 @@ interface IndexedNodeSpan {
 }
 
 function indexNodeSpans(nodes: readonly HtmlNode[], into: Map<NodeId, IndexedNodeSpan>): void {
-  for (const node of nodes) {
+  const stack = [...nodes].reverse();
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (node === undefined) {
+      continue;
+    }
     into.set(node.id, {
       provenance: node.spanProvenance,
       ...(node.span ? { span: node.span } : {})
     });
 
     if (node.kind === "element") {
-      indexNodeSpans(node.children, into);
+      for (let index = node.children.length - 1; index >= 0; index -= 1) {
+        const child = node.children[index];
+        if (child !== undefined) {
+          stack.push(child);
+        }
+      }
     }
   }
 }
 
 function indexNodes(nodes: readonly HtmlNode[], into: Map<NodeId, HtmlNode>): void {
-  for (const node of nodes) {
+  const stack = [...nodes].reverse();
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (node === undefined) {
+      continue;
+    }
     into.set(node.id, node);
     if (node.kind === "element") {
-      indexNodes(node.children, into);
+      for (let index = node.children.length - 1; index >= 0; index -= 1) {
+        const child = node.children[index];
+        if (child !== undefined) {
+          stack.push(child);
+        }
+      }
     }
   }
 }
@@ -2883,7 +3141,7 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
 
   for (const node of tree.children) {
     operation.checkpoint();
-    const content = serializeNode(node, operation);
+    const content = serializeNodes([node], operation);
     const nodes = countNodes(node, operation);
     const bytes = textEncoder.encode(content).length;
     const nextChars = activeContent.length + content.length;

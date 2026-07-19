@@ -17,12 +17,15 @@ Primary JSR runtime exports:
 - `isHtmlAbortError`, `isHtmlBudgetExceededError`, `isHtmlConfigurationError`,
   `isHtmlPatchPlanningError`, `isHtmlStreamReadError`,
   `isHtmlOperationalError`
+- namespace constants, HTML attribute helpers, and HTML/exact-namespace query
+  helpers
 
 Primary JSR type exports:
 - `ParseBudgets`, `ParseOptions`, `ParseStreamBudgets`, `ParseStreamOptions`,
   `TokenizeByteStreamEagerBudgets`, `TokenizeByteStreamEagerOptions`,
   `OperationOptions`
-- `DocumentTree`, `FragmentTree`, `HtmlNode`, `ParseError`
+- `DocumentTree`, `FragmentTree`, the exact namespace-aware `HtmlNode` union,
+  `Attribute`, `DoctypeExternalId`, `Span`, `SpanProvenance`, and `ParseError`
 - `VisibleTextOptions`, `SerializableHtml`, `VisibleTextInput`, `HtmlToken`
 - `HtmlOperationalError`, `HtmlBudgetName`,
   `HtmlConfigurationErrorReason`, `HtmlPatchPlanningReason`, `NodeId`
@@ -37,7 +40,12 @@ In addition to the shared parse and operational-error surface, Node/npm includes
 - `visibleTextTokens(...)`
 - `visibleTextTokensWithProvenance(...)`
 - `getParseErrorSpecRef(parseErrorId)`
-- traversal/search helpers (`walk`, `walkElements`, `findById`, `findAllByTagName`, `findAllByAttr`, `textContent`)
+- traversal/search helpers (`walk`, `walkElements`, `findById`,
+  `findAllByTagName`, `findAllByTagNameNS`, `findAllByAttr`,
+  `findAllByAttrNS`, `textContent`)
+- shared attribute helpers (`getAttributeValue`, `hasAttribute`,
+  `getAttributeValueNS`, `hasAttributeNS`) and canonical HTML/SVG/MathML/XLink/
+  XML/XMLNS namespace URI constants
 - structural helpers (`outline`, `chunk`)
 - patch planning helpers (`computePatch`, `applyPatchPlan`)
 - span metadata fields including `spanProvenance` on parsed nodes when spans are enabled
@@ -46,7 +54,9 @@ In addition to the shared parse and operational-error surface, Node/npm includes
 
 ## JSR Surface vs Node Surface
 
-- JSR is intentionally slimmer for Deno/JSR consumers.
+- JSR is intentionally slimmer for Deno/JSR consumers, but exposes the same
+  parsed-node identity, namespace constants, attribute helpers, and structural
+  queries.
 - Node/npm exposes the broader authoring and transformation surface.
 - Both surfaces share the same parse model, operational error classes and
   structural guards, and option types where names overlap.

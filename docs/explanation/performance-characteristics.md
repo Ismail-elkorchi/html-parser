@@ -16,6 +16,10 @@ Key characteristics:
   public conversion, serialization, traversal, and extraction. A stream
   deadline also interrupts a pending read.
 - Deterministic serialization and traversal helpers.
+- Tree conversion, metrics, normalization, serialization, traversal, text and
+  provenance extraction, outline, queries, patch indexing, and chunk counting
+  use explicit stacks. Accepted parser depths are therefore independent of the
+  JavaScript engine's call-stack limit.
 - Trace events are accounted and appended in one pass. Summary mode retains
   fixed-shape counters instead of the event sequence; callback-only observation
   retains no public trace result.
@@ -32,6 +36,8 @@ The hard-budget benchmark runs node, attribute, parse-error, decoded-output,
 and trace storms in isolated paired processes. It verifies exact first-failure values and
 lower retained heap for bounded work; see the
 [maintainer evidence](../maintainers/hard-budget-evidence.md).
+Namespace/doctype fidelity and 5,000-level public-tree stack-safety evidence is
+recorded in the [tree-model evidence](../maintainers/namespace-tree-model.md).
 
 ## Peak-memory model for byte streams
 

@@ -18,13 +18,27 @@
  * - `./docs/reference/options.md`
  */
 import {
+  findAllByAttr as findAllByAttrInternal,
+  findAllByAttrNS as findAllByAttrNSInternal,
+  findAllByTagName as findAllByTagNameInternal,
+  findAllByTagNameNS as findAllByTagNameNSInternal,
+  getAttributeValue as getAttributeValueInternal,
+  getAttributeValueNS as getAttributeValueNSInternal,
+  hasAttribute as hasAttributeInternal,
+  hasAttributeNS as hasAttributeNSInternal,
+  HTML_NAMESPACE_URI as HTML_NAMESPACE_URI_INTERNAL,
+  MATHML_NAMESPACE_URI as MATHML_NAMESPACE_URI_INTERNAL,
   parse as parseInternal,
   parseBytes as parseBytesInternal,
   parseFragment as parseFragmentInternal,
   parseStream as parseStreamInternal,
   serialize as serializeInternal,
   tokenizeByteStreamEager as tokenizeByteStreamEagerInternal,
-  visibleText as visibleTextInternal
+  visibleText as visibleTextInternal,
+  SVG_NAMESPACE_URI as SVG_NAMESPACE_URI_INTERNAL,
+  XLINK_NAMESPACE_URI as XLINK_NAMESPACE_URI_INTERNAL,
+  XML_NAMESPACE_URI as XML_NAMESPACE_URI_INTERNAL,
+  XMLNS_NAMESPACE_URI as XMLNS_NAMESPACE_URI_INTERNAL
 } from "../src/public/mod.ts";
 import type {
   TraceEvent,
@@ -184,29 +198,112 @@ export interface ParseError {
   /** Optional node id associated with the diagnostic. */
   readonly nodeId?: number;
   /** Optional input offsets associated with the diagnostic. */
-  readonly span?: {
-    /** Zero-based inclusive start offset. */
-    readonly start: number;
-    /** Zero-based exclusive end offset. */
-    readonly end: number;
-  };
+  readonly span?: Span;
 }
 
-/**
- * Minimal public node shape used across parse and serialization APIs.
- */
-export interface HtmlNode {
-  /** Stable node id in the parsed tree. */
-  readonly id: number;
-  /** Node category. */
-  readonly kind: "element" | "text" | "comment" | "doctype";
-  /** Element tag name when `kind` is `"element"`. */
-  readonly tagName?: string;
-  /** Text payload for text/comment nodes. */
-  readonly value?: string;
-  /** Child nodes when this node can contain descendants. */
-  readonly children?: readonly HtmlNode[];
+/** Zero-based, half-open UTF-16 code-unit offsets into decoded input. */
+export interface Span {
+  /** Inclusive start offset. */
+  readonly start: number;
+  /** Exclusive end offset. */
+  readonly end: number;
 }
+
+/** Explains whether a source span came from input, recovery, or disabled capture. */
+export type SpanProvenance = "input" | "inferred" | "none";
+
+/** Namespace-aware parsed attribute. */
+export interface Attribute {
+  /** Namespace URI, or null for an unnamespaced attribute. */
+  readonly namespaceUri: string | null;
+  /** Namespace prefix, or null when unprefixed. */
+  readonly prefix: string | null;
+  /** Attribute local name. */
+  readonly localName: string;
+  /** Qualified attribute name. */
+  readonly name: string;
+  /** Decoded attribute value. */
+  readonly value: string;
+  /** Full input attribute span when captured. */
+  readonly span?: Span;
+}
+
+/** Parsed text node. */
+export interface TextNode {
+  /** Stable node id in this parsed tree. */
+  readonly id: number;
+  /** Node discriminator. */
+  readonly kind: "text";
+  /** Decoded text value. */
+  readonly value: string;
+  /** Source-span provenance. */
+  readonly spanProvenance: SpanProvenance;
+  /** Input span when available. */
+  readonly span?: Span;
+}
+
+/** Parsed comment node. */
+export interface CommentNode {
+  /** Stable node id in this parsed tree. */
+  readonly id: number;
+  /** Node discriminator. */
+  readonly kind: "comment";
+  /** Comment data. */
+  readonly value: string;
+  /** Source-span provenance. */
+  readonly spanProvenance: SpanProvenance;
+  /** Input span when available. */
+  readonly span?: Span;
+}
+
+/** External identifier retained from a document type declaration. */
+export type DoctypeExternalId =
+  | { readonly kind: "none" }
+  | { readonly kind: "public"; readonly publicId: string; readonly systemId: string | null }
+  | { readonly kind: "system"; readonly systemId: string };
+
+/** Parsed document type node. */
+export interface DoctypeNode {
+  /** Stable node id in this parsed tree. */
+  readonly id: number;
+  /** Node discriminator. */
+  readonly kind: "doctype";
+  /** Document type name. */
+  readonly name: string;
+  /** Exact external-identifier syntax state. */
+  readonly externalId: DoctypeExternalId;
+  /** Source-span provenance. */
+  readonly spanProvenance: SpanProvenance;
+  /** Input span when available. */
+  readonly span?: Span;
+}
+
+/** Namespace-aware parsed element node. */
+export interface ElementNode {
+  /** Stable node id in this parsed tree. */
+  readonly id: number;
+  /** Node discriminator. */
+  readonly kind: "element";
+  /** Element namespace URI. */
+  readonly namespaceUri: string;
+  /** Parser-provided prefix, or null. */
+  readonly prefix: string | null;
+  /** Element local name. */
+  readonly localName: string;
+  /** Qualified element name. */
+  readonly tagName: string;
+  /** Namespace-aware attributes in tree order. */
+  readonly attributes: readonly Attribute[];
+  /** Child nodes in tree order. */
+  readonly children: readonly HtmlNode[];
+  /** Source-span provenance. */
+  readonly spanProvenance: SpanProvenance;
+  /** Input span when available. */
+  readonly span?: Span;
+}
+
+/** Exact public node union returned by parse entrypoints. */
+export type HtmlNode = ElementNode | TextNode | CommentNode | DoctypeNode;
 
 /**
  * Parsed HTML document tree returned by `parse`, `parseBytes`, and `parseStream`.
@@ -251,6 +348,107 @@ export type SerializableHtml = DocumentTree | FragmentTree | HtmlNode;
  * Input accepted by `visibleText`.
  */
 export type VisibleTextInput = DocumentTree | FragmentTree | HtmlNode;
+
+/** HTML namespace URI assigned by the tree builder. */
+export const HTML_NAMESPACE_URI: string = HTML_NAMESPACE_URI_INTERNAL;
+/** SVG namespace URI assigned by the tree builder. */
+export const SVG_NAMESPACE_URI: string = SVG_NAMESPACE_URI_INTERNAL;
+/** MathML namespace URI assigned by the tree builder. */
+export const MATHML_NAMESPACE_URI: string = MATHML_NAMESPACE_URI_INTERNAL;
+/** XLink namespace URI used by adjusted foreign attributes. */
+export const XLINK_NAMESPACE_URI: string = XLINK_NAMESPACE_URI_INTERNAL;
+/** XML namespace URI used by adjusted foreign attributes. */
+export const XML_NAMESPACE_URI: string = XML_NAMESPACE_URI_INTERNAL;
+/** XMLNS namespace URI used by namespace declaration attributes. */
+export const XMLNS_NAMESPACE_URI: string = XMLNS_NAMESPACE_URI_INTERNAL;
+
+/** Returns an unnamespaced HTML attribute using ASCII case-insensitive matching. */
+export function getAttributeValue(node: ElementNode, name: string): string | undefined {
+  return getAttributeValueInternal(node, name);
+}
+
+/** Tests for an unnamespaced HTML attribute using ASCII case-insensitive matching. */
+export function hasAttribute(node: ElementNode, name: string): boolean {
+  return hasAttributeInternal(node, name);
+}
+
+/** Returns an attribute value by exact namespace URI and local name. */
+export function getAttributeValueNS(
+  node: ElementNode,
+  namespaceUri: string | null,
+  localName: string
+): string | undefined {
+  return getAttributeValueNSInternal(node, namespaceUri, localName);
+}
+
+/** Tests for an attribute by exact namespace URI and local name. */
+export function hasAttributeNS(
+  node: ElementNode,
+  namespaceUri: string | null,
+  localName: string
+): boolean {
+  return hasAttributeNSInternal(node, namespaceUri, localName);
+}
+
+/** Finds HTML elements by ASCII case-insensitive local name. */
+export function findAllByTagName(
+  tree: DocumentTree | FragmentTree,
+  tagName: string,
+  options: OperationOptions = {}
+): IterableIterator<ElementNode> {
+  return findAllByTagNameInternal(
+    tree as Parameters<typeof findAllByTagNameInternal>[0],
+    tagName,
+    options
+  );
+}
+
+/** Finds elements by exact namespace URI and local name. */
+export function findAllByTagNameNS(
+  tree: DocumentTree | FragmentTree,
+  namespaceUri: string,
+  localName: string,
+  options: OperationOptions = {}
+): IterableIterator<ElementNode> {
+  return findAllByTagNameNSInternal(
+    tree as Parameters<typeof findAllByTagNameNSInternal>[0],
+    namespaceUri,
+    localName,
+    options
+  );
+}
+
+/** Finds HTML elements carrying an unnamespaced attribute. */
+export function findAllByAttr(
+  tree: DocumentTree | FragmentTree,
+  name: string,
+  value?: string,
+  options: OperationOptions = {}
+): IterableIterator<ElementNode> {
+  return findAllByAttrInternal(
+    tree as Parameters<typeof findAllByAttrInternal>[0],
+    name,
+    value,
+    options
+  );
+}
+
+/** Finds elements carrying an attribute with an exact expanded name. */
+export function findAllByAttrNS(
+  tree: DocumentTree | FragmentTree,
+  namespaceUri: string | null,
+  localName: string,
+  value?: string,
+  options: OperationOptions = {}
+): IterableIterator<ElementNode> {
+  return findAllByAttrNSInternal(
+    tree as Parameters<typeof findAllByAttrNSInternal>[0],
+    namespaceUri,
+    localName,
+    value,
+    options
+  );
+}
 
 /**
  * Token returned by `tokenizeByteStreamEager` after complete input consumption.

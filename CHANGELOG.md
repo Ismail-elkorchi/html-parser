@@ -3,6 +3,14 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Preserve element and attribute namespace identity, expose shared HTML and
+  exact-namespace query helpers, and align Node/npm and JSR tree types.
+- Replace ambiguous optional doctype identifiers with an exact external-ID
+  union and serialize valid `PUBLIC`/`SYSTEM` declarations without collapsing
+  explicit empty identifiers.
+- Apply HTML void-element rules only in the HTML namespace, document exact
+  UTF-16 span semantics, and make deep conversion, traversal, serialization,
+  extraction, outline, patch, and chunk paths stack-safe.
 - Replace boolean trace capture with explicit none/summary/events modes, a
   synchronous immutable event observer, exact canonical UTF-8 retention
   budgets, and a linear append-only trace pipeline.
