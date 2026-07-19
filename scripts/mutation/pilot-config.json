@@ -110,7 +110,7 @@
     },
     {
       "targetFile": "tmp/test-runtime/src/internal/html-engine/tokenizer/tokenizer.js",
-      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tokenizer/core.test.js", "tmp/test-runtime/test/engine/tokenizer/corpus.test.js"],
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tokenizer/core.test.js", "tmp/test-runtime/test/engine/tokenizer/complete.test.js", "tmp/test-runtime/test/engine/tokenizer/corpus.test.js"],
       "mutants": [
         {
           "id": "tokenizer-data-character-reference",
@@ -135,6 +135,36 @@
           "description": "Ignore a rejected self-closing acknowledgement from the synchronous sink.",
           "search": "if (token.kind === \"start-tag\" && token.selfClosing && !acceptance.selfClosingAcknowledged) {",
           "replace": "if (false && token.kind === \"start-tag\" && token.selfClosing && !acceptance.selfClosingAcknowledged) {"
+        },
+        {
+          "id": "tokenizer-appropriate-end-tag",
+          "description": "Disable matching between a candidate end tag and the last emitted start tag.",
+          "search": "return this.#lastStartTagName !== null && this.#requireTag().name() === this.#lastStartTagName;",
+          "replace": "return false && this.#lastStartTagName !== null && this.#requireTag().name() === this.#lastStartTagName;"
+        },
+        {
+          "id": "tokenizer-script-double-escape-entry",
+          "description": "Prevent the script temporary buffer from entering double-escaped state.",
+          "search": "this.#state = this.#temporaryBuffer() === \"script\"\n                ? \"script-data-double-escaped-state\"\n                : \"script-data-escaped-state\";",
+          "replace": "this.#state = false && this.#temporaryBuffer() === \"script\"\n                ? \"script-data-double-escaped-state\"\n                : \"script-data-escaped-state\";"
+        },
+        {
+          "id": "tokenizer-cdata-terminator",
+          "description": "Disable recognition of the CDATA closing delimiter.",
+          "search": "else if (read.kind === \"character\" && read.value === \">\") {\n            this.#cdataBracketStartUtf16Offset = null;\n            this.#state = \"data-state\";\n        }",
+          "replace": "else if (false && read.kind === \"character\" && read.value === \">\") {\n            this.#cdataBracketStartUtf16Offset = null;\n            this.#state = \"data-state\";\n        }"
+        },
+        {
+          "id": "tokenizer-processing-instruction-reserved-target",
+          "description": "Allow the reserved XML processing-instruction targets.",
+          "search": "if (normalized === \"xml\" || normalized === \"xml-stylesheet\") {",
+          "replace": "if (false && (normalized === \"xml\" || normalized === \"xml-stylesheet\")) {"
+        },
+        {
+          "id": "tokenizer-processing-instruction-question-mark",
+          "description": "Discard a non-closing question mark from processing-instruction data.",
+          "search": "this.#requireProcessingInstruction().appendData(\"?\");",
+          "replace": "this.#requireProcessingInstruction().appendData(\"\");"
         }
       ]
     },

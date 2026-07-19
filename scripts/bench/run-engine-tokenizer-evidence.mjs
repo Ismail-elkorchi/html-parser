@@ -21,6 +21,17 @@ const cases = Object.freeze([
     name: "tags-attributes-comments",
     input: "<section data-x='&amp;'><!--text--></section>".repeat(20_000),
     chunkCodeUnits: 4093
+  },
+  {
+    name: "rcdata-end-tags-and-references",
+    input: "alpha</x>&amp;".repeat(50_000),
+    chunkCodeUnits: 4093,
+    tokenizer: { initialState: "rcdata", lastStartTagName: "title" }
+  },
+  {
+    name: "processing-instructions",
+    input: "<?target data?>".repeat(30_000),
+    chunkCodeUnits: 4093
   }
 ]);
 
@@ -38,13 +49,17 @@ function runEvidence(fixture) {
   const hash = createHash("sha256");
   let tokenCount = 0;
   const guard = createEngineResourceGuard();
-  const tokenizer = new HtmlTokenizer(guard, {
-    accept(token) {
-      tokenCount += 1;
-      hash.update(JSON.stringify(token));
-      return { selfClosingAcknowledged: true };
-    }
-  });
+  const tokenizer = new HtmlTokenizer(
+    guard,
+    {
+      accept(token) {
+        tokenCount += 1;
+        hash.update(JSON.stringify(token));
+        return { selfClosingAcknowledged: true };
+      }
+    },
+    fixture.tokenizer
+  );
   const startedAt = performance.now();
   for (const chunk of chunksOf(fixture.input, fixture.chunkCodeUnits)) {
     tokenizer.write(chunk);

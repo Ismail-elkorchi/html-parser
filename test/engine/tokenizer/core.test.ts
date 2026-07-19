@@ -5,7 +5,6 @@ import {
   EngineAbortError,
   EngineConfigurationError,
   EngineResourceLimitError,
-  EngineUnsupportedTokenizerStateError,
   HTML_TOKENIZER_STATES,
   HtmlTokenizer,
   createEngineResourceGuard,
@@ -36,7 +35,7 @@ function tokenizeChunks(
       }
     },
     {
-      mode: options.mode ?? "data",
+      initialState: options.mode ?? "data",
       observer: { onParseError: (error) => errors.push(error) }
     }
   );
@@ -105,13 +104,19 @@ void test("foundational tokenizer emits comments, doctypes, exact EOF, and self-
   });
 });
 
-void test("IHP-05-only transitions fail explicitly without a fallback", () => {
-  assert.throws(
-    () => tokenizeChunks(["<"], { mode: "rawtext" }),
-    (error) =>
-      error instanceof EngineUnsupportedTokenizerStateError &&
-      error.state === "rawtext-less-than-sign-state"
-  );
+void test("RAWTEXT less-than transitions preserve literal input through EOF", () => {
+  const actual = tokenizeChunks(["<"], { mode: "rawtext" });
+  assert.deepEqual(actual.tokens, [
+    {
+      kind: "character",
+      data: "<",
+      span: { startUtf16Offset: 0, endUtf16Offset: 1 }
+    },
+    {
+      kind: "eof",
+      span: { startUtf16Offset: 1, endUtf16Offset: 1 }
+    }
+  ]);
 });
 
 void test("the frozen state inventory and text-mode NUL distinction are exact", () => {

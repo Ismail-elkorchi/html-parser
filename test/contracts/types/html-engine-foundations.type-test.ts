@@ -25,6 +25,7 @@ function tokenKind(value: HtmlToken): HtmlToken["kind"] {
     case "start-tag":
     case "end-tag":
     case "comment":
+    case "processing-instruction":
     case "character":
     case "eof":
       return value.kind;

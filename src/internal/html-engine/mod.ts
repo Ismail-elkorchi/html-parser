@@ -71,10 +71,10 @@ export {
 } from "./resource-guard.js";
 export { ENGINE_STANDARD_BASELINE, HTML_STANDARD_REVISION } from "./standards.js";
 export {
-  EngineUnsupportedTokenizerStateError,
   HTML_TOKENIZER_STATES,
   HtmlTokenizer,
   type HtmlTokenizerDone,
+  type HtmlTokenizerInitialState,
   type HtmlTokenizerNeedMore,
   type HtmlTokenizerOptions,
   type HtmlTokenizerRunResult,
@@ -94,6 +94,7 @@ export {
   type HtmlCommentToken,
   type HtmlDoctypeToken,
   type HtmlEndTagToken,
+  type HtmlProcessingInstructionToken,
   type HtmlStartTagToken,
   type HtmlToken,
   type HtmlTokenAttribute

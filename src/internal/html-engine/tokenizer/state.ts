@@ -88,16 +88,3 @@ export const HTML_TOKENIZER_STATES = Object.freeze([
 ] as const);
 
 export type HtmlTokenizerState = (typeof HTML_TOKENIZER_STATES)[number];
-
-/** A standards state intentionally deferred by the current isolated engine row. */
-export class EngineUnsupportedTokenizerStateError extends Error {
-  readonly code = "UNSUPPORTED_TOKENIZER_STATE";
-  readonly state: HtmlTokenizerState;
-
-  constructor(state: HtmlTokenizerState) {
-    super(`Tokenizer state is not implemented in this engine stage: ${state}`);
-    this.name = "EngineUnsupportedTokenizerStateError";
-    this.state = state;
-    Object.freeze(this);
-  }
-}
