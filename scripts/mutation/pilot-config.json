@@ -110,7 +110,7 @@
     },
     {
       "targetFile": "tmp/test-runtime/src/internal/html-engine/tokenizer/tokenizer.js",
-      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tokenizer/core.test.js", "tmp/test-runtime/test/engine/tokenizer/complete.test.js", "tmp/test-runtime/test/engine/tokenizer/corpus.test.js"],
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tokenizer/core.test.js", "tmp/test-runtime/test/engine/tokenizer/complete.test.js", "tmp/test-runtime/test/engine/tokenizer/corpus.test.js", "tmp/test-runtime/test/engine/tree/builder.test.js"],
       "mutants": [
         {
           "id": "tokenizer-data-character-reference",
@@ -165,6 +165,12 @@
           "description": "Discard a non-closing question mark from processing-instruction data.",
           "search": "this.#requireProcessingInstruction().appendData(\"?\");",
           "replace": "this.#requireProcessingInstruction().appendData(\"\");"
+        },
+        {
+          "id": "tokenizer-character-whitespace-boundary",
+          "description": "Coalesce ASCII whitespace with following non-whitespace text.",
+          "search": "this.#characterEndUtf16Offset !== span.startUtf16Offset ||\n                this.#characterCategory !== category",
+          "replace": "this.#characterEndUtf16Offset !== span.startUtf16Offset ||\n                false"
         }
       ]
     },
@@ -207,6 +213,12 @@
           "description": "Emit detach/insert mutations for an insertion that preserves sibling order.",
           "search": "if (oldParent === target && currentIndex === insertionIndex) {",
           "replace": "if (false && oldParent === target && currentIndex === insertionIndex) {"
+        },
+        {
+          "id": "tree-processing-instruction-target",
+          "description": "Allow an empty processing-instruction target into the direct model.",
+          "search": "if (target.length === 0)\n            fail(\"TREE_MODEL_EMPTY_PROCESSING_INSTRUCTION_TARGET\");",
+          "replace": "if (false && target.length === 0)\n            fail(\"TREE_MODEL_EMPTY_PROCESSING_INSTRUCTION_TARGET\");"
         }
       ]
     },
@@ -219,6 +231,42 @@
           "description": "Leave malformed DOCTYPE tokens out of quirks mode.",
           "search": "this.#forceQuirks = true;",
           "replace": "this.#forceQuirks = false;"
+        }
+      ]
+    },
+    {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/doctype-mode.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/builder.test.js"],
+      "mutants": [
+        {
+          "id": "tree-builder-limited-quirks",
+          "description": "Disable the XHTML limited-quirks public identifier rule.",
+          "search": "startsWithAny(publicIdentifier, LIMITED_QUIRKS_PUBLIC_PREFIXES) ||",
+          "replace": "false && startsWithAny(publicIdentifier, LIMITED_QUIRKS_PUBLIC_PREFIXES) ||"
+        }
+      ]
+    },
+    {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/tree-builder.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/builder.test.js"],
+      "mutants": [
+        {
+          "id": "tree-builder-eof-open-element-error",
+          "description": "Suppress the required EOF error for unexpected open elements.",
+          "search": "if (this.#templateInsertionModes.length > 0) {\n                throw new HtmlTreeBuilderPendingFeatureError(\"template\", \"in-body\");\n            }\n            if (this.#hasUnexpectedOpenElementAtBodyEnd())",
+          "replace": "if (this.#templateInsertionModes.length > 0) {\n                throw new HtmlTreeBuilderPendingFeatureError(\"template\", \"in-body\");\n            }\n            if (false && this.#hasUnexpectedOpenElementAtBodyEnd())"
+        },
+        {
+          "id": "tree-builder-doctype-mode",
+          "description": "Leave a valid non-HTML DOCTYPE in no-quirks mode.",
+          "search": "this.#documentMode = documentModeForDoctype(token);",
+          "replace": "this.#documentMode = \"no-quirks\";"
+        },
+        {
+          "id": "tree-builder-text-tokenizer-feedback",
+          "description": "Keep the tokenizer in Data instead of entering RCDATA for title.",
+          "search": "if (token.name === \"title\") {\n                this.#insertTextElement(token, \"rcdata\");",
+          "replace": "if (token.name === \"title\") {\n                this.#insertTextElement(token, \"data\");"
         }
       ]
     }

@@ -75,6 +75,11 @@ npm and JSR artifacts, and is reachable only by repository tests. Its initial
 standards baseline is pinned in code so later implementation work cannot
 silently follow a moving Living Standard revision.
 
+Within that boundary, tokenization feeds tree construction synchronously. The
+current document driver builds the direct internal tree without a token batch
+or adapter; insertion-mode families not implemented yet fail explicitly rather
+than returning a plausible but knowingly incorrect tree.
+
 Private state contradictions use the shared internal foundation error and
 machine-readable reasons; they are library defects, not public operational
 errors. Production TypeScript may not throw unclassified generic `Error`

@@ -10,8 +10,7 @@ import {
   HtmlInputCursor,
   createEngineResourceGuard,
   createParseError,
-  runEngineFoundationDriver,
-  type EngineDocumentDriverConfiguration,
+  runHtmlEngine,
   type EngineParseError,
   type InputRead
 } from "../../../src/internal/html-engine/mod.js";
@@ -253,7 +252,7 @@ void test("configuration, abort, deadlines, and observers stop before extra work
     { startUtf16Offset: 0, endUtf16Offset: 1 }
   );
   assert.ok(Object.isFrozen(diagnostic));
-  const runWithUnknownOptions = runEngineFoundationDriver as (options: unknown) => unknown;
+  const runWithUnknownOptions = runHtmlEngine as (options: unknown) => unknown;
   assert.throws(
     () =>
       runWithUnknownOptions({
@@ -265,7 +264,7 @@ void test("configuration, abort, deadlines, and observers stop before extra work
   );
   assert.throws(
     () =>
-      runEngineFoundationDriver({
+      runHtmlEngine({
         inputChunks: ["\ud800"],
         parser: { kind: "document", scriptingMode: "inert" },
         observer: {
@@ -276,39 +275,4 @@ void test("configuration, abort, deadlines, and observers stop before extra work
       }),
     (error) => error === callbackFailure
   );
-});
-
-void test("test driver is explicit, deterministic, and does not claim a parser result", () => {
-  const result = runEngineFoundationDriver({
-    inputChunks: ["<p>", "x</p>"],
-    parser: {
-      kind: "fragment",
-      context: {
-        namespaceUri: "http://www.w3.org/1999/xhtml",
-        localName: "section"
-      },
-      scriptingMode: "disabled"
-    }
-  });
-
-  assert.equal(result.status, "not-implemented");
-  assert.equal(result.input, "<p>x</p>");
-  assert.deepEqual(result.tokens, []);
-  assert.deepEqual(result.parseErrors, []);
-  assert.ok(Object.isFrozen(result));
-  assert.ok(Object.isFrozen(result.inputCharacters));
-});
-
-void test("foundation preprocessing is invariant across adversarial chunk boundaries", () => {
-  const input = "A\r\n😀\ud800X\r\ufdd0\u000b\u0000Z";
-  const parser = {
-    kind: "document",
-    scriptingMode: "disabled"
-  } satisfies EngineDocumentDriverConfiguration;
-  const whole = runEngineFoundationDriver({ inputChunks: [input], parser });
-  const chunked = runEngineFoundationDriver({ inputChunks: input.split(""), parser });
-
-  assert.deepEqual(chunked.inputCharacters, whole.inputCharacters);
-  assert.deepEqual(chunked.parseErrors, whole.parseErrors);
-  assert.equal(chunked.input, whole.input);
 });

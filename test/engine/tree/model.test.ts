@@ -116,6 +116,20 @@ void test("model retains exact node, namespace, doctype, attribute, and span dat
   );
 });
 
+void test("processing instructions retain their distinct node identity and source data", () => {
+  const model = new HtmlTreeModel({ rootKind: "document", resources: createEngineResourceGuard() });
+  const instruction = model.createProcessingInstruction("xml-stylesheet", "href=x", sourceSpan(0, 31));
+  model.append(model.root, instruction);
+  assert.equal(instruction.kind, "processing-instruction");
+  assert.equal(instruction.target, "xml-stylesheet");
+  assert.equal(instruction.data, "href=x");
+  assert.deepEqual(instruction.sourceSpan, { startUtf16Offset: 0, endUtf16Offset: 31 });
+  assertModelError(
+    () => { model.createProcessingInstruction("", "x"); },
+    "TREE_MODEL_EMPTY_PROCESSING_INSTRUCTION_TARGET"
+  );
+});
+
 void test("template contents are explicit, redirected, hosted, and not separately budgeted", () => {
   const resources = createEngineResourceGuard({ limits: { maxNodes: 3, maxDepth: 3 } });
   const model = new HtmlTreeModel({ rootKind: "fragment", resources });

@@ -30,6 +30,7 @@ const element = model.createElement({
 });
 const parent: HtmlTreeParent = model.root;
 const node: HtmlTreeNode = element;
+const instruction: HtmlTreeNode = model.createProcessingInstruction("target", "data");
 const externalId: HtmlTreeDoctypeExternalId = {
   kind: "public",
   publicIdentifier: "",
@@ -37,6 +38,7 @@ const externalId: HtmlTreeDoctypeExternalId = {
 };
 void parent;
 void node;
+void instruction;
 void externalId;
 
 // @ts-expect-error - private identities cannot be reused as public NodeId values.

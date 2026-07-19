@@ -1,4 +1,6 @@
+import type { InsertionMode } from "./parser-state.js";
 import type { SourceSpan } from "./positions.js";
+import type { HtmlToken } from "./tokens.js";
 
 /**
  * Dedicated parse-error codes in the pinned HTML Standard revision.
@@ -66,17 +68,44 @@ export type HtmlParseErrorCode = (typeof HTML_PARSE_ERROR_CODES)[number];
 export type ParseErrorPhase = "preprocessing" | "tokenizer" | "tree-builder";
 
 /** Immutable non-fatal HTML syntax diagnostic. */
-export interface EngineParseError {
+export interface EngineNamedParseError {
   readonly code: HtmlParseErrorCode;
-  readonly phase: ParseErrorPhase;
+  readonly phase: Exclude<ParseErrorPhase, "tree-builder">;
   readonly span: SourceSpan;
 }
+
+/** The Standard deliberately leaves tree-construction parse errors unnamed. */
+export interface EngineTreeBuilderParseError {
+  readonly code: "unexpected-token";
+  readonly phase: "tree-builder";
+  readonly insertionMode: InsertionMode;
+  readonly tokenKind: HtmlToken["kind"];
+  readonly tagName: string | null;
+  readonly span: SourceSpan;
+}
+
+export type EngineParseError = EngineNamedParseError | EngineTreeBuilderParseError;
 
 /** Creates an immutable engine parse diagnostic. */
 export function createParseError(
   code: HtmlParseErrorCode,
-  phase: ParseErrorPhase,
+  phase: EngineNamedParseError["phase"],
   span: SourceSpan
-): EngineParseError {
+): EngineNamedParseError {
   return Object.freeze({ code, phase, span });
+}
+
+/** Creates one contextual diagnostic for an unnamed tree-construction parse error. */
+export function createTreeBuilderParseError(
+  insertionMode: InsertionMode,
+  token: HtmlToken
+): EngineTreeBuilderParseError {
+  return Object.freeze({
+    code: "unexpected-token",
+    phase: "tree-builder",
+    insertionMode,
+    tokenKind: token.kind,
+    tagName: token.kind === "start-tag" || token.kind === "end-tag" ? token.name : null,
+    span: token.span
+  });
 }

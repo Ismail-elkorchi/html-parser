@@ -21,10 +21,14 @@ export {
 export {
   HTML_PARSE_ERROR_CODES,
   createParseError,
+  createTreeBuilderParseError,
+  type EngineNamedParseError,
   type EngineParseError,
+  type EngineTreeBuilderParseError,
   type HtmlParseErrorCode,
   type ParseErrorPhase
 } from "./diagnostics.js";
+export { documentModeForDoctype, type HtmlDocumentMode } from "./doctype-mode.js";
 export {
   HtmlInputCursor,
   type InputCodeUnit,
@@ -52,6 +56,7 @@ export {
   type TreeMutationKind,
   type TreeMutationObservation
 } from "./observer.js";
+export { OpenElementStack } from "./open-element-stack.js";
 export {
   INSERTION_MODES,
   PARSER_SCRIPTING_MODES,
@@ -81,6 +86,20 @@ export {
 } from "./resource-guard.js";
 export { ENGINE_STANDARD_BASELINE, HTML_STANDARD_REVISION } from "./standards.js";
 export {
+  runHtmlEngine,
+  type HtmlEngineDocumentConfiguration,
+  type HtmlEngineOptions,
+  type HtmlEngineParserConfiguration,
+  type HtmlEngineResult
+} from "./parser-driver.js";
+export {
+  HtmlTreeBuilder,
+  HtmlTreeBuilderPendingFeatureError,
+  type HtmlTreeBuilderOptions,
+  type HtmlTreeBuilderPendingFeature,
+  type HtmlTreeBuilderState
+} from "./tree-builder.js";
+export {
   HtmlTreeModel,
   type HtmlTemplateContents,
   type HtmlTreeAttribute,
@@ -98,6 +117,7 @@ export {
   type HtmlTreeNode,
   type HtmlTreeNodeIdentity,
   type HtmlTreeParent,
+  type HtmlTreeProcessingInstruction,
   type HtmlTreeRoot,
   type HtmlTreeText,
   type HtmlTreeValidationResult,
@@ -116,15 +136,6 @@ export {
   type HtmlTokenizerRunResult,
   type HtmlTokenizerState
 } from "./tokenizer/mod.js";
-export {
-  runEngineFoundationDriver,
-  type EngineDocumentDriverConfiguration,
-  type EngineDriverParserConfiguration,
-  type EngineFoundationDriverOptions,
-  type EngineFoundationDriverResult,
-  type EngineFragmentContext,
-  type EngineFragmentDriverConfiguration
-} from "./test-driver.js";
 export {
   type HtmlCharacterToken,
   type HtmlCommentToken,
