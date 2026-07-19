@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/internal/html-engine/**/*.ts",
+    "test/types/html-engine-foundations.type-test.ts"
+  ]
+}

@@ -3,6 +3,10 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Add isolated strict-TypeScript foundations for the independent HTML engine,
+  including incremental decoded-input preprocessing, exact UTF-16 positions,
+  closed token and diagnostic types, synchronous control boundaries, hard
+  resource checkpoints, and a non-production test driver.
 - Pin the maintained WPT tree-construction corpus for deterministic offline
   testing, preserve exact provenance and licenses, and consolidate `.dat`
   decoding in test support while retaining every existing tree fixture.
