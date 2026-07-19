@@ -3,6 +3,50 @@
 All normal tests run from local, checksum-verified data. They never fetch
 fixtures from the network.
 
+## Named character reference data
+
+The independent engine's generated reference table comes from the pinned
+WHATWG snapshot under
+`test/fixtures/upstream/whatwg-named-character-references`. Its manifest keeps
+the floating `entities.json` retrieval artifact, the rendered HTML Standard
+snapshot, and the WHATWG license as separate URL/byte/SHA-256 identities. The
+rendered snapshot identifier is not described as a `whatwg/html` Git commit.
+
+Normal generation and verification are offline:
+
+```bash
+npm run character-references:generate
+npm run character-references:check
+npm run test:engine:character-references
+```
+
+The refresh command requires reviewed local candidate files and independently
+fetches their fixed upstream URLs. It writes only the local candidates after
+both copies match the supplied SHA-256 values, their schemas agree, and the
+rendered standard's complete table matches the JSON. It also requires an
+explicit retrieval date and immutable standard/license revisions. Stage and
+inspect the three files outside the repository first, then run:
+
+```bash
+npm run character-references:refresh -- \
+  --entities-file=<reviewed-entities-json> \
+  --entities-bytes=<expected-entities-bytes> \
+  --entities-sha256=<expected-entities-sha256> \
+  --license-file=<reviewed-whatwg-license> \
+  --license-bytes=<expected-license-bytes> \
+  --license-revision=<whatwg-html-git-commit> \
+  --license-sha256=<expected-license-sha256> \
+  --retrieved-at=<yyyy-mm-dd> \
+  --standard-file=<reviewed-rendered-snapshot> \
+  --standard-bytes=<expected-rendered-snapshot-bytes> \
+  --standard-revision=<rendered-snapshot-id> \
+  --standard-sha256=<expected-rendered-snapshot-sha256>
+```
+
+Never accept a newly downloaded hash merely because the command observed it.
+Review the changed raw data, manifest counts and composite table hash, generated
+table, license, and focused conformance results together.
+
 ## Maintained tree-construction corpus
 
 The checked-in WPT snapshot under

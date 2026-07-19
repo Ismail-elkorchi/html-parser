@@ -24,6 +24,16 @@ export interface InputEof {
 /** Result of one cursor consume step. */
 export type InputRead = InputCharacter | InputNeedMore | InputEof;
 
+/** One original decoded UTF-16 code unit observed without advancing the cursor. */
+export interface InputCodeUnit {
+  readonly kind: "code-unit";
+  readonly value: number;
+  readonly position: SourcePosition;
+}
+
+/** Result of guarded, non-consuming UTF-16 lookahead. */
+export type InputCodeUnitRead = InputCodeUnit | InputNeedMore | InputEof;
+
 export type InputParseErrorObserver = (error: EngineParseError) => void;
 
 function isLeadingSurrogate(codeUnit: number): boolean {
@@ -113,6 +123,32 @@ export class HtmlInputCursor {
       throw new EngineConfigurationError("cursor", "requires one consumed character to reconsume");
     }
     this.#reconsumePending = true;
+  }
+
+  /**
+   * Observes one original decoded UTF-16 code unit without advancing or emitting diagnostics.
+   * This narrow tokenizer primitive is intended for bounded ASCII lookahead.
+   */
+  peekCodeUnit(distance = 0): InputCodeUnitRead {
+    if (!Number.isSafeInteger(distance) || distance < 0) {
+      throw new EngineConfigurationError("lookahead distance", "must be a non-negative safe integer");
+    }
+    if (this.#reconsumePending) {
+      throw new EngineConfigurationError("cursor", "cannot look ahead while reconsume is pending");
+    }
+    this.#guard.checkpoint();
+    const codeUnit = this.#codeUnitAt(distance);
+    if (codeUnit === undefined) {
+      const boundary = sourcePosition(this.#writtenCodeUnits);
+      return Object.freeze(
+        this.#closed ? { kind: "eof", position: boundary } : { kind: "need-more-input", position: boundary }
+      );
+    }
+    return Object.freeze({
+      kind: "code-unit",
+      value: codeUnit,
+      position: sourcePosition(this.#utf16Offset + distance)
+    });
   }
 
   /** Consumes one normalized code point, reports a boundary wait, or returns conceptual EOF. */

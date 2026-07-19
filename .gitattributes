@@ -1,1 +1,2 @@
 /test/fixtures/upstream/wpt-tree-construction/** -text whitespace=-trailing-space,-blank-at-eof
+/test/fixtures/upstream/whatwg-named-character-references/** -text whitespace=-trailing-space,-blank-at-eof

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "artifact": "WHATWG named character references",
+  "retrievedAt": "2026-07-19",
+  "entities": {
+    "url": "https://html.spec.whatwg.org/entities.json",
+    "bytes": 145897,
+    "sha256": "d741d877ac77c4194c4ad526b5b4a19aef8dfe411ab840a466891cdbb9f362e6",
+    "entryCount": 2231,
+    "legacyEntryCount": 106,
+    "twoCodePointValueCount": 93,
+    "maximumNameLength": 32,
+    "firstKey": "&AElig",
+    "lastKey": "&zwnj;"
+  },
+  "standard": {
+    "identity": "rendered WHATWG HTML commit snapshot; not a whatwg/html Git commit",
+    "revision": "56674fb3ac40279141a202e5d19b84f30d99854d",
+    "url": "https://html.spec.whatwg.org/commit-snapshots/56674fb3ac40279141a202e5d19b84f30d99854d/",
+    "bytes": 14836630,
+    "sha256": "1359f66cdfe5ab5967d0d5b5927ff63401746aa3caac8b6fa246b9277103f0b0",
+    "namedReferenceTableEntryCount": 2231,
+    "namedReferenceTableSha256": "1e6555619477b3c1aff53d22f51e24efa2ca9e1369ddac0f19d655bf89f622fc"
+  },
+  "license": {
+    "url": "https://raw.githubusercontent.com/whatwg/html/85b40db7c40436be8d459e8f4ca2120e823c34f0/LICENSE",
+    "bytes": 16315,
+    "sha256": "85dc6f5ccb57a6fe8c33d158f9fc8fc7ee5655a5d3db2cdd131c6a3d0f48a864"
+  },
+  "generation": {
+    "script": "scripts/generate/generate-named-character-references.mjs",
+    "output": "src/internal/html-engine/generated/named-character-references.ts",
+    "ordering": "UTF-16 code-unit ascending by name after leading ampersand removal"
+  }
+}

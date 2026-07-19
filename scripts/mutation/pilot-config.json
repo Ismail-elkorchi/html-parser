@@ -71,6 +71,42 @@
           "replace": "if (false) checkLimit(\"maxSteps\", actual);"
         }
       ]
+    },
+    {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/character-reference-consumer.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/character-references/consumer.test.js"],
+      "mutants": [
+        {
+          "id": "character-reference-named-match",
+          "description": "Disable recognition of every exact generated named reference.",
+          "search": "if (probe.value !== null) {",
+          "replace": "if (false && probe.value !== null) {"
+        },
+        {
+          "id": "character-reference-attribute-ambiguity",
+          "description": "Disable the legacy-name ambiguity rule in attributes.",
+          "search": "if (this.#context === \"attribute\" && !endsWithSemicolon) {",
+          "replace": "if (false && this.#context === \"attribute\" && !endsWithSemicolon) {"
+        },
+        {
+          "id": "character-reference-numeric-saturation",
+          "description": "Reset overflowing numeric references instead of saturating above Unicode range.",
+          "search": "this.#numericValue = SATURATED_NUMERIC_VALUE;",
+          "replace": "this.#numericValue = 0;"
+        },
+        {
+          "id": "character-reference-windows1252",
+          "description": "Disable the required Windows-1252 numeric replacement table.",
+          "search": "codePoint = windows1252Replacement(codePoint) ?? codePoint;",
+          "replace": "codePoint = codePoint;"
+        },
+        {
+          "id": "character-reference-unknown-name-error",
+          "description": "Disable the semicolon error for an unknown named reference.",
+          "search": "if (read.value === 0x3b) {\n                        this.#emitError(\"unknown-named-character-reference\", sourceSpan(read.position.utf16Offset, read.position.utf16Offset + 1));\n                    }",
+          "replace": "if (false && read.value === 0x3b) {\n                        this.#emitError(\"unknown-named-character-reference\", sourceSpan(read.position.utf16Offset, read.position.utf16Offset + 1));\n                    }"
+        }
+      ]
     }
   ]
 }
