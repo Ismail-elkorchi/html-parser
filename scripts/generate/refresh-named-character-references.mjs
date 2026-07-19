@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import {
@@ -74,13 +74,24 @@ function validateByteCount(name, value) {
 }
 
 async function readLocalCandidate(filePath, expectedBytes) {
-  const fileStats = await stat(filePath);
-  if (!fileStats.isFile() || fileStats.size !== expectedBytes) {
-    throw new Error(
-      `refresh named character references: ${filePath} must be a ${String(expectedBytes)}-byte file`
-    );
+  const file = await open(filePath, "r");
+  try {
+    const fileStats = await file.stat();
+    if (!fileStats.isFile() || fileStats.size !== expectedBytes) {
+      throw new Error(
+        `refresh named character references: ${filePath} must be a ${String(expectedBytes)}-byte file`
+      );
+    }
+    const bytes = await file.readFile();
+    if (bytes.length !== expectedBytes) {
+      throw new Error(
+        `refresh named character references: ${filePath} changed while being read`
+      );
+    }
+    return bytes;
+  } finally {
+    await file.close();
   }
-  return readFile(filePath);
 }
 
 async function fetchBytes(url, expectedBytes) {
