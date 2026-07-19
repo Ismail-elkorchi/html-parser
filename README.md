@@ -1,23 +1,24 @@
 # @ismail-elkorchi/html-parser
 
-HTML parser with bounded, policy-versioned text extraction, fragment parsing,
-and structural traversal.
+A standards-oriented HTML parser with explicit resource limits, structural
+queries, source-aware edits, and bounded text extraction.
 
-Supports Node, Deno, Bun, and browsers with explicit resource budgets.
+This repository documents current development. Published packages are
+available from
+[npm](https://www.npmjs.com/package/@ismail-elkorchi/html-parser) and
+[JSR](https://jsr.io/@ismail-elkorchi/html-parser); use the README and
+TypeScript declarations shipped with the version you install. The project is
+pre-1.0, so minor releases may contain intentional breaking changes.
 
-No runtime dependencies: this package ships with zero runtime dependencies.
+## Use it when
 
-## When To Use
+- you need an immutable, namespace-aware HTML tree rather than a browser DOM;
+- input can be untrusted and work must be constrained by explicit budgets;
+- you need deterministic traversal, serialization, text extraction, or
+  source-preserving edits across Node.js, Deno, Bun, and browsers.
 
-- You need deterministic parse and serialize output.
-- You need explicit resource budgets for untrusted input.
-- You need consistent behavior across Node, Deno, Bun, and browser smoke paths.
-
-## When Not To Use
-
-- You need HTML sanitization.
-- You need a full browser engine with script execution.
-- You need DOM mutation semantics beyond deterministic parse utilities.
+It does not execute scripts, compute layout or accessibility trees, or sanitize
+HTML. Sanitize separately before rendering parser output.
 
 ## Install
 
@@ -29,137 +30,77 @@ npm install @ismail-elkorchi/html-parser
 deno add jsr:@ismail-elkorchi/html-parser
 ```
 
-## Import
-
-```ts
-import { parse } from "@ismail-elkorchi/html-parser";
-```
-
-```txt
-import { parse } from "jsr:@ismail-elkorchi/html-parser";
-```
-
-## Copy/Paste Examples
-
-### Example 1: Parse a document
-
-```ts
-import { parse } from "@ismail-elkorchi/html-parser";
-
-const document = parse("<main><h1>Hello</h1></main>");
-console.log(document.tree.kind);
-```
-
-### Example 2: Parse streaming bytes
-
-```ts
-import { parseStream } from "@ismail-elkorchi/html-parser";
-
-const stream = new ReadableStream({
-  start(controller) {
-    controller.enqueue(new TextEncoder().encode("<p>streamed</p>"));
-    controller.close();
-  }
-});
-
-const controller = new AbortController();
-const document = await parseStream(stream, {
-  signal: controller.signal,
-  budgets: {
-    maxInputBytes: 4096,
-    maxEncodingPrescanBytes: 512,
-    maxDecodedUtf8Bytes: 4096,
-    maxNodes: 512,
-    maxTimeMs: 250
-  }
-});
-console.log(document.tree.kind, document.metadata.encoding);
-```
-
-`parseStream()` streams transport reads and enforces input/decode limits while
-reading, but it buffers the complete decoded document before parsing. Its
-promise cannot resolve before EOF. Use `maxInputBytes` for transport bytes,
-`maxDecodedUtf8Bytes` for decoded UTF-8 bytes, and
-`maxEncodingPrescanBytes` only for encoding-prescan prefix retention.
-
-### Example 3: Extract bounded visible text
+## Quick start
 
 ```ts
 import {
-  VISIBLE_TEXT_HTML_POLICY,
-  extractText,
+  findAllByTagName,
   parse
 } from "@ismail-elkorchi/html-parser";
 
-const document = parse("<article><h1>Title</h1><p>Hello world.</p></article>");
-const result = extractText(document.tree, {
-  policy: VISIBLE_TEXT_HTML_POLICY,
-  maxOutputBytes: 16_384,
-  maxTokens: 1_024,
-  maxFallbackInputBytes: 16_384,
-  maxFallbackNodes: 1_024
-});
-console.log(result.text, result.totalBytes, result.truncated);
+const document = parse("<main><h1>Hello</h1><p>World</p></main>");
+const [heading] = findAllByTagName(document.tree, "h1");
+
+console.log(document.tree.kind); // "document"
+console.log(heading?.localName); // "h1"
+console.log(document.tree.errors); // non-fatal HTML parse diagnostics
 ```
 
-### Example 4: Compute and apply a patch plan
+Full-document entry points return a `ParsedDocument`:
 
-```ts
-import { applyPatchPlan, computePatch, parse } from "@ismail-elkorchi/html-parser";
-
-const document = parse("<p>Draft</p>", {
-  captureSpans: true,
-  sourceRetention: "text"
-});
-const plan = computePatch(document, []);
-const patched = applyPatchPlan(document, plan);
-console.log(patched);
+```txt
+ParsedDocument
+├── tree        immutable document tree and non-fatal parse errors
+├── sourceText  decoded input when source retention was requested
+└── metadata    input, encoding, and observed resource usage
 ```
 
-Run packaged examples:
+`parseFragment()` returns a `FragmentTree` directly.
 
-```bash
-npm run examples:run
-```
+## Find what you need
 
-## Source Checkout
+- [Get started](./docs/getting-started.md)
+- [Parse documents, bytes, and fragments](./docs/parsing.md)
+- [Read streams and handle encodings](./docs/streams-and-encoding.md)
+- [Query trees and extract text](./docs/querying-and-text.md)
+- [Modify source HTML safely](./docs/modifying-html.md)
+- [Set limits and handle errors](./docs/limits-errors-and-safety.md)
+- [Understand the data model](./docs/data-model.md)
+- [Browse API groups](./docs/api.md)
 
-The conformance corpus is a Git submodule. Clone recursively:
+The [documentation index](./docs/index.md) also points maintainers to the
+architecture, testing, corpus, and source-policy notes.
 
-```bash
-git clone --recurse-submodules https://github.com/Ismail-elkorchi/html-parser.git
-```
+## Runtime support
 
-For an existing checkout, initialize it before running conformance tests:
+The npm surface supports Node.js 20, 22, and 24. Deno, Bun, and evergreen
+browsers are covered by smoke tests; JSR currently exposes a smaller surface
+documented in [the API guide](./docs/api.md#runtime-entry-points).
 
-```bash
-git submodule update --init --recursive
-npm run test:conformance
-```
+## Safety
 
-## Compatibility
+All limits are opt-in: no parser budget is enabled by default. For untrusted
+input, set limits appropriate to the containing request, pass an `AbortSignal`,
+and classify operational failures with the exported structural error guards.
+See [limits, errors, and safety](./docs/limits-errors-and-safety.md).
 
-Runtime compatibility matrix:
+## Dependencies and implementation status
 
-| Runtime | Status |
-| --- | --- |
-| Node.js | Supported |
-| Deno | Supported |
-| Bun | Supported |
-| Browser (evergreen) | Supported |
+No external runtime packages are installed: the npm `dependencies` field is
+empty and JSR imports only repository-owned modules. Current builds still
+embed modified legacy code derived from parse5 and entities; vendoring changes
+how the code is delivered, not where it came from. It is being replaced
+incrementally by an independent standards-based implementation. Provenance and
+rules for new parser work are recorded in the
+[source policy](./docs/maintainers/source-policy.md) and
+[THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
-The Node.js package surface is verified against Node 20, 22, and 24.
+## Support and contributing
 
-## Security and Safety Notes
+Use [SUPPORT.md](./SUPPORT.md) for usage questions and bug reports. Start code
+contributions with [CONTRIBUTING.md](./CONTRIBUTING.md). Report vulnerabilities
+through the private channel in [SECURITY.md](./SECURITY.md).
 
-Parsing is not sanitization. For untrusted input:
-- set strict budgets,
-- pass an `AbortSignal` for request-scoped cancellation,
-- classify `HtmlBudgetExceededError` with its structural guard,
-- sanitize separately before rendering.
+## License
 
-## Documentation
-
-- [Docs index](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/index.md)
-- [First parse success tutorial](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/tutorial/first-parse.md)
-- [Options reference](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/reference/options.md)
+[MIT](./LICENSE)

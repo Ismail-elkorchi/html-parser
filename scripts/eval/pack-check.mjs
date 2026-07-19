@@ -114,13 +114,27 @@ async function main() {
     forbiddenPrefixes.some((forbiddenPrefix) => tarPath.startsWith(forbiddenPrefix))
   );
   const thirdPartyNoticesIncluded = normalizedPaths.includes("THIRD_PARTY_NOTICES.md");
+  const requiredDocumentation = [
+    "README.md",
+    "CONTRIBUTING.md",
+    "RELEASING.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    "docs/index.md",
+    "docs/getting-started.md",
+    "docs/api.md"
+  ];
+  const missingDocumentation = requiredDocumentation.filter(
+    (documentationPath) => !normalizedPaths.includes(documentationPath)
+  );
 
   const isPackagingCheckPass =
     dependenciesEmpty &&
     esmOnly &&
     exportsOk &&
     forbiddenIncluded.length === 0 &&
-    thirdPartyNoticesIncluded;
+    thirdPartyNoticesIncluded &&
+    missingDocumentation.length === 0;
 
   const report = {
     suite: "pack",
@@ -131,7 +145,8 @@ async function main() {
     esmOnly,
     exportsOk,
     forbiddenIncluded,
-    thirdPartyNoticesIncluded
+    thirdPartyNoticesIncluded,
+    missingDocumentation
   };
 
   await writeJson("reports/pack.json", report);

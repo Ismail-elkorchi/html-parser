@@ -1,41 +1,46 @@
 import { readFile, readdir } from "node:fs/promises";
+import { dirname, join, normalize } from "node:path";
 
 import { fileExists, nowIso, writeJson } from "./eval-primitives.mjs";
 
 const REQUIRED_FILES = [
   "README.md",
+  "CONTRIBUTING.md",
+  "RELEASING.md",
+  "SECURITY.md",
+  "SUPPORT.md",
+  "THIRD_PARTY_NOTICES.md",
   "docs/index.md",
-  "docs/tutorial/first-parse.md",
-  "docs/reference/api-overview.md",
-  "docs/reference/options.md",
-  "docs/reference/error-model.md",
-  "docs/explanation/design-constraints.md",
-  "docs/explanation/security-posture.md",
-  "docs/explanation/performance-characteristics.md"
+  "docs/getting-started.md",
+  "docs/parsing.md",
+  "docs/streams-and-encoding.md",
+  "docs/querying-and-text.md",
+  "docs/modifying-html.md",
+  "docs/limits-errors-and-safety.md",
+  "docs/data-model.md",
+  "docs/api.md",
+  "docs/architecture.md",
+  "docs/maintainers/index.md",
+  "docs/maintainers/testing.md",
+  "docs/maintainers/corpora.md",
+  "docs/maintainers/source-policy.md"
 ];
 
-const REQUIRED_DOCS_ROOT = new Set([
-  "index.md",
-  "tutorial",
-  "how-to",
-  "reference",
-  "explanation",
-  "maintainers"
-]);
-
 const REQUIRED_README_PATTERNS = [
-  { name: "When To Use", re: /##\s*When To Use/i },
-  { name: "When Not To Use", re: /##\s*When Not To Use/i },
-  { name: "Install", re: /##\s*Install/i },
-  { name: "Import", re: /##\s*Import/i },
-  { name: "Docs map", re: /docs\/index\.md/i },
-  { name: "Runtime compatibility", re: /runtime\s+compatibility/i },
-  { name: "Security", re: /\bsecurity\b/i },
-  { name: "No runtime dependencies statement", re: /no\s+runtime\s+depend/i }
+  { name: "pre-1.0 compatibility policy", re: /pre-1\.0[\s\S]{0,100}breaking changes/i },
+  { name: "installation", re: /##\s*Install/i },
+  { name: "npm installation", re: /npm install @ismail-elkorchi\/html-parser/ },
+  { name: "JSR installation", re: /deno add jsr:@ismail-elkorchi\/html-parser/ },
+  { name: "quick start", re: /##\s*Quick start/i },
+  { name: "documentation path", re: /docs\/index\.md/i },
+  { name: "runtime support", re: /##\s*Runtime support/i },
+  { name: "security boundary", re: /parsing is not sanitization|does not[^\n]*sanitize/i },
+  { name: "external dependency status", re: /no external runtime packages[\s\S]{0,100}dependencies[\s\S]{0,40}empty/i },
+  { name: "embedded legacy implementation disclosure", re: /embed[\s\S]{0,160}parse5[\s\S]{0,80}entities/i }
 ];
 
 const API_ENTRYPOINT_PATH = "src/public/mod.ts";
-const API_REFERENCE_PATH = "docs/reference/api-overview.md";
+const API_REFERENCE_PATH = "docs/api.md";
 
 function collectRuntimeExports(entrypointSource) {
   const exports = new Set();
@@ -48,17 +53,57 @@ function collectRuntimeExports(entrypointSource) {
   return [...exports].sort((left, right) => left.localeCompare(right));
 }
 
-async function collectHowToCount() {
-  const entries = await readdir("docs/how-to", { withFileTypes: true });
-  return entries.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).length;
+async function collectMarkdownFiles(directoryPath) {
+  const files = [];
+  const entries = await readdir(directoryPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = join(directoryPath, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await collectMarkdownFiles(entryPath));
+    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      files.push(entryPath);
+    }
+  }
+  return files;
 }
 
-async function collectDocsRootUnexpectedEntries() {
-  const entries = await readdir("docs", { withFileTypes: true });
-  return entries
-    .map((entry) => entry.name)
-    .filter((name) => !REQUIRED_DOCS_ROOT.has(name))
-    .sort((left, right) => left.localeCompare(right));
+function collectRelativeLinkTargets(markdown) {
+  const targets = [];
+  for (const match of markdown.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)) {
+    const rawTarget = match[1]?.trim().replace(/^<|>$/g, "");
+    if (
+      !rawTarget
+      || rawTarget.startsWith("#")
+      || rawTarget.startsWith("/")
+      || /^[a-z][a-z0-9+.-]*:/i.test(rawTarget)
+    ) {
+      continue;
+    }
+    const fileTarget = rawTarget.split("#", 1)[0]?.split("?", 1)[0];
+    if (fileTarget) targets.push(fileTarget);
+  }
+  return targets;
+}
+
+async function collectBrokenRelativeLinks(markdownFiles) {
+  const brokenLinks = [];
+  for (const markdownFile of markdownFiles) {
+    const markdown = await readFile(markdownFile, "utf8");
+    for (const target of collectRelativeLinkTargets(markdown)) {
+      let decodedTarget;
+      try {
+        decodedTarget = decodeURIComponent(target);
+      } catch {
+        brokenLinks.push({ source: markdownFile, target, reason: "invalid URI encoding" });
+        continue;
+      }
+      const resolvedTarget = normalize(join(dirname(markdownFile), decodedTarget));
+      if (!(await fileExists(resolvedTarget))) {
+        brokenLinks.push({ source: markdownFile, target, resolvedTarget });
+      }
+    }
+  }
+  return brokenLinks;
 }
 
 async function main() {
@@ -69,20 +114,12 @@ async function main() {
     }
   }
 
-  const unexpectedDocsRootEntries = await collectDocsRootUnexpectedEntries();
-  const howToCount = await collectHowToCount();
-
-  let readme = "";
-  if (await fileExists("README.md")) {
-    readme = await readFile("README.md", "utf8");
-  }
-
-  const missingReadmeSections = [];
-  for (const { name: sectionName, re: sectionPattern } of REQUIRED_README_PATTERNS) {
-    if (!sectionPattern.test(readme)) {
-      missingReadmeSections.push(sectionName);
-    }
-  }
+  const readme = await fileExists("README.md")
+    ? await readFile("README.md", "utf8")
+    : "";
+  const missingReadmeSections = REQUIRED_README_PATTERNS
+    .filter(({ re: sectionPattern }) => !sectionPattern.test(readme))
+    .map(({ name: sectionName }) => sectionName);
 
   let missingApiReferenceEntries;
   if (await fileExists(API_ENTRYPOINT_PATH) && await fileExists(API_REFERENCE_PATH)) {
@@ -92,21 +129,28 @@ async function main() {
     ]);
     const runtimeExports = collectRuntimeExports(entrypointSource);
     missingApiReferenceEntries = runtimeExports.filter((name) => {
-      const symbolPattern = new RegExp(`\\\`${name}(?:[^\\\`]*)\\\``);
-      return !symbolPattern.test(apiReference);
+      const symbolMarker = `\`${name}`;
+      return !apiReference.includes(symbolMarker);
     });
   } else {
     missingApiReferenceEntries = ["api-reference-check-input-missing"];
   }
 
-  const docsLayoutOk = unexpectedDocsRootEntries.length === 0;
-  const hasEnoughHowToGuides = howToCount >= 4;
+  const markdownFiles = [
+    "README.md",
+    "CONTRIBUTING.md",
+    "RELEASING.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    "THIRD_PARTY_NOTICES.md",
+    ...await collectMarkdownFiles("docs")
+  ];
+  const brokenRelativeLinks = await collectBrokenRelativeLinks(markdownFiles);
   const isDocsCheckPass =
-    missingFiles.length === 0 &&
-    missingReadmeSections.length === 0 &&
-    missingApiReferenceEntries.length === 0 &&
-    docsLayoutOk &&
-    hasEnoughHowToGuides;
+    missingFiles.length === 0
+    && missingReadmeSections.length === 0
+    && missingApiReferenceEntries.length === 0
+    && brokenRelativeLinks.length === 0;
 
   const report = {
     suite: "docs",
@@ -115,10 +159,8 @@ async function main() {
     missingFiles,
     missingReadmeSections,
     missingApiReferenceEntries,
-    docsLayoutOk,
-    unexpectedDocsRootEntries,
-    howToCount,
-    hasEnoughHowToGuides
+    markdownFilesChecked: markdownFiles.length,
+    brokenRelativeLinks
   };
 
   await writeJson("reports/docs.json", report);

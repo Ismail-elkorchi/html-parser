@@ -1,5 +1,5 @@
 /**
- * What it does: runs all README-linked examples as a single smoke check.
+ * What it does: runs all repository examples as a single smoke check.
  * Expected output: prints "examples:run ok" when every example assertion passes.
  * Constraints: all individual example modules must succeed in the same Node process.
  * Run: npm run build && node examples/run-all.mjs

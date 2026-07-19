@@ -15,7 +15,7 @@ function assert(condition, message) {
 export function runParseSuccessPath() {
   const html = [
     "<article>",
-    "  <h1>Release Candidate</h1>",
+    "  <h1>Example Article</h1>",
     "  <p>Deterministic parse output.</p>",
     "</article>"
   ].join("\n");
@@ -30,7 +30,7 @@ export function runParseSuccessPath() {
     maxFallbackInputBytes: 16_384,
     maxFallbackNodes: 1_024
   }).text;
-  assert(text.includes("Release Candidate"), "visible text should include the heading");
+  assert(text.includes("Example Article"), "visible text should include the heading");
   assert(text.includes("Deterministic parse output."), "visible text should include the paragraph");
 
   const serialized = serialize(tree);

@@ -253,9 +253,7 @@ async function main() {
     textExtractionApiError = error instanceof Error ? error.message : String(error);
   }
 
-  const textExtractionDocsExist =
-    (await fileExists("docs/how-to/extract-visible-text.md"))
-    || (await fileExists("docs/how-to/extract-text-safely.md"));
+  const textExtractionDocsExist = await fileExists("docs/querying-and-text.md");
   const textExtractionTestsExist = await fileExists("test/control/visible-text.test.js");
 
   const fixtureRoot = "test/fixtures/visible-text/v1";
@@ -344,7 +342,7 @@ async function main() {
     parseErrorApiError = error instanceof Error ? error.message : String(error);
   }
 
-  const parseErrorDocsExists = await fileExists("docs/reference/error-model.md");
+  const parseErrorDocsExists = await fileExists("docs/limits-errors-and-safety.md");
   const parseErrorTestsExists = await fileExists("test/control/parse-errors.test.js");
   const agentParseErrorFeaturePresent = Boolean(agentReport?.features?.parseErrorId);
   const agentParseErrorFeatureOk = Boolean(agentReport?.features?.parseErrorId?.ok);
@@ -430,7 +428,7 @@ async function main() {
     spanProvenanceApiError = error instanceof Error ? error.message : String(error);
   }
 
-  const specMarkdown = await readFile("docs/reference/api-overview.md", "utf8");
+  const specMarkdown = await readFile("docs/data-model.md", "utf8");
   const spanProvenanceDocumented = specMarkdown.includes("spanProvenance");
   const spansPatchTestsExist = await fileExists("test/control/spans-patch.test.js");
   const spanProvenanceGatePass =
@@ -603,16 +601,6 @@ async function main() {
       "Text hygiene (no hidden control characters)",
       Boolean(textHygiene?.ok),
       textHygiene || { missing: true }
-    )
-  );
-
-  const docPolicy = await loadOptionalReport("reports/doc-policy.json");
-  gates.push(
-    makeGate(
-      "G-126",
-      "Doc policy coherence",
-      Boolean(docPolicy?.ok),
-      docPolicy || { missing: true }
     )
   );
 

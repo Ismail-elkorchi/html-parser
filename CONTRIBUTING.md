@@ -1,34 +1,32 @@
 # Contributing
 
-## Workflow
-- Repository changes are pull-request only.
-- Do not commit directly to the default branch.
-- Use short-lived topic branches and keep scope reviewable.
-- Preferred merge strategy is squash merge with branch deletion.
+## Set up the repository
 
-## Local verification
-Run before opening a pull request:
-- `npm install` (or `npm ci` when a lockfile exists)
-- `npm run lint`
-- `npm run typecheck`
-- `npm run build`
-- `npm test`
-- `npm run eval:ci`
-
-The html5lib conformance corpus is a submodule. Initialize it once per checkout:
+Create changes on a short-lived branch and submit them through a pull request.
+Install the locked toolchain and initialize the conformance fixtures:
 
 ```bash
+npm ci
 git submodule update --init --recursive
 ```
 
-For release-level audits:
-- `npm run eval:release`
+## Verify a change
 
-## Naming policy
-- Use domain-first names and explicit reference frames.
-- Use truth-conditional booleans (`is*`, `has*`, `can*`).
-- Use stable, domain-first log phrasing for grep-friendly diagnostics.
+Run the fast gate before every pull request:
 
-## Maintainer docs
+```bash
+npm run check:fast
+```
 
-- [Maintainer index](./docs/maintainers/index.md)
+For parser or serializer semantics, also run `npm run test:conformance`. For
+portable entry points or runtime-sensitive code, run `npm run eval:ci`.
+`npm run eval:release` is reserved for release qualification.
+
+The [maintainer guide](./docs/maintainers/index.md) maps specialized testing,
+corpus, architecture, and implementation-source concerns.
+
+## Pull requests
+
+Keep each pull request focused. Explain the user-visible effect, record the
+commands that were actually run, and call out known risks or follow-up work.
+The preferred merge strategy is squash merge with branch deletion.

@@ -20,8 +20,8 @@
  * ```
  *
  * Additional docs:
- * - `./docs/index.md`
- * - `./docs/reference/options.md`
+ * - `../docs/index.md`
+ * - `../docs/limits-errors-and-safety.md`
  */
 import {
   extractText as extractTextInternal,

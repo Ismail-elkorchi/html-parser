@@ -1,17 +1,20 @@
-# Maintainer Docs
+# Maintainer guide
 
-Operational and release documentation for maintainers.
+Use the repository root files for project policy:
 
-- [Surface map](./surface-map.md)
-- [Release validation](./release-validation.md)
-- [Mutation pilot reports](./mutation-pilot.md)
-- [Single-pass parsing benchmark](./single-pass-parsing.md)
-- [Hard-budget resource evidence](./hard-budget-evidence.md)
-- [Stream-buffering contract evidence](./stream-buffering.md)
-- [Trace-pipeline complexity and retention evidence](./trace-pipeline.md)
-- [Namespace tree-model and deep-stack evidence](./namespace-tree-model.md)
-- [Source-aware parse result evidence](./source-aware-results.md)
-- [Bounded text-extraction evidence](./bounded-text-extraction.md)
-- [Hard-budget evidence data (JSON)](./hard-budget-evidence.json)
-- [Current mutation pilot report (JSON)](./mutation-pilot-report.json)
-- [Baseline mutation pilot report (JSON)](./mutation-pilot-report-baseline.json)
+- [CONTRIBUTING.md](../../CONTRIBUTING.md) — change workflow and local checks
+- [RELEASING.md](../../RELEASING.md) — publication procedure
+- [SECURITY.md](../../SECURITY.md) — vulnerability handling
+- [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) — shipped and test-data provenance
+
+The maintainer pages here cover facts that are specific to implementation work:
+
+- [Testing](./testing.md) — which command answers which question
+- [Conformance corpora](./corpora.md) — pins, ownership, and refresh rules
+- [Implementation source policy](./source-policy.md) — allowed and prohibited
+  sources for the independent parser
+
+Start architectural changes with [the architecture overview](../architecture.md).
+Keep durable contracts in types, executable tests, or user documentation.
+Generated reports belong in `reports/`; PR measurements and review narratives
+belong in their PR, not in a permanent parallel documentation system.
