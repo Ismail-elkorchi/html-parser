@@ -12,12 +12,11 @@ Use `.github/workflows/publish.yml` for release-driven publish and `.github/work
 
 ```bash
 npm ci
+git submodule update --init --recursive
 npm run check:fast
+npm run eval:release
 npm run docs:lint:jsr
 npm run docs:test:jsr
-npm run examples:run
-npm pack --dry-run
-node scripts/quality/doc-required.mjs
 ```
 
 ## Release notes and changelog
@@ -27,4 +26,4 @@ node scripts/release/render-notes.mjs --dry-run
 node scripts/release/update-changelog.mjs --dry-run
 ```
 
-Reference details: `docs/maintainers/releasing.md`.
+For test scope and corpus constraints, see `docs/maintainers/testing.md`.

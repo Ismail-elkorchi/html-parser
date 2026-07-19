@@ -1,26 +1,20 @@
-# HTML Parser Docs
+# Documentation
 
-`@ismail-elkorchi/html-parser` provides HTML parsing with bounded,
-policy-versioned text extraction, fragment parsing, and structural traversal.
+Start with [getting started](./getting-started.md), then follow the task that
+matches your work:
 
-## Tutorial
-- [First parse success](./tutorial/first-parse.md)
+- [Parse documents, bytes, and fragments](./parsing.md)
+- [Read streams and handle encodings](./streams-and-encoding.md)
+- [Query trees and extract bounded text](./querying-and-text.md)
+- [Modify source HTML](./modifying-html.md)
+- [Set limits, classify errors, and handle untrusted input](./limits-errors-and-safety.md)
 
-## How-to
-- [Parse fragments](./how-to/parse-fragments.md)
-- [Parse streaming input](./how-to/parse-streaming-input.md)
-- [Extract text safely](./how-to/extract-text-safely.md)
-- [Traverse the data model](./how-to/traverse-data-model.md)
-- [Tune parser budgets](./how-to/tune-parser-budgets.md)
-- [Understand why parsing is not sanitization](./how-to/parsing-is-not-sanitization.md)
+Keep these pages nearby when you need exact shapes and names:
 
-## Reference
-- [API overview](./reference/api-overview.md)
-- [Options](./reference/options.md)
-- [Data model](./reference/data-model.md)
-- [Error model](./reference/error-model.md)
+- [Data model](./data-model.md)
+- [API](./api.md)
+- [Architecture](./architecture.md)
 
-## Explanation
-- [Design constraints](./explanation/design-constraints.md)
-- [Security posture](./explanation/security-posture.md)
-- [Performance characteristics](./explanation/performance-characteristics.md)
+Project work starts at the [maintainer guide](./maintainers/index.md). Release,
+security, license, and contribution policy remain in the root files where
+GitHub and package consumers expect to find them.

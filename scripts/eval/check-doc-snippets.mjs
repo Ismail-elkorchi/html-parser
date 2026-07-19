@@ -92,8 +92,8 @@ async function compileSnippets(snippetFileNames) {
       target: "ES2022",
       module: "ESNext",
       moduleResolution: "Bundler",
-      strict: false,
-      skipLibCheck: true,
+      strict: true,
+      skipLibCheck: false,
       lib: ["ES2022", "DOM", "DOM.Iterable"],
       types: [],
       paths: {
