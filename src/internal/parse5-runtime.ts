@@ -32,6 +32,9 @@ type ParseOptions = {
 
 export type Parse5TokenDetails = {
   readonly attrs?: readonly Parse5TokenizerAttribute[];
+  readonly name?: string | null;
+  readonly publicId?: string | null;
+  readonly systemId?: string | null;
 };
 
 export type Parse5TokenKind =

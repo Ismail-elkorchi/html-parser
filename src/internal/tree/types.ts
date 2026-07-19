@@ -12,6 +12,9 @@ export interface TreeSpan {
 }
 
 export interface TreeAttribute {
+  readonly namespaceUri: string | null;
+  readonly prefix: string | null;
+  readonly localName: string;
   readonly name: string;
   readonly value: string;
   readonly span?: TreeSpan;
@@ -29,6 +32,9 @@ export interface TreeBuildOptions {
 
 export interface TreeTokenDetails {
   readonly attributes?: readonly Readonly<{ readonly name: string; readonly value: string }>[];
+  readonly name?: string | null;
+  readonly publicId?: string | null;
+  readonly systemId?: string | null;
 }
 
 export type TreeTokenKind =
@@ -46,6 +52,9 @@ export interface TreeNodeDocument {
 
 export interface TreeNodeElement {
   readonly kind: "element";
+  readonly namespaceUri: string;
+  readonly prefix: string | null;
+  readonly localName: string;
   readonly name: string;
   readonly attributes: readonly TreeAttribute[];
   readonly children: readonly TreeNode[];
@@ -64,11 +73,19 @@ export interface TreeNodeComment {
   readonly span?: TreeSpan;
 }
 
+export type TreeDoctypeExternalId =
+  | { readonly kind: "none" }
+  | {
+      readonly kind: "public";
+      readonly publicId: string;
+      readonly systemId: string | null;
+    }
+  | { readonly kind: "system"; readonly systemId: string };
+
 export interface TreeNodeDoctype {
   readonly kind: "doctype";
   readonly name: string;
-  readonly publicId: string;
-  readonly systemId: string;
+  readonly externalId: TreeDoctypeExternalId;
   readonly span?: TreeSpan;
 }
 

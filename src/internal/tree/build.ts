@@ -11,19 +11,17 @@ import type {
   TreeBuildOptions,
   TreeBuildResult,
   TreeBuilderError,
+  TreeDoctypeExternalId,
   TreeNode,
   TreeNodeComment,
   TreeNodeDoctype,
   TreeNodeElement,
   TreeNodeText,
   TreeSpan,
+  TreeTokenDetails,
   TreeTokenKind
 } from "./types.js";
 import type { HtmlToken } from "../tokenizer/tokens.js";
-
-const HTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
-const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
-const MATHML_NAMESPACE = "http://www.w3.org/1998/Math/MathML";
 
 const CONTEXT_DOCUMENT_HTML =
   "<!doctype html><html><head><title>x</title></head><body><table><tbody><tr><td></td></tr><caption></caption><colgroup></colgroup></table><frameset></frameset></body></html>";
@@ -34,6 +32,7 @@ type Parse5Attribute = {
   readonly name: string;
   readonly value: string;
   readonly prefix?: string;
+  readonly namespace?: string;
 };
 
 interface Parse5NodeBase {
@@ -119,6 +118,7 @@ interface SourceLocationLike {
 interface BuildState {
   readonly captureSpans: boolean;
   readonly checkpoint: (() => void) | undefined;
+  readonly doctypeTokens: TreeTokenDetails[];
 }
 
 export type TreeBudgetName =
@@ -432,29 +432,12 @@ function pushParseError(
   return next;
 }
 
-function formatElementName(namespaceURI: string, tagName: string): string {
-  if (namespaceURI === HTML_NAMESPACE) {
-    return tagName;
-  }
-
-  if (namespaceURI === SVG_NAMESPACE) {
-    return `svg ${tagName}`;
-  }
-
-  if (namespaceURI === MATHML_NAMESPACE) {
-    return `math ${tagName}`;
-  }
-
-  return `${namespaceURI} ${tagName}`;
+function normalizedPrefix(prefix: string | undefined): string | null {
+  return prefix === undefined || prefix.length === 0 ? null : prefix;
 }
 
-function formatAttributeName(attribute: Parse5Attribute): string {
-  if (attribute.prefix !== undefined && attribute.prefix.length > 0 && attribute.name.includes(":")) {
-    const localName = attribute.name.slice(attribute.prefix.length + 1);
-    return `${attribute.prefix} ${localName}`;
-  }
-
-  return attribute.name;
+function qualifiedName(prefix: string | null, localName: string): string {
+  return prefix === null ? localName : `${prefix}:${localName}`;
 }
 
 function asSourceLocation(value: unknown): SourceLocationLike | undefined {
@@ -507,18 +490,25 @@ function normalizeAttributes(
 
   for (const attr of attrs) {
     state.checkpoint?.();
-    const name = formatAttributeName(attr);
+    const namespaceUri = attr.namespace ?? null;
+    const prefix = normalizedPrefix(attr.prefix);
+    const localName = attr.name;
+    const name = qualifiedName(prefix, localName);
+    const expandedName = `${namespaceUri ?? ""}\0${localName}`;
 
-    if (seen.has(name)) {
+    if (seen.has(expandedName)) {
       continue;
     }
 
-    seen.add(name);
+    seen.add(expandedName);
     const rawLocation = sourceLocation?.attrs?.[attr.name] ?? sourceLocation?.attrs?.[name];
     const span = state.captureSpans ? toTreeSpan(rawLocation) : undefined;
 
     normalized.push(
       Object.freeze({
+        namespaceUri,
+        prefix,
+        localName,
         name,
         value: attr.value,
         ...(span ? { span } : {})
@@ -558,15 +548,21 @@ function isElement(node: Parse5ChildNode, tagName: string): node is Parse5Elemen
 }
 
 function findElementByTagName(node: Parse5ParentNode, tagName: string): Parse5Element | null {
-  for (const child of node.childNodes) {
+  const stack: Parse5ChildNode[] = [...node.childNodes].reverse();
+  while (stack.length > 0) {
+    const child = stack.pop();
+    if (child === undefined) {
+      continue;
+    }
     if (isElement(child, tagName)) {
       return child;
     }
-
     if (hasChildNodes(child)) {
-      const nested = findElementByTagName(child, tagName);
-      if (nested !== null) {
-        return nested;
+      for (let index = child.childNodes.length - 1; index >= 0; index -= 1) {
+        const nested = child.childNodes[index];
+        if (nested !== undefined) {
+          stack.push(nested);
+        }
       }
     }
   }
@@ -602,16 +598,29 @@ function patchSelectAdoptionCompatibility(
   root: Parse5Document | Parse5DocumentFragment,
   controller: TreeBudgetController
 ): void {
-  const walk = (node: Parse5ParentNode): void => {
+  const stack: { readonly node: Parse5ParentNode; readonly exiting: boolean }[] = [
+    { node: root, exiting: false }
+  ];
+  while (stack.length > 0) {
+    const frame = stack.pop();
+    if (frame === undefined) {
+      continue;
+    }
+    const { node } = frame;
     controller.checkpoint();
-    for (const child of node.childNodes) {
-      if ("childNodes" in child) {
-        walk(child);
+    if (!frame.exiting) {
+      stack.push({ node, exiting: true });
+      for (let index = node.childNodes.length - 1; index >= 0; index -= 1) {
+        const child = node.childNodes[index];
+        if (child !== undefined && "childNodes" in child) {
+          stack.push({ node: child, exiting: false });
+        }
       }
+      continue;
     }
 
     if (node.nodeName !== "body") {
-      return;
+      continue;
     }
 
     for (let index = 0; index < node.childNodes.length - 1; index += 1) {
@@ -663,9 +672,7 @@ function patchSelectAdoptionCompatibility(
         node.childNodes.splice(index + 2, 0, ...detachedTextNodes);
       }
     }
-  };
-
-  walk(root);
+  }
   controller.recheckSubtreeDepth(root);
 }
 
@@ -673,7 +680,8 @@ function parseTree(
   input: string,
   budgets: TreeBudgets | undefined,
   options: TreeBuildOptions,
-  errors: TreeBuilderError[]
+  errors: TreeBuilderError[],
+  doctypeTokens: TreeTokenDetails[]
 ): Parse5Document | Parse5DocumentFragment {
   const controller = new TreeBudgetController(
     budgets,
@@ -710,9 +718,20 @@ function parseTree(
       if (kind === "eof") {
         controller.markEof();
       }
-      options.onToken?.(kind, {
-        ...(attrs ? { attributes: attrs } : {})
-      });
+      const details: TreeTokenDetails = {
+        ...(attrs ? { attributes: attrs } : {}),
+        ...(kind === "doctype"
+          ? {
+              name: token.name ?? null,
+              publicId: token.publicId ?? null,
+              systemId: token.systemId ?? null
+            }
+          : {})
+      };
+      if (kind === "doctype") {
+        doctypeTokens.push(details);
+      }
+      options.onToken?.(kind, details);
     }
   });
 
@@ -742,8 +761,43 @@ function parseTree(
   return parsed;
 }
 
-function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): TreeNode | null {
-  state.checkpoint?.();
+function doctypeExternalId(
+  node: Parse5DocumentType,
+  state: BuildState
+): TreeDoctypeExternalId {
+  const name = readString(node.name);
+  const publicId = readString(node.publicId);
+  const systemId = readString(node.systemId);
+  const tokenIndex = state.doctypeTokens.findIndex((token) =>
+    readString(token.name) === name &&
+    readString(token.publicId) === publicId &&
+    readString(token.systemId) === systemId
+  );
+  const token = tokenIndex === -1 ? undefined : state.doctypeTokens.splice(tokenIndex, 1)[0];
+  if (token?.publicId !== undefined && token.publicId !== null) {
+    return {
+      kind: "public",
+      publicId: token.publicId,
+      systemId: token.systemId ?? null
+    };
+  }
+  if (token?.systemId !== undefined && token.systemId !== null) {
+    return { kind: "system", systemId: token.systemId };
+  }
+  if (publicId.length > 0) {
+    return {
+      kind: "public",
+      publicId,
+      systemId: systemId.length === 0 ? null : systemId
+    };
+  }
+  if (systemId.length > 0) {
+    return { kind: "system", systemId };
+  }
+  return { kind: "none" };
+}
+
+function convertLeafNode(node: Parse5ChildNode, state: BuildState): TreeNode | null {
   const sourceLocation = state.captureSpans ? asSourceLocation(node.sourceCodeLocation) : undefined;
   const nodeSpan = toTreeSpan(sourceLocation);
 
@@ -771,8 +825,7 @@ function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): T
     const doctypeNode: TreeNodeDoctype = {
       kind: "doctype",
       name: readString(node.name),
-      publicId: readString(node.publicId),
-      systemId: readString(node.systemId),
+      externalId: doctypeExternalId(node, state),
       ...(nodeSpan ? { span: nodeSpan } : {})
     };
 
@@ -783,24 +836,74 @@ function convertNode(node: Parse5ChildNode, depth: number, state: BuildState): T
     return null;
   }
 
-  const children: TreeNode[] = [];
-  for (const child of node.childNodes) {
-    const converted = convertNode(child, depth + 1, state);
-    if (converted !== null) {
-      children.push(converted);
+  throw new Error("Element conversion requires completed child nodes");
+}
+
+function convertNodes(nodes: readonly Parse5ChildNode[], state: BuildState): readonly TreeNode[] {
+  const converted = new WeakMap<object, TreeNode | null>();
+  const stack: { readonly node: Parse5ChildNode; readonly exiting: boolean }[] = [];
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index];
+    if (node !== undefined) {
+      stack.push({ node, exiting: false });
     }
   }
 
-  const elementSpan = toElementTreeSpan(sourceLocation);
-  const elementNode: TreeNodeElement = {
-    kind: "element",
-    name: formatElementName(node.namespaceURI, node.tagName),
-    attributes: normalizeAttributes(node.attrs, state, sourceLocation),
-    children,
-    ...(elementSpan ? { span: elementSpan } : {})
-  };
+  while (stack.length > 0) {
+    const frame = stack.pop();
+    if (frame === undefined) {
+      continue;
+    }
+    state.checkpoint?.();
+    const { node } = frame;
+    if (isElementNode(node) && !frame.exiting) {
+      stack.push({ node, exiting: true });
+      for (let index = node.childNodes.length - 1; index >= 0; index -= 1) {
+        const child = node.childNodes[index];
+        if (child !== undefined) {
+          stack.push({ node: child, exiting: false });
+        }
+      }
+      continue;
+    }
 
-  return elementNode;
+    if (!isElementNode(node)) {
+      converted.set(node, convertLeafNode(node, state));
+      continue;
+    }
+
+    const sourceLocation = state.captureSpans ? asSourceLocation(node.sourceCodeLocation) : undefined;
+    const children: TreeNode[] = [];
+    for (const child of node.childNodes) {
+      const convertedChild = converted.get(child);
+      if (convertedChild !== undefined && convertedChild !== null) {
+        children.push(convertedChild);
+      }
+    }
+    const prefix = null;
+    const localName = node.tagName;
+    const elementSpan = toElementTreeSpan(sourceLocation);
+    const elementNode: TreeNodeElement = {
+      kind: "element",
+      namespaceUri: node.namespaceURI,
+      prefix,
+      localName,
+      name: qualifiedName(prefix, localName),
+      attributes: normalizeAttributes(node.attrs, state, sourceLocation),
+      children,
+      ...(elementSpan ? { span: elementSpan } : {})
+    };
+    converted.set(node, elementNode);
+  }
+
+  const result: TreeNode[] = [];
+  for (const node of nodes) {
+    const convertedNode = converted.get(node);
+    if (convertedNode !== undefined && convertedNode !== null) {
+      result.push(convertedNode);
+    }
+  }
+  return result;
 }
 
 function escapeAttributeValue(value: string): string {
@@ -809,6 +912,16 @@ function escapeAttributeValue(value: string): string {
 
 function escapeTextForReparse(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function quoteDoctypeIdentifier(value: string): string {
+  if (!value.includes('"')) {
+    return `"${value}"`;
+  }
+  if (!value.includes("'")) {
+    return `'${value}'`;
+  }
+  throw new Error("DOCTYPE identifier cannot be serialized losslessly");
 }
 
 function serializeTokens(tokens: readonly HtmlToken[]): string {
@@ -844,10 +957,14 @@ function serializeTokens(tokens: readonly HtmlToken[]): string {
       continue;
     }
 
-    if (token.publicId !== null || token.systemId !== null) {
-      const publicId = token.publicId ?? "";
-      const systemId = token.systemId ?? "";
-      parts.push(`<!DOCTYPE ${token.name} "${publicId}" "${systemId}">`);
+    if (token.publicId !== null) {
+      const systemId = token.systemId === null ? "" : ` ${quoteDoctypeIdentifier(token.systemId)}`;
+      parts.push(`<!DOCTYPE ${token.name} PUBLIC ${quoteDoctypeIdentifier(token.publicId)}${systemId}>`);
+      continue;
+    }
+
+    if (token.systemId !== null) {
+      parts.push(`<!DOCTYPE ${token.name} SYSTEM ${quoteDoctypeIdentifier(token.systemId)}>`);
       continue;
     }
 
@@ -863,20 +980,16 @@ export function buildTreeFromHtml(
   options: TreeBuildOptions = {}
 ): TreeBuildResult {
   const errors: TreeBuilderError[] = [];
-  const parsed = parseTree(input, budgets, options, errors);
+  const doctypeTokens: TreeTokenDetails[] = [];
+  const parsed = parseTree(input, budgets, options, errors, doctypeTokens);
 
   const state: BuildState = {
     captureSpans: options.captureSpans ?? false,
-    checkpoint: options.checkpoint
+    checkpoint: options.checkpoint,
+    doctypeTokens
   };
 
-  const children: TreeNode[] = [];
-  for (const child of parsed.childNodes) {
-    const converted = convertNode(child, 0, state);
-    if (converted !== null) {
-      children.push(converted);
-    }
-  }
+  const children = convertNodes(parsed.childNodes, state);
 
   return {
     document: {

@@ -4,15 +4,25 @@ export type NodeId = number;
 export type NodeKind = "document" | "fragment" | "element" | "text" | "comment" | "doctype";
 
 export interface Span {
+  /** Zero-based UTF-16 code-unit offset into the decoded input, inclusive. */
   readonly start: number;
+  /** Zero-based UTF-16 code-unit offset into the decoded input, exclusive. */
   readonly end: number;
 }
 
 export type SpanProvenance = "input" | "inferred" | "none";
 
 export interface Attribute {
+  /** Namespace URI, or null for an unnamespaced attribute. */
+  readonly namespaceUri: string | null;
+  /** Namespace prefix, or null when the attribute is unprefixed. */
+  readonly prefix: string | null;
+  /** Local name supplied by the HTML tree builder. */
+  readonly localName: string;
+  /** Qualified name, including the prefix when one exists. */
   readonly name: string;
   readonly value: string;
+  /** Full source span of the attribute, including its name and value syntax. */
   readonly span?: Span;
 }
 
@@ -336,12 +346,21 @@ export interface CommentNode {
   readonly span?: Span;
 }
 
+/** External identifier syntax retained from a document type declaration. */
+export type DoctypeExternalId =
+  | { readonly kind: "none" }
+  | {
+      readonly kind: "public";
+      readonly publicId: string;
+      readonly systemId: string | null;
+    }
+  | { readonly kind: "system"; readonly systemId: string };
+
 export interface DoctypeNode {
   readonly id: NodeId;
   readonly kind: "doctype";
   readonly name: string;
-  readonly publicId?: string;
-  readonly systemId?: string;
+  readonly externalId: DoctypeExternalId;
   readonly spanProvenance: SpanProvenance;
   readonly span?: Span;
 }
@@ -349,6 +368,13 @@ export interface DoctypeNode {
 export interface ElementNode {
   readonly id: NodeId;
   readonly kind: "element";
+  /** Namespace URI assigned by the HTML tree builder. */
+  readonly namespaceUri: string;
+  /** Namespace prefix, or null when the parser did not provide one. */
+  readonly prefix: string | null;
+  /** Local element name supplied by the HTML tree builder. */
+  readonly localName: string;
+  /** Qualified element name, including the prefix when one exists. */
   readonly tagName: string;
   readonly attributes: readonly Attribute[];
   readonly children: readonly HtmlNode[];

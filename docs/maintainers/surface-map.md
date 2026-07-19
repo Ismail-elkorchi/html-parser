@@ -18,4 +18,8 @@ Both roots expose distinct non-stream and stream option types, the
 Both roots also expose the same `TraceMode`, immutable event callback, summary,
 and discriminated trace-result types. Event-retention budgets are accepted only
 for `trace: "events"`.
+Both roots expose the exact namespace-aware element, attribute, doctype, and
+span shapes; canonical namespace URI constants; HTML convenience attribute
+helpers; and exact namespace query variants. JSR must not replace this union
+with an optional-field approximation.
 See `docs/reference/api-overview.md` for the current parity notes.

@@ -7,6 +7,7 @@ export type {
   TreeBudgets,
   TreeBuildResult,
   TreeBuilderError,
+  TreeDoctypeExternalId,
   TreeInsertionModeTransition,
   TreeNode,
   TreeNodeComment,

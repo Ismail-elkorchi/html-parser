@@ -10,7 +10,16 @@ without guessing the output structure.
 
 ## Copy/paste
 ```ts
-import { findAllByAttr, findAllByTagName, parse, textContent, walkElements } from "@ismail-elkorchi/html-parser";
+import {
+  SVG_NAMESPACE_URI,
+  findAllByAttr,
+  findAllByTagName,
+  findAllByTagNameNS,
+  getAttributeValue,
+  parse,
+  textContent,
+  walkElements
+} from "@ismail-elkorchi/html-parser";
 
 const documentTree = parse(`
   <main>
@@ -21,6 +30,8 @@ const documentTree = parse(`
 
 const articles = [...findAllByTagName(documentTree, "article")];
 const newsArticles = [...findAllByAttr(documentTree, "data-kind", "news")];
+const svgTitles = [...findAllByTagNameNS(documentTree, SVG_NAMESPACE_URI, "title")];
+const firstKind = newsArticles[0] ? getAttributeValue(newsArticles[0], "DATA-KIND") : undefined;
 
 walkElements(documentTree, (node, depth) => {
   if (node.tagName === "h1") {
@@ -30,6 +41,8 @@ walkElements(documentTree, (node, depth) => {
 
 console.log(articles.length);
 console.log(newsArticles.length);
+console.log(svgTitles.length);
+console.log(firstKind);
 ```
 
 ## Expected output
@@ -38,6 +51,8 @@ console.log(newsArticles.length);
 3 Heads up
 2
 1
+0
+news
 ```
 
 ## Common failure modes
@@ -45,8 +60,12 @@ console.log(newsArticles.length);
   of objects with `kind`, `children`, and `errors`.
 - Assuming every node is an element; text, comment, and doctype nodes are part
   of the public model.
-- Reimplementing traversal when helpers such as `walkElements`,
-  `findAllByTagName`, and `findAllByAttr` already fit the job.
+- Using the HTML-only convenience queries for SVG or MathML. Use the `NS`
+  variants when namespace identity matters.
+- Comparing `attribute.name` without considering `namespaceUri` and
+  `localName`; use the shared attribute helpers.
+- Reimplementing recursive traversal when stack-safe helpers such as
+  `walkElements`, `findAllByTagName`, and `findAllByAttr` already fit the job.
 
 ## Related reference
 - [Data model](../reference/data-model.md)
