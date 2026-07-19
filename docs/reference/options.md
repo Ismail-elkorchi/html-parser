@@ -182,11 +182,10 @@ if (document.tree.trace?.mode === "summary") {
 
 ## Serialization, traversal, and extraction operation controls
 
-`serialize`, `walk`, `walkElements`, `textContent`, `findById`,
-`findAllByTagName`, `findAllByAttr`, and `outline` accept `OperationOptions`.
-`chunk` accepts its sizing options plus the same controls. Node/npm visible-text
-functions and JSR `visibleText` accept these controls through
-`VisibleTextOptions`.
+`serialize`, `walk`, `walkElements`, `findById`, `findAllByTagName`,
+`findAllByAttr`, and `outline` accept `OperationOptions`. `chunk` accepts its
+sizing options plus the same controls. `extractText` and `iterateText` accept
+these controls through their policy-discriminated extraction options.
 
 - `maxTimeMs`: inclusive monotonic deadline for that operation.
 - `signal`: cooperative cancellation signal for that operation.
@@ -194,7 +193,52 @@ functions and JSR `visibleText` accept these controls through
 Each call owns a new operation context; a completed parse deadline is never
 reused for later traversal or serialization.
 
-## `visibleText(nodeOrTree, options?)`
+## `extractText(input, options)` and `iterateText(input, options)`
+
+Both Node/npm and JSR expose the same bounded extraction contract.
+`extractText` returns an immutable `{ text, totalBytes, truncated, policy }`
+result. `iterateText` yields immutable semantic tokens with coalesced source
+provenance; fully draining it returns the same result. Concatenating every
+yielded token's `value` produces the returned `text`.
+
+Options are required, closed, and discriminated by `policy`. Unknown keys,
+missing limits, and invalid values throw `HtmlConfigurationError`. All limits
+are finite, non-negative safe integers and zero is valid.
+
+### Shared required options
+
+| Key | Meaning |
+| --- | --- |
+| `policy` | Exact semantic identity: `"visible-text-html-v1"` or `"text-content-v1"` |
+| `maxOutputBytes` | Maximum canonical UTF-8 bytes retained in `text` and yielded tokens |
+| `maxTokens` | Maximum complete policy tokens retained and yielded |
+
+`text` is always a prefix of the complete policy output. Byte truncation never
+splits a Unicode scalar value. `totalBytes` measures the complete, untruncated
+policy output even when a retention limit is reached; `truncated` reports
+whether either retention cap omitted output. Deadline and cancellation checks
+therefore continue while measuring omitted output.
+
+### `policy: "text-content-v1"`
+
+Concatenates descendant text nodes in tree order. Each source text node is one
+policy token. It takes only the shared required options and operation controls.
+
+### `policy: "visible-text-html-v1"`
+
+Applies deterministic HTML-aware whitespace, structural-break, hidden-subtree,
+control-value, and fallback rules. It is not browser layout or accessibility
+tree computation. In addition to the shared options, it requires both fallback
+limits:
+
+| Key | Meaning |
+| --- | --- |
+| `maxFallbackInputBytes` | Maximum canonical UTF-8 bytes reparsed for one HTML `noscript` fallback |
+| `maxFallbackNodes` | Maximum nodes allocated by one HTML `noscript` fallback parse |
+
+A fallback shares the extraction's `signal` and remaining `maxTimeMs` deadline.
+Fallback provenance identifies the original `noscript` node rather than the
+temporary fragment used to interpret its raw text.
 
 ### `skipHiddenSubtrees`
 - Type: `boolean`
@@ -215,6 +259,13 @@ reused for later traversal or serialization.
 - Type: `boolean`
 - Default: `true`
 - Trims final extracted output.
+
+### Provenance tokens
+
+Every yielded token reports `kind`, `value`, `policy`, half-open UTF-8 output
+byte offsets, and frozen coalesced provenance ranges. A range identifies the
+parsed source node and its semantic source role. The range model avoids one
+retained metadata object per Unicode scalar.
 
 ## Node/npm-only patch APIs
 

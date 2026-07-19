@@ -34,6 +34,8 @@ const BUDGET_NAMES: ReadonlySet<string> = new Set<HtmlBudgetName>([
   "maxAttributeBytes",
   "maxTraceEvents",
   "maxTraceBytes",
+  "maxFallbackInputBytes",
+  "maxFallbackNodes",
   "maxTimeMs"
 ]);
 

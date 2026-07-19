@@ -26,6 +26,11 @@ Key characteristics:
 - Full-document results expose successful resource observations collected by
   the owning decode/parser pass. Exact decoded source is retained only when
   `sourceRetention: "text"` is requested.
+- Text extraction scans the policy output once while retaining at most the
+  configured output prefix and token/provenance collections. It measures the
+  complete output after retention caps are reached so `totalBytes` stays exact.
+  Visible-text `noscript` reparses have independent input-byte and node caps and
+  share the parent operation deadline and cancellation signal.
 
 Benchmark and profiling commands:
 
@@ -41,6 +46,9 @@ lower retained heap for bounded work; see the
 [maintainer evidence](../maintainers/hard-budget-evidence.md).
 Namespace/doctype fidelity and 5,000-level public-tree stack-safety evidence is
 recorded in the [tree-model evidence](../maintainers/namespace-tree-model.md).
+Bounded extraction heap, Unicode-prefix, fallback, and provenance evidence is
+recorded in the
+[text-extraction evidence](../maintainers/bounded-text-extraction.md).
 
 ## Peak-memory model for byte streams
 

@@ -1,21 +1,21 @@
 import {
   isHtmlBudgetExceededError,
   isHtmlPatchPlanningError,
+  TEXT_CONTENT_POLICY,
+  VISIBLE_TEXT_HTML_POLICY,
   applyPatchPlan,
   chunk,
   computePatch,
+  extractText,
   findAllByAttr,
   findAllByTagName,
   findById,
   getParseErrorSpecRef,
+  iterateText,
   outline,
   parse,
   parseFragment,
-  textContent,
   tokenizeByteStreamEager,
-  visibleText,
-  visibleTextTokens,
-  visibleTextTokensWithProvenance,
   walk,
   walkElements
 } from "../../dist/mod.js";
@@ -23,6 +23,25 @@ import { writeJson } from "./eval-primitives.mjs";
 
 function makeReportFailure(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+const VISIBLE_EXTRACTION_OPTIONS = Object.freeze({
+  policy: VISIBLE_TEXT_HTML_POLICY,
+  maxOutputBytes: 1_000_000,
+  maxTokens: 100_000,
+  maxFallbackInputBytes: 1_000_000,
+  maxFallbackNodes: 100_000
+});
+
+function drainText(iterator) {
+  const tokens = [];
+  while (true) {
+    const next = iterator.next();
+    if (next.done) {
+      return { tokens, result: next.value };
+    }
+    tokens.push(next.value);
+  }
 }
 
 function walkNodes(nodes, visit) {
@@ -312,7 +331,11 @@ function evaluateOutlineFeature() {
   const headingsA = [...findAllByTagName(firstTree, "h1")].map((node) => node.id);
   const headingsB = [...findAllByTagName(secondTree, "h1")].map((node) => node.id);
   const leadNode = leadA.length > 0 ? findById(firstTree, leadA[0]) : null;
-  const leadText = leadNode ? textContent(leadNode) : "";
+  const leadText = leadNode ? extractText(leadNode, {
+    policy: TEXT_CONTENT_POLICY,
+    maxOutputBytes: 1_000,
+    maxTokens: 100
+  }).text : "";
 
   const traversalDeterministic =
     JSON.stringify(walkOrderA) === JSON.stringify(walkOrderB) &&
@@ -429,32 +452,36 @@ async function evaluateStreamTokenFeature() {
   };
 }
 
-function evaluateVisibleTextFeature() {
+function evaluateTextExtractionFeature() {
   const html = "<article><p>A <img alt=\"B\"></p><table><tr><td>x</td><td>y</td></tr></table></article>";
   const { tree: treeA } = parse(html);
   const { tree: treeB } = parse(html);
 
-  const textA = visibleText(treeA);
-  const textB = visibleText(treeB);
-  const tokensA = visibleTextTokens(treeA);
-  const tokensB = visibleTextTokens(treeB);
-  const provenanceTokensA = visibleTextTokensWithProvenance(treeA);
-  const provenanceTokensB = visibleTextTokensWithProvenance(treeB);
+  const resultA = extractText(treeA, VISIBLE_EXTRACTION_OPTIONS);
+  const resultB = extractText(treeB, VISIBLE_EXTRACTION_OPTIONS);
+  const iteratedA = drainText(iterateText(treeA, VISIBLE_EXTRACTION_OPTIONS));
+  const iteratedB = drainText(iterateText(treeB, VISIBLE_EXTRACTION_OPTIONS));
+  const tokensA = iteratedA.tokens;
+  const tokensB = iteratedB.tokens;
 
-  const deterministicText = textA === textB;
+  const deterministicText = JSON.stringify(resultA) === JSON.stringify(resultB);
   const deterministicTokens = JSON.stringify(tokensA) === JSON.stringify(tokensB);
-  const deterministicProvenanceTokens = JSON.stringify(provenanceTokensA) === JSON.stringify(provenanceTokensB);
-  const tokenJoinStable = tokensA.map((entry) => entry.value).join("") === textA;
-  const provenanceTokenJoinStable = provenanceTokensA.map((entry) => entry.value).join("") === textA;
+  const deterministicProvenanceTokens = deterministicTokens;
+  const tokenJoinStable = tokensA.map((entry) => entry.value).join("") === resultA.text;
+  const provenanceTokenJoinStable = tokenJoinStable && JSON.stringify(iteratedA.result) === JSON.stringify(resultA);
   const hasStructureTokens = tokensA.some((entry) => entry.kind === "paragraphBreak")
     && tokensA.some((entry) => entry.kind === "tab");
   const hasTextToken = tokensA.some((entry) => entry.kind === "text");
-  const expectedTermsPresent = textA.includes("A") && textA.includes("B") && textA.includes("x") && textA.includes("y");
-  const provenanceFieldsPresent = provenanceTokensA.every((entry) =>
-    typeof entry.sourceNodeKind === "string"
-    && typeof entry.sourceRole === "string"
+  const expectedTermsPresent = resultA.text.includes("A") && resultA.text.includes("B") &&
+    resultA.text.includes("x") && resultA.text.includes("y");
+  const provenanceFieldsPresent = tokensA.every((entry) => entry.provenance.every((range) =>
+    typeof range.sourceNodeKind === "string" && typeof range.sourceRole === "string"
+  ));
+  const hasNodeBackedProvenance = tokensA.some((entry) =>
+    entry.provenance.some((range) => range.sourceNodeId !== null)
   );
-  const hasNodeBackedProvenance = provenanceTokensA.some((entry) => entry.sourceNodeId !== null);
+  const policyPinned = resultA.policy === VISIBLE_TEXT_HTML_POLICY &&
+    tokensA.every((entry) => entry.policy === VISIBLE_TEXT_HTML_POLICY);
 
   return {
     ok:
@@ -467,11 +494,12 @@ function evaluateVisibleTextFeature() {
       hasTextToken &&
       expectedTermsPresent &&
       provenanceFieldsPresent &&
-      hasNodeBackedProvenance,
+      hasNodeBackedProvenance &&
+      policyPinned,
     details: {
-      text: textA,
+      text: resultA.text,
       tokenCount: tokensA.length,
-      provenanceTokenCount: provenanceTokensA.length,
+      provenanceTokenCount: tokensA.length,
       deterministicText,
       deterministicTokens,
       deterministicProvenanceTokens,
@@ -481,7 +509,10 @@ function evaluateVisibleTextFeature() {
       hasTextToken,
       expectedTermsPresent,
       provenanceFieldsPresent,
-      hasNodeBackedProvenance
+      hasNodeBackedProvenance,
+      policyPinned,
+      totalBytes: resultA.totalBytes,
+      truncated: resultA.truncated
     }
   };
 }
@@ -522,7 +553,7 @@ async function main() {
     outline: { ok: false, details: {} },
     chunk: { ok: false, details: {} },
     streamToken: { ok: false, details: {} },
-    visibleText: { ok: false, details: {} },
+    textExtraction: { ok: false, details: {} },
     parseErrorId: { ok: false, details: {} }
   };
 
@@ -563,9 +594,9 @@ async function main() {
   }
 
   try {
-    features.visibleText = evaluateVisibleTextFeature();
+    features.textExtraction = evaluateTextExtractionFeature();
   } catch (error) {
-    features.visibleText = { ok: false, details: { error: makeReportFailure(error) } };
+    features.textExtraction = { ok: false, details: { error: makeReportFailure(error) } };
   }
 
   try {

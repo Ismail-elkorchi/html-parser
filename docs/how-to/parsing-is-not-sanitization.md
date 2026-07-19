@@ -10,12 +10,22 @@ structure and text extraction, but it does not make hostile HTML safe to render.
 
 ## Copy/paste
 ```ts
-import { parse, visibleText } from "@ismail-elkorchi/html-parser";
+import {
+  VISIBLE_TEXT_HTML_POLICY,
+  extractText,
+  parse
+} from "@ismail-elkorchi/html-parser";
 
 const unsafeHtml = `<img src="x" onerror="alert(1)"><p>Hello</p>`;
 const { tree } = parse(unsafeHtml);
 
-console.log(visibleText(tree, { trim: true }));
+console.log(extractText(tree, {
+  policy: VISIBLE_TEXT_HTML_POLICY,
+  maxOutputBytes: 1_024,
+  maxTokens: 128,
+  maxFallbackInputBytes: 1_024,
+  maxFallbackNodes: 128
+}).text);
 console.log(tree.children.length > 0);
 ```
 

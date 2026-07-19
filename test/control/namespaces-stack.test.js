@@ -9,8 +9,11 @@ import {
   XLINK_NAMESPACE_URI,
   XML_NAMESPACE_URI,
   XMLNS_NAMESPACE_URI,
+  TEXT_CONTENT_POLICY,
+  VISIBLE_TEXT_HTML_POLICY,
   chunk,
   computePatch,
+  extractText,
   findAllByAttr,
   findAllByAttrNS,
   findAllByTagName,
@@ -19,12 +22,10 @@ import {
   getAttributeValueNS,
   hasAttribute,
   hasAttributeNS,
+  iterateText,
   outline,
   parse,
   serialize,
-  textContent,
-  visibleText,
-  visibleTextTokensWithProvenance,
   walk
 } from "../../dist/mod.js";
 import { serializeTreeDocument } from "../../dist/internal/serializer/serialize.js";
@@ -35,6 +36,34 @@ function only(iterable) {
   const values = [...iterable];
   assert.equal(values.length, 1);
   return values[0];
+}
+
+function rawText(input) {
+  return extractText(input, {
+    policy: TEXT_CONTENT_POLICY,
+    maxOutputBytes: 100_000,
+    maxTokens: 10_000
+  }).text;
+}
+
+function visibleTextValue(input) {
+  return extractText(input, {
+    policy: VISIBLE_TEXT_HTML_POLICY,
+    maxOutputBytes: 100_000,
+    maxTokens: 10_000,
+    maxFallbackInputBytes: 100_000,
+    maxFallbackNodes: 10_000
+  }).text;
+}
+
+function visibleTokens(input) {
+  return [...iterateText(input, {
+    policy: VISIBLE_TEXT_HTML_POLICY,
+    maxOutputBytes: 100_000,
+    maxTokens: 10_000,
+    maxFallbackInputBytes: 100_000,
+    maxFallbackNodes: 10_000
+  })];
 }
 
 test("tree nodes retain namespace identity and adjusted foreign attributes", () => {
@@ -164,9 +193,9 @@ test("deep parsed and caller-built trees remain stack-safe across the public sur
     }
   });
   assert.equal([...findAllByTagName(parsed, "div")].length, depth);
-  assert.equal(textContent(parsed), "x");
-  assert.equal(visibleText(parsed), "x");
-  assert.equal(visibleTextTokensWithProvenance(parsed).length, 1);
+  assert.equal(rawText(parsed), "x");
+  assert.equal(visibleTextValue(parsed), "x");
+  assert.equal(visibleTokens(parsed).length, 1);
   assert.equal(serialize(parsed).includes("x"), true);
   assert.equal(outline(parsed).entries.length, 0);
   let visited = 0;
@@ -196,8 +225,8 @@ test("deep parsed and caller-built trees remain stack-safe across the public sur
     };
   }
   const manual = { id: depth + 2, kind: "document", children: [child], errors: [] };
-  assert.equal(textContent(manual), "leaf");
-  assert.equal(visibleText(manual), "leaf");
+  assert.equal(rawText(manual), "leaf");
+  assert.equal(visibleTextValue(manual), "leaf");
   assert.equal(serialize(manual).includes("leaf"), true);
   assert.equal([...findAllByTagName(manual, "div")].length, depth);
   assert.equal(chunk(manual, { maxChars: 100_000, maxNodes: 10_000, maxBytes: 100_000 }).length, 1);

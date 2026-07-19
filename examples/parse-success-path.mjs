@@ -4,7 +4,7 @@
  * Constraints: expects parser outputs to remain deterministic for the same input string.
  * Run: npm run build && node examples/parse-success-path.mjs
  */
-import { parse, serialize, visibleText } from "../dist/mod.js";
+import { VISIBLE_TEXT_HTML_POLICY, extractText, parse, serialize } from "../dist/mod.js";
 
 function assert(condition, message) {
   if (!condition) {
@@ -23,7 +23,13 @@ export function runParseSuccessPath() {
   const { tree } = parse(html);
   assert(tree.kind === "document", "parse should return a document tree");
 
-  const text = visibleText(tree).trim();
+  const text = extractText(tree, {
+    policy: VISIBLE_TEXT_HTML_POLICY,
+    maxOutputBytes: 16_384,
+    maxTokens: 1_024,
+    maxFallbackInputBytes: 16_384,
+    maxFallbackNodes: 1_024
+  }).text;
   assert(text.includes("Release Candidate"), "visible text should include the heading");
   assert(text.includes("Deterministic parse output."), "visible text should include the paragraph");
 

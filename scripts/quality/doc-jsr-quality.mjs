@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { collectDocSymbols } from "./doc-jsr-shape.mjs";
 
 const ENTRYPOINT = "jsr/mod.ts";
-const REQUIRED_SYMBOLS = ["parse", "parseFragment", "parseStream", "visibleText"];
+const REQUIRED_SYMBOLS = ["extractText", "iterateText", "parse", "parseFragment", "parseStream"];
 
 const docJson = JSON.parse(execFileSync("deno", ["doc", "--json", "--sloppy-imports", ENTRYPOINT], {
   encoding: "utf8",

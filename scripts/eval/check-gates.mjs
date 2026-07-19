@@ -242,21 +242,21 @@ async function main() {
     )
   );
 
-  let exportedVisibleText = false;
-  let exportedVisibleTextTokens = false;
-  let visibleTextApiError = null;
+  let exportedExtractText = false;
+  let exportedIterateText = false;
+  let textExtractionApiError = null;
   try {
     const publicModule = await import(pathToFileURL(resolve("dist/mod.js")).href);
-    exportedVisibleText = typeof publicModule.visibleText === "function";
-    exportedVisibleTextTokens = typeof publicModule.visibleTextTokens === "function";
+    exportedExtractText = typeof publicModule.extractText === "function";
+    exportedIterateText = typeof publicModule.iterateText === "function";
   } catch (error) {
-    visibleTextApiError = error instanceof Error ? error.message : String(error);
+    textExtractionApiError = error instanceof Error ? error.message : String(error);
   }
 
-  const visibleTextDocsExists =
+  const textExtractionDocsExist =
     (await fileExists("docs/how-to/extract-visible-text.md"))
     || (await fileExists("docs/how-to/extract-text-safely.md"));
-  const visibleTextTestsExists = await fileExists("test/control/visible-text.test.js");
+  const textExtractionTestsExist = await fileExists("test/control/visible-text.test.js");
 
   const fixtureRoot = "test/fixtures/visible-text/v1";
   let fixtureCaseCount = 0;
@@ -286,34 +286,34 @@ async function main() {
     fixtureScanError = error instanceof Error ? error.message : String(error);
   }
 
-  const agentVisibleTextFeaturePresent = Boolean(agentReport?.features?.visibleText);
-  const agentVisibleTextFeatureOk = Boolean(agentReport?.features?.visibleText?.ok);
-  const visibleTextGatePass =
-    exportedVisibleText &&
-    exportedVisibleTextTokens &&
-    visibleTextDocsExists &&
-    visibleTextTestsExists &&
+  const agentTextExtractionFeaturePresent = Boolean(agentReport?.features?.textExtraction);
+  const agentTextExtractionFeatureOk = Boolean(agentReport?.features?.textExtraction?.ok);
+  const textExtractionGatePass =
+    exportedExtractText &&
+    exportedIterateText &&
+    textExtractionDocsExist &&
+    textExtractionTestsExist &&
     fixtureShapeOk &&
-    agentVisibleTextFeaturePresent &&
-    agentVisibleTextFeatureOk;
+    agentTextExtractionFeaturePresent &&
+    agentTextExtractionFeatureOk;
 
   gates.push(
     makeGate(
       "G-087",
-      "Visible text contract",
-      visibleTextGatePass,
+      "Bounded text extraction contract",
+      textExtractionGatePass,
       {
-        exportedVisibleText,
-        exportedVisibleTextTokens,
-        visibleTextApiError,
-        visibleTextDocsExists,
-        visibleTextTestsExists,
+        exportedExtractText,
+        exportedIterateText,
+        textExtractionApiError,
+        textExtractionDocsExist,
+        textExtractionTestsExist,
         fixtureRoot,
         fixtureCaseCount,
         fixtureShapeOk,
         fixtureScanError,
-        agentVisibleTextFeaturePresent,
-        agentVisibleTextFeatureOk
+        agentTextExtractionFeaturePresent,
+        agentTextExtractionFeatureOk
       }
     )
   );

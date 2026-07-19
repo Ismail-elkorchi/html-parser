@@ -497,14 +497,62 @@ export interface ChunkOptions extends OperationOptions {
   readonly maxBytes?: number;
 }
 
-export interface VisibleTextOptions extends OperationOptions {
+/** Versioned semantic policy selected for bounded text extraction. */
+export type TextExtractionPolicy = "visible-text-html-v1" | "text-content-v1";
+
+/** Resource controls required by every bounded text extraction. */
+export interface TextExtractionOptionsBase extends OperationOptions {
+  /** Semantic policy to apply. */
+  readonly policy: TextExtractionPolicy;
+  /** Maximum canonical UTF-8 bytes retained in returned text. */
+  readonly maxOutputBytes: number;
+  /** Maximum policy tokens retained and yielded. */
+  readonly maxTokens: number;
+}
+
+/** Options for the versioned visible-text policy. */
+export interface VisibleTextExtractionOptions extends TextExtractionOptionsBase {
+  /** Stable visible-text policy identity. */
+  readonly policy: "visible-text-html-v1";
+  /** Maximum UTF-8 bytes reparsed for one `noscript` fallback. */
+  readonly maxFallbackInputBytes: number;
+  /** Maximum nodes allocated by one `noscript` fallback parse. */
+  readonly maxFallbackNodes: number;
+  /** Skip hidden or non-visible subtrees; defaults to true. */
   readonly skipHiddenSubtrees?: boolean;
+  /** Include values from control-like nodes; defaults to true. */
   readonly includeControlValues?: boolean;
+  /** Include limited accessible-name fallback sources; defaults to false. */
   readonly includeAccessibleNameFallback?: boolean;
+  /** Trim final policy output; defaults to true. */
   readonly trim?: boolean;
 }
 
-export type VisibleTextTokenSourceRole =
+/** Options for bounded DOM text-content concatenation. */
+export interface TextContentExtractionOptions extends TextExtractionOptionsBase {
+  /** Stable raw text-content policy identity. */
+  readonly policy: "text-content-v1";
+}
+
+/** Closed policy-discriminated options accepted by text extraction. */
+export type TextExtractionOptions =
+  | VisibleTextExtractionOptions
+  | TextContentExtractionOptions;
+
+/** Immutable bounded text result with exact untruncated UTF-8 measurement. */
+export interface TextExtractionResult {
+  /** Retained scalar-safe output prefix. */
+  readonly text: string;
+  /** Canonical UTF-8 bytes in the complete policy output. */
+  readonly totalBytes: number;
+  /** Whether a byte or token cap omitted output. */
+  readonly truncated: boolean;
+  /** Semantic policy that produced the result. */
+  readonly policy: TextExtractionPolicy;
+}
+
+/** Source role represented by one extraction provenance range. */
+export type TextExtractionSourceRole =
   | "text-node"
   | "img-alt"
   | "input-value"
@@ -513,45 +561,41 @@ export type VisibleTextTokenSourceRole =
   | "structure-break"
   | "noscript-fallback";
 
-export type VisibleTextTokenSourceNodeKind = NodeKind | "document" | "fragment";
+/** Parsed source-node kind represented by extraction provenance. */
+export type TextExtractionSourceNodeKind = NodeKind | "document" | "fragment";
 
-export interface VisibleTextTokenProvenance {
+/** Coalesced provenance for a half-open UTF-8 range in retained output. */
+export interface TextProvenanceRange {
+  /** Inclusive retained-output byte offset. */
+  readonly outputByteStart: number;
+  /** Exclusive retained-output byte offset. */
+  readonly outputByteEnd: number;
+  /** Parsed source node, or null when no node can be identified. */
   readonly sourceNodeId: NodeId | null;
-  readonly sourceNodeKind: VisibleTextTokenSourceNodeKind;
-  readonly sourceRole: VisibleTextTokenSourceRole;
+  /** Parsed source-node kind. */
+  readonly sourceNodeKind: TextExtractionSourceNodeKind;
+  /** Semantic role by which the source contributed output. */
+  readonly sourceRole: TextExtractionSourceRole;
 }
 
-export interface VisibleTextTextToken {
-  readonly kind: "text";
+/** Token kinds emitted by the bounded extraction iterator. */
+export type TextExtractionTokenKind = "text" | "lineBreak" | "paragraphBreak" | "tab";
+
+/** One retained policy token with bounded, range-based source provenance. */
+export interface TextExtractionToken {
+  /** Token category after policy normalization. */
+  readonly kind: TextExtractionTokenKind;
+  /** Retained token text. */
   readonly value: string;
+  /** Semantic policy that produced the token. */
+  readonly policy: TextExtractionPolicy;
+  /** Inclusive token offset in retained-output UTF-8 bytes. */
+  readonly outputByteStart: number;
+  /** Exclusive token offset in retained-output UTF-8 bytes. */
+  readonly outputByteEnd: number;
+  /** Coalesced source ranges covering the complete token. */
+  readonly provenance: readonly TextProvenanceRange[];
 }
-
-export interface VisibleTextLineBreakToken {
-  readonly kind: "lineBreak";
-  readonly value: "\n";
-}
-
-export interface VisibleTextParagraphBreakToken {
-  readonly kind: "paragraphBreak";
-  readonly value: "\n\n";
-}
-
-export interface VisibleTextTabToken {
-  readonly kind: "tab";
-  readonly value: "\t";
-}
-
-export type VisibleTextToken =
-  | VisibleTextTextToken
-  | VisibleTextLineBreakToken
-  | VisibleTextParagraphBreakToken
-  | VisibleTextTabToken;
-
-export type VisibleTextTokenWithProvenance =
-  | (VisibleTextTextToken & VisibleTextTokenProvenance)
-  | (VisibleTextLineBreakToken & VisibleTextTokenProvenance)
-  | (VisibleTextParagraphBreakToken & VisibleTextTokenProvenance)
-  | (VisibleTextTabToken & VisibleTextTokenProvenance);
 
 export interface RemoveNodeEdit {
   readonly kind: "removeNode";
@@ -650,4 +694,6 @@ export type HtmlBudgetName =
   | "maxAttributeBytes"
   | "maxTraceEvents"
   | "maxTraceBytes"
+  | "maxFallbackInputBytes"
+  | "maxFallbackNodes"
   | "maxTimeMs";

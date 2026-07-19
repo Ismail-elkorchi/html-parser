@@ -4,14 +4,15 @@ import test from "node:test";
 import {
   HtmlConfigurationError,
   HtmlPatchPlanningError,
+  TEXT_CONTENT_POLICY,
   applyPatchPlan,
   computePatch,
+  extractText,
   parse,
   parseBytes,
   parseFragment,
   parseStream,
-  serialize,
-  textContent
+  serialize
 } from "../../dist/mod.js";
 
 function byteStream(chunks) {
@@ -124,7 +125,11 @@ test("byte and stream results own decoding evidence and exact retained source", 
 
   for (const document of [fromBytes, fromStream]) {
     assert.equal(document.sourceText, "<p>€</p>");
-    assert.equal(textContent(document.tree), "€");
+    assert.equal(extractText(document.tree, {
+      policy: TEXT_CONTENT_POLICY,
+      maxOutputBytes: 100,
+      maxTokens: 100
+    }).text, "€");
     assert.equal(serialize(document.tree), "<html><head></head><body><p>€</p></body></html>");
     assert.deepEqual(document.metadata.encoding, {
       name: "windows-1252",

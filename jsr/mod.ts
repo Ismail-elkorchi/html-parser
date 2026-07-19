@@ -1,16 +1,22 @@
 /**
- * Deno/JSR entrypoint for HTML parsing with visible-text extraction, fragment parsing, and structural traversal.
+ * Deno/JSR entrypoint for HTML parsing with bounded text extraction, fragment parsing, and structural traversal.
  *
  * Quickstart:
  * @example
  * ```ts
- * import { parse, visibleText } from "./mod.ts";
+ * import { extractText, parse } from "./mod.ts";
  * // Published package form:
- * // import { parse, visibleText } from "jsr:@ismail-elkorchi/html-parser";
+ * // import { extractText, parse } from "jsr:@ismail-elkorchi/html-parser";
  *
  * const document = parse("<main><h1>Hello</h1><p>World</p></main>");
  * console.log(document.tree.kind);
- * console.log(visibleText(document.tree, { trim: true }));
+ * console.log(extractText(document.tree, {
+ *   policy: "visible-text-html-v1",
+ *   maxOutputBytes: 16_384,
+ *   maxTokens: 1_024,
+ *   maxFallbackInputBytes: 16_384,
+ *   maxFallbackNodes: 1_024
+ * }).text);
  * ```
  *
  * Additional docs:
@@ -18,6 +24,7 @@
  * - `./docs/reference/options.md`
  */
 import {
+  extractText as extractTextInternal,
   findAllByAttr as findAllByAttrInternal,
   findAllByAttrNS as findAllByAttrNSInternal,
   findAllByTagName as findAllByTagNameInternal,
@@ -27,14 +34,16 @@ import {
   hasAttribute as hasAttributeInternal,
   hasAttributeNS as hasAttributeNSInternal,
   HTML_NAMESPACE_URI as HTML_NAMESPACE_URI_INTERNAL,
+  iterateText as iterateTextInternal,
   MATHML_NAMESPACE_URI as MATHML_NAMESPACE_URI_INTERNAL,
   parse as parseInternal,
   parseBytes as parseBytesInternal,
   parseFragment as parseFragmentInternal,
   parseStream as parseStreamInternal,
   serialize as serializeInternal,
+  TEXT_CONTENT_POLICY as TEXT_CONTENT_POLICY_INTERNAL,
   tokenizeByteStreamEager as tokenizeByteStreamEagerInternal,
-  visibleText as visibleTextInternal,
+  VISIBLE_TEXT_HTML_POLICY as VISIBLE_TEXT_HTML_POLICY_INTERNAL,
   SVG_NAMESPACE_URI as SVG_NAMESPACE_URI_INTERNAL,
   XLINK_NAMESPACE_URI as XLINK_NAMESPACE_URI_INTERNAL,
   XML_NAMESPACE_URI as XML_NAMESPACE_URI_INTERNAL,
@@ -183,18 +192,110 @@ export interface OperationOptions {
   readonly signal?: AbortSignal;
 }
 
-/**
- * Options accepted by visible text extraction.
- */
-export interface VisibleTextOptions extends OperationOptions {
-  /** Skip hidden or non-visible subtrees. */
+/** Versioned semantic policy selected for bounded text extraction. */
+export type TextExtractionPolicy = "visible-text-html-v1" | "text-content-v1";
+
+/** Resource controls required by every bounded text extraction. */
+export interface TextExtractionOptionsBase extends OperationOptions {
+  /** Semantic policy to apply. */
+  readonly policy: TextExtractionPolicy;
+  /** Maximum canonical UTF-8 bytes retained in returned text. */
+  readonly maxOutputBytes: number;
+  /** Maximum policy tokens retained and yielded. */
+  readonly maxTokens: number;
+}
+
+/** Options for the versioned visible-text policy. */
+export interface VisibleTextExtractionOptions extends TextExtractionOptionsBase {
+  /** Stable visible-text policy identity. */
+  readonly policy: "visible-text-html-v1";
+  /** Maximum UTF-8 bytes reparsed for one `noscript` fallback. */
+  readonly maxFallbackInputBytes: number;
+  /** Maximum nodes allocated by one `noscript` fallback parse. */
+  readonly maxFallbackNodes: number;
+  /** Skip hidden or non-visible subtrees; defaults to true. */
   readonly skipHiddenSubtrees?: boolean;
-  /** Include values from control-like nodes such as inputs. */
+  /** Include values from control-like nodes; defaults to true. */
   readonly includeControlValues?: boolean;
-  /** Include limited accessibility-name fallback sources. */
+  /** Include limited accessible-name fallback sources; defaults to false. */
   readonly includeAccessibleNameFallback?: boolean;
-  /** Trim final output text. */
+  /** Trim the final policy output; defaults to true. */
   readonly trim?: boolean;
+}
+
+/** Options for bounded DOM text-content concatenation. */
+export interface TextContentExtractionOptions extends TextExtractionOptionsBase {
+  /** Stable raw text-content policy identity. */
+  readonly policy: "text-content-v1";
+}
+
+/** Closed policy-discriminated options accepted by text extraction. */
+export type TextExtractionOptions =
+  | VisibleTextExtractionOptions
+  | TextContentExtractionOptions;
+
+/** Immutable bounded text result with exact untruncated UTF-8 measurement. */
+export interface TextExtractionResult {
+  /** Retained scalar-safe output prefix. */
+  readonly text: string;
+  /** Canonical UTF-8 bytes in the complete policy output. */
+  readonly totalBytes: number;
+  /** Whether a byte or token cap omitted output. */
+  readonly truncated: boolean;
+  /** Semantic policy that produced the result. */
+  readonly policy: TextExtractionPolicy;
+}
+
+/** Source role represented by one extraction provenance range. */
+export type TextExtractionSourceRole =
+  | "text-node"
+  | "img-alt"
+  | "input-value"
+  | "input-aria-label"
+  | "button-value"
+  | "structure-break"
+  | "noscript-fallback";
+
+/** Parsed source-node kind represented by extraction provenance. */
+export type TextExtractionSourceNodeKind =
+  | "document"
+  | "fragment"
+  | "element"
+  | "text"
+  | "comment"
+  | "doctype";
+
+/** Coalesced provenance for a half-open UTF-8 range in retained output. */
+export interface TextProvenanceRange {
+  /** Inclusive retained-output byte offset. */
+  readonly outputByteStart: number;
+  /** Exclusive retained-output byte offset. */
+  readonly outputByteEnd: number;
+  /** Parsed source node, or null when no node can be identified. */
+  readonly sourceNodeId: NodeId | null;
+  /** Parsed source-node kind. */
+  readonly sourceNodeKind: TextExtractionSourceNodeKind;
+  /** Semantic role by which the source contributed output. */
+  readonly sourceRole: TextExtractionSourceRole;
+}
+
+/** Token kinds emitted by the bounded extraction iterator. */
+export type TextExtractionTokenKind = "text" | "lineBreak" | "paragraphBreak" | "tab";
+
+/** One retained policy token with bounded, range-based source provenance. */
+export interface TextExtractionToken {
+  /** Token category after policy normalization. */
+  readonly kind: TextExtractionTokenKind;
+  /** Retained token text. */
+  readonly value: string;
+  /** Semantic policy that produced the token. */
+  readonly policy: TextExtractionPolicy;
+  /** Inclusive token offset in retained-output UTF-8 bytes. */
+  readonly outputByteStart: number;
+  /** Exclusive token offset in retained-output UTF-8 bytes. */
+  readonly outputByteEnd: number;
+  /** Coalesced source ranges covering the complete token. */
+  readonly provenance: readonly TextProvenanceRange[];
 }
 
 /**
@@ -413,9 +514,9 @@ export interface FragmentTree {
 export type SerializableHtml = DocumentTree | FragmentTree | HtmlNode;
 
 /**
- * Input accepted by `visibleText`.
+ * Input accepted by bounded text extraction.
  */
-export type VisibleTextInput = DocumentTree | FragmentTree | HtmlNode;
+export type TextExtractionInput = DocumentTree | FragmentTree | HtmlNode;
 
 /** HTML namespace URI assigned by the tree builder. */
 export const HTML_NAMESPACE_URI: string = HTML_NAMESPACE_URI_INTERNAL;
@@ -429,6 +530,10 @@ export const XLINK_NAMESPACE_URI: string = XLINK_NAMESPACE_URI_INTERNAL;
 export const XML_NAMESPACE_URI: string = XML_NAMESPACE_URI_INTERNAL;
 /** XMLNS namespace URI used by namespace declaration attributes. */
 export const XMLNS_NAMESPACE_URI: string = XMLNS_NAMESPACE_URI_INTERNAL;
+/** Stable semantic identity for visible HTML text extraction. */
+export const VISIBLE_TEXT_HTML_POLICY: "visible-text-html-v1" = VISIBLE_TEXT_HTML_POLICY_INTERNAL;
+/** Stable semantic identity for raw DOM text-content extraction. */
+export const TEXT_CONTENT_POLICY: "text-content-v1" = TEXT_CONTENT_POLICY_INTERNAL;
 
 /** Returns an unnamespaced HTML attribute using ASCII case-insensitive matching. */
 export function getAttributeValue(node: ElementNode, name: string): string | undefined {
@@ -678,30 +783,56 @@ export function serialize(input: SerializableHtml, options: OperationOptions = {
 }
 
 /**
- * Extracts visible text from a parsed tree or node.
+ * Extracts a bounded prefix under an explicit, versioned semantic policy.
  *
- * @param input Parsed document, fragment, or node.
- * @param options Visible-text extraction controls. Hidden-subtree skipping is
- * enabled by default; broaden extraction only when you explicitly need more source text.
- * @returns Stable text output suitable for indexing and plain-text auditing.
- * @throws {HtmlAbortError} When `options.signal` is aborted.
- * @throws {HtmlBudgetExceededError} When `options.maxTimeMs` expires.
- *
- * Failure mode:
- * - This function does not sanitize HTML; it only returns text.
- *
- * @example
+ * @example Extract visible HTML text with explicit output and fallback limits.
  * ```ts
- * import { parse, visibleText } from "./mod.ts";
- *
- * const document = parse("<main><h1>Hello</h1><p>World</p></main>");
- * console.log(visibleText(document.tree, { trim: true }));
+ * const document = parse("<article><h1>Hello</h1></article>");
+ * const result = extractText(document.tree, {
+ *   policy: VISIBLE_TEXT_HTML_POLICY,
+ *   maxOutputBytes: 4_096,
+ *   maxTokens: 256,
+ *   maxFallbackInputBytes: 4_096,
+ *   maxFallbackNodes: 256
+ * });
+ * console.log(result.text, result.totalBytes, result.truncated);
  * ```
  */
-export function visibleText(input: VisibleTextInput, options: VisibleTextOptions = {}): string {
-  return visibleTextInternal(
-    input as Parameters<typeof visibleTextInternal>[0],
-    options as Parameters<typeof visibleTextInternal>[1]
+export function extractText(
+  input: TextExtractionInput,
+  options: TextExtractionOptions
+): TextExtractionResult {
+  return extractTextInternal(
+    input as Parameters<typeof extractTextInternal>[0],
+    options as Parameters<typeof extractTextInternal>[1]
+  );
+}
+
+/**
+ * Iterates bounded text tokens with range-based provenance.
+ *
+ * Fully draining the generator returns the same result shape as `extractText`.
+ *
+ * @example Iterate raw descendant-text tokens with bounded retention.
+ * ```ts
+ * const document = parse("<p>Hello <em>world</em></p>");
+ * const iterator = iterateText(document.tree, {
+ *   policy: TEXT_CONTENT_POLICY,
+ *   maxOutputBytes: 4_096,
+ *   maxTokens: 256
+ * });
+ * for (let next = iterator.next(); !next.done; next = iterator.next()) {
+ *   console.log(next.value.value, next.value.provenance);
+ * }
+ * ```
+ */
+export function iterateText(
+  input: TextExtractionInput,
+  options: TextExtractionOptions
+): Generator<TextExtractionToken, TextExtractionResult, void> {
+  return iterateTextInternal(
+    input as Parameters<typeof iterateTextInternal>[0],
+    options as Parameters<typeof iterateTextInternal>[1]
   );
 }
 

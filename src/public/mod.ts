@@ -32,8 +32,8 @@ import {
   normalizeParseFragmentOptions,
   normalizeParseOptions,
   normalizeParseStreamOptions,
+  normalizeTextExtractionOptions,
   normalizeTokenizeByteStreamEagerOptions,
-  normalizeVisibleTextOptions,
   type OperationContext
 } from "./operation.js";
 
@@ -67,6 +67,15 @@ import type {
   ParseResourceUsage,
   Span,
   SpanProvenance,
+  TextContentExtractionOptions,
+  TextExtractionOptions,
+  TextExtractionPolicy,
+  TextExtractionResult,
+  TextExtractionSourceNodeKind,
+  TextExtractionSourceRole,
+  TextExtractionToken,
+  TextExtractionTokenKind,
+  TextProvenanceRange,
   Token,
   TokenizeByteStreamEagerOptions,
   TraceEvent,
@@ -74,11 +83,7 @@ import type {
   TraceMode,
   TraceResult,
   TraceSummary,
-  VisibleTextOptions,
-  VisibleTextToken,
-  VisibleTextTokenSourceNodeKind,
-  VisibleTextTokenSourceRole,
-  VisibleTextTokenWithProvenance
+  VisibleTextExtractionOptions
 } from "./types.js";
 
 export type {
@@ -124,6 +129,16 @@ export type {
   ParseStreamOptions,
   Span,
   SpanProvenance,
+  TextContentExtractionOptions,
+  TextExtractionOptions,
+  TextExtractionOptionsBase,
+  TextExtractionPolicy,
+  TextExtractionResult,
+  TextExtractionSourceNodeKind,
+  TextExtractionSourceRole,
+  TextExtractionToken,
+  TextExtractionTokenKind,
+  TextProvenanceRange,
   SourceRetention,
   StartTagToken,
   Token,
@@ -145,11 +160,7 @@ export type {
   TraceResult,
   TraceSummary,
   TraceSummaryResult,
-  VisibleTextOptions,
-  VisibleTextToken,
-  VisibleTextTokenSourceNodeKind,
-  VisibleTextTokenSourceRole,
-  VisibleTextTokenWithProvenance
+  VisibleTextExtractionOptions
 } from "./types.js";
 
 export {
@@ -196,6 +207,10 @@ export const XLINK_NAMESPACE_URI = "http://www.w3.org/1999/xlink";
 export const XML_NAMESPACE_URI = "http://www.w3.org/XML/1998/namespace";
 /** XMLNS namespace URI used by namespace declaration attributes. */
 export const XMLNS_NAMESPACE_URI = "http://www.w3.org/2000/xmlns/";
+/** Stable semantic identity for visible HTML text extraction. */
+export const VISIBLE_TEXT_HTML_POLICY = "visible-text-html-v1";
+/** Stable semantic identity for raw DOM text-content extraction. */
+export const TEXT_CONTENT_POLICY = "text-content-v1";
 const DEFAULT_STREAM_ENCODING_PRESCAN_BYTES = 16_384;
 const parsedDocumentSources = new WeakMap<object, string | null>();
 const parsedDocumentSpans = new WeakMap<object, boolean>();
@@ -269,8 +284,20 @@ function parseOperationContext(options: ParseOptions, startedAt: number): Operat
   return createOperationContext(options.budgets?.maxTimeMs, options.signal, startedAt);
 }
 
-function utf8ByteLength(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
+function utf8ByteLength(value: string, operation?: OperationContext): number {
+  let bytes = 0;
+  let cursor = 0;
+  while (cursor < value.length) {
+    operation?.checkpoint();
+    const codePoint = value.codePointAt(cursor);
+    if (codePoint === undefined) {
+      break;
+    }
+    const width = codePoint > 0xffff ? 2 : 1;
+    bytes += codePointUtf8ByteLength(codePoint);
+    cursor += width;
+  }
+  return bytes;
 }
 
 class DecodedUtf8BudgetCounter {
@@ -752,7 +779,7 @@ interface ParseInputContext {
 }
 
 function stringInputContext(html: string, operation: OperationContext): ParseInputContext {
-  const byteLength = utf8ByteLength(html);
+  const byteLength = utf8ByteLength(html, operation);
   return {
     inputKind: "text",
     byteLength,
@@ -1028,7 +1055,7 @@ export function parseFragment(
   const operation = parseOperationContext(normalizedOptions, startedAt);
   operation.checkpoint();
 
-  const inputByteLength = utf8ByteLength(html);
+  const inputByteLength = utf8ByteLength(html, operation);
   enforceBudget("maxInputBytes", budgets?.maxInputBytes, inputByteLength);
   enforceBudget("maxDecodedUtf8Bytes", budgets?.maxDecodedUtf8Bytes, inputByteLength);
 
@@ -1590,39 +1617,6 @@ export function serialize(
   return serializeNodes([tree], operation);
 }
 
-function textContentFromNode(
-  node: DocumentTree | FragmentTree | HtmlNode,
-  operation: OperationContext
-): string {
-  const roots = node.kind === "document" || node.kind === "fragment" ? node.children : [node];
-  const parts: string[] = [];
-  const stack: HtmlNode[] = [];
-  for (let index = roots.length - 1; index >= 0; index -= 1) {
-    const root = roots[index];
-    if (root !== undefined) {
-      stack.push(root);
-    }
-  }
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (current === undefined) {
-      continue;
-    }
-    operation.checkpoint();
-    if (current.kind === "text") {
-      parts.push(current.value);
-    } else if (current.kind === "element") {
-      for (let index = current.children.length - 1; index >= 0; index -= 1) {
-        const child = current.children[index];
-        if (child !== undefined) {
-          stack.push(child);
-        }
-      }
-    }
-  }
-  return parts.join("");
-}
-
 const VISIBLE_TEXT_SKIP_TAGS = new Set(["head", "script", "style", "template", "title", "optgroup", "option"]);
 const VISIBLE_TEXT_INPUT_VALUE_TAG_TYPES = new Set(["button", "submit", "reset"]);
 const VISIBLE_TEXT_BLOCK_BREAK_TAGS = new Set([
@@ -1658,13 +1652,15 @@ const VISIBLE_TEXT_BLOCK_BREAK_TAGS = new Set([
 
 type VisibleTextPolicyOptions = Required<
   Pick<
-    VisibleTextOptions,
+    VisibleTextExtractionOptions,
     "skipHiddenSubtrees" | "includeControlValues" | "includeAccessibleNameFallback" | "trim"
   >
 >;
 
 type ResolvedVisibleTextOptions = VisibleTextPolicyOptions & {
   readonly operation: OperationContext;
+  readonly maxFallbackInputBytes: number;
+  readonly maxFallbackNodes: number;
 };
 
 const DEFAULT_VISIBLE_TEXT_OPTIONS: VisibleTextPolicyOptions = Object.freeze({
@@ -1673,22 +1669,6 @@ const DEFAULT_VISIBLE_TEXT_OPTIONS: VisibleTextPolicyOptions = Object.freeze({
   includeAccessibleNameFallback: false,
   trim: true
 });
-
-function normalizeNewlines(value: string): string {
-  return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-}
-
-function collapseAsciiWhitespace(value: string): string {
-  return value.replace(/[ \t\n\f\r]+/g, " ");
-}
-
-function normalizeVisibleTextSegment(value: string, preserveWhitespace: boolean): string {
-  const normalized = normalizeNewlines(value);
-  if (preserveWhitespace) {
-    return normalized;
-  }
-  return collapseAsciiWhitespace(normalized);
-}
 
 function normalizeBooleanAttribute(value: string | undefined): boolean {
   if (value === undefined) {
@@ -1805,51 +1785,23 @@ function accessibleNameFallback(
   return nonEmptyAttributeValue(node, "aria-label");
 }
 
-function normalizeVisibleTextOutput(value: string, options: ResolvedVisibleTextOptions): string {
-  options.operation.checkpoint();
-  let output = normalizeNewlines(value);
-  output = output.replace(/[ \t\f]+\n/g, "\n");
-  output = output.replace(/\n[ \t\f]+/g, "\n");
-  output = output.replace(/\n{3,}/g, "\n\n");
-  output = output.replace(/[ ]{2,}/g, " ");
-  output = output.replace(/\t{2,}/g, "\t");
-  if (options.trim) {
-    output = output.trim();
-  }
-  return output;
-}
-
-interface VisibleTextSourceMeta {
+interface ExtractionSourceMeta {
   readonly sourceNodeId: NodeId | null;
-  readonly sourceNodeKind: VisibleTextTokenSourceNodeKind;
-  readonly sourceRole: VisibleTextTokenSourceRole;
+  readonly sourceNodeKind: TextExtractionSourceNodeKind;
+  readonly sourceRole: TextExtractionSourceRole;
 }
 
-interface VisibleTextSourceChunk extends VisibleTextSourceMeta {
+interface ExtractionSourceChunk {
   readonly value: string;
+  readonly normalizeSegment: boolean;
+  readonly preserveWhitespace: boolean;
+  readonly source: ExtractionSourceMeta;
 }
 
-interface VisibleTextSourceChar extends VisibleTextSourceMeta {
-  readonly char: string;
-}
-
-const DEFAULT_VISIBLE_TEXT_SOURCE: VisibleTextSourceMeta = Object.freeze({
-  sourceNodeId: null,
-  sourceNodeKind: "document",
-  sourceRole: "text-node"
-});
-
-function sourceMetaFromNode(
+function extractionSourceMetaFromNode(
   node: HtmlNode | DocumentTree | FragmentTree,
-  sourceRole: VisibleTextTokenSourceRole
-): VisibleTextSourceMeta {
-  if (node.kind === "document" || node.kind === "fragment") {
-    return {
-      sourceNodeId: node.id,
-      sourceNodeKind: node.kind,
-      sourceRole
-    };
-  }
+  sourceRole: TextExtractionSourceRole
+): ExtractionSourceMeta {
   return {
     sourceNodeId: node.id,
     sourceNodeKind: node.kind,
@@ -1857,85 +1809,633 @@ function sourceMetaFromNode(
   };
 }
 
-function appendVisibleText(
-  parts: string[],
-  value: string,
-  sourceChunks?: VisibleTextSourceChunk[],
-  sourceMeta: VisibleTextSourceMeta = DEFAULT_VISIBLE_TEXT_SOURCE
-): void {
-  if (value.length === 0) {
-    return;
+function sameExtractionSource(left: ExtractionSourceMeta, right: ExtractionSourceMeta): boolean {
+  return left.sourceNodeId === right.sourceNodeId &&
+    left.sourceNodeKind === right.sourceNodeKind &&
+    left.sourceRole === right.sourceRole;
+}
+
+function codePointUtf8ByteLength(codePoint: number): number {
+  if (codePoint <= 0x7f) {
+    return 1;
   }
-  parts.push(value);
-  if (sourceChunks) {
-    sourceChunks.push({
-      value,
-      sourceNodeId: sourceMeta.sourceNodeId,
-      sourceNodeKind: sourceMeta.sourceNodeKind,
-      sourceRole: sourceMeta.sourceRole
-    });
+  if (codePoint <= 0x7ff) {
+    return 2;
+  }
+  if (codePoint <= 0xffff) {
+    return 3;
+  }
+  return 4;
+}
+
+function scalarUtf8ByteLength(value: string): number {
+  const codePoint = value.codePointAt(0);
+  return codePoint === undefined ? 0 : codePointUtf8ByteLength(codePoint);
+}
+
+function* iterateStringScalars(
+  value: string,
+  operation: OperationContext
+): IterableIterator<string> {
+  let cursor = 0;
+  while (cursor < value.length) {
+    operation.checkpoint();
+    const codePoint = value.codePointAt(cursor);
+    if (codePoint === undefined) {
+      break;
+    }
+    const width = codePoint > 0xffff ? 2 : 1;
+    yield value.slice(cursor, cursor + width);
+    cursor += width;
   }
 }
 
-function noscriptFallbackChildren(
+function* iterateNormalizedSegmentScalars(
+  value: string,
+  preserveWhitespace: boolean,
+  operation: OperationContext
+): IterableIterator<string> {
+  let cursor = 0;
+  let inAsciiWhitespace = false;
+  while (cursor < value.length) {
+    operation.checkpoint();
+    const codePoint = value.codePointAt(cursor);
+    if (codePoint === undefined) {
+      break;
+    }
+    const width = codePoint > 0xffff ? 2 : 1;
+    const scalar = value.slice(cursor, cursor + width);
+    cursor += width;
+
+    if (preserveWhitespace) {
+      if (scalar === "\r") {
+        if (value[cursor] === "\n") {
+          cursor += 1;
+        }
+        yield "\n";
+      } else {
+        yield scalar;
+      }
+      continue;
+    }
+
+    const asciiWhitespace = scalar === " " || scalar === "\t" ||
+      scalar === "\n" || scalar === "\f" || scalar === "\r";
+    if (asciiWhitespace) {
+      if (!inAsciiWhitespace) {
+        yield " ";
+        inAsciiWhitespace = true;
+      }
+      continue;
+    }
+    inAsciiWhitespace = false;
+    yield scalar;
+  }
+}
+
+interface MutableExtractionRange {
+  outputByteStart: number;
+  outputByteEnd: number;
+  readonly source: ExtractionSourceMeta;
+}
+
+class BoundedTextCollector {
+  readonly #policy: TextExtractionPolicy;
+  readonly #maxOutputBytes: number;
+  readonly #maxTokens: number;
+  #totalBytes = 0;
+  #retainedBytes = 0;
+  #retainedTokens = 0;
+  #truncated = false;
+  #sealed = false;
+  #resultParts: string[] = [];
+  #readyTokens: TextExtractionToken[] = [];
+  #activeTextLogical = false;
+  #activeTextAccepted = false;
+  #activeTextChunks: string[] = [];
+  #activeTextPendingParts: string[] = [];
+  #activeTextStart = 0;
+  #activeTextRanges: MutableExtractionRange[] = [];
+  #pendingNewlineSource: ExtractionSourceMeta | null = null;
+  #finished = false;
+
+  constructor(policy: TextExtractionPolicy, maxOutputBytes: number, maxTokens: number) {
+    this.#policy = policy;
+    this.#maxOutputBytes = maxOutputBytes;
+    this.#maxTokens = maxTokens;
+  }
+
+  consumeVisibleScalar(value: string, source: ExtractionSourceMeta): void {
+    this.#observeScalar(value);
+    if (value === "\n") {
+      this.#finishTextToken();
+      if (this.#pendingNewlineSource === null) {
+        this.#pendingNewlineSource = source;
+      } else {
+        this.#emitAtomicToken("paragraphBreak", [
+          { value: "\n", source: this.#pendingNewlineSource },
+          { value: "\n", source }
+        ]);
+        this.#pendingNewlineSource = null;
+      }
+      return;
+    }
+
+    this.#finishPendingNewline();
+    if (value === "\t") {
+      this.#finishTextToken();
+      this.#emitAtomicToken("tab", [{ value, source }]);
+      return;
+    }
+    this.#appendTextScalar(value, source);
+  }
+
+  consumeRawScalar(value: string, source: ExtractionSourceMeta): void {
+    this.#observeScalar(value);
+    this.#appendTextScalar(value, source);
+  }
+
+  finishRawChunk(): void {
+    this.#finishTextToken();
+  }
+
+  observeOmittedBytes(bytes: number): void {
+    if (bytes === 0) {
+      return;
+    }
+    this.#totalBytes += bytes;
+    this.#sealed = true;
+    this.#truncated = true;
+  }
+
+  takeReadyTokens(): readonly TextExtractionToken[] {
+    if (this.#readyTokens.length === 0) {
+      return [];
+    }
+    const ready = this.#readyTokens;
+    this.#readyTokens = [];
+    return ready;
+  }
+
+  finish(): TextExtractionResult {
+    if (!this.#finished) {
+      this.#finishPendingNewline();
+      this.#finishTextToken();
+      this.#finished = true;
+    }
+    return Object.freeze({
+      text: this.#resultParts.join(""),
+      totalBytes: this.#totalBytes,
+      truncated: this.#truncated,
+      policy: this.#policy
+    });
+  }
+
+  #observeScalar(value: string): void {
+    this.#totalBytes += scalarUtf8ByteLength(value);
+  }
+
+  #finishPendingNewline(): void {
+    if (this.#pendingNewlineSource === null) {
+      return;
+    }
+    this.#emitAtomicToken("lineBreak", [
+      { value: "\n", source: this.#pendingNewlineSource }
+    ]);
+    this.#pendingNewlineSource = null;
+  }
+
+  #beginTextToken(): void {
+    if (this.#activeTextLogical) {
+      return;
+    }
+    this.#activeTextLogical = true;
+    this.#activeTextAccepted = !this.#sealed && this.#retainedTokens < this.#maxTokens;
+    this.#activeTextStart = this.#retainedBytes;
+    if (!this.#activeTextAccepted) {
+      this.#sealed = true;
+      this.#truncated = true;
+    }
+  }
+
+  #appendTextScalar(value: string, source: ExtractionSourceMeta): void {
+    this.#beginTextToken();
+    if (!this.#activeTextAccepted || this.#sealed) {
+      return;
+    }
+    if (this.#appendRetainedScalar(
+      value,
+      source,
+      this.#activeTextPendingParts,
+      this.#activeTextRanges
+    ) && this.#activeTextPendingParts.length >= 256) {
+      this.#activeTextChunks.push(this.#activeTextPendingParts.join(""));
+      this.#activeTextPendingParts = [];
+    }
+  }
+
+  #appendRetainedScalar(
+    value: string,
+    source: ExtractionSourceMeta,
+    parts: string[],
+    ranges: MutableExtractionRange[]
+  ): boolean {
+    const bytes = scalarUtf8ByteLength(value);
+    if (this.#retainedBytes + bytes > this.#maxOutputBytes) {
+      this.#sealed = true;
+      this.#truncated = true;
+      return false;
+    }
+    const start = this.#retainedBytes;
+    const end = start + bytes;
+    parts.push(value);
+    const previous = ranges[ranges.length - 1];
+    if (
+      previous !== undefined &&
+      previous.outputByteEnd === start &&
+      sameExtractionSource(previous.source, source)
+    ) {
+      previous.outputByteEnd = end;
+    } else {
+      ranges.push({ outputByteStart: start, outputByteEnd: end, source });
+    }
+    this.#retainedBytes = end;
+    return true;
+  }
+
+  #finishTextToken(): void {
+    if (!this.#activeTextLogical) {
+      return;
+    }
+    if (
+      this.#activeTextAccepted &&
+      (this.#activeTextChunks.length > 0 || this.#activeTextPendingParts.length > 0)
+    ) {
+      if (this.#activeTextPendingParts.length > 0) {
+        this.#activeTextChunks.push(this.#activeTextPendingParts.join(""));
+      }
+      this.#publishToken(
+        "text",
+        this.#activeTextChunks.join(""),
+        this.#activeTextStart,
+        this.#activeTextRanges
+      );
+    }
+    this.#activeTextLogical = false;
+    this.#activeTextAccepted = false;
+    this.#activeTextChunks = [];
+    this.#activeTextPendingParts = [];
+    this.#activeTextRanges = [];
+  }
+
+  #emitAtomicToken(
+    kind: Exclude<TextExtractionTokenKind, "text">,
+    scalars: readonly { readonly value: string; readonly source: ExtractionSourceMeta }[]
+  ): void {
+    if (this.#sealed || this.#retainedTokens >= this.#maxTokens) {
+      this.#sealed = true;
+      this.#truncated = true;
+      return;
+    }
+    const start = this.#retainedBytes;
+    const parts: string[] = [];
+    const ranges: MutableExtractionRange[] = [];
+    for (const scalar of scalars) {
+      if (!this.#appendRetainedScalar(scalar.value, scalar.source, parts, ranges)) {
+        break;
+      }
+    }
+    if (parts.length === 0) {
+      return;
+    }
+    const value = parts.join("");
+    const retainedKind = kind === "paragraphBreak" && value === "\n"
+      ? "lineBreak"
+      : kind;
+    this.#publishToken(retainedKind, value, start, ranges);
+    if (parts.length !== scalars.length) {
+      this.#truncated = true;
+    }
+  }
+
+  #publishToken(
+    kind: TextExtractionTokenKind,
+    value: string,
+    outputByteStart: number,
+    ranges: readonly MutableExtractionRange[]
+  ): void {
+    const provenance: readonly TextProvenanceRange[] = Object.freeze(
+      ranges.map((range) => Object.freeze({
+        outputByteStart: range.outputByteStart,
+        outputByteEnd: range.outputByteEnd,
+        sourceNodeId: range.source.sourceNodeId,
+        sourceNodeKind: range.source.sourceNodeKind,
+        sourceRole: range.source.sourceRole
+      }))
+    );
+    const token: TextExtractionToken = Object.freeze({
+      kind,
+      value,
+      policy: this.#policy,
+      outputByteStart,
+      outputByteEnd: this.#retainedBytes,
+      provenance
+    });
+    this.#retainedTokens += 1;
+    this.#resultParts.push(value);
+    this.#readyTokens.push(token);
+  }
+}
+
+interface PendingSourceRun {
+  readonly value: string;
+  readonly source: ExtractionSourceMeta;
+  count: number;
+}
+
+class ExtractionSourceRunBuffer {
+  readonly #maxRetainedBytes: number;
+  #runs: PendingSourceRun[] = [];
+  #retainedBytes = 0;
+  #omittedBytes = 0;
+  #lastValue: string | null = null;
+
+  constructor(maxRetainedBytes: number) {
+    this.#maxRetainedBytes = maxRetainedBytes;
+  }
+
+  get lastValue(): string | null {
+    return this.#lastValue;
+  }
+
+  push(value: string, source: ExtractionSourceMeta): void {
+    const bytes = scalarUtf8ByteLength(value);
+    this.#lastValue = value;
+    if (this.#retainedBytes + bytes > this.#maxRetainedBytes) {
+      this.#omittedBytes += bytes;
+      return;
+    }
+    const previous = this.#runs[this.#runs.length - 1];
+    if (
+      previous !== undefined &&
+      previous.value === value &&
+      sameExtractionSource(previous.source, source)
+    ) {
+      previous.count += 1;
+    } else {
+      this.#runs.push({ value, source, count: 1 });
+    }
+    this.#retainedBytes += bytes;
+  }
+
+  pushOmittedBytes(bytes: number): void {
+    this.#omittedBytes += bytes;
+  }
+
+  clear(): void {
+    this.#runs = [];
+    this.#retainedBytes = 0;
+    this.#omittedBytes = 0;
+    this.#lastValue = null;
+  }
+
+  drain(
+    visitor: (value: string, source: ExtractionSourceMeta) => void,
+    omittedVisitor: (bytes: number) => void,
+    operation: OperationContext
+  ): void {
+    const runs = this.#runs;
+    const omittedBytes = this.#omittedBytes;
+    this.clear();
+    for (const run of runs) {
+      for (let count = 0; count < run.count; count += 1) {
+        operation.checkpoint();
+        visitor(run.value, run.source);
+      }
+    }
+    omittedVisitor(omittedBytes);
+  }
+}
+
+function isEcmaTrimWhitespace(value: string): boolean {
+  return /^\s$/u.test(value);
+}
+
+interface StreamingTextSink {
+  emit(value: string, source: ExtractionSourceMeta): void;
+  observeOmittedBytes(bytes: number): void;
+}
+
+class StreamingVisibleTextNormalizer {
+  readonly #trim: boolean;
+  readonly #operation: OperationContext;
+  readonly #sink: StreamingTextSink;
+  readonly #beforeNewline: ExtractionSourceRunBuffer;
+  readonly #trailingWhitespace: ExtractionSourceRunBuffer;
+  #lastGlobalValue: string | null = null;
+  #newlineRun = 0;
+  #seenNonWhitespace = false;
+
+  constructor(
+    trim: boolean,
+    maxOutputBytes: number,
+    operation: OperationContext,
+    sink: StreamingTextSink
+  ) {
+    this.#trim = trim;
+    this.#beforeNewline = new ExtractionSourceRunBuffer(maxOutputBytes);
+    this.#trailingWhitespace = new ExtractionSourceRunBuffer(maxOutputBytes);
+    this.#operation = operation;
+    this.#sink = sink;
+  }
+
+  consume(value: string, source: ExtractionSourceMeta): void {
+    this.#operation.checkpoint();
+    if (value === "\n") {
+      this.#beforeNewline.clear();
+      this.#emitGlobal(value, source);
+      return;
+    }
+    if (value === " " || value === "\t" || value === "\f") {
+      if (this.#lastGlobalValue !== "\n") {
+        const previous = this.#beforeNewline.lastValue ?? this.#lastGlobalValue;
+        if ((value !== " " && value !== "\t") || previous !== value) {
+          this.#beforeNewline.push(value, source);
+        }
+      }
+      return;
+    }
+    this.#flushBeforeNewline();
+    this.#emitGlobal(value, source);
+  }
+
+  finish(): void {
+    this.#flushBeforeNewline();
+    this.#trailingWhitespace.clear();
+  }
+
+  #flushBeforeNewline(): void {
+    this.#beforeNewline.drain(
+      (value, source) => {
+        this.#emitGlobal(value, source);
+      },
+      (bytes) => {
+        this.#emitOmittedWhitespace(bytes);
+      },
+      this.#operation
+    );
+  }
+
+  #emitOmittedWhitespace(bytes: number): void {
+    if (bytes === 0 || (this.#trim && !this.#seenNonWhitespace)) {
+      return;
+    }
+    if (this.#trim) {
+      this.#trailingWhitespace.pushOmittedBytes(bytes);
+    } else {
+      this.#sink.observeOmittedBytes(bytes);
+    }
+  }
+
+  #emitGlobal(value: string, source: ExtractionSourceMeta): void {
+    if ((value === " " || value === "\t") && this.#lastGlobalValue === value) {
+      return;
+    }
+    if (value === "\n") {
+      if (this.#newlineRun >= 2) {
+        return;
+      }
+      this.#newlineRun += 1;
+    } else {
+      this.#newlineRun = 0;
+    }
+    this.#lastGlobalValue = value;
+    this.#emitTrimmed(value, source);
+  }
+
+  #emitTrimmed(value: string, source: ExtractionSourceMeta): void {
+    if (!this.#trim) {
+      this.#sink.emit(value, source);
+      return;
+    }
+    if (isEcmaTrimWhitespace(value)) {
+      if (this.#seenNonWhitespace) {
+        this.#trailingWhitespace.push(value, source);
+      }
+      return;
+    }
+    if (this.#seenNonWhitespace) {
+      this.#trailingWhitespace.drain(
+        (pendingValue, pendingSource) => {
+          this.#sink.emit(pendingValue, pendingSource);
+        },
+        (bytes) => {
+          this.#sink.observeOmittedBytes(bytes);
+        },
+        this.#operation
+      );
+    }
+    this.#seenNonWhitespace = true;
+    this.#sink.emit(value, source);
+  }
+}
+
+function boundedNoscriptFallbackChildren(
   node: Extract<HtmlNode, { kind: "element" }>,
   options: ResolvedVisibleTextOptions
 ): readonly HtmlNode[] | null {
   options.operation.checkpoint();
-  if (node.tagName.toLowerCase() !== "noscript") {
+  if (!isHtmlElement(node) || asciiLowercase(node.localName) !== "noscript") {
     return null;
   }
-
   if (node.children.length !== 1) {
     return null;
   }
-
   const onlyChild = node.children[0];
   if (!onlyChild || onlyChild.kind !== "text") {
     return null;
   }
-
   const rawMarkup = onlyChild.value;
   if (!rawMarkup.includes("<") || !rawMarkup.includes(">")) {
     return null;
   }
 
-  const fallbackFragment = parseFragment(rawMarkup, "body");
+  const fallbackBytes = utf8ByteLength(rawMarkup, options.operation);
+  enforceBudget("maxFallbackInputBytes", options.maxFallbackInputBytes, fallbackBytes);
+  const remainingTimeMs = options.operation.remainingTimeMs();
+  let fallbackFragment: FragmentTree;
+  try {
+    fallbackFragment = parseFragment(rawMarkup, "body", {
+      ...(options.operation.signal === undefined ? {} : { signal: options.operation.signal }),
+      budgets: {
+        maxNodes: options.maxFallbackNodes,
+        ...(remainingTimeMs === undefined ? {} : { maxTimeMs: Math.floor(remainingTimeMs) })
+      }
+    });
+  } catch (error) {
+    if (isHtmlBudgetExceededError(error) && error.budget === "maxNodes") {
+      throw new HtmlBudgetExceededError(
+        "maxFallbackNodes",
+        options.maxFallbackNodes,
+        options.maxFallbackNodes + 1
+      );
+    }
+    throw error;
+  }
   options.operation.checkpoint();
   return fallbackFragment.children;
 }
 
-function collectVisibleTextNodes(
+function* iterateVisibleExtractionChunks(
   roots: readonly HtmlNode[],
-  parts: string[],
-  options: ResolvedVisibleTextOptions,
-  sourceChunks?: VisibleTextSourceChunk[]
-): void {
+  options: ResolvedVisibleTextOptions
+): IterableIterator<ExtractionSourceChunk> {
   type VisitAction = {
     readonly kind: "visit";
     readonly node: HtmlNode;
     readonly preserveWhitespace: boolean;
-    readonly sourceRoleOverride: VisibleTextTokenSourceRole | null;
+    readonly sourceOverride: ExtractionSourceMeta | null;
   };
   type AppendAction = {
     readonly kind: "append";
     readonly node: HtmlNode;
     readonly value: string;
-    readonly sourceRole: VisibleTextTokenSourceRole;
+    readonly sourceRole: TextExtractionSourceRole;
+    readonly normalizeSegment: boolean;
+    readonly preserveWhitespace: boolean;
+    readonly sourceOverride: ExtractionSourceMeta | null;
   };
   type Action = VisitAction | AppendAction;
   const stack: Action[] = [];
   const pushVisits = (
     nodes: readonly HtmlNode[],
     preserveWhitespace: boolean,
-    sourceRoleOverride: VisibleTextTokenSourceRole | null
+    sourceOverride: ExtractionSourceMeta | null
   ): void => {
     for (let index = nodes.length - 1; index >= 0; index -= 1) {
       const node = nodes[index];
       if (node !== undefined) {
-        stack.push({ kind: "visit", node, preserveWhitespace, sourceRoleOverride });
+        stack.push({ kind: "visit", node, preserveWhitespace, sourceOverride });
       }
     }
+  };
+  const pushAppend = (
+    node: HtmlNode,
+    value: string,
+    sourceRole: TextExtractionSourceRole,
+    normalizeSegment: boolean,
+    preserveWhitespace: boolean,
+    sourceOverride: ExtractionSourceMeta | null
+  ): void => {
+    stack.push({
+      kind: "append",
+      node,
+      value,
+      sourceRole,
+      normalizeSegment,
+      preserveWhitespace,
+      sourceOverride
+    });
   };
   pushVisits(roots, false, null);
 
@@ -1946,22 +2446,27 @@ function collectVisibleTextNodes(
     }
     options.operation.checkpoint();
     if (action.kind === "append") {
-      appendVisibleText(
-        parts,
-        action.value,
-        sourceChunks,
-        sourceMetaFromNode(action.node, action.sourceRole)
-      );
+      if (action.value.length > 0) {
+        yield {
+          value: action.value,
+          normalizeSegment: action.normalizeSegment,
+          preserveWhitespace: action.preserveWhitespace,
+          source: action.sourceOverride ?? extractionSourceMetaFromNode(action.node, action.sourceRole)
+        };
+      }
       continue;
     }
-    const { node, preserveWhitespace, sourceRoleOverride } = action;
+
+    const { node, preserveWhitespace, sourceOverride } = action;
     if (node.kind === "text") {
-      stack.push({
-        kind: "append",
+      pushAppend(
         node,
-        value: normalizeVisibleTextSegment(node.value, preserveWhitespace),
-        sourceRole: sourceRoleOverride ?? "text-node"
-      });
+        node.value,
+        sourceOverride?.sourceRole ?? "text-node",
+        true,
+        preserveWhitespace,
+        sourceOverride
+      );
       continue;
     }
     if (node.kind !== "element" || shouldSkipHiddenSubtree(node, options)) {
@@ -1971,23 +2476,31 @@ function collectVisibleTextNodes(
     if (VISIBLE_TEXT_SKIP_TAGS.has(tagName)) {
       continue;
     }
-    const fallbackChildren = noscriptFallbackChildren(node, options);
+    const fallbackChildren = boundedNoscriptFallbackChildren(node, options);
     if (fallbackChildren !== null) {
-      pushVisits(fallbackChildren, preserveWhitespace, "noscript-fallback");
+      pushVisits(fallbackChildren, preserveWhitespace, {
+        sourceNodeId: node.id,
+        sourceNodeKind: node.kind,
+        sourceRole: "noscript-fallback"
+      });
       continue;
     }
-    const structuralRole = sourceRoleOverride ?? "structure-break";
+    const structuralRole = sourceOverride?.sourceRole ?? "structure-break";
     if (tagName === "br") {
-      stack.push({ kind: "append", node, value: "\n", sourceRole: structuralRole });
+      pushAppend(node, "\n", structuralRole, false, true, sourceOverride);
       continue;
     }
     if (tagName === "img" && options.includeControlValues) {
       const alt = attributeValue(node, "alt");
       if (alt && alt.length > 0) {
-        stack.push({
-          kind: "append", node, value: normalizeVisibleTextSegment(alt, false),
-          sourceRole: sourceRoleOverride ?? "img-alt"
-        });
+        pushAppend(
+          node,
+          alt,
+          sourceOverride?.sourceRole ?? "img-alt",
+          true,
+          false,
+          sourceOverride
+        );
       }
       continue;
     }
@@ -1996,17 +2509,25 @@ function collectVisibleTextNodes(
       if (type !== "hidden") {
         const value = attributeValue(node, "value");
         if (VISIBLE_TEXT_INPUT_VALUE_TAG_TYPES.has(type) && value && value.length > 0) {
-          stack.push({
-            kind: "append", node, value: normalizeVisibleTextSegment(value, false),
-            sourceRole: sourceRoleOverride ?? "input-value"
-          });
+          pushAppend(
+            node,
+            value,
+            sourceOverride?.sourceRole ?? "input-value",
+            true,
+            false,
+            sourceOverride
+          );
         } else {
           const fallbackName = accessibleNameFallback(node, options);
           if (fallbackName) {
-            stack.push({
-              kind: "append", node, value: normalizeVisibleTextSegment(fallbackName, false),
-              sourceRole: sourceRoleOverride ?? "input-aria-label"
-            });
+            pushAppend(
+              node,
+              fallbackName,
+              sourceOverride?.sourceRole ?? "input-aria-label",
+              true,
+              false,
+              sourceOverride
+            );
           }
         }
       }
@@ -2018,29 +2539,56 @@ function collectVisibleTextNodes(
     if (tagName === "button" && options.includeControlValues) {
       const value = attributeValue(node, "value");
       if (value && value.length > 0) {
-        stack.push({
-          kind: "append", node, value: normalizeVisibleTextSegment(value, false),
-          sourceRole: sourceRoleOverride ?? "button-value"
-        });
+        pushAppend(
+          node,
+          value,
+          sourceOverride?.sourceRole ?? "button-value",
+          true,
+          false,
+          sourceOverride
+        );
         continue;
       }
     }
     if (tagName === "tr") {
-      const actions: Action[] = [
-        { kind: "append", node, value: "\n", sourceRole: structuralRole }
-      ];
+      const actions: Action[] = [];
+      actions.push({
+        kind: "append",
+        node,
+        value: "\n",
+        sourceRole: structuralRole,
+        normalizeSegment: false,
+        preserveWhitespace: true,
+        sourceOverride
+      });
       let seenTableCell = false;
       for (const child of node.children) {
         const childTagName = child.kind === "element" ? child.tagName.toLowerCase() : "";
         if ((childTagName === "td" || childTagName === "th") && seenTableCell) {
-          actions.push({ kind: "append", node, value: "\t", sourceRole: structuralRole });
+          actions.push({
+            kind: "append",
+            node,
+            value: "\t",
+            sourceRole: structuralRole,
+            normalizeSegment: false,
+            preserveWhitespace: true,
+            sourceOverride
+          });
         }
-        actions.push({ kind: "visit", node: child, preserveWhitespace, sourceRoleOverride });
+        actions.push({ kind: "visit", node: child, preserveWhitespace, sourceOverride });
         if (childTagName === "td" || childTagName === "th") {
           seenTableCell = true;
         }
       }
-      actions.push({ kind: "append", node, value: "\n", sourceRole: structuralRole });
+      actions.push({
+        kind: "append",
+        node,
+        value: "\n",
+        sourceRole: structuralRole,
+        normalizeSegment: false,
+        preserveWhitespace: true,
+        sourceOverride
+      });
       for (let index = actions.length - 1; index >= 0; index -= 1) {
         const next = actions[index];
         if (next !== undefined) {
@@ -2050,385 +2598,184 @@ function collectVisibleTextNodes(
       continue;
     }
     if (tagName === "td" || tagName === "th") {
-      pushVisits(node.children, preserveWhitespace, sourceRoleOverride);
+      pushVisits(node.children, preserveWhitespace, sourceOverride);
       continue;
     }
     const childPreserveWhitespace = preserveWhitespace || tagName === "pre" || tagName === "textarea";
     const blockBreakBefore = tagName === "p" || VISIBLE_TEXT_BLOCK_BREAK_TAGS.has(tagName);
-    if (tagName === "p") {
-      stack.push({ kind: "append", node, value: "\n\n", sourceRole: structuralRole });
-    } else if (blockBreakBefore) {
-      stack.push({ kind: "append", node, value: "\n", sourceRole: structuralRole });
-    }
-    pushVisits(node.children, childPreserveWhitespace, sourceRoleOverride);
     if (blockBreakBefore) {
-      stack.push({ kind: "append", node, value: "\n", sourceRole: structuralRole });
+      pushAppend(
+        node,
+        tagName === "p" ? "\n\n" : "\n",
+        structuralRole,
+        false,
+        true,
+        sourceOverride
+      );
+    }
+    pushVisits(node.children, childPreserveWhitespace, sourceOverride);
+    if (blockBreakBefore) {
+      pushAppend(node, "\n", structuralRole, false, true, sourceOverride);
     }
   }
 }
 
-function collectVisibleText(
+function* iterateRawExtractionChunks(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
-  options: ResolvedVisibleTextOptions
-): string {
-  options.operation.checkpoint();
-  const parts: string[] = [];
-  const roots = nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment"
-    ? nodeOrTree.children
-    : [nodeOrTree];
-  collectVisibleTextNodes(roots, parts, options);
-  return normalizeVisibleTextOutput(parts.join(""), options);
-}
-
-function collectVisibleTextWithSourceChunks(
-  nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
-  options: ResolvedVisibleTextOptions
-): { readonly output: string; readonly sourceChunks: readonly VisibleTextSourceChunk[] } {
-  options.operation.checkpoint();
-  const parts: string[] = [];
-  const sourceChunks: VisibleTextSourceChunk[] = [];
-  const roots = nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment"
-    ? nodeOrTree.children
-    : [nodeOrTree];
-  collectVisibleTextNodes(roots, parts, options, sourceChunks);
-  return {
-    output: normalizeVisibleTextOutput(parts.join(""), options),
-    sourceChunks
-  };
-}
-
-function sourceChunksToChars(
-  chunks: readonly VisibleTextSourceChunk[],
   operation: OperationContext
-): VisibleTextSourceChar[] {
-  const chars: VisibleTextSourceChar[] = [];
-  for (const chunk of chunks) {
-    for (const char of chunk.value) {
-      operation.checkpoint();
-      chars.push({
-        char,
-        sourceNodeId: chunk.sourceNodeId,
-        sourceNodeKind: chunk.sourceNodeKind,
-        sourceRole: chunk.sourceRole
-      });
+): IterableIterator<ExtractionSourceChunk> {
+  const roots = nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment"
+    ? nodeOrTree.children
+    : [nodeOrTree];
+  const stack: HtmlNode[] = [];
+  for (let index = roots.length - 1; index >= 0; index -= 1) {
+    const root = roots[index];
+    if (root !== undefined) {
+      stack.push(root);
     }
   }
-  return chars;
-}
-
-function isSpaceTabFormFeed(char: string): boolean {
-  return char === " " || char === "\t" || char === "\f";
-}
-
-function collapseSourceChars(
-  chars: readonly VisibleTextSourceChar[],
-  predicate: (char: string) => boolean,
-  limit: number,
-  operation: OperationContext
-): VisibleTextSourceChar[] {
-  const result: VisibleTextSourceChar[] = [];
-  let runCount = 0;
-  for (const entry of chars) {
+  while (stack.length > 0) {
     operation.checkpoint();
-    if (predicate(entry.char)) {
-      runCount += 1;
-      if (runCount <= limit) {
-        result.push(entry);
+    const node = stack.pop();
+    if (node === undefined) {
+      continue;
+    }
+    if (node.kind === "text") {
+      if (node.value.length > 0) {
+        yield {
+          value: node.value,
+          normalizeSegment: false,
+          preserveWhitespace: true,
+          source: extractionSourceMetaFromNode(node, "text-node")
+        };
       }
       continue;
     }
-    runCount = 0;
-    result.push(entry);
+    if (node.kind === "element") {
+      for (let index = node.children.length - 1; index >= 0; index -= 1) {
+        const child = node.children[index];
+        if (child !== undefined) {
+          stack.push(child);
+        }
+      }
+    }
+  }
+}
+
+function resolvedVisibleTextOptions(
+  options: VisibleTextExtractionOptions,
+  operation: OperationContext
+): ResolvedVisibleTextOptions {
+  return {
+    ...DEFAULT_VISIBLE_TEXT_OPTIONS,
+    skipHiddenSubtrees: options.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
+    includeControlValues: options.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
+    includeAccessibleNameFallback:
+      options.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
+    trim: options.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
+    maxFallbackInputBytes: options.maxFallbackInputBytes,
+    maxFallbackNodes: options.maxFallbackNodes,
+    operation
+  };
+}
+
+function* iterateVisibleTextInternal(
+  nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
+  options: VisibleTextExtractionOptions,
+  operation: OperationContext
+): Generator<TextExtractionToken, TextExtractionResult, void> {
+  const resolved = resolvedVisibleTextOptions(options, operation);
+  const collector = new BoundedTextCollector(options.policy, options.maxOutputBytes, options.maxTokens);
+  const normalizer = new StreamingVisibleTextNormalizer(
+    resolved.trim,
+    options.maxOutputBytes,
+    operation,
+    {
+      emit(value, source): void {
+        collector.consumeVisibleScalar(value, source);
+      },
+      observeOmittedBytes(bytes): void {
+        collector.observeOmittedBytes(bytes);
+      }
+    }
+  );
+  const roots = nodeOrTree.kind === "document" || nodeOrTree.kind === "fragment"
+    ? nodeOrTree.children
+    : [nodeOrTree];
+
+  for (const chunk of iterateVisibleExtractionChunks(roots, resolved)) {
+    const scalars = chunk.normalizeSegment
+      ? iterateNormalizedSegmentScalars(chunk.value, chunk.preserveWhitespace, operation)
+      : iterateStringScalars(chunk.value, operation);
+    for (const scalar of scalars) {
+      normalizer.consume(scalar, chunk.source);
+      for (const token of collector.takeReadyTokens()) {
+        yield token;
+      }
+    }
+  }
+  normalizer.finish();
+  for (const token of collector.takeReadyTokens()) {
+    yield token;
+  }
+  const result = collector.finish();
+  for (const token of collector.takeReadyTokens()) {
+    yield token;
   }
   return result;
 }
 
-function normalizeSourceChars(
-  sourceChars: readonly VisibleTextSourceChar[],
-  options: ResolvedVisibleTextOptions
-): VisibleTextSourceChar[] {
-  options.operation.checkpoint();
-  const removeSpaceBeforeNewline: VisibleTextSourceChar[] = [];
-  for (const entry of sourceChars) {
-    options.operation.checkpoint();
-    if (entry.char === "\n") {
-      while (
-        removeSpaceBeforeNewline.length > 0 &&
-        isSpaceTabFormFeed(removeSpaceBeforeNewline[removeSpaceBeforeNewline.length - 1]?.char ?? "")
-      ) {
-        removeSpaceBeforeNewline.pop();
-      }
-    }
-    removeSpaceBeforeNewline.push(entry);
-  }
-
-  const removeSpaceAfterNewline: VisibleTextSourceChar[] = [];
-  for (const entry of removeSpaceBeforeNewline) {
-    options.operation.checkpoint();
-    const previous = removeSpaceAfterNewline[removeSpaceAfterNewline.length - 1];
-    if (previous?.char === "\n" && isSpaceTabFormFeed(entry.char)) {
-      continue;
-    }
-    removeSpaceAfterNewline.push(entry);
-  }
-
-  const collapsedNewlines = collapseSourceChars(
-    removeSpaceAfterNewline,
-    (char) => char === "\n",
-    2,
-    options.operation
-  );
-  const collapsedSpaces = collapseSourceChars(
-    collapsedNewlines,
-    (char) => char === " ",
-    1,
-    options.operation
-  );
-  const collapsedTabs = collapseSourceChars(
-    collapsedSpaces,
-    (char) => char === "\t",
-    1,
-    options.operation
-  );
-
-  if (!options.trim || collapsedTabs.length === 0) {
-    return collapsedTabs;
-  }
-
-  let start = 0;
-  let end = collapsedTabs.length;
-  while (start < end && /\s/.test(collapsedTabs[start]?.char ?? "")) {
-    start += 1;
-  }
-  while (end > start && /\s/.test(collapsedTabs[end - 1]?.char ?? "")) {
-    end -= 1;
-  }
-  return collapsedTabs.slice(start, end);
-}
-
-function sameSource(
-  left: VisibleTextSourceChar,
-  right: VisibleTextSourceChar
-): boolean {
-  return left.sourceNodeId === right.sourceNodeId
-    && left.sourceNodeKind === right.sourceNodeKind
-    && left.sourceRole === right.sourceRole;
-}
-
-function provenanceToken(
-  kind: VisibleTextTokenWithProvenance["kind"],
-  value: string,
-  source: VisibleTextSourceChar
-): VisibleTextTokenWithProvenance {
-  return Object.freeze({
-    kind,
-    value,
-    sourceNodeId: source.sourceNodeId,
-    sourceNodeKind: source.sourceNodeKind,
-    sourceRole: source.sourceRole
-  }) as VisibleTextTokenWithProvenance;
-}
-
-function tokenizeVisibleTextWithSourceChars(
-  chars: readonly VisibleTextSourceChar[],
+function* iterateRawTextInternal(
+  nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
+  options: TextContentExtractionOptions,
   operation: OperationContext
-): readonly VisibleTextTokenWithProvenance[] {
-  const tokens: VisibleTextTokenWithProvenance[] = [];
-  let cursor = 0;
-
-  while (cursor < chars.length) {
-    operation.checkpoint();
-    const current = chars[cursor];
-    if (!current) {
-      break;
+): Generator<TextExtractionToken, TextExtractionResult, void> {
+  const collector = new BoundedTextCollector(options.policy, options.maxOutputBytes, options.maxTokens);
+  for (const chunk of iterateRawExtractionChunks(nodeOrTree, operation)) {
+    for (const scalar of iterateStringScalars(chunk.value, operation)) {
+      collector.consumeRawScalar(scalar, chunk.source);
     }
-
-    if (current.char === "\n" && chars[cursor + 1]?.char === "\n") {
-      tokens.push(provenanceToken("paragraphBreak", "\n\n", current));
-      cursor += 2;
-      continue;
+    collector.finishRawChunk();
+    for (const token of collector.takeReadyTokens()) {
+      yield token;
     }
-
-    if (current.char === "\n") {
-      tokens.push(provenanceToken("lineBreak", "\n", current));
-      cursor += 1;
-      continue;
-    }
-
-    if (current.char === "\t") {
-      tokens.push(provenanceToken("tab", "\t", current));
-      cursor += 1;
-      continue;
-    }
-
-    let value = "";
-    const source = current;
-    while (cursor < chars.length) {
-      operation.checkpoint();
-      const entry = chars[cursor];
-      if (!entry || entry.char === "\n" || entry.char === "\t") {
-        break;
-      }
-      if (!sameSource(source, entry)) {
-        break;
-      }
-      value += entry.char;
-      cursor += 1;
-    }
-    tokens.push(provenanceToken("text", value, source));
   }
-
-  return Object.freeze(tokens);
+  const result = collector.finish();
+  for (const token of collector.takeReadyTokens()) {
+    yield token;
+  }
+  return result;
 }
 
-function tokenizeVisibleText(value: string, operation: OperationContext): readonly VisibleTextToken[] {
-  const tokens: VisibleTextToken[] = [];
-  let cursor = 0;
-  let activeText = "";
-  const flushText = () => {
-    if (activeText.length === 0) {
-      return;
-    }
-    tokens.push(
-      Object.freeze({
-        kind: "text",
-        value: activeText
-      })
-    );
-    activeText = "";
-  };
-
-  while (cursor < value.length) {
-    operation.checkpoint();
-    const char = value[cursor];
-    if (char === undefined) {
-      break;
-    }
-    if (char === "\n" && value[cursor + 1] === "\n") {
-      flushText();
-      tokens.push(Object.freeze({ kind: "paragraphBreak", value: "\n\n" }));
-      cursor += 2;
-      continue;
-    }
-    if (char === "\n") {
-      flushText();
-      tokens.push(Object.freeze({ kind: "lineBreak", value: "\n" }));
-      cursor += 1;
-      continue;
-    }
-    if (char === "\t") {
-      flushText();
-      tokens.push(Object.freeze({ kind: "tab", value: "\t" }));
-      cursor += 1;
-      continue;
-    }
-    activeText += char;
-    cursor += 1;
-  }
-
-  flushText();
-  return Object.freeze(tokens);
-}/**
- * Provides deterministic public behavior for `visibleText`.
- */
-
-
-export function visibleText(nodeOrTree: DocumentTree | FragmentTree | HtmlNode, options: VisibleTextOptions = {}): string {
-  const startedAt = performance.now();
-  const normalizedOptions = normalizeVisibleTextOptions(options);
-  const operation = createOperationContext(
-    normalizedOptions.maxTimeMs,
-    normalizedOptions.signal,
-    startedAt
-  );
-  operation.checkpoint();
-  const resolvedOptions: ResolvedVisibleTextOptions = {
-    ...DEFAULT_VISIBLE_TEXT_OPTIONS,
-    skipHiddenSubtrees: normalizedOptions.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
-    includeControlValues: normalizedOptions.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
-    includeAccessibleNameFallback:
-      normalizedOptions.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
-    trim: normalizedOptions.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
-    operation
-  };
-  return collectVisibleText(nodeOrTree, resolvedOptions);
-}/**
- * Provides deterministic public behavior for `visibleTextTokens`.
- */
-
-
-export function visibleTextTokens(
+/** Iterates bounded policy tokens and returns the final result when fully drained. */
+export function iterateText(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
-  options: VisibleTextOptions = {}
-): readonly VisibleTextToken[] {
+  options: TextExtractionOptions
+): Generator<TextExtractionToken, TextExtractionResult, void> {
   const startedAt = performance.now();
-  const normalizedOptions = normalizeVisibleTextOptions(options);
+  const normalizedOptions = normalizeTextExtractionOptions(options);
   const operation = createOperationContext(
     normalizedOptions.maxTimeMs,
     normalizedOptions.signal,
     startedAt
   );
   operation.checkpoint();
-  const resolvedOptions: ResolvedVisibleTextOptions = {
-    ...DEFAULT_VISIBLE_TEXT_OPTIONS,
-    skipHiddenSubtrees: normalizedOptions.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
-    includeControlValues: normalizedOptions.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
-    includeAccessibleNameFallback:
-      normalizedOptions.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
-    trim: normalizedOptions.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
-    operation
-  };
-  return tokenizeVisibleText(collectVisibleText(nodeOrTree, resolvedOptions), operation);
-}/**
- * Provides deterministic public behavior for `visibleTextTokensWithProvenance`.
- */
+  return normalizedOptions.policy === VISIBLE_TEXT_HTML_POLICY
+    ? iterateVisibleTextInternal(nodeOrTree, normalizedOptions, operation)
+    : iterateRawTextInternal(nodeOrTree, normalizedOptions, operation);
+}
 
-
-export function visibleTextTokensWithProvenance(
+/** Extracts bounded text under an explicit, versioned semantic policy. */
+export function extractText(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
-  options: VisibleTextOptions = {}
-): readonly VisibleTextTokenWithProvenance[] {
-  const startedAt = performance.now();
-  const normalizedOptions = normalizeVisibleTextOptions(options);
-  const operation = createOperationContext(
-    normalizedOptions.maxTimeMs,
-    normalizedOptions.signal,
-    startedAt
-  );
-  operation.checkpoint();
-  const resolvedOptions: ResolvedVisibleTextOptions = {
-    ...DEFAULT_VISIBLE_TEXT_OPTIONS,
-    skipHiddenSubtrees: normalizedOptions.skipHiddenSubtrees ?? DEFAULT_VISIBLE_TEXT_OPTIONS.skipHiddenSubtrees,
-    includeControlValues: normalizedOptions.includeControlValues ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeControlValues,
-    includeAccessibleNameFallback:
-      normalizedOptions.includeAccessibleNameFallback ?? DEFAULT_VISIBLE_TEXT_OPTIONS.includeAccessibleNameFallback,
-    trim: normalizedOptions.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
-    operation
-  };
-  const { output, sourceChunks } = collectVisibleTextWithSourceChunks(nodeOrTree, resolvedOptions);
-  const normalizedSourceChars = normalizeSourceChars(
-    sourceChunksToChars(sourceChunks, operation),
-    resolvedOptions
-  );
-  const normalizedOutput = normalizedSourceChars.map((entry) => entry.char).join("");
-
-  if (normalizedOutput !== output) {
-    const fallbackSource: VisibleTextSourceChar = {
-      char: "",
-      sourceNodeId: null,
-      sourceNodeKind: "document",
-      sourceRole: "text-node"
-    };
-    return Object.freeze(
-      tokenizeVisibleText(output, operation).map((token) => provenanceToken(
-        token.kind,
-        token.value,
-        token.kind === "text" ? fallbackSource : { ...fallbackSource, sourceRole: "structure-break" }
-      ))
-    );
+  options: TextExtractionOptions
+): TextExtractionResult {
+  const iterator = iterateText(nodeOrTree, options);
+  let next = iterator.next();
+  while (!next.done) {
+    next = iterator.next();
   }
-
-  return tokenizeVisibleTextWithSourceChars(normalizedSourceChars, operation);
+  return next.value;
 }
 
 function* iterateNodes(
@@ -2505,24 +2852,6 @@ export function walkElements(
       operation.checkpoint();
     }
   }
-}/**
- * Provides deterministic public behavior for `textContent`.
- */
-
-
-export function textContent(
-  node: DocumentTree | FragmentTree | HtmlNode,
-  options: OperationOptions = {}
-): string {
-  const startedAt = performance.now();
-  const normalizedOptions = normalizeOperationOptions(options);
-  const operation = createOperationContext(
-    normalizedOptions.maxTimeMs,
-    normalizedOptions.signal,
-    startedAt
-  );
-  operation.checkpoint();
-  return textContentFromNode(node, operation);
 }/**
  * Traverses parsed data deterministically for the `findById` public API.
  */
@@ -2711,10 +3040,9 @@ export function findAllByAttrNS(
 }
 
 /**
- * Provides deterministic public behavior for `outline`.
+ * Builds a deterministic structural outline whose entry text is capped at 200
+ * canonical UTF-8 bytes without splitting Unicode scalar values.
  */
-
-
 export function outline(
   tree: DocumentTree | FragmentTree,
   options: OperationOptions = {}
@@ -2734,11 +3062,19 @@ export function outline(
     }
     const normalized = asciiLowercase(entry.node.localName);
     if (/^h[1-6]$/.test(normalized) || normalized === "section" || normalized === "article") {
+      const remainingTimeMs = operation.remainingTimeMs();
+      const text = extractText(entry.node, {
+        policy: TEXT_CONTENT_POLICY,
+        maxOutputBytes: 200,
+        maxTokens: Number.MAX_SAFE_INTEGER,
+        ...(operation.signal === undefined ? {} : { signal: operation.signal }),
+        ...(remainingTimeMs === undefined ? {} : { maxTimeMs: Math.floor(remainingTimeMs) })
+      }).text;
       entries.push({
         nodeId: entry.node.id,
         depth: entry.depth,
         tagName: entry.node.tagName,
-        text: textContentFromNode(entry.node, operation).slice(0, 200)
+        text
       });
     }
   }

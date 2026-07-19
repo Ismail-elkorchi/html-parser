@@ -16,8 +16,9 @@ import {
   findAllByTagName,
   findAllByTagNameNS,
   getAttributeValue,
+  extractText,
   parse,
-  textContent,
+  TEXT_CONTENT_POLICY,
   walkElements
 } from "@ismail-elkorchi/html-parser";
 
@@ -35,7 +36,11 @@ const firstKind = newsArticles[0] ? getAttributeValue(newsArticles[0], "DATA-KIN
 
 walkElements(documentTree, (node, depth) => {
   if (node.tagName === "h1") {
-    console.log(depth, textContent(node));
+    console.log(depth, extractText(node, {
+      policy: TEXT_CONTENT_POLICY,
+      maxOutputBytes: 1_024,
+      maxTokens: 128
+    }).text);
   }
 });
 

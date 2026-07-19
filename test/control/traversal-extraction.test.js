@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  TEXT_CONTENT_POLICY,
+  extractText,
   findAllByAttr,
   findAllByTagName,
   findById,
+  outline,
   parse,
-  textContent,
   walk,
   walkElements
 } from "../../dist/mod.js";
@@ -39,7 +41,16 @@ test("walk and walkElements are deterministic", () => {
   assert.ok(firstElements.length >= 3);
 });
 
-test("textContent and find helpers return expected nodes", () => {
+test("outline entry text uses a scalar-safe 200-byte UTF-8 prefix", () => {
+  const { tree } = parse(`<h1>${"😀".repeat(100)}Z</h1>`);
+  const entry = outline(tree).entries[0];
+  assert.ok(entry);
+  assert.equal(new TextEncoder().encode(entry.text).byteLength, 200);
+  assert.equal(entry.text, "😀".repeat(50));
+  assert.equal(/^[\uD800-\uDBFF]$/u.test(entry.text.at(-1) ?? ""), false);
+});
+
+test("bounded raw extraction and find helpers return expected nodes", () => {
   const { tree } = parse("<section id=\"root\"><h1>x</h1><p data-role=\"lead\">hello</p><p>world</p></section>");
 
   const sections = [...findAllByTagName(tree, "section")];
@@ -55,6 +66,15 @@ test("textContent and find helpers return expected nodes", () => {
   const byId = findById(tree, section.id);
   assert.equal(byId?.id, section.id);
 
-  const sectionText = textContent(section);
-  assert.equal(sectionText, "xhelloworld");
+  const sectionText = extractText(section, {
+    policy: TEXT_CONTENT_POLICY,
+    maxOutputBytes: 100,
+    maxTokens: 100
+  });
+  assert.deepEqual(sectionText, {
+    text: "xhelloworld",
+    totalBytes: 11,
+    truncated: false,
+    policy: TEXT_CONTENT_POLICY
+  });
 });

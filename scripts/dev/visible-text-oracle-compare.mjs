@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { parse, visibleText } from "../../dist/mod.js";
+import { VISIBLE_TEXT_HTML_POLICY, extractText, parse } from "../../dist/mod.js";
 import { nowIso, writeJson } from "../eval/eval-primitives.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -134,7 +134,13 @@ async function loadFixtures() {
   for (const id of ids) {
     const htmlPath = resolve(FIXTURE_ROOT, id, "input.html");
     const html = await readFile(htmlPath, "utf8");
-    const expected = visibleText(parse(html).tree);
+    const expected = extractText(parse(html).tree, {
+      policy: VISIBLE_TEXT_HTML_POLICY,
+      maxOutputBytes: 10_000_000,
+      maxTokens: 1_000_000,
+      maxFallbackInputBytes: 10_000_000,
+      maxFallbackNodes: 1_000_000
+    }).text;
     fixtures.push({ id, htmlPath, html, expected });
   }
   return fixtures;
