@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "document-output-errors-resources-trace",
+      "operation": "parse",
+      "input": "<!doctype html><html><body><p id=x>A&amp;B<table><tr><td>C</table><svg><foreignObject><p>D</svg>",
+      "options": {
+        "captureSpans": true,
+        "sourceRetention": "text",
+        "trace": "events",
+        "budgets": {
+          "maxInputBytes": 4096,
+          "maxDecodedUtf8Bytes": 4096,
+          "maxNodes": 128,
+          "maxDepth": 32,
+          "maxParseErrors": 32,
+          "maxAttributesPerElement": 16,
+          "maxAttributeBytes": 256,
+          "maxTraceEvents": 256,
+          "maxTraceBytes": 65536
+        }
+      }
+    },
+    {
+      "id": "fragment-context-trace",
+      "operation": "parseFragment",
+      "input": "A&amp;</textarea><b>B",
+      "contextTagName": "textarea",
+      "options": {
+        "captureSpans": true,
+        "trace": "events"
+      }
+    },
+    {
+      "id": "windows-1252-byte-input",
+      "operation": "parseBytes",
+      "inputBase64": "PG1ldGEgY2hhcnNldD13aW5kb3dzLTEyNTI+PHA+gDwvcD4=",
+      "options": {
+        "sourceRetention": "text",
+        "trace": "summary"
+      }
+    },
+    {
+      "id": "chunked-stream-input",
+      "operation": "parseStream",
+      "chunksBase64": [
+        "PG1ldGEgY2hhcnNldD11dGYtOD48cD5B4g==",
+        "gg==",
+        "rEI8L3A+"
+      ],
+      "options": {
+        "sourceRetention": "text",
+        "trace": "events",
+        "budgets": {
+          "maxEncodingPrescanBytes": 64
+        }
+      }
+    },
+    {
+      "id": "node-budget-error",
+      "operation": "parse",
+      "input": "<div><span>x</span></div>",
+      "options": {
+        "budgets": {
+          "maxNodes": 2
+        }
+      }
+    },
+    {
+      "id": "configuration-error",
+      "operation": "parse",
+      "input": "<p>x</p>",
+      "options": {
+        "unknownOption": true
+      }
+    },
+    {
+      "id": "stream-read-error",
+      "operation": "parseStream",
+      "chunksBase64": [
+        "PHA+eA=="
+      ],
+      "failAfterChunks": true,
+      "failureMessage": "fixture stream failure",
+      "options": {}
+    },
+    {
+      "id": "trace-callback-error",
+      "operation": "parse",
+      "input": "<p>x</p>",
+      "options": {
+        "trace": "summary"
+      },
+      "traceCallbackFailure": {
+        "afterEvent": 2,
+        "message": "fixture trace observer failure"
+      }
+    },
+    {
+      "id": "pre-aborted-operation",
+      "operation": "parse",
+      "input": "<p>x</p>",
+      "options": {},
+      "abortReason": "fixture abort reason"
+    }
+  ]
+}

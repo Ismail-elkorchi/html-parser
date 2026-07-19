@@ -1,9 +1,13 @@
 import { cp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 
+import { verifyLegacyRuntimeSeal } from "../legacy/verify-runtime-seal.mjs";
+
 const sourceRoot = path.join("src", "internal", "vendor");
 const targetRoot = path.join("dist", "internal", "vendor");
 const runtimeDirectories = ["parse5", "entities"];
+
+await verifyLegacyRuntimeSeal();
 
 await mkdir(targetRoot, { recursive: true });
 

@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 1,
+  "sealedAtBaseRevision": "5aff074864cb11ab267f59f032c676dc969fb179",
+  "sealedRoot": "src/internal/vendor",
+  "packagedRoot": "dist/internal/vendor",
+  "composite": {
+    "algorithm": "sha256",
+    "canonicalLineFormat": "<lowercase file SHA-256><two spaces><repository-relative path><LF>, sorted by path",
+    "sha256": "85da9fd67f7b343ffb65a9c66e7ae45ddb34d25173bb6c0f34e0715cca698538"
+  },
+  "sources": {
+    "parse5": {
+      "version": "8.0.0",
+      "repository": "https://github.com/inikulin/parse5",
+      "gitCommit": "f99c093156d2ac3f5f7a8a169c8b39b4a230be67",
+      "npmTarball": "https://registry.npmjs.org/parse5/-/parse5-8.0.0.tgz",
+      "npmIntegrity": "sha512-9m4m5GSgXjL4AjumKzq1Fgfp3Z8rsvjRNbnkVwfu2ImRqE5D0LnY2QfDen18FSY9C573YU5XxSapdHZTZ2WolA==",
+      "npmShasum": "aceb267f6b15f9b6e6ba9e35bfdd481fc2167b12",
+      "tarballSha256": "cb2b4941439b49f5bcc66aec6cc6b279a75edc061757c8615cd338a493d9e6b0",
+      "license": "MIT",
+      "localPatchResponsibilities": [
+        {
+          "path": "src/internal/vendor/parse5/parser/index.js",
+          "responsibilities": [
+            "emit deterministic insertion-mode transition observations",
+            "preserve fragment parser construction used by the local tree adapter"
+          ]
+        },
+        {
+          "path": "src/internal/vendor/parse5/tokenizer/index.js",
+          "responsibilities": [
+            "resolve the embedded entities decoder without an installed dependency",
+            "emit progress, token, and attempted-attribute observations for resource and trace contracts"
+          ]
+        }
+      ]
+    },
+    "entities": {
+      "version": "6.0.1",
+      "repository": "https://github.com/fb55/entities",
+      "gitTagObject": "bc35337ad1369981f33e316a90738d0c47037f60",
+      "gitCommit": "9f7ca4c7b759151add244744deb2b99932f6048c",
+      "npmTarball": "https://registry.npmjs.org/entities/-/entities-6.0.1.tgz",
+      "npmIntegrity": "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g==",
+      "npmShasum": "c28c34a43379ca7f61d074130b2f5f7020a30694",
+      "tarballSha256": "a4de957ab0852f6c91eae59a6000ced5a25a04f0b6e1c3062fbad732a6b5479d",
+      "license": "BSD-2-Clause",
+      "localPatchResponsibilities": [
+        {
+          "path": "src/internal/vendor/entities/decode.js",
+          "responsibilities": [
+            "accumulate numeric references digit by digit so long zero-prefixed inputs cannot produce NaN through zero-times-infinity arithmetic"
+          ]
+        }
+      ]
+    }
+  },
+  "files": [
+    {
+      "path": "src/internal/vendor/entities/LICENSE",
+      "packagedPath": "dist/internal/vendor/entities/LICENSE",
+      "source": "entities",
+      "upstreamPath": "LICENSE",
+      "relation": "identical",
+      "bytes": 1260,
+      "sha256": "cb992345949ccd6e8394b2cd6c465f7b897c864f845937dbf64e8997f389e164",
+      "upstreamSha256": "cb992345949ccd6e8394b2cd6c465f7b897c864f845937dbf64e8997f389e164"
+    },
+    {
+      "path": "src/internal/vendor/entities/decode-codepoint.js",
+      "packagedPath": "dist/internal/vendor/entities/decode-codepoint.js",
+      "source": "entities",
+      "upstreamPath": "dist/esm/decode-codepoint.js",
+      "relation": "identical",
+      "bytes": 2098,
+      "sha256": "5d8ee93923d609724c69c8c356147176af5226585d4f343c87a5eec6590ebca9",
+      "upstreamSha256": "5d8ee93923d609724c69c8c356147176af5226585d4f343c87a5eec6590ebca9"
+    },
+    {
+      "path": "src/internal/vendor/entities/decode.js",
+      "packagedPath": "dist/internal/vendor/entities/decode.js",
+      "source": "entities",
+      "upstreamPath": "dist/esm/decode.js",
+      "relation": "locally-modified",
+      "bytes": 19855,
+      "sha256": "de563a36e2cca4264751e27221783fe2b987e3bf012cb002063df40960a49ee8",
+      "upstreamSha256": "8af227bae5682a686bf9e9a6547af8c388274f41cb857ff39592fe74fc848d25"
+    },
+    {
+      "path": "src/internal/vendor/entities/generated/decode-data-html.js",
+      "packagedPath": "dist/internal/vendor/entities/generated/decode-data-html.js",
+      "source": "entities",
+      "upstreamPath": "dist/esm/generated/decode-data-html.js",
+      "relation": "identical",
+      "bytes": 47771,
+      "sha256": "b035b71d6969983297e39df1a06d760f2a8000a0f98444c4fe845fe1155da451",
+      "upstreamSha256": "b035b71d6969983297e39df1a06d760f2a8000a0f98444c4fe845fe1155da451"
+    },
+    {
+      "path": "src/internal/vendor/entities/generated/decode-data-xml.js",
+      "packagedPath": "dist/internal/vendor/entities/generated/decode-data-xml.js",
+      "source": "entities",
+      "upstreamPath": "dist/esm/generated/decode-data-xml.js",
+      "relation": "identical",
+      "bytes": 325,
+      "sha256": "e28599f48fddd869435e44e6ae8644e70a610450d97562e33c869c056e3b129f",
+      "upstreamSha256": "e28599f48fddd869435e44e6ae8644e70a610450d97562e33c869c056e3b129f"
+    },
+    {
+      "path": "src/internal/vendor/parse5/LICENSE",
+      "packagedPath": "dist/internal/vendor/parse5/LICENSE",
+      "source": "parse5",
+      "upstreamPath": "LICENSE",
+      "relation": "identical",
+      "bytes": 1109,
+      "sha256": "8c535800331e1e4439835555b3f9edc7fe9dee2fab0d8bbbd5a982e8b8343d4d",
+      "upstreamSha256": "8c535800331e1e4439835555b3f9edc7fe9dee2fab0d8bbbd5a982e8b8343d4d"
+    },
+    {
+      "path": "src/internal/vendor/parse5/common/doctype.js",
+      "packagedPath": "dist/internal/vendor/parse5/common/doctype.js",
+      "source": "parse5",
+      "upstreamPath": "dist/common/doctype.js",
+      "relation": "identical",
+      "bytes": 4661,
+      "sha256": "855d8cd764782cdc73003a9847d03ed261c5158f6a6901e563ccd4d3b92c8b16",
+      "upstreamSha256": "855d8cd764782cdc73003a9847d03ed261c5158f6a6901e563ccd4d3b92c8b16"
+    },
+    {
+      "path": "src/internal/vendor/parse5/common/error-codes.js",
+      "packagedPath": "dist/internal/vendor/parse5/common/error-codes.js",
+      "source": "parse5",
+      "upstreamPath": "dist/common/error-codes.js",
+      "relation": "identical",
+      "bytes": 4746,
+      "sha256": "b38ae5ac4f2a31ce2e1cfeca35cf7b89cc66736cd5be068cc433a3ccaca78be2",
+      "upstreamSha256": "b38ae5ac4f2a31ce2e1cfeca35cf7b89cc66736cd5be068cc433a3ccaca78be2"
+    },
+    {
+      "path": "src/internal/vendor/parse5/common/foreign-content.js",
+      "packagedPath": "dist/internal/vendor/parse5/common/foreign-content.js",
+      "source": "parse5",
+      "upstreamPath": "dist/common/foreign-content.js",
+      "relation": "identical",
+      "bytes": 6299,
+      "sha256": "129a84a9d04b6050b6896de45a70e1ee468434e19bdd6486e3aef3405d137cac",
+      "upstreamSha256": "129a84a9d04b6050b6896de45a70e1ee468434e19bdd6486e3aef3405d137cac"
+    },
+    {
+      "path": "src/internal/vendor/parse5/common/html.js",
+      "packagedPath": "dist/internal/vendor/parse5/common/html.js",
+      "source": "parse5",
+      "upstreamPath": "dist/common/html.js",
+      "relation": "identical",
+      "bytes": 17554,
+      "sha256": "e6cf93f387be70ddcd4f2bec67fbeb53161094f6306d834de461ec888a9dab76",
+      "upstreamSha256": "e6cf93f387be70ddcd4f2bec67fbeb53161094f6306d834de461ec888a9dab76"
+    },
+    {
+      "path": "src/internal/vendor/parse5/common/token.js",
+      "packagedPath": "dist/internal/vendor/parse5/common/token.js",
+      "source": "parse5",
+      "upstreamPath": "dist/common/token.js",
+      "relation": "identical",
+      "bytes": 834,
+      "sha256": "52dac9efba3a637771818d633a5cf1df30c7913d05ff23235150c88319ea035a",
+      "upstreamSha256": "52dac9efba3a637771818d633a5cf1df30c7913d05ff23235150c88319ea035a"
+    },
+    {
+      "path": "src/internal/vendor/parse5/common/unicode.js",
+      "packagedPath": "dist/internal/vendor/parse5/common/unicode.js",
+      "source": "parse5",
+      "upstreamPath": "dist/common/unicode.js",
+      "relation": "identical",
+      "bytes": 2989,
+      "sha256": "69a0a52be895d2bcf88850beead4a098c5305c0b5669d1e8a0fe26f621ea25c6",
+      "upstreamSha256": "69a0a52be895d2bcf88850beead4a098c5305c0b5669d1e8a0fe26f621ea25c6"
+    },
+    {
+      "path": "src/internal/vendor/parse5/parser/formatting-element-list.js",
+      "packagedPath": "dist/internal/vendor/parse5/parser/formatting-element-list.js",
+      "source": "parse5",
+      "upstreamPath": "dist/parser/formatting-element-list.js",
+      "relation": "identical",
+      "bytes": 4301,
+      "sha256": "a6e04b000b228a0bf7eba4e5462b343ec1e13dbfbe40bce913ade646bbde4461",
+      "upstreamSha256": "a6e04b000b228a0bf7eba4e5462b343ec1e13dbfbe40bce913ade646bbde4461"
+    },
+    {
+      "path": "src/internal/vendor/parse5/parser/index.js",
+      "packagedPath": "dist/internal/vendor/parse5/parser/index.js",
+      "source": "parse5",
+      "upstreamPath": "dist/parser/index.js",
+      "relation": "locally-modified",
+      "bytes": 109608,
+      "sha256": "2ea256f2e3a2821ecb093e0693fd1f69b67512ce26f7f9511d0ac0873c54c81f",
+      "upstreamSha256": "23eb8e0f6b45abc36132c08f067899e0e615acbe9069762ba7780a66db78e65d"
+    },
+    {
+      "path": "src/internal/vendor/parse5/parser/open-element-stack.js",
+      "packagedPath": "dist/internal/vendor/parse5/parser/open-element-stack.js",
+      "source": "parse5",
+      "upstreamPath": "dist/parser/open-element-stack.js",
+      "relation": "identical",
+      "bytes": 10918,
+      "sha256": "fe4b609a572c9aa06fbd45ac53632b3ad565168903f4126a6f98d5a9d1f42999",
+      "upstreamSha256": "fe4b609a572c9aa06fbd45ac53632b3ad565168903f4126a6f98d5a9d1f42999"
+    },
+    {
+      "path": "src/internal/vendor/parse5/tokenizer/index.js",
+      "packagedPath": "dist/internal/vendor/parse5/tokenizer/index.js",
+      "source": "parse5",
+      "upstreamPath": "dist/tokenizer/index.js",
+      "relation": "locally-modified",
+      "bytes": 99193,
+      "sha256": "48337e871cbe717aae264c5486c68d4a10f60f79e749bcf2c5d5c73b5e7fdca6",
+      "upstreamSha256": "738969a05c4e7d3c0ce566225e742d730d248db82972a84e517828cd97bc3bb4"
+    },
+    {
+      "path": "src/internal/vendor/parse5/tokenizer/preprocessor.js",
+      "packagedPath": "dist/internal/vendor/parse5/tokenizer/preprocessor.js",
+      "source": "parse5",
+      "upstreamPath": "dist/tokenizer/preprocessor.js",
+      "relation": "identical",
+      "bytes": 7021,
+      "sha256": "12199175a31eb461dcecefa10ce2536c69ab92cdd2a1f67da3ea20b214599ac1",
+      "upstreamSha256": "12199175a31eb461dcecefa10ce2536c69ab92cdd2a1f67da3ea20b214599ac1"
+    },
+    {
+      "path": "src/internal/vendor/parse5/tree-adapters/default.js",
+      "packagedPath": "dist/internal/vendor/parse5/tree-adapters/default.js",
+      "source": "parse5",
+      "upstreamPath": "dist/tree-adapters/default.js",
+      "relation": "identical",
+      "bytes": 5232,
+      "sha256": "14b6408b0abb1c041e645644f977db34da280239be8a59a2eb3c9e282e89b7c4",
+      "upstreamSha256": "14b6408b0abb1c041e645644f977db34da280239be8a59a2eb3c9e282e89b7c4"
+    }
+  ]
+}

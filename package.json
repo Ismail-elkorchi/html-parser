@@ -33,11 +33,13 @@
     "SECURITY.md",
     "SUPPORT.md",
     "LICENSE",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "legacy-runtime-manifest.json"
   ],
   "scripts": {
     "lint": "eslint . --max-warnings=0",
     "fmt": "eslint . --fix --max-warnings=0",
+    "check:legacy-runtime": "node scripts/legacy/verify-runtime-seal.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "build": "tsc -p tsconfig.build.json && node scripts/build/copy-vendor.mjs",
     "prepare": "npm run build",
@@ -61,7 +63,7 @@
     "smoke:bun": "bun run scripts/smoke/control.mjs --runtime=bun --report=reports/smoke-bun.json",
     "smoke:browser": "npm run build && node scripts/smoke/browser-smoke.mjs --report=reports/smoke-browser.json",
     "smoke:all": "npm run smoke:node && npm run smoke:deno && npm run smoke:bun",
-    "check:fast": "npm run lint && npm run typecheck && npm run test:control && npm run docs:check && npm run docs:snippets && npm run docs:required && npm run docs:quality:jsr && npm run examples:run",
+    "check:fast": "npm run check:legacy-runtime && npm run lint && npm run typecheck && npm run test:control && npm run docs:check && npm run docs:snippets && npm run docs:required && npm run docs:quality:jsr && npm run examples:run",
     "docs:lint:jsr": "deno doc --lint --sloppy-imports jsr/mod.ts",
     "docs:test:jsr": "deno test --doc --no-check --sloppy-imports jsr/mod.ts",
     "deps:freshness": "npm outdated || true",
