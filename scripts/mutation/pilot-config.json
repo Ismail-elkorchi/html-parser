@@ -175,9 +175,51 @@
       ]
     },
     {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/active-formatting-list.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/active-formatting-list.test.js", "tmp/test-runtime/test/engine/tree/builder.test.js"],
+      "mutants": [
+        {
+          "id": "formatting-list-noah-cap",
+          "description": "Retain four matching formatting entries instead of three.",
+          "search": "familyBucket !== undefined && familyBucket.length >= 3",
+          "replace": "familyBucket !== undefined && familyBucket.length >= 4"
+        },
+        {
+          "id": "formatting-list-marker-generation",
+          "description": "Keep Noah-family and subject indexes in the previous marker generation.",
+          "search": "this.#generation = this.#nextGeneration;",
+          "replace": "this.#generation = this.#generation;"
+        },
+        {
+          "id": "formatting-list-attribute-values",
+          "description": "Ignore attribute values when defining a Noah family.",
+          "search": "attributes.push(JSON.stringify([attribute.namespaceUri, attribute.localName, attribute.value]));",
+          "replace": "attributes.push(JSON.stringify([attribute.namespaceUri, attribute.localName, \"\"]));"
+        }
+      ]
+    },
+    {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/open-element-stack.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/open-element-stack.test.js"],
+      "mutants": [
+        {
+          "id": "open-stack-tail-insertion",
+          "description": "Send insertion after current through the linear middle-insertion relabel path.",
+          "search": "if (referenceIndex === this.#entries.length - 1) {",
+          "replace": "if (false && referenceIndex === this.#entries.length - 1) {"
+        }
+      ]
+    },
+    {
       "targetFile": "tmp/test-runtime/src/internal/html-engine/tree-model.js",
       "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/model.test.js"],
       "mutants": [
+        {
+          "id": "tree-bulk-child-source-clear",
+          "description": "Leave moved children attached to both source and destination arrays.",
+          "search": "sourceState.children.length = 0;",
+          "replace": "sourceState.children.length = sourceState.children.length;"
+        },
         {
           "id": "tree-template-content-redirection",
           "description": "Insert directly into an HTML template element instead of its hosted contents.",
@@ -187,7 +229,7 @@
         {
           "id": "tree-depth-boundary",
           "description": "Skip subtree depth accounting before insertion.",
-          "search": "this.#resources.observeDepth(parentDepth + this.#subtreeHeight(node));",
+          "search": "this.#resources.observeDepth(parentDepth + depthAssignments.maxRelativeDepth);",
           "replace": "this.#resources.checkpoint();"
         },
         {
@@ -267,6 +309,36 @@
           "description": "Keep the tokenizer in Data instead of entering RCDATA for title.",
           "search": "if (token.name === \"title\") {\n                this.#insertTextElement(token, \"rcdata\");",
           "replace": "if (token.name === \"title\") {\n                this.#insertTextElement(token, \"data\");"
+        },
+        {
+          "id": "tree-builder-formatting-reconstruction",
+          "description": "Disable active-formatting reconstruction.",
+          "search": "let entry = this.#activeFormatting.last();",
+          "replace": "let entry = null;"
+        },
+        {
+          "id": "tree-builder-adoption-loop",
+          "description": "Disable the adoption agency outer loop.",
+          "search": "for (let outer = 0; outer < 8; outer += 1) {",
+          "replace": "for (let outer = 0; outer < 0; outer += 1) {"
+        },
+        {
+          "id": "tree-builder-null-character",
+          "description": "Insert Data-state NUL character tokens into the tree.",
+          "search": "if (token.data === \"\\u0000\") {",
+          "replace": "if (false && token.data === \"\\u0000\") {"
+        },
+        {
+          "id": "tree-builder-text-leading-line-feed",
+          "description": "Retain textarea's ignored leading line feed.",
+          "search": "if (token.kind === \"character\" && token.data === \"\\n\")\n                return null;",
+          "replace": "if (false && token.kind === \"character\" && token.data === \"\\n\")\n                return null;"
+        },
+        {
+          "id": "tree-builder-form-current-node-error",
+          "description": "Suppress the early form end-tag current-node diagnostic.",
+          "search": "if (this.#currentNode() !== form)\n                this.#parseError(token, \"in-body\");",
+          "replace": "if (false && this.#currentNode() !== form)\n                this.#parseError(token, \"in-body\");"
         }
       ]
     }

@@ -8,6 +8,7 @@ import {
   HtmlTreeBuilderPendingFeatureError,
   runHtmlEngine,
   type EngineObserver,
+  type HtmlTreeElement,
   type HtmlTreeNode,
   type HtmlTreeModel,
   type HtmlTreeParent,
@@ -274,4 +275,92 @@ void test("later insertion-mode families fail explicitly instead of constructing
         error instanceof HtmlTreeBuilderPendingFeatureError && error.feature === feature
     );
   }
+});
+
+void test("active formatting is reconstructed before text is inserted after a block boundary", () => {
+  const result = runHtmlEngine({
+    inputChunks: ["<p><b>one<div>two</b>three"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  const bolds = [...result.model.walk()]
+    .map(({ node }) => node)
+    .filter((node): node is HtmlTreeElement => node.kind === "element" && node.localName === "b");
+
+  assert.equal(bolds.length, 2);
+  const original = bolds[0];
+  assert.ok(original);
+  assert.equal(original.parent?.kind, "element");
+  assert.equal(original.parent.localName, "p");
+  const reconstructed = bolds[1];
+  assert.ok(reconstructed);
+  assert.equal(reconstructed.parent?.kind, "element");
+  assert.equal(reconstructed.parent.localName, "div");
+  const text = reconstructed.childAt(0);
+  assert.ok(text?.kind === "text");
+  assert.equal(text.data, "two");
+});
+
+void test("misnested links are repaired during token handling", () => {
+  const result = runHtmlEngine({
+    inputChunks: ["<a><p></a></p>"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  const links = [...result.model.walk()]
+    .map(({ node }) => node)
+    .filter((node) => node.kind === "element" && node.localName === "a");
+
+  assert.equal(links.length, 2);
+  assert.equal(links[0]?.parent?.kind === "element" ? links[0].parent.localName : null, "body");
+  assert.equal(links[1]?.parent?.kind === "element" ? links[1].parent.localName : null, "p");
+});
+
+void test("related in-body recovery rejects NUL, consumes textarea LF, and removes forms exactly", () => {
+  const nul = runHtmlEngine({
+    inputChunks: ["<body>\u0000x"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  const nulText = [...nul.model.walk()].find(({ node }) => node.kind === "text")?.node;
+  assert.equal(nulText?.kind === "text" ? nulText.data : null, "x");
+  assert.equal(nul.parseErrors.length, 3);
+
+  const textarea = runHtmlEngine({
+    inputChunks: ["<!doctype html><textarea>\nfoo</textarea>"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  const textareaElement = [...textarea.model.walk()]
+    .map(({ node }) => node)
+    .find((node): node is HtmlTreeElement => node.kind === "element" && node.localName === "textarea");
+  assert.ok(textareaElement);
+  const textareaText = textareaElement.childAt(0);
+  assert.equal(textareaText?.kind === "text" ? textareaText.data : null, "foo");
+
+  const form = runHtmlEngine({
+    inputChunks: ["<!doctype html><form><div></form><div>"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  assert.equal(form.parseErrors.length, 2);
+  assert.equal(form.state.formElement, null);
+});
+
+void test("formatting recovery trees, diagnostics, and mutations are chunk-invariant", () => {
+  const input = "<p><b id=a>one<i>two<div>three</b>four</i><nobr><nobr>five";
+  const run = (inputChunks: readonly string[]) => {
+    const mutations: TreeMutationObservation[] = [];
+    const result = runHtmlEngine({
+      inputChunks,
+      parser: { kind: "document", scriptingMode: "disabled" },
+      observer: { onTreeMutation(mutation) { mutations.push(mutation); } }
+    });
+    return { result, mutations };
+  };
+  const whole = run([input]);
+  const unitChunks = run(input.split(""));
+
+  assert.deepEqual(treeShape(unitChunks.result.model), treeShape(whole.result.model));
+  assert.deepEqual(unitChunks.result.parseErrors, whole.result.parseErrors);
+  assert.deepEqual(
+    { ...unitChunks.result.resources, steps: 0 },
+    { ...whole.result.resources, steps: 0 }
+  );
+  assert.deepEqual(unitChunks.mutations, whole.mutations);
 });

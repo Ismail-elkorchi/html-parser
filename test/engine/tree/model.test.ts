@@ -149,7 +149,7 @@ void test("template contents are explicit, redirected, hosted, and not separatel
     ["element", 3]
   ]);
   assert.deepEqual(resources.snapshot(), {
-    steps: 5,
+    steps: 10,
     nodes: 3,
     maxDepth: 3,
     parseErrors: 0,
@@ -206,6 +206,41 @@ void test("insert-before, moves, detach, and document rules preserve one direct 
     () => { orderModel.append(orderModel.root, lateDoctype); },
     "TREE_MODEL_DOCTYPE_AFTER_DOCUMENT_ELEMENT"
   );
+});
+
+void test("bulk child moves preserve order, parents, depths, and linear observations", () => {
+  const observations: TreeMutationObservation[] = [];
+  const model = new HtmlTreeModel({
+    rootKind: "fragment",
+    resources: createEngineResourceGuard(),
+    observer: { onTreeMutation(observation) { observations.push(observation); } }
+  });
+  const source = element(model, "div");
+  const destination = element(model, "b");
+  const first = element(model, "i");
+  const second = model.createText("two");
+  model.append(model.root, source);
+  model.append(source, first);
+  model.append(source, second);
+
+  const beforeMove = observations.length;
+  assert.equal(model.moveChildren(source, destination), 2);
+  assert.equal(source.childCount, 0);
+  assert.equal(destination.childAt(0), first);
+  assert.equal(destination.childAt(1), second);
+  assert.equal(first.parent, destination);
+  assert.equal(second.parent, destination);
+  assert.deepEqual(
+    observations.slice(beforeMove).map(({ kind, node }) => [kind, node]),
+    [
+      ["node-detached", first.identity.serial],
+      ["node-inserted", first.identity.serial],
+      ["node-detached", second.identity.serial],
+      ["node-inserted", second.identity.serial]
+    ]
+  );
+  model.append(source, destination);
+  assert.deepEqual(model.validate(), { allocatedNodes: 5, attachedNodes: 5, maxDepth: 4 });
 });
 
 void test("ownership and reference checks reject cross-model mutations before tree changes", () => {
@@ -314,6 +349,71 @@ void test("resource failures precede node allocation and structural mutation", (
   );
   assert.equal(shallow.parent, depthModel.root);
   assert.equal(depthModel.root.childAt(1), shallow);
+});
+
+void test("step failures leave subtree reparenting and bulk moves unchanged", () => {
+  function reparentScenario(maxSteps?: number) {
+    const resources = createEngineResourceGuard(
+      maxSteps === undefined ? {} : { limits: { maxSteps } }
+    );
+    const model = new HtmlTreeModel({ rootKind: "fragment", resources });
+    const source = element(model, "div");
+    const destination = element(model, "section");
+    const child = element(model, "span");
+    const leaf = model.createText("leaf");
+    model.append(model.root, source);
+    model.append(model.root, destination);
+    model.append(source, child);
+    model.append(child, leaf);
+    return { resources, model, source, destination, child, leaf };
+  }
+
+  const successfulReparent = reparentScenario();
+  const reparentBaseline = successfulReparent.resources.snapshot().steps;
+  successfulReparent.model.append(successfulReparent.destination, successfulReparent.child);
+  const reparentSteps = successfulReparent.resources.snapshot().steps - reparentBaseline;
+  const failingReparent = reparentScenario(reparentBaseline + reparentSteps - 1);
+  assert.throws(
+    () => { failingReparent.model.append(failingReparent.destination, failingReparent.child); },
+    (error) => error instanceof EngineResourceLimitError && error.resource === "maxSteps"
+  );
+  assert.equal(failingReparent.child.parent, failingReparent.source);
+  assert.equal(failingReparent.source.childAt(0), failingReparent.child);
+  assert.equal(failingReparent.destination.childCount, 0);
+  assert.equal(failingReparent.leaf.parent, failingReparent.child);
+
+  function bulkMoveScenario(maxSteps?: number) {
+    const resources = createEngineResourceGuard(
+      maxSteps === undefined ? {} : { limits: { maxSteps } }
+    );
+    const model = new HtmlTreeModel({ rootKind: "fragment", resources });
+    const source = element(model, "div");
+    const destination = element(model, "b");
+    const first = element(model, "i");
+    const nested = element(model, "em");
+    const second = model.createText("tail");
+    model.append(model.root, source);
+    model.append(source, first);
+    model.append(first, nested);
+    model.append(source, second);
+    return { resources, model, source, destination, first, nested, second };
+  }
+
+  const successfulBulkMove = bulkMoveScenario();
+  const bulkMoveBaseline = successfulBulkMove.resources.snapshot().steps;
+  successfulBulkMove.model.moveChildren(successfulBulkMove.source, successfulBulkMove.destination);
+  const bulkMoveSteps = successfulBulkMove.resources.snapshot().steps - bulkMoveBaseline;
+  const failingBulkMove = bulkMoveScenario(bulkMoveBaseline + bulkMoveSteps - 1);
+  assert.throws(
+    () => { failingBulkMove.model.moveChildren(failingBulkMove.source, failingBulkMove.destination); },
+    (error) => error instanceof EngineResourceLimitError && error.resource === "maxSteps"
+  );
+  assert.equal(failingBulkMove.source.childCount, 2);
+  assert.equal(failingBulkMove.source.childAt(0), failingBulkMove.first);
+  assert.equal(failingBulkMove.source.childAt(1), failingBulkMove.second);
+  assert.equal(failingBulkMove.destination.childCount, 0);
+  assert.equal(failingBulkMove.first.parent, failingBulkMove.source);
+  assert.equal(failingBulkMove.nested.parent, failingBulkMove.first);
 });
 
 void test("observation is synchronous, immutable, ordered, and preserves callback failures", () => {

@@ -59,3 +59,28 @@ void test("indexed stack rejects duplicate and absent element mutations", () => 
       error.reason === "TREE_BUILDER_OPEN_ELEMENT_NOT_PRESENT"
   );
 });
+
+void test("random-access replacement and insertion preserve identity scope and order", () => {
+  const resources = createEngineResourceGuard();
+  const model = new HtmlTreeModel({ rootKind: "fragment", resources });
+  const stack = new OpenElementStack(resources);
+  const html = element(model, "html");
+  const bold = element(model, "b");
+  const block = element(model, "div");
+  const replacement = element(model, "b");
+  const inserted = element(model, "i");
+  const boundaries = new Set(["html"]);
+
+  stack.push(html);
+  stack.push(bold);
+  stack.push(block);
+  stack.replace(bold, replacement);
+  assert.equal(stack.includes(bold), false);
+  assert.equal(stack.indexOf(replacement), 1);
+  const beforeTailInsertion = resources.snapshot().steps;
+  stack.insertAfter(block, inserted);
+  assert.equal(resources.snapshot().steps - beforeTailInsertion, 1);
+  assert.equal(stack.at(3), inserted);
+  assert.equal(stack.hasElementInScope(replacement, boundaries), true);
+  assert.equal(stack.hasInScope(HTML_NAMESPACE, "i", boundaries), true);
+});
