@@ -1,3 +1,5 @@
+import { failInternalState, requireInternalValue } from "../foundation/internal-state-error.js";
+
 import {
   MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
   NAMED_CHARACTER_REFERENCE_DATA,
@@ -12,11 +14,10 @@ export interface NamedCharacterReferenceProbe {
 }
 
 function dataAt(index: number): string {
-  const value = NAMED_CHARACTER_REFERENCE_DATA[index];
-  if (value === undefined) {
-    throw new Error("Generated named character reference table invariant violated");
-  }
-  return value;
+  return requireInternalValue(
+    NAMED_CHARACTER_REFERENCE_DATA[index],
+    "GENERATED_CHARACTER_REFERENCE_ENTRY_MISSING"
+  );
 }
 
 function nameAt(entryIndex: number): string {
@@ -24,7 +25,7 @@ function nameAt(entryIndex: number): string {
 }
 
 if (NAMED_CHARACTER_REFERENCE_DATA.length !== NAMED_CHARACTER_REFERENCE_ENTRY_COUNT * 2) {
-  throw new Error("Generated named character reference table has an invalid length");
+  failInternalState("GENERATED_CHARACTER_REFERENCE_LENGTH_MISMATCH");
 }
 
 /** Looks up an exact name and whether any generated name starts with it. */

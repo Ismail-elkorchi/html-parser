@@ -1,5 +1,7 @@
 import {
   HtmlTokenizer,
+  type HtmlTokenizerDelegatedCharacterReferenceState,
+  type HtmlTokenizerExecutionState,
   createEngineResourceGuard,
   type HtmlTokenizerRunResult,
   type HtmlTokenizerState
@@ -22,8 +24,9 @@ const tokenizer = new HtmlTokenizer(
 
 const result: HtmlTokenizerRunResult = tokenizer.write("text");
 if (result.status === "need-more-input") {
-  const state: HtmlTokenizerState = result.state;
-  void state;
+  const executionState: HtmlTokenizerExecutionState = result.state;
+  const standardState: HtmlTokenizerState = executionState;
+  void standardState;
 } else {
   const offset: number = result.position.utf16Offset;
   void offset;
@@ -51,6 +54,14 @@ new HtmlTokenizer(
 // @ts-expect-error state names retain exact standard-anchor spelling
 const invalidState: HtmlTokenizerState = "data";
 void invalidState;
+
+const delegatedState: HtmlTokenizerDelegatedCharacterReferenceState =
+  "named-character-reference-state";
+void delegatedState;
+
+// @ts-expect-error delegated substates execute inside the character-reference consumer
+const invalidExecutionState: HtmlTokenizerExecutionState = "named-character-reference-state";
+void invalidExecutionState;
 
 // @ts-expect-error the incomplete tokenizer is not part of the public package surface
 void PublicApi.HtmlTokenizer;

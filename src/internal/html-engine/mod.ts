@@ -71,9 +71,12 @@ export {
 } from "./resource-guard.js";
 export { ENGINE_STANDARD_BASELINE, HTML_STANDARD_REVISION } from "./standards.js";
 export {
+  HTML_TOKENIZER_DELEGATED_CHARACTER_REFERENCE_STATES,
   HTML_TOKENIZER_STATES,
   HtmlTokenizer,
+  type HtmlTokenizerDelegatedCharacterReferenceState,
   type HtmlTokenizerDone,
+  type HtmlTokenizerExecutionState,
   type HtmlTokenizerInitialState,
   type HtmlTokenizerNeedMore,
   type HtmlTokenizerOptions,

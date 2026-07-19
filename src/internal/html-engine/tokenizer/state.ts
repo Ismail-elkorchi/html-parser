@@ -1,3 +1,15 @@
+/** Standard character-reference substates delegated to the isolated consumer. */
+export const HTML_TOKENIZER_DELEGATED_CHARACTER_REFERENCE_STATES = Object.freeze([
+  "named-character-reference-state",
+  "ambiguous-ampersand-state",
+  "numeric-character-reference-state",
+  "hexadecimal-character-reference-start-state",
+  "decimal-character-reference-start-state",
+  "hexadecimal-character-reference-state",
+  "decimal-character-reference-state",
+  "numeric-character-reference-end-state"
+] as const);
+
 /** Exact tokenizer-state anchors in the pinned HTML Standard revision. */
 export const HTML_TOKENIZER_STATES = Object.freeze([
   "data-state",
@@ -77,14 +89,17 @@ export const HTML_TOKENIZER_STATES = Object.freeze([
   "processing-instruction-data-state",
   "processing-instruction-questionable-state",
   "character-reference-state",
-  "named-character-reference-state",
-  "ambiguous-ampersand-state",
-  "numeric-character-reference-state",
-  "hexadecimal-character-reference-start-state",
-  "decimal-character-reference-start-state",
-  "hexadecimal-character-reference-state",
-  "decimal-character-reference-state",
-  "numeric-character-reference-end-state"
+  ...HTML_TOKENIZER_DELEGATED_CHARACTER_REFERENCE_STATES
 ] as const);
 
 export type HtmlTokenizerState = (typeof HTML_TOKENIZER_STATES)[number];
+
+/** Standard states executed inside the isolated character-reference consumer. */
+export type HtmlTokenizerDelegatedCharacterReferenceState =
+  (typeof HTML_TOKENIZER_DELEGATED_CHARACTER_REFERENCE_STATES)[number];
+
+/** States directly owned and reported by `HtmlTokenizer`. */
+export type HtmlTokenizerExecutionState = Exclude<
+  HtmlTokenizerState,
+  HtmlTokenizerDelegatedCharacterReferenceState
+>;

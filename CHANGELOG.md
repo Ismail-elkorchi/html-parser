@@ -3,6 +3,10 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Replace ad hoc internal assertion messages with one private structured error
+  category, make tokenizer execution states compile-time exhaustive, remove
+  redundant completion state, and fail explicitly instead of silently dropping
+  incomplete tree conversions.
 - Complete the isolated incremental tokenizer across text end tags, script
   escaped and double-escaped states, CDATA, processing instructions, exact
   diagnostics, synchronous parser feedback, and bounded resources; integrate
