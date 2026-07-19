@@ -169,6 +169,48 @@
       ]
     },
     {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/tree-model.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/model.test.js"],
+      "mutants": [
+        {
+          "id": "tree-template-content-redirection",
+          "description": "Insert directly into an HTML template element instead of its hosted contents.",
+          "search": "return contents ?? parent;",
+          "replace": "return parent;"
+        },
+        {
+          "id": "tree-depth-boundary",
+          "description": "Skip subtree depth accounting before insertion.",
+          "search": "this.#resources.observeDepth(parentDepth + this.#subtreeHeight(node));",
+          "replace": "this.#resources.checkpoint();"
+        },
+        {
+          "id": "tree-adopt-existing-attribute",
+          "description": "Adopt attributes even when their expanded names are already present.",
+          "search": "if (present.has(key))\n                continue;",
+          "replace": "if (false && present.has(key))\n                continue;"
+        },
+        {
+          "id": "tree-text-span-contiguity",
+          "description": "Claim one exact source span for non-contiguous coalesced text.",
+          "search": "if (current === null || next === null || current.endUtf16Offset !== next.startUtf16Offset) {",
+          "replace": "if (current === null || next === null) {"
+        },
+        {
+          "id": "tree-document-constraints",
+          "description": "Skip document child validation before insertion.",
+          "search": "if (target.kind === \"document\") {\n            this.#validateDocumentInsertion(targetState.children, node, insertionIndex);\n        }",
+          "replace": "if (false && target.kind === \"document\") {\n            this.#validateDocumentInsertion(targetState.children, node, insertionIndex);\n        }"
+        },
+        {
+          "id": "tree-move-removal",
+          "description": "Emit detach/insert mutations for an insertion that preserves sibling order.",
+          "search": "if (oldParent === target && currentIndex === insertionIndex) {",
+          "replace": "if (false && oldParent === target && currentIndex === insertionIndex) {"
+        }
+      ]
+    },
+    {
       "targetFile": "tmp/test-runtime/src/internal/html-engine/tokenizer/builders.js",
       "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tokenizer/core.test.js", "tmp/test-runtime/test/engine/tokenizer/corpus.test.js"],
       "mutants": [
