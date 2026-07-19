@@ -75,7 +75,9 @@ export interface StartTagResourceGuard {
 export interface EngineResourceGuard {
   ensureActive(): void;
   checkpoint(): void;
-  reserveNode(depth: number): void;
+  reserveNode(): void;
+  reserveNodeAtDepth(depth: number): void;
+  observeDepth(depth: number): void;
   reserveParseError(): void;
   beginStartTag(): StartTagResourceGuard;
   snapshot(): EngineResourceUsage;
@@ -221,6 +223,12 @@ export function createEngineResourceGuard(
     if (limit !== undefined && actual > limit) fail(resource, limit, actual);
   }
 
+  function validateDepth(depth: number): void {
+    if (!Number.isSafeInteger(depth) || depth < 1) {
+      throw new EngineConfigurationError("depth", "must be a positive safe integer");
+    }
+  }
+
   const guard: EngineResourceGuard = {
     ensureActive(): void {
       if (signal?.aborted === true) throw new EngineAbortError(signal.reason);
@@ -238,15 +246,25 @@ export function createEngineResourceGuard(
       checkLimit("maxSteps", actual);
       steps = actual;
     },
-    reserveNode(depth: number): void {
+    reserveNode(): void {
       guard.checkpoint();
-      if (!Number.isSafeInteger(depth) || depth < 1) {
-        throw new EngineConfigurationError("depth", "must be a positive safe integer");
-      }
+      const actualNodes = nodes + 1;
+      checkLimit("maxNodes", actualNodes);
+      nodes = actualNodes;
+    },
+    reserveNodeAtDepth(depth: number): void {
+      guard.checkpoint();
+      validateDepth(depth);
       const actualNodes = nodes + 1;
       checkLimit("maxNodes", actualNodes);
       checkLimit("maxDepth", depth);
       nodes = actualNodes;
+      maxDepth = Math.max(maxDepth, depth);
+    },
+    observeDepth(depth: number): void {
+      guard.checkpoint();
+      validateDepth(depth);
+      checkLimit("maxDepth", depth);
       maxDepth = Math.max(maxDepth, depth);
     },
     reserveParseError(): void {

@@ -131,9 +131,9 @@ void test("resource limits fail before committing the unavailable unit", () => {
     }
   });
 
-  guard.reserveNode(2);
+  guard.reserveNodeAtDepth(2);
   assert.throws(
-    () => { guard.reserveNode(2); },
+    () => { guard.reserveNodeAtDepth(2); },
     (error) =>
       error instanceof EngineResourceLimitError &&
       error.resource === "maxNodes" &&
@@ -168,9 +168,9 @@ void test("every foundation resource counter enforces zero and exact boundaries"
   assert.equal(zeroSteps.snapshot().steps, 0);
 
   const depth = createEngineResourceGuard({ limits: { maxDepth: 1 } });
-  depth.reserveNode(1);
+  depth.reserveNodeAtDepth(1);
   assert.throws(
-    () => { depth.reserveNode(2); },
+    () => { depth.observeDepth(2); },
     (error) =>
       error instanceof EngineResourceLimitError &&
       error.resource === "maxDepth" &&

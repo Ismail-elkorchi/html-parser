@@ -1,4 +1,14 @@
 export {
+  HTML_NAMESPACE,
+  MATHML_NAMESPACE,
+  SVG_NAMESPACE,
+  XLINK_NAMESPACE,
+  XML_NAMESPACE,
+  XMLNS_NAMESPACE,
+  type HtmlAttributeNamespaceUri,
+  type HtmlElementNamespaceUri
+} from "./namespaces.js";
+export {
   CharacterReferenceConsumer,
   type CharacterReferenceConsumerMetrics,
   type CharacterReferenceConsumerOptions,
@@ -70,6 +80,29 @@ export {
   type StartTagResourceGuard
 } from "./resource-guard.js";
 export { ENGINE_STANDARD_BASELINE, HTML_STANDARD_REVISION } from "./standards.js";
+export {
+  HtmlTreeModel,
+  type HtmlTemplateContents,
+  type HtmlTreeAttribute,
+  type HtmlTreeAttributeInput,
+  type HtmlTreeComment,
+  type HtmlTreeDoctype,
+  type HtmlTreeDoctypeExternalId,
+  type HtmlTreeDoctypeInput,
+  type HtmlTreeDocument,
+  type HtmlTreeElement,
+  type HtmlTreeElementInput,
+  type HtmlTreeFragment,
+  type HtmlTreeModelErrorReason,
+  type HtmlTreeModelOptions,
+  type HtmlTreeNode,
+  type HtmlTreeNodeIdentity,
+  type HtmlTreeParent,
+  type HtmlTreeRoot,
+  type HtmlTreeText,
+  type HtmlTreeValidationResult,
+  type HtmlTreeWalkEntry
+} from "./tree-model.js";
 export {
   HTML_TOKENIZER_DELEGATED_CHARACTER_REFERENCE_STATES,
   HTML_TOKENIZER_STATES,

@@ -23,6 +23,7 @@ Use narrower commands while iterating:
 | Do independent-engine foundation units pass? | `npm run test:engine:unit` |
 | Do independent character references match pinned data and fixtures? | `npm run test:engine:character-references` |
 | Do isolated tokenizer states match their assigned primary and holdout fixtures? | `npm run test:engine:tokenizer` |
+| Do direct tree-model mutations and resource boundaries pass? | `npm run test:engine:tree` |
 | Do all compiled TypeScript runtime tests pass? | `npm run test:runtime` |
 | Do compile-only API contracts pass? | `npm run test:types` |
 | Do production behavior and regression tests pass? | `npm run test:behavior` |
@@ -79,6 +80,8 @@ an oracle's behavior blindly.
 - `npm run test:bench:engine-tokenizer` records isolated tokenizer throughput,
   heap delta, token fingerprints, and deterministic resource counters across
   character references, markup, text end tags, and processing instructions.
+- `npm run test:bench:engine-tree` records isolated deep and wide direct-tree
+  construction, traversal, validation, heap, and resource evidence.
 - `npm run mutation:pilot` writes a disposable report under `reports/`.
 
 Do not commit generated benchmark or mutation JSON as documentation. Record a

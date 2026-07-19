@@ -1,0 +1,381 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { InternalStateError } from "../../../src/internal/foundation/internal-state-error.js";
+import {
+  HTML_NAMESPACE,
+  MATHML_NAMESPACE,
+  SVG_NAMESPACE,
+  XML_NAMESPACE,
+  EngineResourceLimitError,
+  HtmlTreeModel,
+  createEngineResourceGuard,
+  sourceSpan,
+  type HtmlTreeAttributeInput,
+  type HtmlTreeElement,
+  type HtmlTreeModelErrorReason,
+  type HtmlTreeParent,
+  type TreeMutationObservation
+} from "../../../src/internal/html-engine/mod.js";
+
+function element(
+  model: HtmlTreeModel,
+  localName: string,
+  attributes: readonly HtmlTreeAttributeInput[] = []
+): HtmlTreeElement {
+  return model.createElement({
+    namespaceUri: HTML_NAMESPACE,
+    prefix: null,
+    localName,
+    qualifiedName: localName,
+    attributes
+  });
+}
+
+function assertModelError(action: () => unknown, reason: HtmlTreeModelErrorReason): void {
+  assert.throws(
+    action,
+    (error) => error instanceof InternalStateError && error.reason === reason
+  );
+}
+
+void test("model retains exact node, namespace, doctype, attribute, and span data", () => {
+  const model = new HtmlTreeModel({
+    rootKind: "document",
+    resources: createEngineResourceGuard()
+  });
+  const doctype = model.createDoctype({
+    name: "html",
+    externalId: { kind: "public", publicIdentifier: "", systemIdentifier: null },
+    sourceSpan: sourceSpan(0, 15)
+  });
+  const html = model.createElement({
+    namespaceUri: HTML_NAMESPACE,
+    prefix: null,
+    localName: "html",
+    qualifiedName: "html",
+    attributes: [
+      {
+        namespaceUri: null,
+        prefix: null,
+        localName: "lang",
+        qualifiedName: "lang",
+        value: "en",
+        sourceSpan: sourceSpan(21, 30)
+      },
+      {
+        namespaceUri: XML_NAMESPACE,
+        prefix: "xml",
+        localName: "lang",
+        qualifiedName: "xml:lang",
+        value: "fr"
+      }
+    ],
+    sourceSpan: sourceSpan(15, 31)
+  });
+
+  model.append(model.root, doctype);
+  model.append(model.root, html);
+
+  assert.equal(model.root.identity.serial, 1);
+  assert.equal(doctype.identity.serial, 2);
+  assert.equal(html.identity.serial, 3);
+  assert.deepEqual(doctype.externalId, {
+    kind: "public",
+    publicIdentifier: "",
+    systemIdentifier: null
+  });
+  assert.deepEqual(html.sourceSpan, { startUtf16Offset: 15, endUtf16Offset: 31 });
+  assert.deepEqual(html.attributeAt(0), {
+    namespaceUri: null,
+    prefix: null,
+    localName: "lang",
+    qualifiedName: "lang",
+    value: "en",
+    sourceSpan: { startUtf16Offset: 21, endUtf16Offset: 30 }
+  });
+  assert.equal(model.attribute(html, XML_NAMESPACE, "lang")?.value, "fr");
+  assert.deepEqual(model.validate(), { allocatedNodes: 3, attachedNodes: 3, maxDepth: 2 });
+  assertModelError(
+    () => {
+      model.createElement({
+        namespaceUri: HTML_NAMESPACE,
+        prefix: null,
+        localName: "p",
+        qualifiedName: "p",
+        attributes: [{
+          namespaceUri: XML_NAMESPACE,
+          prefix: null,
+          localName: "lang",
+          qualifiedName: "lang",
+          value: "en"
+        }]
+      });
+    },
+    "TREE_MODEL_ATTRIBUTE_NAMESPACE_PREFIX_MISMATCH"
+  );
+});
+
+void test("template contents are explicit, redirected, hosted, and not separately budgeted", () => {
+  const resources = createEngineResourceGuard({ limits: { maxNodes: 3, maxDepth: 3 } });
+  const model = new HtmlTreeModel({ rootKind: "fragment", resources });
+  const template = element(model, "template");
+  const child = element(model, "p");
+  model.append(model.root, template);
+  model.append(template, child);
+
+  const contents = template.templateContents;
+  assert.equal(template.childCount, 0);
+  assert.ok(contents);
+  assert.equal(contents.host, template);
+  assert.equal(contents.childAt(0), child);
+  assert.equal(child.parent, contents);
+  assert.deepEqual([...model.walk()].map(({ node, depth }) => [node.kind, depth]), [
+    ["element", 2],
+    ["element", 3]
+  ]);
+  assert.deepEqual(resources.snapshot(), {
+    steps: 5,
+    nodes: 3,
+    maxDepth: 3,
+    parseErrors: 0,
+    attributes: 0,
+    attributeUtf8Bytes: 0
+  });
+});
+
+void test("insert-before, moves, detach, and document rules preserve one direct tree", () => {
+  const model = new HtmlTreeModel({ rootKind: "document", resources: createEngineResourceGuard() });
+  const doctype = model.createDoctype({ name: "html", externalId: { kind: "none" } });
+  const html = element(model, "html");
+  const head = element(model, "head");
+  const body = element(model, "body");
+  model.append(model.root, doctype);
+  model.append(model.root, html);
+  model.append(html, body);
+  model.insertBefore(html, head, body);
+  model.insertBefore(html, body, body);
+
+  assert.equal(html.childAt(0), head);
+  assert.equal(html.childAt(1), body);
+  model.insertBefore(html, body, head);
+  assert.equal(html.childAt(0), body);
+  assert.equal(html.childAt(1), head);
+  assert.equal(model.detach(body), true);
+  assert.equal(model.detach(body), false);
+  assert.equal(body.parent, null);
+
+  assertModelError(
+    () => { model.append(model.root, element(model, "other")); },
+    "TREE_MODEL_DUPLICATE_DOCUMENT_ELEMENT"
+  );
+  assertModelError(
+    () => { model.append(html, doctype); },
+    "TREE_MODEL_DOCTYPE_UNDER_NON_DOCUMENT"
+  );
+  assertModelError(() => { model.append(html, html); }, "TREE_MODEL_ANCESTOR_CYCLE");
+  assert.equal(model.insertText(model.root, "x", sourceSpan(0, 1)), null);
+  const detachedText = model.createText("x", sourceSpan(0, 1));
+  assertModelError(
+    () => { model.append(model.root, detachedText); },
+    "TREE_MODEL_TEXT_UNDER_DOCUMENT"
+  );
+
+  const orderModel = new HtmlTreeModel({
+    rootKind: "document",
+    resources: createEngineResourceGuard()
+  });
+  const orderElement = element(orderModel, "html");
+  const lateDoctype = orderModel.createDoctype({ name: "html", externalId: { kind: "none" } });
+  orderModel.append(orderModel.root, orderElement);
+  assertModelError(
+    () => { orderModel.append(orderModel.root, lateDoctype); },
+    "TREE_MODEL_DOCTYPE_AFTER_DOCUMENT_ELEMENT"
+  );
+});
+
+void test("ownership and reference checks reject cross-model mutations before tree changes", () => {
+  const first = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });
+  const second = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });
+  const local = element(first, "p");
+  const foreign = element(second, "p");
+  first.append(first.root, local);
+
+  assertModelError(() => { first.append(first.root, foreign); }, "TREE_MODEL_FOREIGN_NODE");
+  assertModelError(() => { first.append(second.root, local); }, "TREE_MODEL_FOREIGN_PARENT");
+  assertModelError(
+    () => { first.insertBefore(first.root, local, foreign); },
+    "TREE_MODEL_FOREIGN_NODE"
+  );
+  assert.equal(first.root.childAt(0), local);
+  assert.equal(second.root.childCount, 0);
+});
+
+void test("attribute adoption uses expanded names and preserves first-seen order", () => {
+  const model = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });
+  const html = element(model, "html", [
+    {
+      namespaceUri: null,
+      prefix: null,
+      localName: "lang",
+      qualifiedName: "lang",
+      value: "en"
+    }
+  ]);
+  const adopted = model.adoptAttributes(html, [
+    {
+      namespaceUri: null,
+      prefix: null,
+      localName: "lang",
+      qualifiedName: "lang",
+      value: "discarded"
+    },
+    {
+      namespaceUri: XML_NAMESPACE,
+      prefix: "xml",
+      localName: "lang",
+      qualifiedName: "xml:lang",
+      value: "fr"
+    }
+  ]);
+
+  assert.equal(adopted, 1);
+  assert.equal(html.attributeCount, 2);
+  assert.equal(html.attributeAt(0)?.value, "en");
+  assert.equal(html.attributeAt(1)?.qualifiedName, "xml:lang");
+});
+
+void test("text insertion coalesces only at the insertion point and retains only exact spans", () => {
+  const model = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });
+  const paragraph = element(model, "p");
+  model.append(model.root, paragraph);
+  const text = model.insertText(paragraph, "a", sourceSpan(0, 1));
+  assert.equal(model.insertText(paragraph, "b", sourceSpan(1, 2)), text);
+  assert.equal(text.data, "ab");
+  assert.deepEqual(text.sourceSpan, { startUtf16Offset: 0, endUtf16Offset: 2 });
+
+  model.insertText(paragraph, "c", sourceSpan(4, 5));
+  assert.equal(text.data, "abc");
+  assert.equal(text.sourceSpan, null);
+
+  const comment = model.createComment("split");
+  model.append(paragraph, comment);
+  const tail = model.insertText(paragraph, "d", sourceSpan(5, 6));
+  model.insertText(paragraph, "x", sourceSpan(3, 4), comment);
+  assert.equal(paragraph.childAt(0), text);
+  assert.equal(text.data, "abcx");
+  assert.equal(paragraph.childAt(1), comment);
+  assert.equal(paragraph.childAt(2), tail);
+});
+
+void test("resource failures precede node allocation and structural mutation", () => {
+  const nodeResources = createEngineResourceGuard({ limits: { maxNodes: 1 } });
+  const nodeModel = new HtmlTreeModel({ rootKind: "fragment", resources: nodeResources });
+  assert.throws(
+    () => element(nodeModel, "p"),
+    (error) => error instanceof EngineResourceLimitError && error.resource === "maxNodes"
+  );
+  assert.equal(nodeResources.snapshot().nodes, 1);
+  assert.equal(nodeModel.root.childCount, 0);
+
+  const depthResources = createEngineResourceGuard({ limits: { maxDepth: 3 } });
+  const depthModel = new HtmlTreeModel({ rootKind: "fragment", resources: depthResources });
+  const outer = element(depthModel, "div");
+  const inner = element(depthModel, "span");
+  const tooDeep = element(depthModel, "b");
+  depthModel.append(depthModel.root, outer);
+  depthModel.append(outer, inner);
+  assert.throws(
+    () => { depthModel.append(inner, tooDeep); },
+    (error) => error instanceof EngineResourceLimitError && error.resource === "maxDepth"
+  );
+  assert.equal(tooDeep.parent, null);
+  assert.equal(inner.childCount, 0);
+
+  const shallow = element(depthModel, "i");
+  depthModel.append(depthModel.root, shallow);
+  assert.throws(
+    () => { depthModel.append(inner, shallow); },
+    (error) => error instanceof EngineResourceLimitError && error.resource === "maxDepth"
+  );
+  assert.equal(shallow.parent, depthModel.root);
+  assert.equal(depthModel.root.childAt(1), shallow);
+});
+
+void test("observation is synchronous, immutable, ordered, and preserves callback failures", () => {
+  const events: TreeMutationObservation[] = [];
+  const model = new HtmlTreeModel({
+    rootKind: "fragment",
+    resources: createEngineResourceGuard(),
+    observer: { onTreeMutation: (event) => events.push(event) }
+  });
+  const parent = element(model, "p");
+  model.append(model.root, parent);
+  const text = model.insertText(parent, "x", sourceSpan(0, 1));
+  model.insertText(parent, "y", sourceSpan(1, 2));
+  model.adoptAttributes(parent, [{
+    namespaceUri: null,
+    prefix: null,
+    localName: "id",
+    qualifiedName: "id",
+    value: "x"
+  }]);
+
+  assert.deepEqual(events.map(({ kind }) => kind), [
+    "node-created",
+    "node-created",
+    "node-inserted",
+    "node-created",
+    "node-inserted",
+    "text-coalesced",
+    "attributes-adopted"
+  ]);
+  assert.ok(events.every(Object.isFrozen));
+  const eventCount = events.length;
+  model.insertBefore(parent, text, text);
+  assert.equal(events.length, eventCount);
+
+  const callbackFailure = new RangeError("observer stopped");
+  assert.throws(
+    () => new HtmlTreeModel({
+      rootKind: "fragment",
+      resources: createEngineResourceGuard(),
+      observer: { onTreeMutation: () => { throw callbackFailure; } }
+    }),
+    (error) => error === callbackFailure
+  );
+});
+
+void test("explicit-stack mutation, validation, and traversal handle 5,000 levels", () => {
+  const depth = 5_000;
+  const model = new HtmlTreeModel({
+    rootKind: "fragment",
+    resources: createEngineResourceGuard({ limits: { maxNodes: depth + 1, maxDepth: depth + 1 } })
+  });
+  let parent: HtmlTreeParent = model.root;
+  for (let index = 0; index < depth; index += 1) {
+    const namespaceUri = index % 2 === 0 ? SVG_NAMESPACE : MATHML_NAMESPACE;
+    const child = model.createElement({
+      namespaceUri,
+      prefix: null,
+      localName: "g",
+      qualifiedName: "g"
+    });
+    model.append(parent, child);
+    parent = child;
+  }
+
+  assert.deepEqual(model.validate(), {
+    allocatedNodes: depth + 1,
+    attachedNodes: depth + 1,
+    maxDepth: depth + 1
+  });
+  let traversed = 0;
+  let lastDepth = 0;
+  for (const entry of model.walk()) {
+    traversed += 1;
+    lastDepth = entry.depth;
+  }
+  assert.equal(traversed, depth);
+  assert.equal(lastDepth, depth + 1);
+});

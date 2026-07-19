@@ -3,6 +3,9 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Add the independent engine's direct document/fragment tree model with typed
+  namespace-aware nodes and mutations, explicit template contents, exact span
+  handling, separated allocation/depth accounting, and stack-safe validation.
 - Replace ad hoc internal assertion messages with one private structured error
   category, make tokenizer execution states compile-time exhaustive, remove
   redundant completion state, and fail explicitly instead of silently dropping
