@@ -94,6 +94,12 @@ export interface HtmlTreeComment extends HtmlTreeNodeBase {
   readonly data: string;
 }
 
+export interface HtmlTreeProcessingInstruction extends HtmlTreeNodeBase {
+  readonly kind: "processing-instruction";
+  readonly target: string;
+  readonly data: string;
+}
+
 export type HtmlTreeDoctypeExternalId =
   | { readonly kind: "none" }
   | {
@@ -110,7 +116,12 @@ export interface HtmlTreeDoctype extends HtmlTreeNodeBase {
 }
 
 export type HtmlTreeRoot = HtmlTreeDocument | HtmlTreeFragment;
-export type HtmlTreeNode = HtmlTreeElement | HtmlTreeText | HtmlTreeComment | HtmlTreeDoctype;
+export type HtmlTreeNode =
+  | HtmlTreeElement
+  | HtmlTreeText
+  | HtmlTreeComment
+  | HtmlTreeProcessingInstruction
+  | HtmlTreeDoctype;
 export type HtmlTreeParent = HtmlTreeRoot | HtmlTreeElement | HtmlTemplateContents;
 
 export interface HtmlTreeElementInput {
@@ -386,6 +397,30 @@ export class HtmlTreeModel {
     this.#nodes.set(identity.serial, comment);
     this.#emit("node-created", identity.serial, null);
     return comment;
+  }
+
+  createProcessingInstruction(
+    target: string,
+    data: string,
+    span: SourceSpan | null = null
+  ): HtmlTreeProcessingInstruction {
+    if (target.length === 0) fail("TREE_MODEL_EMPTY_PROCESSING_INSTRUCTION_TARGET");
+    const source = checkedSpan(span);
+    this.#resources.reserveNode();
+    const identity = this.#newIdentity();
+    const nodeState: NodeState = { owner: this, parent: null, sourceSpan: source, depth: null };
+    const instruction: HtmlTreeProcessingInstruction = Object.freeze({
+      kind: "processing-instruction",
+      identity,
+      target,
+      data,
+      get parent(): HtmlTreeParent | null { return nodeState.parent; },
+      get sourceSpan(): SourceSpan | null { return nodeState.sourceSpan; }
+    });
+    NODE_STATES.set(instruction, nodeState);
+    this.#nodes.set(identity.serial, instruction);
+    this.#emit("node-created", identity.serial, null);
+    return instruction;
   }
 
   createDoctype(input: HtmlTreeDoctypeInput): HtmlTreeDoctype {

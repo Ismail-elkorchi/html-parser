@@ -3,6 +3,11 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Add the independent engine's synchronous document driver and basic HTML tree
+  construction through in-body/text/after-body modes, including complete
+  DOCTYPE mode selection, indexed scope queries, typed unnamed diagnostics,
+  processing-instruction nodes, exact token feedback, and assigned WPT proof;
+  remove the obsolete preprocessing-only driver.
 - Add the independent engine's direct document/fragment tree model with typed
   namespace-aware nodes and mutations, explicit template contents, exact span
   handling, separated allocation/depth accounting, and stack-safe validation.
@@ -27,7 +32,7 @@ All notable changes are documented in this file.
 - Add isolated strict-TypeScript foundations for the independent HTML engine,
   including incremental decoded-input preprocessing, exact UTF-16 positions,
   closed token and diagnostic types, synchronous control boundaries, hard
-  resource checkpoints, and a non-production test driver.
+  resource checkpoints, and internal observer contracts.
 - Pin the maintained WPT tree-construction corpus for deterministic offline
   testing, preserve exact provenance and licenses, and consolidate `.dat`
   decoding in test support while retaining every existing tree fixture.

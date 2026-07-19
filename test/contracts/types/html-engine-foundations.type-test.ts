@@ -1,5 +1,5 @@
 import {
-  runEngineFoundationDriver,
+  runHtmlEngine,
   type HtmlToken,
   type InsertionMode,
   type TokenizerMode
@@ -41,7 +41,7 @@ const insertionMode: InsertionMode = "in-table-text";
 void tokenizerMode;
 void insertionMode;
 
-runEngineFoundationDriver({
+runHtmlEngine({
   inputChunks: ["<p>x"],
   parser: { kind: "document", scriptingMode: "inert" }
 });
@@ -55,13 +55,13 @@ const invalidInsertionMode: InsertionMode = "body";
 void invalidInsertionMode;
 
 // @ts-expect-error - the non-executing driver cannot select a script-executing mode.
-runEngineFoundationDriver({ inputChunks: [], parser: { kind: "document", scriptingMode: "normal" } });
+runHtmlEngine({ inputChunks: [], parser: { kind: "document", scriptingMode: "normal" } });
 
-// @ts-expect-error - fragment parsing requires an explicit context identity.
-runEngineFoundationDriver({ inputChunks: [], parser: { kind: "fragment", scriptingMode: "inert" } });
+// @ts-expect-error - fragment parsing is introduced with its real algorithm in IHP-10.
+runHtmlEngine({ inputChunks: [], parser: { kind: "fragment", scriptingMode: "inert" } });
 
 // @ts-expect-error - tokens are immutable once emitted.
 token.name = "svg";
 
 // @ts-expect-error - the incomplete driver is not part of the public package surface.
-void PublicApi.runEngineFoundationDriver;
+void PublicApi.runHtmlEngine;
