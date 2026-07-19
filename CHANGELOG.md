@@ -43,6 +43,10 @@ All notable changes are documented in this file.
 - Upgrade every GitHub Actions dependency to its latest stable release while retaining immutable commit pins.
 - Remove Dependabot configuration in favor of deliberate, consolidated dependency maintenance.
 - Remove the obsolete AJV override and refresh ESLint's compatible development-only validator.
+- Replace overlapping eager text helpers with one policy-versioned bounded
+  result API and one token iterator; require output, token, and visible-text
+  fallback limits; preserve scalar-safe UTF-8 prefixes and exact total-byte
+  measurements; and expose coalesced source provenance on both package roots.
 
 - Make input budgets byte-accurate and stream encoding-prescan limits
   independent of producer chunk boundaries.

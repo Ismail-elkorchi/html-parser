@@ -1,6 +1,7 @@
 # @ismail-elkorchi/html-parser
 
-HTML parser with visible-text extraction, fragment parsing, and structural traversal.
+HTML parser with bounded, policy-versioned text extraction, fragment parsing,
+and structural traversal.
 
 Supports Node, Deno, Bun, and browsers with explicit resource budgets.
 
@@ -81,13 +82,24 @@ promise cannot resolve before EOF. Use `maxInputBytes` for transport bytes,
 `maxDecodedUtf8Bytes` for decoded UTF-8 bytes, and
 `maxEncodingPrescanBytes` only for encoding-prescan prefix retention.
 
-### Example 3: Extract visible text
+### Example 3: Extract bounded visible text
 
 ```ts
-import { parse, visibleText } from "@ismail-elkorchi/html-parser";
+import {
+  VISIBLE_TEXT_HTML_POLICY,
+  extractText,
+  parse
+} from "@ismail-elkorchi/html-parser";
 
 const document = parse("<article><h1>Title</h1><p>Hello world.</p></article>");
-console.log(visibleText(document.tree).trim());
+const result = extractText(document.tree, {
+  policy: VISIBLE_TEXT_HTML_POLICY,
+  maxOutputBytes: 16_384,
+  maxTokens: 1_024,
+  maxFallbackInputBytes: 16_384,
+  maxFallbackNodes: 1_024
+});
+console.log(result.text, result.totalBytes, result.truncated);
 ```
 
 ### Example 4: Compute and apply a patch plan

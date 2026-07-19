@@ -20,8 +20,8 @@ retains its children and closing tag.
 
 ## Hidden paths investigated
 
-The initial public conversion, metrics, serialization, `textContent`, visible
-text, and traversal paths were recursive. Related inspection found the same
+The initial public conversion, metrics, serialization, text extraction, and
+traversal paths were recursive. Related inspection found the same
 failure mode in:
 
 - parse5 select-adoption recovery;
@@ -49,9 +49,9 @@ assignment.
 - 3,200-level internal normalization, internal serialization, and patch
   indexing.
 
-The accepted-depth test exercises serialization, traversal, outline,
-`textContent`, visible-text extraction and provenance, queries, and chunking on
-both parsed and caller-built trees. The prior implementation threw `RangeError`
+The accepted-depth test exercises serialization, traversal, outline, both text
+extraction policies and provenance, queries, and chunking on both parsed and
+caller-built trees. The prior implementation threw `RangeError`
 while parsing 3,000 nested elements and independently overflowed each tested
 operation on a 5,000-level caller-built tree.
 

@@ -10,7 +10,8 @@ Primary JSR runtime exports:
 - `parseFragment(input, contextTagName, options?)`
 - `parseStream(stream, options?)`
 - `serialize(input, operationOptions?)`
-- `visibleText(input, options?)`
+- `extractText(input, options)`
+- `iterateText(input, options)`
 - `tokenizeByteStreamEager(stream, options?)`
 - `HtmlAbortError`, `HtmlBudgetExceededError`, `HtmlConfigurationError`,
   `HtmlPatchPlanningError`, `HtmlStreamReadError`
@@ -24,12 +25,14 @@ Primary JSR type exports:
 - `ParseBudgets`, `ParseOptions`, `ParseBytesOptions`, `ParseFragmentOptions`,
   `ParseStreamBudgets`, `ParseStreamOptions`, `SourceRetention`,
   `TokenizeByteStreamEagerBudgets`, `TokenizeByteStreamEagerOptions`,
-  `OperationOptions`
+  `OperationOptions`, `TextExtractionOptions`,
+  `VisibleTextExtractionOptions`, `TextContentExtractionOptions`
 - `ParsedDocument`, `ParsedDocumentMetadata`, `ParseEncodingMetadata`,
   `ParseResourceUsage`, `DocumentTree`, `FragmentTree`, the exact
   namespace-aware `HtmlNode` union,
   `Attribute`, `DoctypeExternalId`, `Span`, `SpanProvenance`, and `ParseError`
-- `VisibleTextOptions`, `SerializableHtml`, `VisibleTextInput`, `HtmlToken`
+- `TextExtractionResult`, `TextExtractionToken`, `TextProvenanceRange`,
+  `TextExtractionInput`, `SerializableHtml`, `HtmlToken`
 - `HtmlOperationalError`, `HtmlBudgetName`,
   `HtmlConfigurationErrorReason`, `HtmlPatchPlanningReason`, `NodeId`
 
@@ -40,12 +43,10 @@ Node/npm type surface is shipped from `dist/mod.d.ts` (source: `src/public/mod.t
 In addition to the shared parse and operational-error surface, Node/npm includes:
 - `ParseBudgetOptions`, `ParseBytesOptions`, `ParseFragmentOptions`,
   `ParseStreamBudgetOptions`, and the shared `ParseStreamOptions` contract
-- `visibleTextTokens(...)`
-- `visibleTextTokensWithProvenance(...)`
 - `getParseErrorSpecRef(parseErrorId)`
 - traversal/search helpers (`walk`, `walkElements`, `findById`,
   `findAllByTagName`, `findAllByTagNameNS`, `findAllByAttr`,
-  `findAllByAttrNS`, `textContent`)
+  `findAllByAttrNS`)
 - shared attribute helpers (`getAttributeValue`, `hasAttribute`,
   `getAttributeValueNS`, `hasAttributeNS`) and canonical HTML/SVG/MathML/XLink/
   XML/XMLNS namespace URI constants
@@ -62,8 +63,9 @@ In addition to the shared parse and operational-error surface, Node/npm includes
   parsed-node identity, namespace constants, attribute helpers, and structural
   queries.
 - Node/npm exposes the broader authoring and transformation surface.
-- Both surfaces share the same parse model, operational error classes and
-  structural guards, and option types where names overlap.
+- Both surfaces share the same parse model, bounded extraction policies and
+  results, operational error classes and structural guards, and option types
+  where names overlap.
 
 ## Related
 - [Options](./options.md)

@@ -8,7 +8,9 @@ import {
   HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
+  VISIBLE_TEXT_HTML_POLICY,
   chunk,
+  extractText,
   isHtmlAbortError,
   isHtmlBudgetExceededError,
   isHtmlConfigurationError,
@@ -18,9 +20,16 @@ import {
   parseStream,
   serialize,
   tokenizeByteStreamEager,
-  visibleText,
   walk
 } from "../../dist/mod.js";
+
+const VISIBLE_EXTRACTION = Object.freeze({
+  policy: VISIBLE_TEXT_HTML_POLICY,
+  maxOutputBytes: 1_000_000,
+  maxTokens: 100_000,
+  maxFallbackInputBytes: 1_000_000,
+  maxFallbackNodes: 100_000
+});
 
 const PARSE_BUDGETS = [
   "maxInputBytes",
@@ -96,7 +105,10 @@ test("parse option schemas reject unknown and invalid limits before work", async
     }
   );
   assert.throws(() => serialize(parse("").tree, { unknown: true }), HtmlConfigurationError);
-  assert.throws(() => visibleText(parse("").tree, { unknown: true }), HtmlConfigurationError);
+  assert.throws(
+    () => extractText(parse("").tree, { ...VISIBLE_EXTRACTION, unknown: true }),
+    HtmlConfigurationError
+  );
   assert.throws(() => walk(parse("").tree, () => {}, { maxTimeMs: -1 }), HtmlConfigurationError);
 
   const controller = new globalThis.AbortController();
@@ -298,7 +310,7 @@ test("abort signals preserve their exact reason and stream cleanup", async () =>
     () => parseBytes(new Uint8Array(), { signal: controller.signal }),
     () => parseFragment("", "div", { signal: controller.signal }),
     () => serialize(parse("").tree, { signal: controller.signal }),
-    () => visibleText(parse("").tree, { signal: controller.signal })
+    () => extractText(parse("").tree, { ...VISIBLE_EXTRACTION, signal: controller.signal })
   ]) {
     assert.throws(operation, (error) => {
       assert.ok(error instanceof HtmlAbortError);
@@ -472,7 +484,7 @@ test("serialization, traversal, and extraction own independent zero deadlines", 
   const { tree } = parse("<!doctype html><main><p>x</p></main>");
   for (const operation of [
     () => serialize(tree, { maxTimeMs: 0 }),
-    () => visibleText(tree, { maxTimeMs: 0 }),
+    () => extractText(tree, { ...VISIBLE_EXTRACTION, maxTimeMs: 0 }),
     () => walk(tree, () => {}, { maxTimeMs: 0 })
   ]) {
     assert.throws(operation, (error) => assertBudget(error, "maxTimeMs", 0, 1));
@@ -483,7 +495,7 @@ test("non-parse operations use one immutable option snapshot", () => {
   const { tree } = parse("<main><p>x</p></main>");
   const operations = [
     (options) => serialize(tree, options),
-    (options) => visibleText(tree, options),
+    (options) => extractText(tree, { ...VISIBLE_EXTRACTION, ...options }),
     (options) => walk(tree, () => {}, options),
     (options) => chunk(tree, options)
   ];

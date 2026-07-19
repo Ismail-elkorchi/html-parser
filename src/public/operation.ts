@@ -13,9 +13,10 @@ import type {
   ParseOptions,
   ParseStreamBudgetOptions,
   ParseStreamOptions,
+  TextContentExtractionOptions,
+  TextExtractionOptions,
   TokenizeByteStreamEagerBudgetOptions,
-  TokenizeByteStreamEagerOptions,
-  VisibleTextOptions
+  TokenizeByteStreamEagerOptions
 } from "./types.js";
 
 const PARSE_BUDGET_KEYS = Object.freeze([
@@ -67,13 +68,22 @@ const TOKENIZE_BYTE_STREAM_EAGER_OPTION_KEYS = new Set<PropertyKey>([
   "signal"
 ]);
 const OPERATION_OPTION_KEYS = new Set<PropertyKey>(["maxTimeMs", "signal"]);
-const VISIBLE_TEXT_OPTION_KEYS = new Set<PropertyKey>([
+const TEXT_EXTRACTION_OPTION_KEYS = [
+  "policy",
+  "maxOutputBytes",
+  "maxTokens",
+  ...OPERATION_OPTION_KEYS
+] as const;
+const VISIBLE_TEXT_EXTRACTION_OPTION_KEYS = new Set<PropertyKey>([
+  ...TEXT_EXTRACTION_OPTION_KEYS,
+  "maxFallbackInputBytes",
+  "maxFallbackNodes",
   "skipHiddenSubtrees",
   "includeControlValues",
   "includeAccessibleNameFallback",
-  "trim",
-  ...OPERATION_OPTION_KEYS
+  "trim"
 ]);
+const TEXT_CONTENT_EXTRACTION_OPTION_KEYS = new Set<PropertyKey>(TEXT_EXTRACTION_OPTION_KEYS);
 const CHUNK_OPTION_KEYS = new Set<PropertyKey>([
   "maxChars",
   "maxNodes",
@@ -151,6 +161,13 @@ function traceMode(value: unknown, option: string): ParseOptions["trace"] {
   return value;
 }
 
+function textExtractionPolicy(value: unknown, option: string): TextExtractionOptions["policy"] {
+  if (value !== "visible-text-html-v1" && value !== "text-content-v1") {
+    invalidConfiguration(option, 'must be "visible-text-html-v1" or "text-content-v1"');
+  }
+  return value;
+}
+
 function sourceRetention(value: unknown, option: string): ParseOptions["sourceRetention"] {
   if (value !== undefined && value !== "none" && value !== "text") {
     invalidConfiguration(option, 'must be "none" or "text" when provided');
@@ -166,6 +183,14 @@ function limit(value: unknown, option: string): number | undefined {
     invalidConfiguration(option, "must be a finite, non-negative safe integer when provided");
   }
   return value;
+}
+
+function requiredLimit(value: unknown, option: string): number {
+  const normalized = limit(value, option);
+  if (normalized === undefined) {
+    invalidConfiguration(option, "must be provided as a finite, non-negative safe integer");
+  }
+  return normalized;
 }
 
 function signal(value: unknown, option: string): AbortSignal | undefined {
@@ -351,12 +376,50 @@ export function normalizeOperationOptions(options: OperationOptions): OperationO
   return normalizeCommonOperationOptions(options, OPERATION_OPTION_KEYS, "options").normalized;
 }
 
-/** Validates and snapshots visible-text policy plus operation controls. */
-export function normalizeVisibleTextOptions(options: VisibleTextOptions): VisibleTextOptions {
-  const { record, normalized } = normalizeCommonOperationOptions(
-    options,
-    VISIBLE_TEXT_OPTION_KEYS,
-    "options"
+/** Validates and snapshots one versioned bounded text-extraction policy. */
+export function normalizeTextExtractionOptions(options: TextExtractionOptions): TextExtractionOptions {
+  const unknownOptions: unknown = options;
+  if (typeof unknownOptions !== "object" || unknownOptions === null || Array.isArray(unknownOptions)) {
+    invalidConfiguration("options", "must be a plain option object");
+  }
+  const candidate = unknownOptions as UnknownRecord;
+  const policy = textExtractionPolicy(read(candidate, "policy", "options.policy"), "options.policy");
+  const record = asClosedRecord(
+    candidate,
+    "options",
+    policy === "visible-text-html-v1"
+      ? VISIBLE_TEXT_EXTRACTION_OPTION_KEYS
+      : TEXT_CONTENT_EXTRACTION_OPTION_KEYS
+  );
+  const maxOutputBytes = requiredLimit(
+    read(record, "maxOutputBytes", "options.maxOutputBytes"),
+    "options.maxOutputBytes"
+  );
+  const maxTokens = requiredLimit(
+    read(record, "maxTokens", "options.maxTokens"),
+    "options.maxTokens"
+  );
+  const maxTimeMs = limit(read(record, "maxTimeMs", "options.maxTimeMs"), "options.maxTimeMs");
+  const normalizedSignal = signal(read(record, "signal", "options.signal"), "options.signal");
+  const common = {
+    policy,
+    maxOutputBytes,
+    maxTokens,
+    ...(maxTimeMs === undefined ? {} : { maxTimeMs }),
+    ...(normalizedSignal === undefined ? {} : { signal: normalizedSignal })
+  };
+
+  if (policy === "text-content-v1") {
+    return Object.freeze(common) as TextContentExtractionOptions;
+  }
+
+  const maxFallbackInputBytes = requiredLimit(
+    read(record, "maxFallbackInputBytes", "options.maxFallbackInputBytes"),
+    "options.maxFallbackInputBytes"
+  );
+  const maxFallbackNodes = requiredLimit(
+    read(record, "maxFallbackNodes", "options.maxFallbackNodes"),
+    "options.maxFallbackNodes"
   );
   const skipHiddenSubtrees = optionalBoolean(
     read(record, "skipHiddenSubtrees", "options.skipHiddenSubtrees"),
@@ -372,7 +435,9 @@ export function normalizeVisibleTextOptions(options: VisibleTextOptions): Visibl
   );
   const trim = optionalBoolean(read(record, "trim", "options.trim"), "options.trim");
   return Object.freeze({
-    ...normalized,
+    ...common,
+    maxFallbackInputBytes,
+    maxFallbackNodes,
     ...(skipHiddenSubtrees === undefined ? {} : { skipHiddenSubtrees }),
     ...(includeControlValues === undefined ? {} : { includeControlValues }),
     ...(includeAccessibleNameFallback === undefined ? {} : { includeAccessibleNameFallback }),

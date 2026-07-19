@@ -93,6 +93,19 @@ Traversal, query, serialization, outline, text extraction, patch indexing, and
 chunking use explicit stacks, so a tree accepted by the configured depth budget
 does not depend on the JavaScript call-stack limit.
 
+## Bounded Text Extraction
+
+`extractText` returns a frozen `TextExtractionResult` containing a retained
+scalar-safe prefix, the exact complete-output UTF-8 byte count, a truncation
+flag, and the selected versioned policy. `iterateText` yields frozen
+`TextExtractionToken` values and returns the same result when fully drained.
+
+Token offsets and `TextProvenanceRange` offsets are half-open byte ranges in
+the retained output's canonical UTF-8 encoding. Coalesced provenance identifies
+the parsed source node and contribution role without retaining one metadata
+object per Unicode scalar. The visible-text policy attributes interpreted
+`noscript` fallback output to the original `noscript` element.
+
 ## Serialization
 
 `serialize(documentTreeOrNode)` emits normalized HTML text from a parsed tree or
@@ -110,6 +123,8 @@ their children and closing tags.
 - Stream acquisition/read failures throw `HtmlStreamReadError` with the
   original failure as `cause`.
 
-Budget controls live in `ParseOptions.budgets` and hard-stop input/decoded
-bytes, parser node/depth/error/attribute allocation, trace retention, and
-elapsed work at the first unavailable unit.
+Parser budget controls live in `ParseOptions.budgets` and hard-stop
+input/decoded bytes, parser node/depth/error/attribute allocation, trace
+retention, and elapsed work at the first unavailable unit. Text extraction has
+separate required output-byte, token, and visible-policy fallback limits plus
+the shared deadline and cancellation controls.

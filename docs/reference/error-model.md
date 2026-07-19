@@ -27,6 +27,10 @@ All budget limits are inclusive and a failure reports `actual: limit + 1`.
 Invalid, fractional, negative, non-finite, or unknown limits are configuration
 errors rather than budget failures. Configuration validation takes priority
 over an already-aborted signal and occurs before stream-reader acquisition.
+The extraction-only `maxFallbackInputBytes` and `maxFallbackNodes` budgets use
+the same error shape when an HTML `noscript` fallback exceeds its configured
+reparse limit. `maxOutputBytes` and `maxTokens` are retention caps: they set the
+successful result's `truncated` flag instead of throwing.
 
 `HtmlConfigurationError.reason` is one of `UNKNOWN_OPTION`, `INVALID_VALUE`, or
 `CONFLICTING_OPTIONS`. `HtmlPatchPlanningError.reason` supplies the specific

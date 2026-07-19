@@ -1,7 +1,7 @@
 {
   "name": "@ismail-elkorchi/html-parser",
   "version": "0.1.1",
-  "description": "HTML parser with visible-text extraction, fragment parsing, and structural traversal.",
+  "description": "HTML parser with bounded text extraction, fragment parsing, and structural traversal.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -48,6 +48,7 @@
     "test:fuzz": "npm run build && node scripts/fuzz/run-fuzz.mjs",
     "test:bench": "npm run build && node scripts/bench/run-bench.mjs",
     "test:bench:hard-budgets": "npm run build && node --expose-gc scripts/bench/run-hard-budget-evidence.mjs",
+    "test:bench:text-extraction": "npm run build && node --expose-gc scripts/bench/run-text-extraction-evidence.mjs",
     "test:bench:stability": "npm run build && node scripts/bench/run-bench-stability.mjs",
     "examples:run": "npm run build && node examples/run-all.mjs",
     "smoke:node": "npm run build && node scripts/smoke/control.mjs --runtime=node --report=reports/smoke-node.json",

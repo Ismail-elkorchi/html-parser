@@ -19,13 +19,24 @@ document
 1
 ```
 
-## Step 2: Extract visible text
+## Step 2: Extract bounded visible text
 
 ```ts
-import { parse, visibleText } from "@ismail-elkorchi/html-parser";
+import {
+  VISIBLE_TEXT_HTML_POLICY,
+  extractText,
+  parse
+} from "@ismail-elkorchi/html-parser";
 
 const document = parse("<article><h1>Hello</h1><p>World</p></article>");
-console.log(visibleText(document.tree).trim());
+const result = extractText(document.tree, {
+  policy: VISIBLE_TEXT_HTML_POLICY,
+  maxOutputBytes: 4_096,
+  maxTokens: 256,
+  maxFallbackInputBytes: 4_096,
+  maxFallbackNodes: 256
+});
+console.log(result.text);
 ```
 
 Expected output:

@@ -22,6 +22,11 @@ and successful resource metadata. `parseFragment()` remains a direct
 Both roots also expose the same `TraceMode`, immutable event callback, summary,
 and discriminated trace-result types. Event-retention budgets are accepted only
 for `trace: "events"`.
+Both roots expose `extractText()` and `iterateText()` with identical versioned
+policy identities, required byte/token limits, immutable result and token
+shapes, and range-based provenance. The visible-text policy additionally
+requires bounded `noscript` fallback input and node limits. The removed eager
+extraction helpers are not retained as aliases.
 Both roots expose the exact namespace-aware element, attribute, doctype, and
 span shapes; canonical namespace URI constants; HTML convenience attribute
 helpers; and exact namespace query variants. JSR must not replace this union
