@@ -108,6 +108,16 @@ Do not update, remove, or narrow the html5lib submodule until the consumer
 suites have been assigned another authoritative pin and the live comparison
 still proves no coverage loss.
 
+The isolated tokenizer runner expands the 14 tokenizer files to 7,036 entry
+mode cases and applies the same visible primary/holdout partition as the legacy
+runner. Its foundational state set currently matches 6,175 primary and 690
+holdout cases. The other 171 cases stop with one of five exact state names:
+CDATA entry, processing-instruction entry, or the RCDATA, RAWTEXT, and script
+less-than-sign states. That classification is a temporary implementation
+boundary, not a skip or a fixture-ID allowlist; `npm run test:engine:tokenizer`
+also requires every outcome to agree under whole-input and one-UTF-16-unit
+chunks.
+
 ## Refresh procedure
 
 Refreshing the WPT snapshot is an explicit maintenance operation. Pass a full

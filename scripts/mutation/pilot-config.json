@@ -107,6 +107,48 @@
           "replace": "if (false && read.value === 0x3b) {\n                        this.#emitError(\"unknown-named-character-reference\", sourceSpan(read.position.utf16Offset, read.position.utf16Offset + 1));\n                    }"
         }
       ]
+    },
+    {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/tokenizer/tokenizer.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tokenizer/core.test.js", "tmp/test-runtime/test/engine/tokenizer/corpus.test.js"],
+      "mutants": [
+        {
+          "id": "tokenizer-data-character-reference",
+          "description": "Treat an ampersand in Data as ordinary text instead of invoking the reference consumer.",
+          "search": "if (read.value === \"&\") {\n            this.#startCharacterReference(read, { state: \"data-state\", context: \"text\" });\n        }",
+          "replace": "if (false && read.value === \"&\") {\n            this.#startCharacterReference(read, { state: \"data-state\", context: \"text\" });\n        }"
+        },
+        {
+          "id": "tokenizer-duplicate-attribute",
+          "description": "Suppress duplicate-attribute diagnostics while retaining token output.",
+          "search": "if (this.#requireTag().finishAttributeName()) {\n            this.#emitParseError(\"duplicate-attribute\", span);\n        }",
+          "replace": "if (false && this.#requireTag().finishAttributeName()) {\n            this.#emitParseError(\"duplicate-attribute\", span);\n        }"
+        },
+        {
+          "id": "tokenizer-markup-declaration-error",
+          "description": "Suppress the incorrectly-opened-comment recovery diagnostic.",
+          "search": "this.#emitParseError(\"incorrectly-opened-comment\", decisionSpan(read));",
+          "replace": "if (false) this.#emitParseError(\"incorrectly-opened-comment\", decisionSpan(read));"
+        },
+        {
+          "id": "tokenizer-self-closing-acknowledgement",
+          "description": "Ignore a rejected self-closing acknowledgement from the synchronous sink.",
+          "search": "if (token.kind === \"start-tag\" && token.selfClosing && !acceptance.selfClosingAcknowledged) {",
+          "replace": "if (false && token.kind === \"start-tag\" && token.selfClosing && !acceptance.selfClosingAcknowledged) {"
+        }
+      ]
+    },
+    {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/tokenizer/builders.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tokenizer/core.test.js", "tmp/test-runtime/test/engine/tokenizer/corpus.test.js"],
+      "mutants": [
+        {
+          "id": "tokenizer-doctype-force-quirks",
+          "description": "Leave malformed DOCTYPE tokens out of quirks mode.",
+          "search": "this.#forceQuirks = true;",
+          "replace": "this.#forceQuirks = false;"
+        }
+      ]
     }
   ]
 }
