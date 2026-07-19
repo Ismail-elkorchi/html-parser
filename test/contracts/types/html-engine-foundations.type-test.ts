@@ -3,8 +3,8 @@ import {
   type HtmlToken,
   type InsertionMode,
   type TokenizerMode
-} from "../../src/internal/html-engine/mod.js";
-import * as PublicApi from "../../src/mod.js";
+} from "../../../src/internal/html-engine/mod.js";
+import * as PublicApi from "../../../src/mod.js";
 
 const token: HtmlToken = {
   kind: "doctype",

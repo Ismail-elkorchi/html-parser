@@ -23,46 +23,6 @@ function getInitialState(options: TokenizeOptions): TokenizerInitialState {
   return options.initialState ?? "Data state";
 }
 
-function normalizeCharacterData(value: string, input: string, options: TokenizeOptions): string {
-  let normalizedValue = value;
-
-  if (options.doubleEscaped && getInitialState(options) !== "CDATA section state") {
-    normalizedValue = normalizedValue.replace(/\u0000/g, "\uFFFD");
-    normalizedValue = normalizedValue.replace(/\\u0000/g, "\\uFFFD");
-  }
-
-  if (options.xmlViolationMode) {
-    normalizedValue = normalizedValue.replace(/[\uFFFE\uFFFF]/g, "\uFFFD");
-    normalizedValue = normalizedValue.replace(/\f/g, " ");
-  }
-
-  if (
-    getInitialState(options) === "CDATA section state" &&
-    options.doubleEscaped &&
-    input.endsWith("]]>") &&
-    normalizedValue.endsWith("]]>")
-  ) {
-    normalizedValue = normalizedValue.slice(0, -3);
-  }
-
-  return normalizedValue;
-}
-
-function normalizeCommentData(value: string, options: TokenizeOptions): string {
-  let normalizedValue = value;
-
-  if (options.doubleEscaped) {
-    normalizedValue = normalizedValue.replace(/\u0000/g, "\uFFFD");
-    normalizedValue = normalizedValue.replace(/\\u0000/g, "\\uFFFD");
-  }
-
-  if (options.xmlViolationMode) {
-    normalizedValue = normalizedValue.replace(/--/g, "- -");
-  }
-
-  return normalizedValue;
-}
-
 function mergeAdjacentCharacterTokens(tokens: readonly HtmlToken[]): HtmlToken[] {
   const merged: HtmlToken[] = [];
 
@@ -177,7 +137,7 @@ function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeRe
         options.checkpoint?.();
         tokens.push({
           type: "Comment",
-          data: normalizeCommentData(token.data, options)
+          data: token.data
         });
       },
       onDoctype(token) {
@@ -194,21 +154,21 @@ function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeRe
         options.checkpoint?.();
         tokens.push({
           type: "Character",
-          data: normalizeCharacterData(token.chars, input, options)
+          data: token.chars
         });
       },
       onWhitespaceCharacter(token) {
         options.checkpoint?.();
         tokens.push({
           type: "Character",
-          data: normalizeCharacterData(token.chars, input, options)
+          data: token.chars
         });
       },
       onNullCharacter(token) {
         options.checkpoint?.();
         tokens.push({
           type: "Character",
-          data: normalizeCharacterData(token.chars, input, options)
+          data: token.chars
         });
       },
       onParseError(error: { readonly code: string; readonly startOffset: number }) {
@@ -239,19 +199,6 @@ function tokenizeWithParse5(input: string, options: TokenizeOptions): TokenizeRe
   }
 
   parser.write(input, true);
-
-  if (
-    options.doubleEscaped &&
-    input.startsWith("<!----!") &&
-    input.endsWith("-->") &&
-    tokens.length === 1 &&
-    tokens[0]?.type === "Character"
-  ) {
-    tokens[0] = {
-      type: "Comment",
-      data: normalizeCommentData(input.slice(4, -3), options)
-    };
-  }
 
   const mergedTokens = mergeAdjacentCharacterTokens(tokens);
 

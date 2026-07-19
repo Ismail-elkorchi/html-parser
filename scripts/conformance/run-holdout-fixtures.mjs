@@ -1,53 +1,22 @@
 import { readFile } from "node:fs/promises";
 
 import { sniffHtmlEncoding } from "../../dist/internal/encoding/sniff.js";
-import { serializeFixtureTokenStream } from "../../dist/internal/serializer/mod.js";
-import { tokenize } from "../../dist/internal/tokenizer/mod.js";
 import { buildTreeFromHtml, normalizeTree } from "../../dist/internal/tree/mod.js";
+import {
+  ALL_HTML5LIB_FIXTURE_FILES,
+  ENCODING_FIXTURE_FILES,
+  requireFixtureFiles,
+  SERIALIZER_FIXTURE_FILES,
+  TOKENIZER_FIXTURE_FILES,
+  TREE_FIXTURE_FILES
+} from "../../test/support/fixture-sources.mjs";
+import { serializeFixtureTokenStream } from "../../tmp/test-runtime/test/support/fixture-serializer.js";
+import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
+import { tokenizeFixtureCase } from "../../test/support/tokenizer-fixture-adapter.mjs";
 import { writeJson } from "../eval/eval-primitives.mjs";
-import { expandTreeDatCases, parseTreeDatFixtures } from "./tree-dat.mjs";
 
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
-
-const TOKENIZER_FILES = [
-  "vendor/html5lib-tests/tokenizer/test1.test",
-  "vendor/html5lib-tests/tokenizer/test2.test",
-  "vendor/html5lib-tests/tokenizer/test3.test",
-  "vendor/html5lib-tests/tokenizer/test4.test",
-  "vendor/html5lib-tests/tokenizer/entities.test",
-  "vendor/html5lib-tests/tokenizer/namedEntities.test",
-  "vendor/html5lib-tests/tokenizer/numericEntities.test",
-  "vendor/html5lib-tests/tokenizer/unicodeChars.test",
-  "vendor/html5lib-tests/tokenizer/unicodeCharsProblematic.test",
-  "vendor/html5lib-tests/tokenizer/domjs.test",
-  "vendor/html5lib-tests/tokenizer/escapeFlag.test",
-  "vendor/html5lib-tests/tokenizer/contentModelFlags.test",
-  "vendor/html5lib-tests/tokenizer/xmlViolation.test"
-];
-
-const TREE_FILES = [
-  "vendor/html5lib-tests/tree-construction/tests1.dat",
-  "vendor/html5lib-tests/tree-construction/tests2.dat",
-  "vendor/html5lib-tests/tree-construction/tests3.dat",
-  "vendor/html5lib-tests/tree-construction/tests4.dat",
-  "vendor/html5lib-tests/tree-construction/tests5.dat",
-  "vendor/html5lib-tests/tree-construction/tests6.dat"
-];
-
-const ENCODING_FIXTURE_FILES = [
-  "vendor/html5lib-tests/encoding/tests1.dat",
-  "vendor/html5lib-tests/encoding/tests2.dat",
-  "vendor/html5lib-tests/encoding/test-yahoo-jp.dat"
-];
-
-const SERIALIZER_FILES = [
-  "vendor/html5lib-tests/serializer/core.test",
-  "vendor/html5lib-tests/serializer/options.test",
-  "vendor/html5lib-tests/serializer/whitespace.test",
-  "vendor/html5lib-tests/serializer/optionaltags.test",
-  "vendor/html5lib-tests/serializer/injectmeta.test"
-];
 
 const encoder = new TextEncoder();
 
@@ -187,7 +156,7 @@ function sumCases(records) {
 
 async function runTokenizerHoldout() {
   const parsedCases = [];
-  for (const fixturePath of TOKENIZER_FILES) {
+  for (const fixturePath of TOKENIZER_FIXTURE_FILES) {
     const fixtureFile = JSON.parse(await readFile(fixturePath, "utf8"));
     const tests = fixtureFile.tests ?? fixtureFile.xmlViolationTests ?? [];
 
@@ -219,7 +188,7 @@ async function runTokenizerHoldout() {
   const failures = [];
 
   for (const fixtureCase of selectedCases) {
-    const tokenizeResult = tokenize(fixtureCase.input, {
+    const tokenizeResult = tokenizeFixtureCase(fixtureCase.input, {
       initialState: fixtureCase.initialState,
       lastStartTag: fixtureCase.lastStartTag,
       doubleEscaped: fixtureCase.doubleEscaped,
@@ -266,7 +235,7 @@ async function runTokenizerHoldout() {
 
 async function runTreeHoldout() {
   const allTests = [];
-  for (const fixturePath of TREE_FILES) {
+  for (const fixturePath of TREE_FIXTURE_FILES) {
     const fixtureData = await readFile(fixturePath, "utf8");
     const baseCases = parseTreeDatFixtures(fixtureData, fixturePath);
     allTests.push(...expandTreeDatCases(baseCases, {
@@ -374,7 +343,7 @@ async function runEncodingHoldout() {
 
 async function runSerializerHoldout() {
   const serializerCases = [];
-  for (const fixturePath of SERIALIZER_FILES) {
+  for (const fixturePath of SERIALIZER_FIXTURE_FILES) {
     const fixtureFile = JSON.parse(await readFile(fixturePath, "utf8"));
     for (let caseIndex = 0; caseIndex < (fixtureFile.tests ?? []).length; caseIndex += 1) {
       const fixtureCase = fixtureFile.tests[caseIndex];
@@ -423,6 +392,7 @@ async function runSerializerHoldout() {
   };
 }
 
+await requireFixtureFiles(ALL_HTML5LIB_FIXTURE_FILES);
 const tokenizerHoldout = await runTokenizerHoldout();
 const treeHoldout = await runTreeHoldout();
 const encodingHoldout = await runEncodingHoldout();

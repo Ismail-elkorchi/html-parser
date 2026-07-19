@@ -4,7 +4,7 @@ import tseslint from "typescript-eslint";
 import boundaries from "eslint-plugin-boundaries";
 import importPlugin from "eslint-plugin-import-x";
 
-const typedFiles = ["src/**/*.ts", "test/**/*.ts", "tests/**/*.ts"];
+const typedFiles = ["src/**/*.ts", "test/**/*.ts"];
 
 const recommendedTypeChecked = tseslint.configs.recommendedTypeChecked.map((config) => ({
   ...config,
@@ -60,7 +60,7 @@ export default [
         { "type": "public", "pattern": "src/public/**" },
         { "type": "engine", "pattern": "src/internal/html-engine/**" },
         { "type": "internal", "pattern": "src/internal/**" },
-        { "type": "tests", "pattern": ["test/**", "tests/**"] }
+        { "type": "tests", "pattern": "test/**" }
       ]
     },
     rules: {

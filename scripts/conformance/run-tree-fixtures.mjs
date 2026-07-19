@@ -1,18 +1,13 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { writeJson } from "../eval/eval-primitives.mjs";
 import { buildTreeFromHtml, normalizeTree } from "../../dist/internal/tree/mod.js";
-import { expandTreeDatCases, parseTreeDatFixtures } from "./tree-dat.mjs";
-
-const TREE_FILES = [
-  "vendor/html5lib-tests/tree-construction/tests1.dat",
-  "vendor/html5lib-tests/tree-construction/tests2.dat",
-  "vendor/html5lib-tests/tree-construction/tests3.dat",
-  "vendor/html5lib-tests/tree-construction/tests4.dat",
-  "vendor/html5lib-tests/tree-construction/tests5.dat",
-  "vendor/html5lib-tests/tree-construction/tests6.dat"
-];
+import {
+  requireFixtureFiles,
+  TREE_FIXTURE_FILES
+} from "../../test/support/fixture-sources.mjs";
+import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
+import { writeJson } from "../eval/eval-primitives.mjs";
 
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
@@ -59,7 +54,8 @@ async function writeDivergenceRecord(caseId, inputHtml, expectedTree, actualTree
 }
 
 const allTests = [];
-for (const fixturePath of TREE_FILES) {
+await requireFixtureFiles(TREE_FIXTURE_FILES);
+for (const fixturePath of TREE_FIXTURE_FILES) {
   const fixtureData = await readFile(fixturePath, "utf8");
   const baseCases = parseTreeDatFixtures(fixtureData, fixturePath);
   allTests.push(...expandTreeDatCases(baseCases, {

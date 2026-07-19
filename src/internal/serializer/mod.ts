@@ -1,1 +1,1 @@
-export { serializeFixtureTokenStream, serializeTreeDocument } from "./serialize.js";
+export { serializeTreeDocument } from "./serialize.js";

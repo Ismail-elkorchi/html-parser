@@ -18,6 +18,7 @@ if (files.length === 0) {
   throw new Error(`run-node-tests: no test files found under ${roots.join(", ")}`);
 }
 
+files.sort();
 const result = spawnSync(process.execPath, ["--test", ...files], {
   stdio: "inherit"
 });

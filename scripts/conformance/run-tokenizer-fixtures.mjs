@@ -1,23 +1,11 @@
 import { readFile } from "node:fs/promises";
 
+import {
+  requireFixtureFiles,
+  TOKENIZER_FIXTURE_FILES
+} from "../../test/support/fixture-sources.mjs";
+import { tokenizeFixtureCase } from "../../test/support/tokenizer-fixture-adapter.mjs";
 import { writeJson } from "../eval/eval-primitives.mjs";
-import { tokenize } from "../../dist/internal/tokenizer/mod.js";
-
-const TOKENIZER_FILES = [
-  "vendor/html5lib-tests/tokenizer/test1.test",
-  "vendor/html5lib-tests/tokenizer/test2.test",
-  "vendor/html5lib-tests/tokenizer/test3.test",
-  "vendor/html5lib-tests/tokenizer/test4.test",
-  "vendor/html5lib-tests/tokenizer/entities.test",
-  "vendor/html5lib-tests/tokenizer/namedEntities.test",
-  "vendor/html5lib-tests/tokenizer/numericEntities.test",
-  "vendor/html5lib-tests/tokenizer/unicodeChars.test",
-  "vendor/html5lib-tests/tokenizer/unicodeCharsProblematic.test",
-  "vendor/html5lib-tests/tokenizer/domjs.test",
-  "vendor/html5lib-tests/tokenizer/escapeFlag.test",
-  "vendor/html5lib-tests/tokenizer/contentModelFlags.test",
-  "vendor/html5lib-tests/tokenizer/xmlViolation.test"
-];
 
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
@@ -69,7 +57,8 @@ function normalizeTokenArray(tokens) {
 }
 
 const parsedCases = [];
-for (const fixturePath of TOKENIZER_FILES) {
+await requireFixtureFiles(TOKENIZER_FIXTURE_FILES);
+for (const fixturePath of TOKENIZER_FIXTURE_FILES) {
   const fixtureFile = JSON.parse(await readFile(fixturePath, "utf8"));
   const tests = fixtureFile.tests ?? fixtureFile.xmlViolationTests ?? [];
 
@@ -108,7 +97,7 @@ for (const fixtureCase of parsedCases) {
 
   let tokenizeResult;
   try {
-    tokenizeResult = tokenize(fixtureCase.input, {
+    tokenizeResult = tokenizeFixtureCase(fixtureCase.input, {
       initialState: fixtureCase.initialState,
       lastStartTag: fixtureCase.lastStartTag,
       doubleEscaped: fixtureCase.doubleEscaped,

@@ -69,16 +69,15 @@ function main() {
   const outPath = path.resolve(repoRoot, args.out);
 
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-  const targetPath = path.resolve(repoRoot, config.targetFile);
-  const originalSource = fs.readFileSync(targetPath, "utf8");
+  if (!Array.isArray(config.targets) || config.targets.length === 0) {
+    throw new Error("mutation config must define a non-empty targets array");
+  }
 
   const report = {
-    schema: "mutation-pilot/v1",
+    schema: "mutation-pilot/v2",
     generatedAt: new Date().toISOString(),
     config: path.relative(repoRoot, configPath).split(path.sep).join("/"),
-    targetFile: path.relative(repoRoot, targetPath).split(path.sep).join("/"),
-    testCommand: config.testCommand,
-    mutants: [],
+    targets: [],
     totals: {
       total: 0,
       killed: 0,
@@ -87,39 +86,53 @@ function main() {
     },
   };
 
-  try {
-    for (const mutant of config.mutants) {
-      report.totals.total += 1;
-      const applied = applySingleReplace(originalSource, mutant.search, mutant.replace);
-      if (!applied.ok) {
-        report.totals.invalid += 1;
-        report.mutants.push({
+  for (const target of config.targets) {
+    if (!Array.isArray(target.testCommand) || !Array.isArray(target.mutants)) {
+      throw new Error("each mutation target must define testCommand and mutants arrays");
+    }
+    const targetPath = path.resolve(repoRoot, target.targetFile);
+    const originalSource = fs.readFileSync(targetPath, "utf8");
+    const targetReport = {
+      targetFile: path.relative(repoRoot, targetPath).split(path.sep).join("/"),
+      testCommand: target.testCommand,
+      mutants: [],
+    };
+    report.targets.push(targetReport);
+
+    try {
+      for (const mutant of target.mutants) {
+        report.totals.total += 1;
+        const applied = applySingleReplace(originalSource, mutant.search, mutant.replace);
+        if (!applied.ok) {
+          report.totals.invalid += 1;
+          targetReport.mutants.push({
+            id: mutant.id,
+            description: mutant.description,
+            status: "invalid",
+            reason: applied.reason,
+          });
+          continue;
+        }
+
+        fs.writeFileSync(targetPath, applied.value, "utf8");
+        const execution = runCommand(target.testCommand, repoRoot);
+        const status = execution.status === 0 ? "survived" : "killed";
+        if (status === "survived") {
+          report.totals.survived += 1;
+        } else {
+          report.totals.killed += 1;
+        }
+
+        targetReport.mutants.push({
           id: mutant.id,
           description: mutant.description,
-          status: "invalid",
-          reason: applied.reason,
+          status,
+          testExitCode: execution.status,
         });
-        continue;
       }
-
-      fs.writeFileSync(targetPath, applied.value, "utf8");
-      const execution = runCommand(config.testCommand, repoRoot);
-      const status = execution.status === 0 ? "survived" : "killed";
-      if (status === "survived") {
-        report.totals.survived += 1;
-      } else {
-        report.totals.killed += 1;
-      }
-
-      report.mutants.push({
-        id: mutant.id,
-        description: mutant.description,
-        status,
-        testExitCode: execution.status,
-      });
+    } finally {
+      fs.writeFileSync(targetPath, originalSource, "utf8");
     }
-  } finally {
-    fs.writeFileSync(targetPath, originalSource, "utf8");
   }
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });

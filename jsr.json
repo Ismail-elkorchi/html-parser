@@ -9,7 +9,6 @@
     "vendor/**",
     "src/internal/html-engine/**",
     "test/**",
-    "tests/**",
     "reports/**",
     "tmp/**",
     "scripts/**"

@@ -11,7 +11,6 @@ const INCLUDED_PREFIXES = [
   "src/",
   "scripts/",
   "test/",
-  "tests/",
   ".github/"
 ];
 

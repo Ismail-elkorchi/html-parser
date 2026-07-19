@@ -1,4 +1,4 @@
-export { buildTreeFromHtml, buildTreeFromTokens, TreeBudgetExceededError } from "./build.js";
+export { buildTreeFromHtml, TreeBudgetExceededError } from "./build.js";
 export { normalizeTree } from "./normalize.js";
 
 export type {

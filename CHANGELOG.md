@@ -3,6 +3,10 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Consolidate tests under one taxonomy, compile strict TypeScript runtime and
+  type-contract suites independently, move fixture adaptation out of runtime
+  source, require complete upstream fixture inventories, remove dead
+  token-to-tree production helpers, and extend mutation checks beyond encoding.
 - Add isolated strict-TypeScript foundations for the independent HTML engine,
   including incremental decoded-input preprocessing, exact UTF-16 positions,
   closed token and diagnostic types, synchronous control boundaries, hard
