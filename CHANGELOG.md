@@ -3,6 +3,9 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Pin the maintained WPT tree-construction corpus for deterministic offline
+  testing, preserve exact provenance and licenses, and consolidate `.dat`
+  decoding in test support while retaining every existing tree fixture.
 - Seal the embedded legacy runtime with exact per-file provenance and SHA-256
   verification, frozen public black-box fixtures, controlled mutation tests,
   and separate package metrics for installed dependencies and embedded code.

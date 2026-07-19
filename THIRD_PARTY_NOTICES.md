@@ -10,6 +10,14 @@ Scope:
 - License: MIT
 - Notice: Fixture data is used for conformance evaluation.
 
+## Web Platform Tests tree-construction fixtures
+- Source: https://github.com/web-platform-tests/wpt
+- Location in repository: `test/fixtures/upstream/wpt-tree-construction`
+- License: BSD-3-Clause
+- Notice: A test-only, offline snapshot of the maintained HTML
+  tree-construction fixtures. Exact commit, upstream paths, Git blob IDs,
+  SHA-256 values, and byte counts are recorded in the colocated `manifest.json`.
+
 ## parse5 runtime source (vendored subset)
 - Source: https://github.com/inikulin/parse5
 - Location in repository: `src/internal/vendor/parse5`

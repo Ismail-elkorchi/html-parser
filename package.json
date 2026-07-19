@@ -43,12 +43,14 @@
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "build": "tsc -p tsconfig.build.json && node scripts/build/copy-vendor.mjs",
     "prepare": "npm run build",
-    "test": "npm run test:control",
+    "test": "npm run test:control && node scripts/conformance/run-wpt-tree-fixtures.mjs",
     "test:control": "npm run build && node scripts/test/run-node-tests.mjs test/control tests/control && node scripts/eval/write-stub-reports.mjs",
     "test:conformance": "node scripts/conformance/run-all.mjs",
     "test:encoding": "npm run build && node scripts/conformance/run-encoding-fixtures.mjs",
     "test:tokenizer": "npm run build && node scripts/conformance/run-tokenizer-fixtures.mjs",
     "test:tree": "npm run build && node scripts/conformance/run-tree-fixtures.mjs",
+    "test:wpt-tree": "npm run build && node scripts/conformance/run-wpt-tree-fixtures.mjs",
+    "test:wpt-tree:coverage": "npm run build && node scripts/conformance/run-wpt-tree-fixtures.mjs --require-legacy-coverage",
     "test:serializer": "npm run build && node scripts/conformance/run-serializer-fixtures.mjs",
     "test:holdout": "npm run build && node scripts/conformance/run-holdout-fixtures.mjs",
     "test:browser-diff": "npm run build && node scripts/oracles/run-browser-diff.mjs",
@@ -76,7 +78,8 @@
     "docs:required": "node scripts/quality/doc-required.mjs",
     "docs:quality:jsr": "node scripts/quality/doc-jsr-quality.mjs",
     "release:notes:dry-run": "node scripts/release/render-notes.mjs --dry-run",
-    "changelog:update:dry-run": "node scripts/release/update-changelog.mjs --dry-run"
+    "changelog:update:dry-run": "node scripts/release/update-changelog.mjs --dry-run",
+    "wpt-tree:refresh": "node scripts/conformance/refresh-wpt-tree-fixtures.mjs"
   },
   "dependencies": {},
   "devDependencies": {

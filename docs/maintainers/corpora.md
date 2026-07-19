@@ -1,42 +1,100 @@
 # Conformance corpora
 
-## Current pin
+All normal tests run from local, checksum-verified data. They never fetch
+fixtures from the network.
 
-`vendor/html5lib-tests` is a Git submodule pinned at
-`8f43b7ec8c9d02179f5f38e0ea08cb5000fb9c9e`. Current runners consume its
-tokenizer, tree-construction, encoding, and serializer fixtures. Normal tests
-must use the local pin and must not fetch from the network.
+## Maintained tree-construction corpus
 
-Initialize a fresh checkout with:
+The checked-in WPT snapshot under
+`test/fixtures/upstream/wpt-tree-construction` is pinned to commit
+`e4ea1706fa708c3ac4523c534a65160d1ab20db8`. Its manifest records the official
+repository, upstream paths, Git blob IDs, SHA-256 values, licenses, byte counts,
+and expected inventory.
+
+Run the complete snapshot with:
+
+```bash
+npm run test:wpt-tree
+```
+
+The runner expands cases without a scripting marker into script-on and
+script-off variants. It reports a visible `current-primary` and
+`current-holdout` partition, verifies two consecutive results are identical,
+and compares the result fingerprint with the checked-in legacy-engine
+baseline. Tree-output conformance and parse-error-count evidence are reported
+separately because the WPT browser harness ignores the `.dat` error sections.
+
+The current snapshot contains 61 `.dat` files, 470,005 fixture bytes, 1,934
+base cases, and 3,828 scripting variants. Of those variants:
+
+- 3,690 execute through the current string-parser facade;
+- 134 are applicable but explicitly reported as unsupported because the
+  legacy fragment API cannot express an SVG or MathML context element; and
+- four are inapplicable to a static parser-library harness because they require
+  live DOM mutation or `document.write`.
+
+Every non-executed variant appears in `reports/wpt-tree.json` with its exact ID
+and reason. Files whose names contain `unsafe` remain applicable: their NUL,
+CR, and other raw input is preserved by the shared `.dat` reader.
+
+## Legacy corpus retained during migration
+
+`vendor/html5lib-tests` remains a Git submodule at
+`8f43b7ec8c9d02179f5f38e0ea08cb5000fb9c9e`. It still supplies tokenizer,
+encoding, serializer, and the previous six-file tree corpus. Initialize it
+when running those suites:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-The upstream html5lib-tests project now directs maintained HTML
-tree-construction tests to
-[Web Platform Tests](https://github.com/web-platform-tests/wpt/tree/master/html/syntax/parsing/resources).
-Do not update the existing submodule blindly: a newer revision can remove tree
-files that current runners still consume.
+The live coverage comparison proves that all 277 previous tree cases are
+represented in the WPT snapshot:
 
-## Migration rule
+```bash
+npm run test:wpt-tree:coverage
+```
 
-Before replacing or updating the current tree corpus:
+The inputs, contexts, and scripting requirements match. WPT has three updated
+expected trees in `tests1.dat` for processing-instruction handling. This is
+recorded standards drift; the corpus-only change does not alter production
+parser behavior.
 
-1. pin an exact WPT commit and preserve its license;
-2. record upstream paths and hashes for imported fixtures;
-3. run the maintained WPT `.dat` cases offline through one test-support parser;
-4. list every intentionally inapplicable case with a concrete reason;
-5. demonstrate equal or greater applicable coverage than the current pin;
-6. only then remove or narrow the old tree fixtures.
+Do not update, remove, or narrow the html5lib submodule until the consumer
+suites have been assigned another authoritative pin and the live comparison
+still proves no coverage loss.
 
-Tokenizer, encoding, and serializer fixtures may remain pinned separately if
-html5lib-tests remains their authoritative home. Fixture decoding and output
-normalization belong in test support, never in production parser behavior.
+## Refresh procedure
 
-Prefer a checked-in, test-only snapshot of the required WPT data over another
-large submodule. A refresh command may use the network when invoked explicitly;
-ordinary build and test commands must remain deterministic and offline.
+Refreshing the WPT snapshot is an explicit maintenance operation. Pass a full
+40-character WPT commit:
+
+```bash
+npm run wpt-tree:refresh -- --commit=<wpt-commit>
+```
+
+The command fetches only when invoked. For an already checked-out WPT tree at
+the same commit, add `--source=/absolute/path/to/wpt`. It replaces only the
+test snapshot and regenerates the provenance manifest.
+
+After a refresh:
+
+1. inspect the upstream commit and license;
+2. review added, removed, scripted, raw, and foreign-fragment cases;
+3. run `npm run test:wpt-tree:coverage`;
+4. inspect `reports/wpt-tree.json`, especially every skip and semantic change;
+5. update the result baseline only after accepting the evidence:
+
+   ```bash
+   npm run build
+   node scripts/conformance/run-wpt-tree-fixtures.mjs \
+     --require-legacy-coverage --update-baseline
+   ```
+
+6. rerun the full checks and confirm normal tests remain offline.
+
+Fixture decoding and expected-output formatting belong in test support, never
+in production parser behavior.
 
 ## Ownership and provenance
 
@@ -46,6 +104,6 @@ Product regressions cover html-parser-specific budgets, errors, spans, traces,
 immutability, and public API behavior.
 
 Store licenses and corpus provenance with test fixtures and summarize them in
-[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md). Do not describe a test
-partition as private or holdout unless normal contributors truly cannot see or
-run it.
+[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md). A test partition is not
+private merely because it is called holdout; all repository partitions are
+visible and runnable.

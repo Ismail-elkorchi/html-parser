@@ -21,6 +21,8 @@ Use narrower commands while iterating:
 | Do production TypeScript sources compile? | `npm run typecheck` |
 | Does the package build? | `npm run build` |
 | Do control and regression tests pass? | `npm test` |
+| Does the maintained WPT tree snapshot reproduce its frozen result? | `npm run test:wpt-tree` |
+| Does WPT retain every legacy tree case? | `npm run test:wpt-tree:coverage` |
 | Do documentation links and API names stay valid? | `npm run docs:check` |
 | Do documented TypeScript examples compile strictly? | `npm run docs:snippets` |
 | Do repository examples execute? | `npm run examples:run` |
@@ -32,10 +34,12 @@ JavaScript test file is a TypeScript contract test.
 
 ## Parser semantics
 
-`npm run test:conformance` runs tokenizer, tree, encoding, serializer, and the
-currently named holdout suite. Individual commands are available as
-`test:tokenizer`, `test:tree`, `test:encoding`, `test:serializer`, and
-`test:holdout`.
+`npm run test:conformance` runs the legacy-pinned tokenizer, tree, encoding,
+serializer, and currently named holdout suite. Individual commands are
+available as `test:tokenizer`, `test:tree`, `test:encoding`, `test:serializer`,
+and `test:holdout`. The maintained WPT tree suite is separate because its
+frozen report intentionally exposes legacy-engine conformance gaps while
+failing only on unexplained corpus, determinism, coverage, or baseline drift.
 
 The aggregate command currently executes every partition, including holdout;
 the label does not make those cases hidden. Treat all of its results as one
