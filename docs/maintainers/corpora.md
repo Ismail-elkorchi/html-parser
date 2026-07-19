@@ -20,18 +20,25 @@ npm run character-references:check
 npm run test:engine:character-references
 ```
 
-The refresh command is deliberately network-only and requires the expected
-SHA-256 for the entity data, license, and rendered standard snapshot before it
-writes anything. It also requires an explicit retrieval date, standard
-revision, and immutable license URL. Obtain and review those values first, then
-run:
+The refresh command requires reviewed local candidate files and independently
+fetches their fixed upstream URLs. It writes only the local candidates after
+both copies match the supplied SHA-256 values, their schemas agree, and the
+rendered standard's complete table matches the JSON. It also requires an
+explicit retrieval date and immutable standard/license revisions. Stage and
+inspect the three files outside the repository first, then run:
 
 ```bash
 npm run character-references:refresh -- \
+  --entities-file=<reviewed-entities-json> \
+  --entities-bytes=<expected-entities-bytes> \
   --entities-sha256=<expected-entities-sha256> \
-  --license-url=<immutable-license-url> \
+  --license-file=<reviewed-whatwg-license> \
+  --license-bytes=<expected-license-bytes> \
+  --license-revision=<whatwg-html-git-commit> \
   --license-sha256=<expected-license-sha256> \
   --retrieved-at=<yyyy-mm-dd> \
+  --standard-file=<reviewed-rendered-snapshot> \
+  --standard-bytes=<expected-rendered-snapshot-bytes> \
   --standard-revision=<rendered-snapshot-id> \
   --standard-sha256=<expected-rendered-snapshot-sha256>
 ```

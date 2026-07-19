@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import {
@@ -16,7 +16,7 @@ import {
   sha256
 } from "./named-character-reference-data.mjs";
 
-const DEFAULT_ENTITIES_URL = "https://html.spec.whatwg.org/entities.json";
+const ENTITIES_URL = "https://html.spec.whatwg.org/entities.json";
 
 function parseArguments(arguments_) {
   const values = new Map();
@@ -30,17 +30,23 @@ function parseArguments(arguments_) {
     values.set(name, value);
   }
   const required = [
+    "entities-file",
+    "entities-bytes",
     "entities-sha256",
-    "license-url",
+    "license-file",
+    "license-bytes",
+    "license-revision",
     "license-sha256",
     "retrieved-at",
+    "standard-file",
+    "standard-bytes",
     "standard-revision",
     "standard-sha256"
   ];
   for (const name of required) {
     if (!values.has(name)) throw new Error(`refresh named character references: missing --${name}`);
   }
-  const allowed = new Set([...required, "entities-url"]);
+  const allowed = new Set(required);
   for (const name of values.keys()) {
     if (!allowed.has(name)) throw new Error(`refresh named character references: unsupported --${name}`);
   }
@@ -59,37 +65,111 @@ function validateSha256(name, value) {
   }
 }
 
-async function fetchBytes(url) {
-  const response = await globalThis.fetch(url, { redirect: "follow" });
+function validateByteCount(name, value) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || String(parsed) !== value) {
+    throw new Error(`refresh named character references: --${name} must be a positive safe integer`);
+  }
+  return parsed;
+}
+
+async function readLocalCandidate(filePath, expectedBytes) {
+  const fileStats = await stat(filePath);
+  if (!fileStats.isFile() || fileStats.size !== expectedBytes) {
+    throw new Error(
+      `refresh named character references: ${filePath} must be a ${String(expectedBytes)}-byte file`
+    );
+  }
+  return readFile(filePath);
+}
+
+async function fetchBytes(url, expectedBytes) {
+  const response = await globalThis.fetch(url, { redirect: "error" });
   if (!response.ok) {
     throw new Error(`refresh named character references: ${url} returned HTTP ${String(response.status)}`);
   }
-  return Buffer.from(await response.arrayBuffer());
+  if (response.body === null) {
+    throw new Error(`refresh named character references: ${url} returned no body`);
+  }
+  const chunks = [];
+  const reader = response.body.getReader();
+  let receivedBytes = 0;
+  for (;;) {
+    const read = await reader.read();
+    if (read.done) break;
+    receivedBytes += read.value.length;
+    if (receivedBytes > expectedBytes) {
+      await reader.cancel("verified byte limit exceeded");
+      throw new Error(
+        `refresh named character references: ${url} exceeded ${String(expectedBytes)} bytes`
+      );
+    }
+    chunks.push(Buffer.from(read.value));
+  }
+  if (receivedBytes !== expectedBytes) {
+    throw new Error(
+      `refresh named character references: ${url} expected ${String(expectedBytes)} bytes, received ${String(receivedBytes)}`
+    );
+  }
+  return Buffer.concat(chunks, receivedBytes);
 }
 
 const values = parseArguments(process.argv.slice(2));
-const entitiesUrl = values.get("entities-url") ?? DEFAULT_ENTITIES_URL;
+const entitiesFile = requiredValue(values, "entities-file");
+const entitiesBytesExpected = validateByteCount(
+  "entities-bytes",
+  requiredValue(values, "entities-bytes")
+);
 const entitiesSha256 = requiredValue(values, "entities-sha256");
-const licenseUrl = requiredValue(values, "license-url");
+const licenseFile = requiredValue(values, "license-file");
+const licenseBytesExpected = validateByteCount(
+  "license-bytes",
+  requiredValue(values, "license-bytes")
+);
+const licenseRevision = requiredValue(values, "license-revision");
 const licenseSha256 = requiredValue(values, "license-sha256");
 const retrievedAt = requiredValue(values, "retrieved-at");
+const standardFile = requiredValue(values, "standard-file");
+const standardBytesExpected = validateByteCount(
+  "standard-bytes",
+  requiredValue(values, "standard-bytes")
+);
 const standardRevision = requiredValue(values, "standard-revision");
 const standardSha256 = requiredValue(values, "standard-sha256");
 validateSha256("entities-sha256", entitiesSha256);
 validateSha256("license-sha256", licenseSha256);
 validateSha256("standard-sha256", standardSha256);
-if (!/^\d{4}-\d{2}-\d{2}$/.test(retrievedAt)) {
+const parsedRetrievalDate = new Date(`${retrievedAt}T00:00:00.000Z`);
+if (
+  !/^\d{4}-\d{2}-\d{2}$/.test(retrievedAt) ||
+  Number.isNaN(parsedRetrievalDate.valueOf()) ||
+  parsedRetrievalDate.toISOString().slice(0, 10) !== retrievedAt
+) {
   throw new Error("refresh named character references: --retrieved-at must be YYYY-MM-DD");
 }
 if (!/^[0-9a-f]{40}$/.test(standardRevision)) {
   throw new Error("refresh named character references: --standard-revision must be 40 lowercase hex digits");
 }
+if (!/^[0-9a-f]{40}$/.test(licenseRevision)) {
+  throw new Error("refresh named character references: --license-revision must be 40 lowercase hex digits");
+}
 
 const standardUrl = `https://html.spec.whatwg.org/commit-snapshots/${standardRevision}/`;
-const [entitiesBytes, licenseBytes, standardBytes] = await Promise.all([
-  fetchBytes(entitiesUrl),
-  fetchBytes(licenseUrl),
-  fetchBytes(standardUrl)
+const licenseUrl = `https://raw.githubusercontent.com/whatwg/html/${licenseRevision}/LICENSE`;
+const [
+  entitiesBytes,
+  licenseBytes,
+  standardBytes,
+  remoteEntitiesBytes,
+  remoteLicenseBytes,
+  remoteStandardBytes
+] = await Promise.all([
+  readLocalCandidate(entitiesFile, entitiesBytesExpected),
+  readLocalCandidate(licenseFile, licenseBytesExpected),
+  readLocalCandidate(standardFile, standardBytesExpected),
+  fetchBytes(ENTITIES_URL, entitiesBytesExpected),
+  fetchBytes(licenseUrl, licenseBytesExpected),
+  fetchBytes(standardUrl, standardBytesExpected)
 ]);
 const actualEntitiesSha256 = sha256(entitiesBytes);
 const actualLicenseSha256 = sha256(licenseBytes);
@@ -109,6 +189,24 @@ if (actualStandardSha256 !== standardSha256) {
     `refresh named character references: standard SHA-256 expected=${standardSha256} actual=${actualStandardSha256}`
   );
 }
+const remoteEntitiesSha256 = sha256(remoteEntitiesBytes);
+const remoteLicenseSha256 = sha256(remoteLicenseBytes);
+const remoteStandardSha256 = sha256(remoteStandardBytes);
+if (remoteEntitiesSha256 !== entitiesSha256) {
+  throw new Error(
+    `refresh named character references: remote entities SHA-256 expected=${entitiesSha256} actual=${remoteEntitiesSha256}`
+  );
+}
+if (remoteLicenseSha256 !== licenseSha256) {
+  throw new Error(
+    `refresh named character references: remote license SHA-256 expected=${licenseSha256} actual=${remoteLicenseSha256}`
+  );
+}
+if (remoteStandardSha256 !== standardSha256) {
+  throw new Error(
+    `refresh named character references: remote standard SHA-256 expected=${standardSha256} actual=${remoteStandardSha256}`
+  );
+}
 
 const inspection = inspectEntities(entitiesBytes);
 const standardTable = inspectStandardNamedReferenceTable(standardBytes);
@@ -119,7 +217,7 @@ const manifest = {
   artifact: "WHATWG named character references",
   retrievedAt,
   entities: {
-    url: entitiesUrl,
+    url: ENTITIES_URL,
     bytes: entitiesBytes.length,
     sha256: actualEntitiesSha256,
     entryCount: inspection.entryCount,
