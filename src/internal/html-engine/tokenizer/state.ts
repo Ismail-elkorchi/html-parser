@@ -1,0 +1,103 @@
+/** Exact tokenizer-state anchors in the pinned HTML Standard revision. */
+export const HTML_TOKENIZER_STATES = Object.freeze([
+  "data-state",
+  "rcdata-state",
+  "rawtext-state",
+  "script-data-state",
+  "plaintext-state",
+  "tag-open-state",
+  "end-tag-open-state",
+  "tag-name-state",
+  "rcdata-less-than-sign-state",
+  "rcdata-end-tag-open-state",
+  "rcdata-end-tag-name-state",
+  "rawtext-less-than-sign-state",
+  "rawtext-end-tag-open-state",
+  "rawtext-end-tag-name-state",
+  "script-data-less-than-sign-state",
+  "script-data-end-tag-open-state",
+  "script-data-end-tag-name-state",
+  "script-data-escape-start-state",
+  "script-data-escape-start-dash-state",
+  "script-data-escaped-state",
+  "script-data-escaped-dash-state",
+  "script-data-escaped-dash-dash-state",
+  "script-data-escaped-less-than-sign-state",
+  "script-data-escaped-end-tag-open-state",
+  "script-data-escaped-end-tag-name-state",
+  "script-data-double-escape-start-state",
+  "script-data-double-escaped-state",
+  "script-data-double-escaped-dash-state",
+  "script-data-double-escaped-dash-dash-state",
+  "script-data-double-escaped-less-than-sign-state",
+  "script-data-double-escape-end-state",
+  "before-attribute-name-state",
+  "attribute-name-state",
+  "after-attribute-name-state",
+  "before-attribute-value-state",
+  "attribute-value-(double-quoted)-state",
+  "attribute-value-(single-quoted)-state",
+  "attribute-value-(unquoted)-state",
+  "after-attribute-value-(quoted)-state",
+  "self-closing-start-tag-state",
+  "bogus-comment-state",
+  "markup-declaration-open-state",
+  "comment-start-state",
+  "comment-start-dash-state",
+  "comment-state",
+  "comment-less-than-sign-state",
+  "comment-less-than-sign-bang-state",
+  "comment-less-than-sign-bang-dash-state",
+  "comment-less-than-sign-bang-dash-dash-state",
+  "comment-end-dash-state",
+  "comment-end-state",
+  "comment-end-bang-state",
+  "doctype-state",
+  "before-doctype-name-state",
+  "doctype-name-state",
+  "after-doctype-name-state",
+  "after-doctype-public-keyword-state",
+  "before-doctype-public-identifier-state",
+  "doctype-public-identifier-(double-quoted)-state",
+  "doctype-public-identifier-(single-quoted)-state",
+  "after-doctype-public-identifier-state",
+  "between-doctype-public-and-system-identifiers-state",
+  "after-doctype-system-keyword-state",
+  "before-doctype-system-identifier-state",
+  "doctype-system-identifier-(double-quoted)-state",
+  "doctype-system-identifier-(single-quoted)-state",
+  "after-doctype-system-identifier-state",
+  "bogus-doctype-state",
+  "cdata-section-state",
+  "cdata-section-bracket-state",
+  "cdata-section-end-state",
+  "processing-instruction-open-state",
+  "processing-instruction-target-state",
+  "after-processing-instruction-target-state",
+  "processing-instruction-data-state",
+  "processing-instruction-questionable-state",
+  "character-reference-state",
+  "named-character-reference-state",
+  "ambiguous-ampersand-state",
+  "numeric-character-reference-state",
+  "hexadecimal-character-reference-start-state",
+  "decimal-character-reference-start-state",
+  "hexadecimal-character-reference-state",
+  "decimal-character-reference-state",
+  "numeric-character-reference-end-state"
+] as const);
+
+export type HtmlTokenizerState = (typeof HTML_TOKENIZER_STATES)[number];
+
+/** A standards state intentionally deferred by the current isolated engine row. */
+export class EngineUnsupportedTokenizerStateError extends Error {
+  readonly code = "UNSUPPORTED_TOKENIZER_STATE";
+  readonly state: HtmlTokenizerState;
+
+  constructor(state: HtmlTokenizerState) {
+    super(`Tokenizer state is not implemented in this engine stage: ${state}`);
+    this.name = "EngineUnsupportedTokenizerStateError";
+    this.state = state;
+    Object.freeze(this);
+  }
+}

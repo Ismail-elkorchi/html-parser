@@ -71,6 +71,16 @@ export {
 } from "./resource-guard.js";
 export { ENGINE_STANDARD_BASELINE, HTML_STANDARD_REVISION } from "./standards.js";
 export {
+  EngineUnsupportedTokenizerStateError,
+  HTML_TOKENIZER_STATES,
+  HtmlTokenizer,
+  type HtmlTokenizerDone,
+  type HtmlTokenizerNeedMore,
+  type HtmlTokenizerOptions,
+  type HtmlTokenizerRunResult,
+  type HtmlTokenizerState
+} from "./tokenizer/mod.js";
+export {
   runEngineFoundationDriver,
   type EngineDocumentDriverConfiguration,
   type EngineDriverParserConfiguration,
