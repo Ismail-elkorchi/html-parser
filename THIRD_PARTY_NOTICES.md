@@ -18,6 +18,17 @@ Scope:
   tree-construction fixtures. Exact commit, upstream paths, Git blob IDs,
   SHA-256 values, and byte counts are recorded in the colocated `manifest.json`.
 
+## WHATWG named character references
+- Source: https://html.spec.whatwg.org/entities.json
+- Location in repository:
+  `test/fixtures/upstream/whatwg-named-character-references`
+- License: CC BY 4.0; incorporated source-code portions are also available under
+  BSD-3-Clause, as stated in the colocated WHATWG license.
+- Notice: The exact test/generator input, license, rendered-standard snapshot
+  identity, retrieval date, SHA-256 values, byte counts, and schema counts are
+  recorded in the colocated `manifest.json`. The generated first-party table is
+  excluded from published packages while the independent engine is incomplete.
+
 ## parse5 runtime source (vendored subset)
 - Source: https://github.com/inikulin/parse5
 - Location in repository: `src/internal/vendor/parse5`

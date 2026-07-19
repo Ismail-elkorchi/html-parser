@@ -25,6 +25,12 @@ const OWNED_BOUNDARY_FILES = Object.freeze([
   "src/internal/tree/mod.ts"
 ]);
 
+const FORBIDDEN_ENGINE_SOURCE_PATTERNS = Object.freeze([
+  /src\/internal\/vendor/,
+  /parse5-runtime/,
+  /(?:from|import)\s*["'](?:parse5|entities|htmlparser2|jsdom)(?:[/'"])/
+]);
+
 async function exists(filePath) {
   try {
     await stat(filePath);
@@ -32,6 +38,16 @@ async function exists(filePath) {
   } catch {
     return false;
   }
+}
+
+async function listFiles(directoryPath) {
+  const files = [];
+  for (const entry of await readdir(directoryPath, { withFileTypes: true })) {
+    const entryPath = `${directoryPath}/${entry.name}`;
+    if (entry.isDirectory()) files.push(...await listFiles(entryPath));
+    else if (entry.isFile()) files.push(entryPath);
+  }
+  return files;
 }
 
 if (await exists("tests")) {
@@ -58,4 +74,15 @@ for (const filePath of OWNED_BOUNDARY_FILES) {
   }
 }
 
-process.stdout.write("test architecture: one root and production/test-support boundaries verified\n");
+for (const filePath of await listFiles("src/internal/html-engine")) {
+  const source = await readFile(filePath, "utf8");
+  for (const pattern of FORBIDDEN_ENGINE_SOURCE_PATTERNS) {
+    if (pattern.test(source)) {
+      throw new Error(`test architecture: prohibited implementation reference in ${filePath}`);
+    }
+  }
+}
+
+process.stdout.write(
+  "test architecture: one root, production/test-support boundaries, and engine isolation verified\n"
+);

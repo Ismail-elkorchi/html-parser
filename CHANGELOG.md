@@ -3,6 +3,10 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Generate a compact named-character-reference table from separately pinned
+  WHATWG data and add an isolated incremental consumer with longest-match,
+  attribute-context, numeric-replacement, exact diagnostic, and resource
+  behavior covered by the complete applicable html5lib fixture set.
 - Consolidate tests under one taxonomy, compile strict TypeScript runtime and
   type-contract suites independently, move fixture adaptation out of runtime
   source, require complete upstream fixture inventories, remove dead

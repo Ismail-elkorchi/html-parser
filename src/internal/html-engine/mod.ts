@@ -1,4 +1,14 @@
 export {
+  CharacterReferenceConsumer,
+  type CharacterReferenceConsumerMetrics,
+  type CharacterReferenceConsumerOptions,
+  type CharacterReferenceContext,
+  type CharacterReferenceLiteral,
+  type CharacterReferenceNeedMore,
+  type CharacterReferenceResolved,
+  type CharacterReferenceResult
+} from "./character-reference-consumer.js";
+export {
   HTML_PARSE_ERROR_CODES,
   createParseError,
   type EngineParseError,
@@ -7,12 +17,21 @@ export {
 } from "./diagnostics.js";
 export {
   HtmlInputCursor,
+  type InputCodeUnit,
+  type InputCodeUnitRead,
   type InputCharacter,
   type InputEof,
   type InputNeedMore,
   type InputParseErrorObserver,
   type InputRead
 } from "./input-cursor.js";
+export {
+  LEGACY_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
+  MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
+  NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
+  probeNamedCharacterReference,
+  type NamedCharacterReferenceProbe
+} from "./named-character-references.js";
 export {
   type EngineObserver,
   type InsertionModeTokenContext,
