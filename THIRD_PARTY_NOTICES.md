@@ -21,3 +21,7 @@ Scope:
 - Location in repository: `src/internal/vendor/entities`
 - License: BSD-2-Clause
 - Notice: Vendored entity decoder subset used by the vendored tokenizer runtime.
+
+Exact source versions, registry artifacts, upstream and local SHA-256 values,
+and the responsibilities of the three local patches are recorded in
+[`legacy-runtime-manifest.json`](./legacy-runtime-manifest.json).

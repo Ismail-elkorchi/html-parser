@@ -3,6 +3,9 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Seal the embedded legacy runtime with exact per-file provenance and SHA-256
+  verification, frozen public black-box fixtures, controlled mutation tests,
+  and separate package metrics for installed dependencies and embedded code.
 - Return one `ParsedDocument` from all full-document entrypoints with optional
   exact decoded-source retention, encoding evidence, and successful resource
   observations; freeze parser-owned trees and require patch plans to retain the
