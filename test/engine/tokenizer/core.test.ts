@@ -304,3 +304,27 @@ void test("resource, abort, callback, and reentry failures stop before unavailab
   );
   assert.throws(() => reentrant.close(), (error) => error === reentryFailure);
 });
+
+void test("completion is idempotent but cannot accept new input", () => {
+  const tokens: HtmlToken[] = [];
+  const tokenizer = new HtmlTokenizer(
+    createEngineResourceGuard(),
+    {
+      accept(token) {
+        tokens.push(token);
+        return { selfClosingAcknowledged: true };
+      }
+    }
+  );
+  tokenizer.write("");
+  const completed = tokenizer.close();
+  assert.deepEqual(tokenizer.run(), completed);
+  assert.deepEqual(tokenizer.close(), completed);
+  assert.deepEqual(tokens.map((token) => token.kind), ["eof"]);
+  assert.throws(
+    () => tokenizer.write("late"),
+    (error) =>
+      error instanceof EngineConfigurationError &&
+      error.option === "tokenizer"
+  );
+});

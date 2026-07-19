@@ -190,6 +190,9 @@ export class HtmlTokenizer implements TokenizerControl {
 
   /** Appends one decoded-input chunk and advances until another chunk is required. */
   write(chunk: string): HtmlTokenizerRunResult {
+    if (this.#done) {
+      throw new EngineConfigurationError("tokenizer", "cannot accept input after completion");
+    }
     return this.#invoke(() => {
       if (this.#closed) {
         throw new EngineConfigurationError("tokenizer", "cannot accept input after close");
@@ -1289,6 +1292,10 @@ export class HtmlTokenizer implements TokenizerControl {
 
   #emitToken(token: HtmlToken): { readonly selfClosingAcknowledged: boolean } {
     this.#flushCharacters();
+    return this.#deliverToken(token);
+  }
+
+  #deliverToken(token: HtmlToken): { readonly selfClosingAcknowledged: boolean } {
     this.#observer?.onToken?.(token);
     this.#guard.ensureActive();
     const acceptance: unknown = this.#sink.accept(token);
@@ -1332,21 +1339,7 @@ export class HtmlTokenizer implements TokenizerControl {
     this.#characterParts = [];
     this.#characterStartUtf16Offset = null;
     this.#characterEndUtf16Offset = null;
-    this.#observer?.onToken?.(token);
-    this.#guard.ensureActive();
-    const acceptance: unknown = this.#sink.accept(token);
-    this.#guard.ensureActive();
-    if (
-      typeof acceptance !== "object" ||
-      acceptance === null ||
-      Array.isArray(acceptance) ||
-      typeof (acceptance as { readonly selfClosingAcknowledged?: unknown }).selfClosingAcknowledged !== "boolean"
-    ) {
-      throw new EngineConfigurationError(
-        "token sink acceptance",
-        "must provide a boolean selfClosingAcknowledged value"
-      );
-    }
+    this.#deliverToken(token);
   }
 
   #finishAttributeName(span: SourceSpan): void {
