@@ -1,4 +1,8 @@
 import {
+  requireInternalValue,
+  unreachableInternalState
+} from "../foundation/internal-state-error.js";
+import {
   defaultTreeAdapter,
   parse,
   parseFragment,
@@ -81,6 +85,8 @@ type Parse5ChildNode =
   | Parse5CommentNode
   | Parse5DocumentType
   | Parse5Element;
+
+type Parse5LeafNode = Exclude<Parse5ChildNode, Parse5Element>;
 
 type Parse5AnyNode = Parse5Document | Parse5DocumentFragment | Parse5ChildNode;
 
@@ -819,7 +825,7 @@ function doctypeExternalId(
   return { kind: "none" };
 }
 
-function convertLeafNode(node: Parse5ChildNode, state: BuildState): TreeNode | null {
+function convertLeafNode(node: Parse5LeafNode, state: BuildState): TreeNode {
   const sourceLocation = state.captureSpans ? asSourceLocation(node.sourceCodeLocation) : undefined;
   const nodeSpan = toTreeSpan(sourceLocation);
 
@@ -854,15 +860,11 @@ function convertLeafNode(node: Parse5ChildNode, state: BuildState): TreeNode | n
     return doctypeNode;
   }
 
-  if (!isElementNode(node)) {
-    return null;
-  }
-
-  throw new Error("Element conversion requires completed child nodes");
+  return unreachableInternalState(node, "TREE_ADAPTER_LEAF_KIND_UNREACHABLE");
 }
 
 function convertNodes(nodes: readonly Parse5ChildNode[], state: BuildState): readonly TreeNode[] {
-  const converted = new WeakMap<object, TreeNode | null>();
+  const converted = new WeakMap<object, TreeNode>();
   const stack: { readonly node: Parse5ChildNode; readonly exiting: boolean }[] = [];
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
     const node = nodes[index];
@@ -897,10 +899,10 @@ function convertNodes(nodes: readonly Parse5ChildNode[], state: BuildState): rea
     const sourceLocation = state.captureSpans ? asSourceLocation(node.sourceCodeLocation) : undefined;
     const children: TreeNode[] = [];
     for (const child of node.childNodes) {
-      const convertedChild = converted.get(child);
-      if (convertedChild !== undefined && convertedChild !== null) {
-        children.push(convertedChild);
-      }
+      children.push(requireInternalValue(
+        converted.get(child),
+        "TREE_ADAPTER_CHILD_CONVERSION_MISSING"
+      ));
     }
     const prefix = null;
     const localName = node.tagName;
@@ -920,10 +922,10 @@ function convertNodes(nodes: readonly Parse5ChildNode[], state: BuildState): rea
 
   const result: TreeNode[] = [];
   for (const node of nodes) {
-    const convertedNode = converted.get(node);
-    if (convertedNode !== undefined && convertedNode !== null) {
-      result.push(convertedNode);
-    }
+    result.push(requireInternalValue(
+      converted.get(node),
+      "TREE_ADAPTER_ROOT_CONVERSION_MISSING"
+    ));
   }
   return result;
 }

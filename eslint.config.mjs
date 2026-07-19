@@ -58,6 +58,7 @@ export default [
       ],
       "boundaries/elements": [
         { "type": "public", "pattern": "src/public/**" },
+        { "type": "internal-foundation", "pattern": "src/internal/foundation/**" },
         { "type": "engine", "pattern": "src/internal/html-engine/**" },
         { "type": "internal", "pattern": "src/internal/**" },
         { "type": "tests", "pattern": "test/**" }
@@ -91,20 +92,34 @@ export default [
           "policies": [
             {
               "from": { "element": { "types": "public" } },
-              "allow": { "to": { "element": { "types": { "anyOf": ["public", "internal"] } } } }
+              "allow": {
+                "to": {
+                  "element": { "types": { "anyOf": ["public", "internal", "internal-foundation"] } }
+                }
+              }
             },
             {
               "from": { "element": { "types": "engine" } },
-              "allow": { "to": { "element": { "types": "engine" } } }
+              "allow": {
+                "to": { "element": { "types": { "anyOf": ["engine", "internal-foundation"] } } }
+              }
             },
             {
               "from": { "element": { "types": "internal" } },
-              "allow": { "to": { "element": { "types": "internal" } } }
+              "allow": {
+                "to": { "element": { "types": { "anyOf": ["internal", "internal-foundation"] } } }
+              }
             },
             {
               "from": { "element": { "types": "tests" } },
               "allow": {
-                  "to": { "element": { "types": { "anyOf": ["public", "engine", "internal", "tests"] } } }
+                  "to": {
+                    "element": {
+                      "types": {
+                        "anyOf": ["public", "engine", "internal", "internal-foundation", "tests"]
+                      }
+                    }
+                  }
               }
             }
           ]
@@ -115,7 +130,18 @@ export default [
   {
     files: ["src/**/*.ts"],
     rules: {
-      "import-x/no-nodejs-modules": "error"
+      "import-x/no-nodejs-modules": "error",
+      "no-restricted-syntax": [
+        "error",
+        {
+          "selector": "ThrowStatement > NewExpression[callee.name='Error']",
+          "message": "Production failures must use a typed error category."
+        },
+        {
+          "selector": "ThrowStatement > CallExpression[callee.name='Error']",
+          "message": "Production failures must use a typed error category."
+        }
+      ]
     }
   },
   {

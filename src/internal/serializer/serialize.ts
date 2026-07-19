@@ -1,3 +1,5 @@
+import { failInternalState } from "../foundation/internal-state-error.js";
+
 import type { TreeAttribute, TreeNode, TreeNodeDocument } from "../tree/types.js";
 
 const VOID_ELEMENTS = new Set([
@@ -78,7 +80,7 @@ function quoteDoctypeIdentifier(value: string): string {
   if (!value.includes("'")) {
     return `'${value}'`;
   }
-  throw new Error("DOCTYPE identifier cannot be serialized losslessly");
+  return failInternalState("TREE_SERIALIZER_DOCTYPE_IDENTIFIER_UNREPRESENTABLE");
 }
 
 function serializeTreeNodes(nodes: readonly TreeNode[]): string {

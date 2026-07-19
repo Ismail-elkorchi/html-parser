@@ -1,3 +1,5 @@
+import { failInternalState } from "../foundation/internal-state-error.js";
+
 import { HtmlInputCursor, type InputCharacter } from "./input-cursor.js";
 import {
   createEngineResourceGuard,
@@ -197,7 +199,7 @@ export function runEngineFoundationDriver(
   }
   cursor.close();
   if (!consumeAvailable()) {
-    throw new Error("Input cursor invariant violated: closed input requested more data");
+    failInternalState("FOUNDATION_CURSOR_REQUESTED_MORE_AFTER_CLOSE");
   }
 
   return Object.freeze({

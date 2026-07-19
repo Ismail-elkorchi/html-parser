@@ -75,6 +75,12 @@ npm and JSR artifacts, and is reachable only by repository tests. Its initial
 standards baseline is pinned in code so later implementation work cannot
 silently follow a moving Living Standard revision.
 
+Private state contradictions use the shared internal foundation error and
+machine-readable reasons; they are library defects, not public operational
+errors. Production TypeScript may not throw unclassified generic `Error`
+instances. Configuration, resource, cancellation, callback, and parse failures
+retain their separate contracts.
+
 Test-only fixture conventions, serializers, corpus readers, and integrity
 checks live under `test/support`. Production source must not export helpers for
 adapting third-party fixture formats; conformance runners adapt those formats at

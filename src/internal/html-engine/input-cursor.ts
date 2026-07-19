@@ -1,3 +1,5 @@
+import { requireInternalValue } from "../foundation/internal-state-error.js";
+
 import { createParseError, type EngineParseError, type HtmlParseErrorCode } from "./diagnostics.js";
 import { sourcePosition, sourceSpan, type SourcePosition, type SourceSpan } from "./positions.js";
 import { EngineConfigurationError, type EngineResourceGuard } from "./resource-guard.js";
@@ -226,10 +228,10 @@ export class HtmlInputCursor {
   #advance(codeUnits: number): void {
     let remaining = codeUnits;
     while (remaining > 0) {
-      const chunk = this.#chunks[this.#headChunk];
-      if (chunk === undefined) {
-        throw new Error("Input cursor invariant violated: advance exceeded buffered input");
-      }
+      const chunk = requireInternalValue(
+        this.#chunks[this.#headChunk],
+        "INPUT_CURSOR_BUFFER_UNDERRUN"
+      );
       const available = chunk.length - this.#headOffset;
       const consumed = Math.min(available, remaining);
       this.#headOffset += consumed;

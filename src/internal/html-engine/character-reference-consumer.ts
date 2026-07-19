@@ -1,3 +1,5 @@
+import { failInternalState } from "../foundation/internal-state-error.js";
+
 import { createParseError, type EngineParseError, type HtmlParseErrorCode } from "./diagnostics.js";
 import { type HtmlInputCursor } from "./input-cursor.js";
 import {
@@ -64,8 +66,7 @@ type ConsumerState =
   | "numeric-start"
   | "hexadecimal-start"
   | "decimal"
-  | "hexadecimal"
-  | "done";
+  | "hexadecimal";
 
 interface NamedMatch {
   readonly name: string;
@@ -378,9 +379,6 @@ export class CharacterReferenceConsumer {
           }
           return this.#finishNumericValue();
         }
-
-        case "done":
-          throw new Error("Character reference consumer invariant violated: missing cached result");
       }
     }
   }
@@ -432,7 +430,7 @@ export class CharacterReferenceConsumer {
         read.span.endUtf16Offset !== read.span.startUtf16Offset + 1 ||
         read.value.charCodeAt(0) > 0x7f
       ) {
-        throw new Error("Character reference consumer invariant violated: expected ASCII input");
+        failInternalState("CHARACTER_REFERENCE_ASCII_CONSUMPTION_MISMATCH");
       }
       this.#consumedUtf16 += 1;
     }
@@ -523,7 +521,6 @@ export class CharacterReferenceConsumer {
       span: this.#resultSpan(),
       errors: Object.freeze([...this.#errors])
     });
-    this.#state = "done";
     this.#result = result;
     return result;
   }
@@ -537,7 +534,6 @@ export class CharacterReferenceConsumer {
       span: this.#resultSpan(),
       errors: Object.freeze([...this.#errors])
     });
-    this.#state = "done";
     this.#result = result;
     return result;
   }

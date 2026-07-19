@@ -1,4 +1,5 @@
 import { decodeHtmlBytes, sniffHtmlEncoding } from "../internal/encoding/mod.js";
+import { requireInternalValue } from "../internal/foundation/internal-state-error.js";
 import { tokenize, type HtmlToken } from "../internal/tokenizer/mod.js";
 import {
   buildTreeFromHtml,
@@ -697,11 +698,10 @@ function convertTreeNodes(
       };
     } else {
       const children = Object.freeze(node.children.map((child) => {
-        const convertedChild = converted.get(child);
-        if (convertedChild === undefined) {
-          throw new Error("Tree conversion order invariant violated");
-        }
-        return convertedChild;
+        return requireInternalValue(
+          converted.get(child),
+          "PUBLIC_TREE_CHILD_CONVERSION_MISSING"
+        );
       }));
       publicNode = {
         id: assigner.next(), kind: "element",
@@ -718,11 +718,10 @@ function convertTreeNodes(
   }
 
   return Object.freeze(nodes.map((node) => {
-    const convertedNode = converted.get(node);
-    if (convertedNode === undefined) {
-      throw new Error("Tree conversion result invariant violated");
-    }
-    return convertedNode;
+    return requireInternalValue(
+      converted.get(node),
+      "PUBLIC_TREE_ROOT_CONVERSION_MISSING"
+    );
   }));
 }
 

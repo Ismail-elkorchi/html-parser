@@ -1,3 +1,4 @@
+import { requireInternalValue } from "../../foundation/internal-state-error.js";
 import { sourceSpan, type SourceSpan } from "../positions.js";
 
 import type { StartTagResourceGuard } from "../resource-guard.js";
@@ -9,6 +10,11 @@ import type {
   HtmlStartTagToken,
   HtmlTokenAttribute
 } from "../tokens.js";
+
+type DoctypeFieldMissingReason =
+  | "TOKENIZER_DOCTYPE_NAME_MISSING"
+  | "TOKENIZER_DOCTYPE_PUBLIC_IDENTIFIER_MISSING"
+  | "TOKENIZER_DOCTYPE_SYSTEM_IDENTIFIER_MISSING";
 
 function appendCodePoints(guard: StartTagResourceGuard, value: string): void {
   for (const codePoint of value) guard.appendCodePoint(codePoint);
@@ -201,10 +207,7 @@ export class TagTokenBuilder {
   }
 
   #requireAttribute(): AttributeBuilder {
-    if (this.#currentAttribute === null) {
-      throw new Error("Tokenizer invariant violated: current attribute is missing");
-    }
-    return this.#currentAttribute;
+    return requireInternalValue(this.#currentAttribute, "TOKENIZER_CURRENT_ATTRIBUTE_MISSING");
   }
 }
 
@@ -274,7 +277,7 @@ export class DoctypeTokenBuilder {
   }
 
   appendName(value: string): void {
-    this.#requireParts(this.#nameParts, "name").push(value);
+    this.#requireParts(this.#nameParts, "TOKENIZER_DOCTYPE_NAME_MISSING").push(value);
   }
 
   startPublicIdentifier(): void {
@@ -282,7 +285,10 @@ export class DoctypeTokenBuilder {
   }
 
   appendPublicIdentifier(value: string): void {
-    this.#requireParts(this.#publicIdentifierParts, "public identifier").push(value);
+    this.#requireParts(
+      this.#publicIdentifierParts,
+      "TOKENIZER_DOCTYPE_PUBLIC_IDENTIFIER_MISSING"
+    ).push(value);
   }
 
   startSystemIdentifier(): void {
@@ -290,7 +296,10 @@ export class DoctypeTokenBuilder {
   }
 
   appendSystemIdentifier(value: string): void {
-    this.#requireParts(this.#systemIdentifierParts, "system identifier").push(value);
+    this.#requireParts(
+      this.#systemIdentifierParts,
+      "TOKENIZER_DOCTYPE_SYSTEM_IDENTIFIER_MISSING"
+    ).push(value);
   }
 
   forceQuirks(): void {
@@ -308,8 +317,7 @@ export class DoctypeTokenBuilder {
     });
   }
 
-  #requireParts(parts: string[] | null, field: string): string[] {
-    if (parts === null) throw new Error(`Tokenizer invariant violated: DOCTYPE ${field} is missing`);
-    return parts;
+  #requireParts(parts: string[] | null, reason: DoctypeFieldMissingReason): string[] {
+    return requireInternalValue(parts, reason);
   }
 }

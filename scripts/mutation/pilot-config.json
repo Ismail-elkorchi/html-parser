@@ -115,8 +115,8 @@
         {
           "id": "tokenizer-data-character-reference",
           "description": "Treat an ampersand in Data as ordinary text instead of invoking the reference consumer.",
-          "search": "if (read.value === \"&\") {\n            this.#startCharacterReference(read, { state: \"data-state\", context: \"text\" });\n        }",
-          "replace": "if (false && read.value === \"&\") {\n            this.#startCharacterReference(read, { state: \"data-state\", context: \"text\" });\n        }"
+          "search": "if (read.value === \"&\") {\n            this.#startCharacterReference(read, \"data-state\");\n        }",
+          "replace": "if (false && read.value === \"&\") {\n            this.#startCharacterReference(read, \"data-state\");\n        }"
         },
         {
           "id": "tokenizer-duplicate-attribute",

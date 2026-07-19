@@ -1,6 +1,17 @@
+import {
+  failInternalState,
+  requireInternalValue,
+  unreachableInternalState
+} from "../../foundation/internal-state-error.js";
 import { CharacterReferenceConsumer } from "../character-reference-consumer.js";
 import { createParseError, type EngineParseError, type HtmlParseErrorCode } from "../diagnostics.js";
-import { HtmlInputCursor, type InputCharacter, type InputEof, type InputRead } from "../input-cursor.js";
+import {
+  HtmlInputCursor,
+  type InputCharacter,
+  type InputEof,
+  type InputNeedMore,
+  type InputRead
+} from "../input-cursor.js";
 import { type EngineObserver, type TokenSink, type TokenizerControl } from "../observer.js";
 import { type TokenizerMode } from "../parser-state.js";
 import { sourceSpan, type SourcePosition, type SourceSpan } from "../positions.js";
@@ -14,14 +25,14 @@ import {
   TagTokenBuilder
 } from "./builders.js";
 import {
-  type HtmlTokenizerState
+  type HtmlTokenizerExecutionState
 } from "./state.js";
 
 /** Tokenization stopped at an open decoded-input boundary. */
 export interface HtmlTokenizerNeedMore {
   readonly status: "need-more-input";
   readonly position: SourcePosition;
-  readonly state: HtmlTokenizerState;
+  readonly state: HtmlTokenizerExecutionState;
 }
 
 /** Tokenization emitted its sole end-of-file token. */
@@ -49,9 +60,11 @@ type AttributeValueState =
   | "attribute-value-(single-quoted)-state"
   | "attribute-value-(unquoted)-state";
 
-interface CharacterReferenceReturn {
-  readonly state: "data-state" | "rcdata-state" | AttributeValueState;
-  readonly context: "text" | "attribute";
+type CharacterReferenceReturnState = "data-state" | "rcdata-state" | AttributeValueState;
+
+interface ActiveCharacterReference {
+  readonly consumer: CharacterReferenceConsumer;
+  readonly returnState: CharacterReferenceReturnState;
 }
 
 interface KeywordProbeMatch {
@@ -144,7 +157,7 @@ export class HtmlTokenizer implements TokenizerControl {
   readonly #sink: TokenSink;
   readonly #observer: EngineObserver | undefined;
   readonly #cursor: HtmlInputCursor;
-  #state: HtmlTokenizerState;
+  #state: HtmlTokenizerExecutionState;
   #lastStartTagName: string | null;
   #foreignContent: boolean;
   #closed = false;
@@ -160,8 +173,7 @@ export class HtmlTokenizer implements TokenizerControl {
   #comment: CommentTokenBuilder | null = null;
   #doctype: DoctypeTokenBuilder | null = null;
   #processingInstruction: ProcessingInstructionTokenBuilder | null = null;
-  #characterReference: CharacterReferenceConsumer | null = null;
-  #characterReferenceReturn: CharacterReferenceReturn | null = null;
+  #characterReference: ActiveCharacterReference | null = null;
   #lessThanSpan: SourceSpan | null = null;
   #temporaryBufferParts: string[] = [];
   #cdataBracketStartUtf16Offset: number | null = null;
@@ -265,7 +277,7 @@ export class HtmlTokenizer implements TokenizerControl {
     this.#foreignContent = enabled;
   }
 
-  state(): HtmlTokenizerState {
+  state(): HtmlTokenizerExecutionState {
     return this.#state;
   }
 
@@ -379,7 +391,7 @@ export class HtmlTokenizer implements TokenizerControl {
       case "processing-instruction-data-state": return this.#stepProcessingInstructionData();
       case "processing-instruction-questionable-state": return this.#stepProcessingInstructionQuestionable();
       case "character-reference-state": return this.#stepCharacterReference();
-      default: throw new Error(`Tokenizer invariant violated: unreachable state ${this.#state}`);
+      default: return unreachableInternalState(this.#state, "TOKENIZER_STATE_UNREACHABLE");
     }
   }
 
@@ -388,7 +400,7 @@ export class HtmlTokenizer implements TokenizerControl {
     if (read.kind === "need-more-input") return this.#wait(read.position);
     if (read.kind === "eof") return this.#emitEof(read.position);
     if (read.value === "&") {
-      this.#startCharacterReference(read, { state: "data-state", context: "text" });
+      this.#startCharacterReference(read, "data-state");
     } else if (read.value === "<") {
       this.#markupStartUtf16Offset = read.span.startUtf16Offset;
       this.#state = "tag-open-state";
@@ -404,7 +416,7 @@ export class HtmlTokenizer implements TokenizerControl {
     if (read.kind === "need-more-input") return this.#wait(read.position);
     if (read.kind === "eof") return this.#emitEof(read.position);
     if (read.value === "&") {
-      this.#startCharacterReference(read, { state: "rcdata-state", context: "text" });
+      this.#startCharacterReference(read, "rcdata-state");
     } else if (read.value === "<") {
       this.#lessThanSpan = read.span;
       this.#state = "rcdata-less-than-sign-state";
@@ -989,12 +1001,12 @@ export class HtmlTokenizer implements TokenizerControl {
       tag.touchAttribute(read.span);
       this.#state = "after-attribute-value-(quoted)-state";
     } else if (read.value === "&") {
-      this.#startCharacterReference(read, {
-        state: quote === '"'
+      this.#startCharacterReference(
+        read,
+        quote === '"'
           ? "attribute-value-(double-quoted)-state"
-          : "attribute-value-(single-quoted)-state",
-        context: "attribute"
-      });
+          : "attribute-value-(single-quoted)-state"
+      );
     } else if (read.value === "\0") {
       this.#emitParseError("unexpected-null-character", read.span);
       tag.appendAttributeValue("\uFFFD", read.span);
@@ -1016,10 +1028,7 @@ export class HtmlTokenizer implements TokenizerControl {
     if (isAsciiWhitespace(read.value)) {
       this.#state = "before-attribute-name-state";
     } else if (read.value === "&") {
-      this.#startCharacterReference(read, {
-        state: "attribute-value-(unquoted)-state",
-        context: "attribute"
-      });
+      this.#startCharacterReference(read, "attribute-value-(unquoted)-state");
     } else if (read.value === ">") {
       this.#state = "data-state";
       this.#emitTag(read.span);
@@ -1382,8 +1391,7 @@ export class HtmlTokenizer implements TokenizerControl {
     const read = this.#cursor.peekCodeUnit();
     if (read.kind === "need-more-input") return this.#wait(read.position);
     if (read.kind === "eof") {
-      const eof = this.#cursor.consume();
-      if (eof.kind !== "eof") throw new Error("Tokenizer invariant violated: expected DOCTYPE EOF");
+      const eof = this.#consumeLookedAheadEof();
       this.#emitParseError("eof-in-doctype", decisionSpan(eof));
       this.#requireDoctype().forceQuirks();
       this.#emitDoctype(eof.position.utf16Offset);
@@ -1391,19 +1399,13 @@ export class HtmlTokenizer implements TokenizerControl {
     }
     const value = String.fromCharCode(read.value);
     if (isAsciiWhitespace(value) || read.value === 0x0d) {
-      const consumed = this.#cursor.consume();
+      const consumed = this.#consumeLookedAheadCharacter();
       if (consumed.kind === "need-more-input") return this.#wait(consumed.position);
-      if (consumed.kind !== "character") {
-        throw new Error("Tokenizer invariant violated: expected DOCTYPE whitespace");
-      }
       return null;
     }
     if (value === ">") {
-      const consumed = this.#cursor.consume();
+      const consumed = this.#consumeLookedAheadCharacter();
       if (consumed.kind === "need-more-input") return this.#wait(consumed.position);
-      if (consumed.kind !== "character") {
-        throw new Error("Tokenizer invariant violated: expected DOCTYPE delimiter");
-      }
       this.#state = "data-state";
       this.#emitDoctype(consumed.span.endUtf16Offset);
       return null;
@@ -1420,12 +1422,8 @@ export class HtmlTokenizer implements TokenizerControl {
         : "after-doctype-system-keyword-state";
       return null;
     }
-    const consumed = this.#cursor.consume();
-    if (consumed.kind === "need-more-input") return this.#wait(consumed.position);
-    if (consumed.kind !== "character") {
-      throw new Error("Tokenizer invariant violated: expected invalid DOCTYPE character");
-    }
-    const character = consumed;
+    const character = this.#consumeLookedAheadCharacter();
+    if (character.kind === "need-more-input") return this.#wait(character.position);
     this.#emitParseError("invalid-character-sequence-after-doctype-name", character.span);
     this.#requireDoctype().forceQuirks();
     this.#cursor.reconsumeCurrent();
@@ -1759,38 +1757,41 @@ export class HtmlTokenizer implements TokenizerControl {
   }
 
   #stepCharacterReference(): StepResult {
-    const consumer = this.#characterReference;
-    const returnContext = this.#characterReferenceReturn;
-    if (consumer === null || returnContext === null) {
-      throw new Error("Tokenizer invariant violated: character-reference state is incomplete");
-    }
-    const result = consumer.step();
+    const active = requireInternalValue(
+      this.#characterReference,
+      "TOKENIZER_CHARACTER_REFERENCE_MISSING"
+    );
+    const result = active.consumer.step();
     if (result.kind === "need-more-input") return this.#wait(result.position);
-    if (returnContext.context === "attribute") {
+    if (active.returnState !== "data-state" && active.returnState !== "rcdata-state") {
       this.#requireTag().appendAttributeValue(result.value, result.span);
     } else {
       this.#appendCharacters(result.value, result.span);
     }
     this.#characterReference = null;
-    this.#characterReferenceReturn = null;
-    this.#state = returnContext.state;
+    this.#state = active.returnState;
     return null;
   }
 
-  #startCharacterReference(read: InputCharacter, returnContext: CharacterReferenceReturn): void {
+  #startCharacterReference(read: InputCharacter, returnState: CharacterReferenceReturnState): void {
     let additionalAllowedCharacter: string | null = null;
-    if (returnContext.state === "attribute-value-(double-quoted)-state") additionalAllowedCharacter = '"';
-    if (returnContext.state === "attribute-value-(single-quoted)-state") additionalAllowedCharacter = "'";
-    if (returnContext.state === "attribute-value-(unquoted)-state") additionalAllowedCharacter = ">";
-    this.#characterReferenceReturn = returnContext;
-    this.#characterReference = new CharacterReferenceConsumer(this.#cursor, this.#guard, {
-      context: returnContext.context,
-      ampersandSpan: read.span,
-      additionalAllowedCharacter,
-      onParseError: (error) => {
-        this.#observeParseError(error);
-      }
-    });
+    if (returnState === "attribute-value-(double-quoted)-state") additionalAllowedCharacter = '"';
+    if (returnState === "attribute-value-(single-quoted)-state") additionalAllowedCharacter = "'";
+    if (returnState === "attribute-value-(unquoted)-state") additionalAllowedCharacter = ">";
+    const context = returnState === "data-state" || returnState === "rcdata-state"
+      ? "text"
+      : "attribute";
+    this.#characterReference = {
+      consumer: new CharacterReferenceConsumer(this.#cursor, this.#guard, {
+        context,
+        ampersandSpan: read.span,
+        additionalAllowedCharacter,
+        onParseError: (error) => {
+          this.#observeParseError(error);
+        }
+      }),
+      returnState
+    };
     this.#state = "character-reference-state";
   }
 
@@ -1947,13 +1948,29 @@ export class HtmlTokenizer implements TokenizerControl {
   }
 
   #consumeAscii(count: number): void {
-    for (let index = 0; index < count; index += 1) this.#consumeOneCharacter();
+    for (let index = 0; index < count; index += 1) this.#consumeBufferedCharacter();
   }
 
-  #consumeOneCharacter(): InputCharacter {
+  #consumeBufferedCharacter(): InputCharacter {
     const read: InputRead = this.#cursor.consume();
     if (read.kind !== "character") {
-      throw new Error("Tokenizer invariant violated: expected buffered character");
+      return failInternalState("TOKENIZER_BUFFERED_CHARACTER_MISSING");
+    }
+    return read;
+  }
+
+  #consumeLookedAheadCharacter(): InputCharacter | InputNeedMore {
+    const read = this.#cursor.consume();
+    if (read.kind === "eof") {
+      return failInternalState("TOKENIZER_LOOKAHEAD_CONSUMPTION_MISMATCH");
+    }
+    return read;
+  }
+
+  #consumeLookedAheadEof(): InputEof {
+    const read = this.#cursor.consume();
+    if (read.kind !== "eof") {
+      return failInternalState("TOKENIZER_LOOKAHEAD_CONSUMPTION_MISMATCH");
     }
     return read;
   }
@@ -1975,7 +1992,10 @@ export class HtmlTokenizer implements TokenizerControl {
     else this.#requireDoctype().appendSystemIdentifier(value);
   }
 
-  #doctypeQuotedState(identifier: "public" | "system", quote: '"' | "'"): HtmlTokenizerState {
+  #doctypeQuotedState(
+    identifier: "public" | "system",
+    quote: '"' | "'"
+  ): HtmlTokenizerExecutionState {
     if (identifier === "public") {
       return quote === '"'
         ? "doctype-public-identifier-(double-quoted)-state"
@@ -1988,7 +2008,7 @@ export class HtmlTokenizer implements TokenizerControl {
 
   #textEndTagNameState(
     family: "rcdata" | "rawtext" | "script-data" | "script-data-escaped"
-  ): HtmlTokenizerState {
+  ): HtmlTokenizerExecutionState {
     switch (family) {
       case "rcdata": return "rcdata-end-tag-name-state";
       case "rawtext": return "rawtext-end-tag-name-state";
@@ -2033,39 +2053,33 @@ export class HtmlTokenizer implements TokenizerControl {
   }
 
   #requireLessThanSpan(): SourceSpan {
-    if (this.#lessThanSpan === null) {
-      throw new Error("Tokenizer invariant violated: less-than-sign span is missing");
-    }
-    return this.#lessThanSpan;
+    return requireInternalValue(this.#lessThanSpan, "TOKENIZER_LESS_THAN_SPAN_MISSING");
   }
 
   #requireCdataBracketStart(): number {
-    if (this.#cdataBracketStartUtf16Offset === null) {
-      throw new Error("Tokenizer invariant violated: CDATA bracket position is missing");
-    }
-    return this.#cdataBracketStartUtf16Offset;
+    return requireInternalValue(
+      this.#cdataBracketStartUtf16Offset,
+      "TOKENIZER_CDATA_BRACKET_POSITION_MISSING"
+    );
   }
 
   #requireTag(): TagTokenBuilder {
-    if (this.#tag === null) throw new Error("Tokenizer invariant violated: current tag is missing");
-    return this.#tag;
+    return requireInternalValue(this.#tag, "TOKENIZER_CURRENT_TAG_MISSING");
   }
 
   #requireComment(): CommentTokenBuilder {
-    if (this.#comment === null) throw new Error("Tokenizer invariant violated: current comment is missing");
-    return this.#comment;
+    return requireInternalValue(this.#comment, "TOKENIZER_CURRENT_COMMENT_MISSING");
   }
 
   #requireDoctype(): DoctypeTokenBuilder {
-    if (this.#doctype === null) throw new Error("Tokenizer invariant violated: current DOCTYPE is missing");
-    return this.#doctype;
+    return requireInternalValue(this.#doctype, "TOKENIZER_CURRENT_DOCTYPE_MISSING");
   }
 
   #requireProcessingInstruction(): ProcessingInstructionTokenBuilder {
-    if (this.#processingInstruction === null) {
-      throw new Error("Tokenizer invariant violated: current processing instruction is missing");
-    }
-    return this.#processingInstruction;
+    return requireInternalValue(
+      this.#processingInstruction,
+      "TOKENIZER_CURRENT_PROCESSING_INSTRUCTION_MISSING"
+    );
   }
 
   #ensureUsable(): void {

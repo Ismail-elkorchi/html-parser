@@ -104,6 +104,22 @@ void test("foundational tokenizer emits comments, doctypes, exact EOF, and self-
   });
 });
 
+void test("DOCTYPE lookahead waits when CR normalization crosses a chunk boundary", () => {
+  const input = "<!DOCTYPE html\rPUBLIC \"id\">";
+  const whole = tokenizeChunks([input]);
+  const split = tokenizeChunks(["<!DOCTYPE html\r", "PUBLIC \"id\">"]);
+
+  assert.deepEqual(split, whole);
+  assert.deepEqual(split.tokens[0], {
+    kind: "doctype",
+    name: "html",
+    publicIdentifier: "id",
+    systemIdentifier: null,
+    forceQuirks: false,
+    span: { startUtf16Offset: 0, endUtf16Offset: input.length }
+  });
+});
+
 void test("RAWTEXT less-than transitions preserve literal input through EOF", () => {
   const actual = tokenizeChunks(["<"], { mode: "rawtext" });
   assert.deepEqual(actual.tokens, [
