@@ -280,7 +280,6 @@ export class HtmlTreeModel {
 
   readonly #resources: EngineResourceGuard;
   readonly #observer: EngineObserver | undefined;
-  readonly #nodes = new Map<number, HtmlTreeRoot | HtmlTreeNode>();
   #nextSerial = 1;
 
   constructor(options: HtmlTreeModelOptions) {
@@ -308,7 +307,6 @@ export class HtmlTreeModel {
       this.root = root;
     }
     PARENT_STATES.set(this.root, parentState);
-    this.#nodes.set(identity.serial, this.root);
     this.#emit("node-created", identity.serial, null);
   }
 
@@ -360,7 +358,6 @@ export class HtmlTreeModel {
     NODE_STATES.set(element, nodeState);
     PARENT_STATES.set(element, parentState);
     ELEMENT_STATES.set(element, elementState);
-    this.#nodes.set(identity.serial, element);
     this.#emit("node-created", identity.serial, null);
     return element;
   }
@@ -381,7 +378,6 @@ export class HtmlTreeModel {
     });
     NODE_STATES.set(text, nodeState);
     TEXT_STATES.set(text, textState);
-    this.#nodes.set(identity.serial, text);
     this.#emit("node-created", identity.serial, null);
     return text;
   }
@@ -399,7 +395,6 @@ export class HtmlTreeModel {
       get sourceSpan(): SourceSpan | null { return nodeState.sourceSpan; }
     });
     NODE_STATES.set(comment, nodeState);
-    this.#nodes.set(identity.serial, comment);
     this.#emit("node-created", identity.serial, null);
     return comment;
   }
@@ -423,7 +418,6 @@ export class HtmlTreeModel {
       get sourceSpan(): SourceSpan | null { return nodeState.sourceSpan; }
     });
     NODE_STATES.set(instruction, nodeState);
-    this.#nodes.set(identity.serial, instruction);
     this.#emit("node-created", identity.serial, null);
     return instruction;
   }
@@ -442,7 +436,6 @@ export class HtmlTreeModel {
       get sourceSpan(): SourceSpan | null { return nodeState.sourceSpan; }
     });
     NODE_STATES.set(doctype, nodeState);
-    this.#nodes.set(identity.serial, doctype);
     this.#emit("node-created", identity.serial, null);
     return doctype;
   }
@@ -578,6 +571,24 @@ export class HtmlTreeModel {
       this.#emit("node-inserted", child.identity.serial, this.#observableParentSerial(destinationParent));
     }
     return children.length;
+  }
+
+  /** Replaces semantic children with deep, spanless clones in one structural commit. */
+  replaceChildrenWithClones(source: HtmlTreeElement, destination: HtmlTreeElement): number {
+    this.#elementState(source);
+    this.#elementState(destination);
+    const sourceChildren = [...this.#semanticChildren(source)];
+    const clones = sourceChildren.map((child) => this.#cloneSubtree(child));
+    this.#replaceChildren(destination, clones);
+    return clones.length;
+  }
+
+  /** Removes every semantic child in one structural commit. */
+  clearChildren(parent: HtmlTreeElement): number {
+    this.#elementState(parent);
+    const count = this.#semanticChildren(parent).length;
+    this.#replaceChildren(parent, []);
+    return count;
   }
 
   adoptAttributes(element: HtmlTreeElement, attributes: readonly HtmlTreeAttributeInput[]): number {
@@ -741,7 +752,7 @@ export class HtmlTreeModel {
     }
 
     return Object.freeze({
-      allocatedNodes: this.#nodes.size,
+      allocatedNodes: this.#nextSerial - 1,
       attachedNodes,
       maxDepth
     });
@@ -751,6 +762,111 @@ export class HtmlTreeModel {
     const identity = Object.freeze({ serial: this.#nextSerial });
     this.#nextSerial += 1;
     return identity;
+  }
+
+  #cloneSubtree(source: HtmlTreeNode): HtmlTreeNode {
+    const root = this.#cloneNode(source);
+    const stack: Array<{
+      readonly source: HtmlTreeElement;
+      readonly clone: HtmlTreeElement;
+    }> = [];
+    if (source.kind === "element" && root.kind === "element") {
+      stack.push({ source, clone: root });
+    }
+    while (stack.length > 0) {
+      this.#resources.checkpoint();
+      const pair = stack.pop();
+      if (pair === undefined) break;
+      const childPairs: Array<{
+        readonly source: HtmlTreeElement;
+        readonly clone: HtmlTreeElement;
+      }> = [];
+      for (const sourceChild of this.#semanticChildren(pair.source)) {
+        const childClone = this.#cloneNode(sourceChild);
+        this.append(this.insertionParent(pair.clone), childClone);
+        if (sourceChild.kind === "element" && childClone.kind === "element") {
+          childPairs.push({ source: sourceChild, clone: childClone });
+        }
+      }
+      for (let index = childPairs.length - 1; index >= 0; index -= 1) {
+        const childPair = childPairs[index];
+        if (childPair !== undefined) stack.push(childPair);
+      }
+    }
+    return root;
+  }
+
+  #cloneNode(source: HtmlTreeNode): HtmlTreeNode {
+    switch (source.kind) {
+      case "element": {
+        const state = this.#elementState(source);
+        return this.createElement({
+          namespaceUri: source.namespaceUri,
+          prefix: source.prefix,
+          localName: source.localName,
+          qualifiedName: source.qualifiedName,
+          attributes: state.attributes.map((attribute) => ({
+            namespaceUri: attribute.namespaceUri,
+            prefix: attribute.prefix,
+            localName: attribute.localName,
+            qualifiedName: attribute.qualifiedName,
+            value: attribute.value,
+            sourceSpan: null
+          })),
+          sourceSpan: null
+        });
+      }
+      case "text": return this.createText(source.data, null);
+      case "comment": return this.createComment(source.data, null);
+      case "processing-instruction": {
+        return this.createProcessingInstruction(source.target, source.data, null);
+      }
+      case "doctype": return fail("TREE_MODEL_DOCTYPE_UNDER_NON_DOCUMENT");
+    }
+  }
+
+  #replaceChildren(parent: HtmlTreeElement, replacements: readonly HtmlTreeNode[]): void {
+    const target = this.insertionParent(parent);
+    const targetState = this.#parentState(target);
+    const previous = [...targetState.children];
+    const previousDepths = previous.map((child) => this.#prepareSubtreeDepths(child, null));
+    const parentDepth = this.#parentDepth(target);
+    const replacementDepths = replacements.map((child) => {
+      const state = this.#nodeState(child);
+      if (state.parent !== null) fail("TREE_MODEL_REFERENCE_NOT_CHILD");
+      if (child.kind === "doctype") fail("TREE_MODEL_DOCTYPE_UNDER_NON_DOCUMENT");
+      const depths = this.#prepareSubtreeDepths(
+        child,
+        parentDepth === null ? null : parentDepth + 1
+      );
+      if (parentDepth !== null) {
+        this.#resources.observeDepth(parentDepth + depths.maxRelativeDepth);
+      }
+      return depths;
+    });
+    for (const depths of previousDepths) this.#authorizeDepthApplication(depths.assignments);
+    for (const depths of replacementDepths) this.#authorizeDepthApplication(depths.assignments);
+
+    targetState.children.length = 0;
+    for (let index = 0; index < previous.length; index += 1) {
+      const child = previous[index];
+      const depths = previousDepths[index];
+      if (child === undefined || depths === undefined) fail("TREE_MODEL_REFERENCE_NOT_CHILD");
+      this.#nodeState(child).parent = null;
+      this.#applySubtreeDepths(depths.assignments);
+    }
+    for (let index = 0; index < replacements.length; index += 1) {
+      const child = replacements[index];
+      const depths = replacementDepths[index];
+      if (child === undefined || depths === undefined) fail("TREE_MODEL_REFERENCE_NOT_CHILD");
+      this.#nodeState(child).parent = target;
+      targetState.children.push(child);
+      this.#applySubtreeDepths(depths.assignments);
+    }
+
+    const parentSerial = this.#observableParentSerial(target);
+    for (const child of previous) this.#emit("node-detached", child.identity.serial, parentSerial);
+    for (const child of replacements) this.#emit("node-inserted", child.identity.serial, parentSerial);
   }
 
   #nodeState(node: HtmlTreeNode): NodeState {

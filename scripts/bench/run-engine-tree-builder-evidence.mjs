@@ -51,6 +51,7 @@ const fosterCharacterCount = 20_000;
 const nestedTemplateCount = 2_000;
 const foreignDepth = 5_000;
 const integrationPointCount = 3_000;
+const selectedContentReplacementCount = 3_000;
 const cases = [
   measure(
     "nested-elements",
@@ -88,6 +89,10 @@ const cases = [
   measure(
     "foreign-integration-boundaries",
     `<!doctype html>${"<svg><foreignObject><p>x</p></foreignObject></svg>".repeat(integrationPointCount)}`
+  ),
+  measure(
+    "selectedcontent-replacement",
+    `<!doctype html><select><button><selectedcontent></button>${"<option selected>x".repeat(selectedContentReplacementCount)}`
   )
 ];
 
@@ -151,7 +156,7 @@ if (
 }
 
 process.stdout.write(`${JSON.stringify({
-  schema: "engine-tree-builder-evidence/v3",
+  schema: "engine-tree-builder-evidence/v4",
   runtime: process.version,
   cases,
   contextualBudget: {

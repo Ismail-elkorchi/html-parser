@@ -353,6 +353,67 @@ void test("fragment parsing targets the fragment and respects HTML and foreign c
   assert.equal(annotationChild?.kind === "element" ? annotationChild.namespaceUri : null, HTML_NAMESPACE);
 });
 
+void test("option parser-pop state clones the selected subtree into selectedcontent", () => {
+  const inputs = [
+    "<select><button><selectedcontent></button><option>X",
+    "<select><button><selectedcontent></button><option>x<i>i<b>ib</i>b",
+    "<select><button><selectedcontent></button><option>X<option>Y",
+    "<select><button><selectedcontent></button><option>X<option selected>Y"
+  ];
+  for (const input of inputs) {
+    const whole = runHtmlEngine({
+      inputChunks: [input],
+      parser: { kind: "document", scriptingMode: "disabled" }
+    });
+    const chunked = runHtmlEngine({
+      inputChunks: input.split(""),
+      parser: { kind: "document", scriptingMode: "disabled" }
+    });
+    assert.deepEqual(treeShape(chunked.model), treeShape(whole.model));
+    assert.deepEqual(chunked.parseErrors, whole.parseErrors);
+
+    const elements = [...whole.model.walk()]
+      .map(({ node }) => node)
+      .filter((node): node is HtmlTreeElement => node.kind === "element");
+    const selectedContent = elements.find((element) => element.localName === "selectedcontent");
+    const selectedOptions = elements.filter((element) =>
+      element.localName === "option" && element.attributeAt(0)?.localName === "selected"
+    );
+    assert.ok(selectedContent);
+    const expectedText = selectedOptions.length > 0 ? "Y" : input.includes("option>x") ? "x" : "X";
+    const clonedText = [...whole.model.walk()]
+      .map(({ node }) => node)
+      .find((node) => node.kind === "text" && node.parent === selectedContent);
+    assert.equal(clonedText?.kind === "text" ? clonedText.data : null, expectedText);
+    assert.equal(clonedText?.sourceSpan, null);
+  }
+
+  const disabledFirst = runHtmlEngine({
+    inputChunks: ["<select><button><selectedcontent></button><option disabled>X<option>Y"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  const selectedContent = [...disabledFirst.model.walk()]
+    .map(({ node }) => node)
+    .find((node): node is HtmlTreeElement =>
+      node.kind === "element" && node.localName === "selectedcontent"
+    );
+  const disabledFirstClone = selectedContent?.childAt(0);
+  assert.equal(disabledFirstClone?.kind === "text" ? disabledFirstClone.data : null, "Y");
+
+  for (const selectAttributes of [" multiple", " size=2"]) {
+    const inactive = runHtmlEngine({
+      inputChunks: [`<select${selectAttributes}><button><selectedcontent></button><option>X`],
+      parser: { kind: "document", scriptingMode: "disabled" }
+    });
+    const inactiveSelectedContent = [...inactive.model.walk()]
+      .map(({ node }) => node)
+      .find((node): node is HtmlTreeElement =>
+        node.kind === "element" && node.localName === "selectedcontent"
+      );
+    assert.equal(inactiveSelectedContent?.childCount, 0);
+  }
+});
+
 void test("table construction synthesizes containers and foster-parents text during token handling", () => {
   const result = runHtmlEngine({
     inputChunks: ["<!doctype html><p>lead<table>x<tr><td><b>cell</table>tail"],

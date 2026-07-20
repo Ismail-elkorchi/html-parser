@@ -14,6 +14,7 @@ import {
 import { fragmentContextAttributes } from "./fragment-context.js";
 import { HTML_NAMESPACE, MATHML_NAMESPACE, SVG_NAMESPACE } from "./namespaces.js";
 import { OpenElementStack } from "./open-element-stack.js";
+import { HtmlSelectElementState } from "./select-element-state.js";
 
 import type {
   ActiveFormattingEntry
@@ -225,6 +226,7 @@ export class HtmlTreeBuilder implements TokenSink {
   readonly #onParseError: (error: EngineParseError) => void;
   readonly #openElements: OpenElementStack;
   readonly #activeFormatting: ActiveFormattingList;
+  readonly #selectElements: HtmlSelectElementState;
   readonly #fragmentContext: HtmlTreeElement | null;
   readonly #templateInsertionModes: InsertionMode[] = [];
   #tokenizer: TokenizerControl | null = null;
@@ -247,6 +249,7 @@ export class HtmlTreeBuilder implements TokenSink {
     this.#onParseError = options.onParseError;
     this.#openElements = new OpenElementStack(options.resources);
     this.#activeFormatting = new ActiveFormattingList(options.resources);
+    this.#selectElements = new HtmlSelectElementState(options.model, options.resources);
     if (options.fragmentContext === undefined) {
       if (options.model.root.kind !== "document") {
         failInternalState("TREE_BUILDER_FRAGMENT_CONTEXT_MISSING");
@@ -760,7 +763,7 @@ export class HtmlTreeBuilder implements TokenSink {
         return "in-template";
       }
       if (this.#hasUnexpectedOpenElementAtBodyEnd()) this.#parseError(token, "in-body");
-      this.#finished = true;
+      this.#finish();
       return null;
     }
     if (token.kind === "start-tag") return this.#startTagInBody(token, acknowledge);
@@ -1590,7 +1593,7 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (!this.#hasOpenHtmlElement("template")) {
-      this.#finished = true;
+      this.#finish();
       return null;
     }
     this.#parseError(token, "in-template");
@@ -1645,7 +1648,7 @@ export class HtmlTreeBuilder implements TokenSink {
     }
     if (token.kind === "eof") {
       if (this.#currentNode().localName !== "html") this.#parseError(token, "in-frameset");
-      this.#finished = true;
+      this.#finish();
       return null;
     }
     if (token.kind === "character") this.#parseErrorForEachCharacter(token, "in-frameset");
@@ -1674,7 +1677,7 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (token.kind === "eof") {
-      this.#finished = true;
+      this.#finish();
       return null;
     }
     if (token.kind === "character") this.#parseErrorForEachCharacter(token, "after-frameset");
@@ -1697,7 +1700,7 @@ export class HtmlTreeBuilder implements TokenSink {
     ) return this.#inBody(token, acknowledge);
     if (token.kind === "start-tag" && token.name === "noframes") return this.#inHead(token, acknowledge);
     if (token.kind === "eof") {
-      this.#finished = true;
+      this.#finish();
       return null;
     }
     if (token.kind === "character") {
@@ -1734,7 +1737,7 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (token.kind === "eof") {
-      this.#finished = true;
+      this.#finish();
       return null;
     }
     this.#parseError(token, "after-body");
@@ -1756,7 +1759,7 @@ export class HtmlTreeBuilder implements TokenSink {
       return this.#inBody(token, acknowledge);
     }
     if (token.kind === "eof") {
-      this.#finished = true;
+      this.#finish();
       return null;
     }
     this.#parseError(token, "after-after-body");
@@ -1802,6 +1805,7 @@ export class HtmlTreeBuilder implements TokenSink {
   #insertElement(token: HtmlStartTagToken, retainSpan = true): HtmlTreeElement {
     const element = retainSpan ? this.#createElement(token) : this.#createElementNamed(token.name);
     this.#insertAtAppropriateLocation(element);
+    this.#selectElements.elementInserted(element);
     this.#openElements.push(element);
     return element;
   }
@@ -1970,7 +1974,20 @@ export class HtmlTreeBuilder implements TokenSink {
   }
 
   #popCurrent(): HtmlTreeElement {
+    const current = this.#currentNode();
+    this.#selectElements.optionPopped(current);
     return this.#openElements.pop();
+  }
+
+  #finish(): void {
+    for (let index = this.#openElements.length - 1; index >= 0; index -= 1) {
+      const element = requireInternalValue(
+        this.#openElements.at(index),
+        "TREE_BUILDER_STACK_ENTRY_MISSING"
+      );
+      this.#selectElements.optionPopped(element);
+    }
+    this.#finished = true;
   }
 
   #popThrough(name: string): void {

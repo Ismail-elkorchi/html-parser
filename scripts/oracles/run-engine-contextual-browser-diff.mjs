@@ -19,11 +19,22 @@ const CASES = Object.freeze([
       }
     }
   },
+  {
+    id: "selectedcontent-option-clone",
+    html: "<!doctype html><select><button><selectedcontent></button><option>X<option selected><b>Y</b>",
+    acceptedBrowserTrees: {
+      firefox: {
+        engineSha256: "b6cbe1f823ae2ceeaaed5c47c04b5e82cfe912796314fe7c9498592a87aa86bb",
+        browserSha256: "9a072e51114310c7947704a9be9c137152021b7a9dfbb18c0b02c6003f7b6b53",
+        reason: "Playwright Firefox 151 predates selectedcontent parser construction support tracked by Mozilla bug 1974276"
+      }
+    }
+  },
   { id: "table-select", html: "<!doctype html><table><select><option>a</select></table>" },
   { id: "frameset", html: "<!doctype html><frameset cols=*><frame src=x></frameset></html>" }
 ]);
 
 await runBrowserTreeDifferential({
-  schema: "engine-contextual-browser-diff/v1",
+  schema: "engine-contextual-browser-diff/v2",
   cases: CASES
 });
