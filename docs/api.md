@@ -69,16 +69,28 @@ Key exported type groups include:
   `TokenizeByteStreamEagerOptions`, `OperationOptions`, `SourceRetention`;
 - trees and metadata: `ParsedDocument`, `ParsedDocumentMetadata`,
   `ParseEncodingMetadata`, `ParseResourceUsage`, `DocumentTree`,
-  `FragmentTree`, `HtmlNode`, `ElementNode`, `TextNode`, `CommentNode`,
-  `DoctypeNode`, `DoctypeExternalId`, `Attribute`, `Span`, `SpanProvenance`,
-  `ParseError`, `NodeId`;
+  `FragmentTree`, `HtmlNode`, `NodeKind`, `ElementNode`,
+  `TemplateContentNode`, `TextNode`, `CommentNode`,
+  `ProcessingInstructionNode`, `DoctypeNode`, `DoctypeExternalId`, `Attribute`,
+  `Span`, `SpanProvenance`, `ParseError`, `NodeId`, `NodeVisitor`, and
+  `ElementVisitor`;
 - traces and tokens: `TraceMode`, `TraceEvent`, `TraceEventCallback`,
-  `TraceResult`, `TraceSummary`, `Token`;
+  `TraceResult`, `TraceSummary`, `TraceSummaryResult`, `TraceEventsResult`,
+  `TraceBudgetEvent`, `TraceDecodeEvent`, `TraceInsertionModeTransitionEvent`,
+  `TraceParseErrorEvent`, `TraceStreamEvent`, `TraceTokenEvent`,
+  `TraceTreeMutationEvent`, `Token`, `TokenAttribute`, `StartTagToken`,
+  `EndTagToken`, `CharsToken`, `CommentToken`, `ProcessingInstructionToken`,
+  `DoctypeToken`, and `EofToken`;
 - extraction: `TextExtractionPolicy`, `TextExtractionOptions`,
+  `TextExtractionOptionsBase`,
   `VisibleTextExtractionOptions`, `TextContentExtractionOptions`,
-  `TextExtractionResult`, `TextExtractionToken`, `TextProvenanceRange`;
+  `TextExtractionResult`, `TextExtractionToken`, `TextExtractionTokenKind`,
+  `TextExtractionSourceNodeKind`, `TextExtractionSourceRole`, and
+  `TextProvenanceRange`;
 - structural output: `Outline`, `OutlineEntry`, `Chunk`, `ChunkOptions`, `Edit`,
-  `PatchPlan`, `PatchStep`;
+  `RemoveNodeEdit`, `ReplaceTextEdit`, `SetAttrEdit`, `RemoveAttrEdit`,
+  `InsertHtmlBeforeEdit`, `InsertHtmlAfterEdit`, `PatchPlan`, `PatchStep`,
+  `PatchSliceStep`, and `PatchInsertStep`;
 - failures: `HtmlOperationalError`, `HtmlBudgetName`,
   `HtmlConfigurationErrorReason`, and `HtmlPatchPlanningReason`.
 
@@ -87,13 +99,7 @@ semantics and [the data model](./data-model.md) for structural invariants.
 
 ## Runtime entry points
 
-The npm entry point exposes the complete surface above. The current JSR entry
-point shares parsing, serialization, extraction, namespace/attribute helpers,
-namespace-aware query helpers, and operational errors, but does not yet expose
-`getParseErrorSpecRef()`, `walk()`, `walkElements()`, `findById()`, `outline()`,
-`chunk()`, `computePatch()`, or `applyPatchPlan()`.
-
-JSR currently names its duplicated budget types `ParseBudgets`,
-`ParseStreamBudgets`, and `TokenizeByteStreamEagerBudgets`. Treat these entry
-point differences as current implementation facts, not a design pattern to
-copy into new APIs.
+The npm/Node and JSR entrypoints expose the same runtime values and the same
+canonical TypeScript types. There are no JSR-only declarations, renamed budget
+aliases, or wrapper signatures. Import the names documented above from either
+`@ismail-elkorchi/html-parser` or `jsr:@ismail-elkorchi/html-parser`.

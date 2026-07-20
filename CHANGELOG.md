@@ -3,6 +3,10 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Unify npm/Node and JSR around one canonical public export and TypeScript
+  model, remove JSR-only aliases and wrapper declarations, split public
+  features by responsibility, and add exact surface, documentation, and packed
+  strict-consumer checks.
 - Implement parser-owned option selectedness and direct selectedcontent cloning
   at every option-pop boundary, add atomic spanless subtree replacement, and
   stop retaining detached historical allocations in the tree model.

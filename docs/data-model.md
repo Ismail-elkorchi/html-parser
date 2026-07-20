@@ -23,8 +23,12 @@ limits and do not imply that budgets were enabled.
 
 - `ElementNode`: namespace URI, prefix, local and qualified names, attributes,
   and children;
+- `TemplateContentNode`: the distinct document fragment owned by an HTML
+  `template` element;
 - `TextNode`: a text value;
 - `CommentNode`: a comment value;
+- `ProcessingInstructionNode`: a target and data retained from current HTML
+  processing-instruction syntax;
 - `DoctypeNode`: a name and discriminated external identifier.
 
 Every tree and node has a parser-assigned numeric `NodeId`. Results, nodes,
@@ -35,6 +39,12 @@ An element's identity is `(namespaceUri, localName)`. `tagName` is the
 qualified name. Attributes similarly retain namespace URI, prefix, local name,
 qualified name, and value. Use the exported HTML, SVG, MathML, XLink, XML, and
 XMLNS namespace constants instead of copying URI strings.
+
+For an HTML `template`, `children` is empty and `templateContent` owns a
+`TemplateContentNode`. That fragment has its own `NodeId` and depth/resource
+identity. Traversal and serialization follow the owned fragment; raw
+`text-content-v1` extraction applied to the template element itself correctly
+observes the element's empty DOM child list.
 
 Doctype external ids distinguish no id, public id with an optional system id,
 and system id. Empty strings are retained and differ from a missing value.

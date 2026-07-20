@@ -74,8 +74,8 @@ architecture, testing, corpus, and source-policy notes.
 ## Runtime support
 
 The npm surface supports Node.js 20, 22, and 24. Deno, Bun, and evergreen
-browsers are covered by smoke tests; JSR currently exposes a smaller surface
-documented in [the API guide](./docs/api.md#runtime-entry-points).
+browsers are covered by smoke tests. npm/Node and JSR expose the same runtime
+and TypeScript API, documented in [the API guide](./docs/api.md).
 
 ## Safety
 

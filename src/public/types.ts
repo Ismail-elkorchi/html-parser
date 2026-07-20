@@ -1,6 +1,7 @@
 /** Deterministic numeric identifier assigned to a node within one parsed tree. */
 export type NodeId = number;
 
+/** Discriminator values used by public document, fragment, and node records. */
 export type NodeKind =
   | "document"
   | "fragment"
@@ -11,6 +12,7 @@ export type NodeKind =
   | "processingInstruction"
   | "doctype";
 
+/** Half-open UTF-16 source range in decoded input. */
 export interface Span {
   /** Zero-based UTF-16 code-unit offset into the decoded input, inclusive. */
   readonly start: number;
@@ -18,8 +20,10 @@ export interface Span {
   readonly end: number;
 }
 
+/** Describes whether a node's span came from input, inference, or no source range. */
 export type SpanProvenance = "input" | "inferred" | "none";
 
+/** Immutable parsed attribute with namespace and optional source information. */
 export interface Attribute {
   /** Namespace URI, or null for an unnamespaced attribute. */
   readonly namespaceUri: string | null;
@@ -29,16 +33,23 @@ export interface Attribute {
   readonly localName: string;
   /** Qualified name, including the prefix when one exists. */
   readonly name: string;
+  /** Decoded attribute value. */
   readonly value: string;
   /** Full source span of the attribute, including its name and value syntax. */
   readonly span?: Span;
 }
 
+/** Non-fatal HTML syntax error reported while constructing a tree. */
 export interface ParseError {
+  /** Stable public error category. */
   readonly code: "PARSER_ERROR";
+  /** HTML Standard parse-error identifier. */
   readonly parseErrorId: string;
+  /** Human-readable diagnostic message. */
   readonly message: string;
+  /** Related parsed node when one can be identified. */
   readonly nodeId?: NodeId;
+  /** Related decoded-input range when one can be identified. */
   readonly span?: Span;
 }
 
@@ -71,6 +82,7 @@ export type SourceRetention = "none" | "text";
 
 /** Options accepted by already-decoded full-document text parsing. */
 export interface ParseOptions {
+  /** Captures node and attribute source spans when available. */
   readonly captureSpans?: boolean;
   /** Exact decoded source retention; defaults to `"none"`. */
   readonly sourceRetention?: SourceRetention;
@@ -78,7 +90,9 @@ export interface ParseOptions {
   readonly trace?: TraceMode;
   /** Synchronously observes each immutable trace event without requiring retention. */
   readonly onTraceEvent?: TraceEventCallback;
+  /** Inclusive resource limits for this parse. */
   readonly budgets?: ParseBudgetOptions;
+  /** Cancels this parse with the signal's reason. */
   readonly signal?: AbortSignal;
 }
 
@@ -99,6 +113,7 @@ export interface ParseStreamBudgetOptions extends ParseBudgetOptions {
 
 /** Options accepted by full-document byte-stream parsing. */
 export interface ParseStreamOptions extends Omit<ParseBytesOptions, "budgets"> {
+  /** Parse and stream-prescan resource limits. */
   readonly budgets?: ParseStreamBudgetOptions;
 }
 
@@ -116,8 +131,11 @@ export type TokenizeByteStreamEagerBudgetOptions = Pick<
 
 /** Options accepted by eager byte-stream tokenization. */
 export interface TokenizeByteStreamEagerOptions {
+  /** Optional transport encoding label considered during HTML encoding sniffing. */
   readonly transportEncodingLabel?: string;
+  /** Resource limits for decoding and tokenization. */
   readonly budgets?: TokenizeByteStreamEagerBudgetOptions;
+  /** Cancels decoding and tokenization with the signal's reason. */
   readonly signal?: AbortSignal;
 }
 
@@ -129,52 +147,81 @@ export interface OperationOptions {
   readonly signal?: AbortSignal;
 }
 
+/** Name and decoded value retained on a public start-tag token. */
 export interface TokenAttribute {
+  /** Attribute name as emitted by the tokenizer. */
   readonly name: string;
+  /** Decoded attribute value. */
   readonly value: string;
 }
 
+/** Public start-tag token. */
 export interface StartTagToken {
+  /** Token discriminator. */
   readonly kind: "startTag";
+  /** Emitted tag name. */
   readonly name: string;
+  /** Attributes in tokenizer order after duplicate handling. */
   readonly attributes: readonly TokenAttribute[];
+  /** Whether a self-closing marker was present. */
   readonly selfClosing: boolean;
 }
 
+/** Public end-tag token. */
 export interface EndTagToken {
+  /** Token discriminator. */
   readonly kind: "endTag";
+  /** Emitted tag name. */
   readonly name: string;
 }
 
+/** Public character-data token. */
 export interface CharsToken {
+  /** Token discriminator. */
   readonly kind: "chars";
+  /** Decoded character data. */
   readonly value: string;
 }
 
+/** Public comment token. */
 export interface CommentToken {
+  /** Token discriminator. */
   readonly kind: "comment";
+  /** Comment data. */
   readonly value: string;
 }
 
 /** Processing-instruction token defined by the current HTML syntax. */
 export interface ProcessingInstructionToken {
+  /** Token discriminator. */
   readonly kind: "processingInstruction";
+  /** Processing-instruction target. */
   readonly target: string;
+  /** Processing-instruction data. */
   readonly data: string;
 }
 
+/** Public document-type token. */
 export interface DoctypeToken {
+  /** Token discriminator. */
   readonly kind: "doctype";
+  /** Document-type name, or null when absent. */
   readonly name: string | null;
+  /** Public identifier, or null when absent. */
   readonly publicId: string | null;
+  /** System identifier, or null when absent. */
   readonly systemId: string | null;
+  /** Whether this token forces quirks mode during tree construction. */
   readonly forceQuirks: boolean;
 }
 
+/** Public end-of-file token. */
 export interface EofToken {
+  /** Token discriminator. */
   readonly kind: "eof";
 }
 
+/** Token emitted by eager public byte-stream tokenization. */
 export type Token =
   | StartTagToken
   | EndTagToken
@@ -359,29 +406,47 @@ export interface TraceEventsResult {
 /** Returned deterministic trace data for summary and retained-event modes. */
 export type TraceResult = TraceSummaryResult | TraceEventsResult;
 
+/** Immutable text node in a parsed tree. */
 export interface TextNode {
+  /** Parser-assigned identity. */
   readonly id: NodeId;
+  /** Node discriminator. */
   readonly kind: "text";
+  /** Text data. */
   readonly value: string;
+  /** Origin of the optional source span. */
   readonly spanProvenance: SpanProvenance;
+  /** Decoded-input range when captured and available. */
   readonly span?: Span;
 }
 
+/** Immutable comment node in a parsed tree. */
 export interface CommentNode {
+  /** Parser-assigned identity. */
   readonly id: NodeId;
+  /** Node discriminator. */
   readonly kind: "comment";
+  /** Comment data. */
   readonly value: string;
+  /** Origin of the optional source span. */
   readonly spanProvenance: SpanProvenance;
+  /** Decoded-input range when captured and available. */
   readonly span?: Span;
 }
 
 /** Processing instruction retained as a distinct DOM node. */
 export interface ProcessingInstructionNode {
+  /** Parser-assigned identity. */
   readonly id: NodeId;
+  /** Node discriminator. */
   readonly kind: "processingInstruction";
+  /** Processing-instruction target. */
   readonly target: string;
+  /** Processing-instruction data. */
   readonly data: string;
+  /** Origin of the optional source span. */
   readonly spanProvenance: SpanProvenance;
+  /** Decoded-input range when captured and available. */
   readonly span?: Span;
 }
 
@@ -395,17 +460,27 @@ export type DoctypeExternalId =
     }
   | { readonly kind: "system"; readonly systemId: string };
 
+/** Immutable document-type node in a parsed document. */
 export interface DoctypeNode {
+  /** Parser-assigned identity. */
   readonly id: NodeId;
+  /** Node discriminator. */
   readonly kind: "doctype";
+  /** Document-type name. */
   readonly name: string;
+  /** Retained public or system identifier syntax. */
   readonly externalId: DoctypeExternalId;
+  /** Origin of the optional source span. */
   readonly spanProvenance: SpanProvenance;
+  /** Decoded-input range when captured and available. */
   readonly span?: Span;
 }
 
+/** Immutable namespace-aware element node in a parsed tree. */
 export interface ElementNode {
+  /** Parser-assigned identity. */
   readonly id: NodeId;
+  /** Node discriminator. */
   readonly kind: "element";
   /** Namespace URI assigned by the HTML tree builder. */
   readonly namespaceUri: string;
@@ -415,23 +490,31 @@ export interface ElementNode {
   readonly localName: string;
   /** Qualified element name, including the prefix when one exists. */
   readonly tagName: string;
+  /** Attributes in parser order. */
   readonly attributes: readonly Attribute[];
   /** DOM child nodes; empty for an HTML template element. */
   readonly children: readonly HtmlNode[];
   /** Owned DocumentFragment, present only for an HTML template element. */
   readonly templateContent?: TemplateContentNode;
+  /** Origin of the optional source span. */
   readonly spanProvenance: SpanProvenance;
+  /** Decoded-input range when captured and available. */
   readonly span?: Span;
 }
 
 /** The distinct DocumentFragment owned by an HTML template element. */
 export interface TemplateContentNode {
+  /** Parser-assigned identity distinct from the owning template element. */
   readonly id: NodeId;
+  /** Node discriminator. */
   readonly kind: "templateContent";
+  /** Nodes owned by the template's document fragment. */
   readonly children: readonly HtmlNode[];
+  /** Template-content spans are inferred from parser ownership. */
   readonly spanProvenance: "inferred";
 }
 
+/** Any immutable node that can occur below a public document or fragment root. */
 export type HtmlNode =
   | ElementNode
   | TemplateContentNode
@@ -440,14 +523,22 @@ export type HtmlNode =
   | ProcessingInstructionNode
   | DoctypeNode;
 
+/** Callback invoked for a node and its zero-based traversal depth. */
 export type NodeVisitor = (node: HtmlNode, depth: number) => void;
+/** Callback invoked for an element and its zero-based traversal depth. */
 export type ElementVisitor = (node: ElementNode, depth: number) => void;
 
+/** Immutable root returned by full-document parsing. */
 export interface DocumentTree {
+  /** Parser-assigned root identity. */
   readonly id: NodeId;
+  /** Root discriminator. */
   readonly kind: "document";
+  /** Top-level document nodes in tree order. */
   readonly children: readonly HtmlNode[];
+  /** Non-fatal parse errors in emission order. */
   readonly errors: readonly ParseError[];
+  /** Retained trace when tracing was requested. */
   readonly trace?: TraceResult;
 }
 
@@ -507,36 +598,59 @@ export interface ParsedDocument {
   readonly metadata: ParsedDocumentMetadata;
 }
 
+/** Immutable root returned by fragment parsing. */
 export interface FragmentTree {
+  /** Parser-assigned root identity. */
   readonly id: NodeId;
+  /** Root discriminator. */
   readonly kind: "fragment";
+  /** Normalized HTML context element name. */
   readonly contextTagName: string;
+  /** Top-level fragment nodes in tree order. */
   readonly children: readonly HtmlNode[];
+  /** Non-fatal parse errors in emission order. */
   readonly errors: readonly ParseError[];
+  /** Retained trace when tracing was requested. */
   readonly trace?: TraceResult;
 }
 
+/** One structural outline entry derived from a heading or sectioning element. */
 export interface OutlineEntry {
+  /** Identity of the source element. */
   readonly nodeId: NodeId;
+  /** Zero-based traversal depth of the source element. */
   readonly depth: number;
+  /** Qualified source element name. */
   readonly tagName: string;
+  /** Bounded text extracted from the source element. */
   readonly text: string;
 }
 
+/** Structural outline in document order. */
 export interface Outline {
+  /** Immutable outline entries. */
   readonly entries: readonly OutlineEntry[];
 }
 
+/** Serialized group of complete top-level nodes. */
 export interface Chunk {
+  /** Zero-based output chunk index. */
   readonly index: number;
+  /** Identity of the first node in the chunk. */
   readonly nodeId: NodeId;
+  /** Serialized HTML for all nodes in the chunk. */
   readonly content: string;
+  /** Total nodes represented by the chunk. */
   readonly nodes: number;
 }
 
+/** Character, node, and byte targets for top-level serialization chunks. */
 export interface ChunkOptions extends OperationOptions {
+  /** Preferred maximum UTF-16 code units per chunk. */
   readonly maxChars?: number;
+  /** Preferred maximum represented nodes per chunk. */
   readonly maxNodes?: number;
+  /** Preferred maximum UTF-8 bytes per chunk. */
   readonly maxBytes?: number;
 }
 
@@ -640,42 +754,67 @@ export interface TextExtractionToken {
   readonly provenance: readonly TextProvenanceRange[];
 }
 
+/** Removes one parsed node. */
 export interface RemoveNodeEdit {
+  /** Edit discriminator. */
   readonly kind: "removeNode";
+  /** Identity of the node to remove. */
   readonly target: NodeId;
 }
 
+/** Replaces the data of one parsed text node. */
 export interface ReplaceTextEdit {
+  /** Edit discriminator. */
   readonly kind: "replaceText";
+  /** Identity of the text node to replace. */
   readonly target: NodeId;
+  /** Replacement text data. */
   readonly value: string;
 }
 
+/** Sets an unnamespaced attribute on one parsed element. */
 export interface SetAttrEdit {
+  /** Edit discriminator. */
   readonly kind: "setAttr";
+  /** Identity of the element to edit. */
   readonly target: NodeId;
+  /** HTML attribute name. */
   readonly name: string;
+  /** Replacement attribute value. */
   readonly value: string;
 }
 
+/** Removes an unnamespaced attribute from one parsed element. */
 export interface RemoveAttrEdit {
+  /** Edit discriminator. */
   readonly kind: "removeAttr";
+  /** Identity of the element to edit. */
   readonly target: NodeId;
+  /** HTML attribute name. */
   readonly name: string;
 }
 
+/** Inserts serialized HTML immediately before one parsed node. */
 export interface InsertHtmlBeforeEdit {
+  /** Edit discriminator. */
   readonly kind: "insertHtmlBefore";
+  /** Identity of the reference node. */
   readonly target: NodeId;
+  /** HTML source to insert. */
   readonly html: string;
 }
 
+/** Inserts serialized HTML immediately after one parsed node. */
 export interface InsertHtmlAfterEdit {
+  /** Edit discriminator. */
   readonly kind: "insertHtmlAfter";
+  /** Identity of the reference node. */
   readonly target: NodeId;
+  /** HTML source to insert. */
   readonly html: string;
 }
 
+/** Source edit accepted by the patch planner. */
 export type Edit =
   | RemoveNodeEdit
   | ReplaceTextEdit
@@ -707,22 +846,34 @@ export type HtmlPatchPlanningReason =
   | "INVALID_PLAN_SLICE"
   | "INVALID_PLAN_INSERTION";
 
+/** Copies a half-open range from the retained original source. */
 export interface PatchSliceStep {
+  /** Patch-step discriminator. */
   readonly kind: "slice";
+  /** Inclusive UTF-16 source offset. */
   readonly start: number;
+  /** Exclusive UTF-16 source offset. */
   readonly end: number;
 }
 
+/** Inserts source text at one UTF-16 source offset. */
 export interface PatchInsertStep {
+  /** Patch-step discriminator. */
   readonly kind: "insert";
+  /** UTF-16 source offset where text is inserted. */
   readonly at: number;
+  /** Source text to insert. */
   readonly text: string;
 }
 
+/** Ordered source operation in a patch plan. */
 export type PatchStep = PatchSliceStep | PatchInsertStep;
 
+/** Immutable patch operations and their precomputed result. */
 export interface PatchPlan {
+  /** Ordered, non-overlapping source operations. */
   readonly steps: readonly PatchStep[];
+  /** HTML produced by applying the steps. */
   readonly result: string;
 }
 
