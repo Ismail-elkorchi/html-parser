@@ -4,15 +4,20 @@ import test from "node:test";
 import { InternalStateError } from "../../../src/internal/foundation/internal-state-error.js";
 import {
   HTML_NAMESPACE,
+  MATHML_NAMESPACE,
   HtmlTreeModel,
   OpenElementStack,
   createEngineResourceGuard,
   type HtmlTreeElement
 } from "../../../src/internal/html-engine/mod.js";
 
-function element(model: HtmlTreeModel, localName: string): HtmlTreeElement {
+function element(
+  model: HtmlTreeModel,
+  localName: string,
+  namespaceUri: typeof HTML_NAMESPACE | typeof MATHML_NAMESPACE = HTML_NAMESPACE
+): HtmlTreeElement {
   return model.createElement({
-    namespaceUri: HTML_NAMESPACE,
+    namespaceUri,
     prefix: null,
     localName,
     qualifiedName: localName
@@ -40,6 +45,22 @@ void test("indexed stack scope queries preserve order across pushes, pops, and m
   assert.equal(stack.current(), innerParagraph);
   assert.equal(stack.pop(), innerParagraph);
   assert.equal(stack.current(), paragraph);
+});
+
+void test("HTML scope boundaries constrain foreign target lookups", () => {
+  const model = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });
+  const stack = new OpenElementStack();
+  const html = element(model, "html");
+  const mathTarget = element(model, "mi", MATHML_NAMESPACE);
+  const button = element(model, "button");
+  const boundaries = new Set(["html", "button"]);
+
+  stack.push(html);
+  stack.push(mathTarget);
+  assert.equal(stack.hasInScope(MATHML_NAMESPACE, "mi", boundaries), true);
+  stack.push(button);
+  assert.equal(stack.hasInScope(MATHML_NAMESPACE, "mi", boundaries), false);
+  assert.equal(stack.lastInScope(MATHML_NAMESPACE, new Set(["mi"]), boundaries), null);
 });
 
 void test("indexed stack rejects duplicate and absent element mutations", () => {

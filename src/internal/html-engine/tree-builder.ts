@@ -3,19 +3,30 @@ import { failInternalState, requireInternalValue } from "../foundation/internal-
 import { ActiveFormattingList } from "./active-formatting-list.js";
 import { createTreeBuilderParseError } from "./diagnostics.js";
 import { documentModeForDoctype, type HtmlDocumentMode } from "./doctype-mode.js";
-import { HTML_NAMESPACE } from "./namespaces.js";
+import {
+  adjustedForeignAttributes,
+  adjustedForeignTagName,
+  hasForeignBreakoutFontAttribute,
+  isForeignBreakoutStartTag,
+  isHtmlIntegrationPoint,
+  isMathMLTextIntegrationPoint
+} from "./foreign-content.js";
+import { fragmentContextAttributes } from "./fragment-context.js";
+import { HTML_NAMESPACE, MATHML_NAMESPACE, SVG_NAMESPACE } from "./namespaces.js";
 import { OpenElementStack } from "./open-element-stack.js";
 
 import type {
   ActiveFormattingEntry
 } from "./active-formatting-list.js";
 import type { EngineParseError } from "./diagnostics.js";
+import type { HtmlFragmentContext } from "./fragment-context.js";
 import type {
   EngineObserver,
   TokenAcceptance,
   TokenizerControl,
   TokenSink
 } from "./observer.js";
+import type { OpenElementName } from "./open-element-stack.js";
 import type { InsertionMode, NonExecutingScriptingMode, TokenizerMode } from "./parser-state.js";
 import type { EngineResourceGuard } from "./resource-guard.js";
 import type {
@@ -33,27 +44,11 @@ import type {
   HtmlTreeParent
 } from "./tree-model.js";
 
-export type HtmlTreeBuilderPendingFeature = "foreign-content";
-
-/** Honest staged-engine boundary for algorithms owned by later implementation rows. */
-export class HtmlTreeBuilderPendingFeatureError extends Error {
-  readonly code = "HTML_TREE_BUILDER_FEATURE_PENDING";
-  readonly feature: HtmlTreeBuilderPendingFeature;
-  readonly insertionMode: InsertionMode;
-
-  constructor(feature: HtmlTreeBuilderPendingFeature, insertionMode: InsertionMode) {
-    super(`HTML tree-construction feature is not implemented: ${feature}`);
-    this.name = "HtmlTreeBuilderPendingFeatureError";
-    this.feature = feature;
-    this.insertionMode = insertionMode;
-    Object.freeze(this);
-  }
-}
-
 export interface HtmlTreeBuilderOptions {
   readonly model: HtmlTreeModel;
   readonly resources: EngineResourceGuard;
   readonly scriptingMode: NonExecutingScriptingMode;
+  readonly fragmentContext?: HtmlFragmentContext;
   readonly observer?: EngineObserver;
   readonly onParseError: (error: EngineParseError) => void;
 }
@@ -155,6 +150,15 @@ const TABLE_CONTEXT_CLEAR_TAGS = new Set(["html", "table", "template"]);
 const TABLE_BODY_CONTEXT_CLEAR_TAGS = new Set(["html", "tbody", "template", "tfoot", "thead"]);
 const TABLE_ROW_CONTEXT_CLEAR_TAGS = new Set(["html", "template", "tr"]);
 
+const FOREIGN_SCOPE_BOUNDARIES: readonly OpenElementName[] = Object.freeze([
+  ...["mi", "mo", "mn", "ms", "mtext", "annotation-xml"].map((localName) =>
+    Object.freeze({ namespaceUri: MATHML_NAMESPACE, localName })
+  ),
+  ...["foreignObject", "desc", "title"].map((localName) =>
+    Object.freeze({ namespaceUri: SVG_NAMESPACE, localName })
+  )
+]);
+
 const SPECIAL_HTML_ELEMENTS = new Set([
   "address", "applet", "area", "article", "aside", "base", "basefont", "bgsound", "blockquote",
   "body", "br", "button", "caption", "center", "col", "colgroup", "dd", "details", "dir",
@@ -166,6 +170,8 @@ const SPECIAL_HTML_ELEMENTS = new Set([
   "table", "tbody", "td", "template", "textarea", "tfoot", "th", "thead", "title", "tr",
   "track", "ul", "wbr", "xmp"
 ]);
+const SPECIAL_MATHML_ELEMENTS = new Set(["mi", "mo", "mn", "ms", "mtext", "annotation-xml"]);
+const SPECIAL_SVG_ELEMENTS = new Set(["foreignObject", "desc", "title"]);
 
 function tokenTagName(token: HtmlToken): string | null {
   return token.kind === "start-tag" || token.kind === "end-tag" ? token.name : null;
@@ -219,6 +225,7 @@ export class HtmlTreeBuilder implements TokenSink {
   readonly #onParseError: (error: EngineParseError) => void;
   readonly #openElements: OpenElementStack;
   readonly #activeFormatting: ActiveFormattingList;
+  readonly #fragmentContext: HtmlTreeElement | null;
   readonly #templateInsertionModes: InsertionMode[] = [];
   #tokenizer: TokenizerControl | null = null;
   #insertionMode: InsertionMode = "initial";
@@ -240,6 +247,32 @@ export class HtmlTreeBuilder implements TokenSink {
     this.#onParseError = options.onParseError;
     this.#openElements = new OpenElementStack(options.resources);
     this.#activeFormatting = new ActiveFormattingList(options.resources);
+    if (options.fragmentContext === undefined) {
+      if (options.model.root.kind !== "document") {
+        failInternalState("TREE_BUILDER_FRAGMENT_CONTEXT_MISSING");
+      }
+      this.#fragmentContext = null;
+    } else {
+      if (options.model.root.kind !== "fragment") {
+        failInternalState("TREE_BUILDER_FRAGMENT_CONTEXT_UNEXPECTED");
+      }
+      const root = this.#createElementNamed("html");
+      this.#openElements.push(root);
+      this.#fragmentContext = this.#model.createElement({
+        namespaceUri: options.fragmentContext.namespaceUri,
+        prefix: null,
+        localName: options.fragmentContext.localName,
+        qualifiedName: options.fragmentContext.localName,
+        attributes: fragmentContextAttributes(options.fragmentContext)
+      });
+      if (
+        this.#fragmentContext.namespaceUri === HTML_NAMESPACE &&
+        this.#fragmentContext.localName === "template"
+      ) {
+        this.#templateInsertionModes.push("in-template");
+      }
+      this.#resetInsertionMode(null);
+    }
   }
 
   connectTokenizer(tokenizer: TokenizerControl): void {
@@ -248,6 +281,7 @@ export class HtmlTreeBuilder implements TokenSink {
     }
     this.#resources.ensureActive();
     this.#tokenizer = tokenizer;
+    this.#updateTokenizerForeignContext();
   }
 
   accept(token: HtmlToken): TokenAcceptance {
@@ -255,13 +289,18 @@ export class HtmlTreeBuilder implements TokenSink {
     if (this.#finished) failInternalState("TREE_BUILDER_TOKEN_AFTER_EOF");
     this.#resources.checkpoint();
     let mode: InsertionMode = this.#insertionMode;
+    let useForeignRules = !this.#shouldProcessInHtml(token);
     let acknowledged = false;
     for (;;) {
       this.#resources.checkpoint();
-      const nextMode = this.#process(mode, token, () => { acknowledged = true; });
+      const nextMode = useForeignRules
+        ? this.#inForeignContent(token, () => { acknowledged = true; })
+        : this.#process(mode, token, () => { acknowledged = true; });
+      useForeignRules = false;
       if (nextMode === null) break;
       mode = nextMode;
     }
+    this.#updateTokenizerForeignContext();
     return Object.freeze({ selfClosingAcknowledged: acknowledged });
   }
 
@@ -308,6 +347,120 @@ export class HtmlTreeBuilder implements TokenSink {
       case "after-frameset": return this.#inAfterFrameset(token, acknowledge);
       case "after-after-body": return this.#inAfterAfterBody(token, acknowledge);
       case "after-after-frameset": return this.#inAfterAfterFrameset(token, acknowledge);
+    }
+  }
+
+  #shouldProcessInHtml(token: HtmlToken): boolean {
+    if (this.#openElements.length === 0) return true;
+    const adjusted = this.#adjustedCurrentNode();
+    if (adjusted.namespaceUri === HTML_NAMESPACE) return true;
+    if (
+      isMathMLTextIntegrationPoint(adjusted) &&
+      ((token.kind === "start-tag" && token.name !== "mglyph" && token.name !== "malignmark") ||
+        token.kind === "character")
+    ) {
+      return true;
+    }
+    if (
+      adjusted.namespaceUri === MATHML_NAMESPACE &&
+      adjusted.localName === "annotation-xml" &&
+      token.kind === "start-tag" &&
+      token.name === "svg"
+    ) {
+      return true;
+    }
+    if (isHtmlIntegrationPoint(adjusted) &&
+      (token.kind === "start-tag" || token.kind === "character")) {
+      return true;
+    }
+    return token.kind === "eof";
+  }
+
+  #inForeignContent(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (token.kind === "character") {
+      if (token.data.includes("\u0000")) {
+        this.#parseErrorForEachCharacter(token, this.#insertionMode);
+        this.#insertCharacter(Object.freeze({
+          ...token,
+          data: token.data.replaceAll("\u0000", "\uFFFD")
+        }));
+      } else {
+        this.#insertCharacter(token);
+        if (!isWhitespaceToken(token)) this.#framesetOk = false;
+      }
+      return null;
+    }
+    if (token.kind === "comment") {
+      this.#insertComment(token);
+      return null;
+    }
+    if (token.kind === "processing-instruction") {
+      this.#insertProcessingInstruction(token);
+      return null;
+    }
+    if (token.kind === "doctype") {
+      this.#parseError(token, this.#insertionMode);
+      return null;
+    }
+    if (token.kind === "eof") return this.#process(this.#insertionMode, token, acknowledge);
+    const breaksOut =
+      (token.kind === "start-tag" &&
+        (isForeignBreakoutStartTag(token.name) || hasForeignBreakoutFontAttribute(token))) ||
+      (token.kind === "end-tag" && (token.name === "br" || token.name === "p"));
+    if (breaksOut) {
+      this.#parseError(token, this.#insertionMode);
+      while (
+        this.#currentNode().namespaceUri !== HTML_NAMESPACE &&
+        !isMathMLTextIntegrationPoint(this.#currentNode()) &&
+        !isHtmlIntegrationPoint(this.#currentNode())
+      ) {
+        this.#popCurrent();
+      }
+      return this.#process(this.#insertionMode, token, acknowledge);
+    }
+
+    if (token.kind === "start-tag") {
+      const namespaceUri = this.#adjustedCurrentNode().namespaceUri;
+      if (namespaceUri === HTML_NAMESPACE) {
+        failInternalState("TREE_BUILDER_FOREIGN_NAMESPACE_MISSING");
+      }
+      this.#insertForeignElement(token, namespaceUri);
+      if (token.selfClosing) {
+        this.#popCurrent();
+        acknowledge();
+      }
+      return null;
+    }
+
+    if (
+      token.name === "script" &&
+      this.#currentNode().namespaceUri === SVG_NAMESPACE &&
+      this.#currentNode().localName === "script"
+    ) {
+      this.#popCurrent();
+      return null;
+    }
+
+    let index = this.#openElements.length - 1;
+    let node = this.#currentNode();
+    if (node.localName.toLowerCase() !== token.name) {
+      this.#parseError(token, this.#insertionMode);
+    }
+    for (;;) {
+      if (index === 0) return null;
+      if (node.localName.toLowerCase() === token.name) {
+        this.#popThroughElement(node);
+        return null;
+      }
+      index -= 1;
+      node = requireInternalValue(
+        this.#openElements.at(index),
+        "TREE_BUILDER_STACK_ENTRY_MISSING"
+      );
+      if (node.namespaceUri === HTML_NAMESPACE) {
+        if (index === 0) return null;
+        return this.#process(this.#insertionMode, token, acknowledge);
+      }
     }
   }
 
@@ -761,6 +914,10 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "select") {
+      if (this.#isHtmlFragmentContext("select")) {
+        this.#parseError(token, "in-body");
+        return null;
+      }
       if (this.#hasInScope("select", "default")) {
         this.#parseError(token, "in-body");
         this.#popThrough("select");
@@ -796,7 +953,16 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "math" || name === "svg") {
-      throw new HtmlTreeBuilderPendingFeatureError("foreign-content", "in-body");
+      this.#reconstructActiveFormatting();
+      this.#insertForeignElement(
+        token,
+        name === "math" ? MATHML_NAMESPACE : SVG_NAMESPACE
+      );
+      if (token.selfClosing) {
+        this.#popCurrent();
+        acknowledge();
+      }
+      return null;
     }
     if (name === "area" || name === "br" || name === "embed" || name === "img" || name === "keygen" || name === "wbr") {
       this.#reconstructActiveFormatting();
@@ -807,6 +973,14 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "input") {
+      if (this.#isHtmlFragmentContext("select")) {
+        this.#parseError(token, "in-body");
+        return null;
+      }
+      if (this.#hasInScope("select", "default")) {
+        this.#parseError(token, "in-body");
+        this.#popThrough("select");
+      }
       this.#reconstructActiveFormatting();
       this.#insertElement(token);
       this.#popCurrent();
@@ -823,6 +997,12 @@ export class HtmlTreeBuilder implements TokenSink {
     }
     if (name === "hr") {
       this.#closeParagraphIfInButtonScope(token);
+      if (this.#hasInScope("select", "default")) {
+        this.#generateImpliedEndTags();
+        if (this.#hasInScope("option", "default") || this.#hasInScope("optgroup", "default")) {
+          this.#parseError(token, "in-body");
+        }
+      }
       this.#insertElement(token);
       this.#popCurrent();
       if (token.selfClosing) acknowledge();
@@ -918,7 +1098,11 @@ export class HtmlTreeBuilder implements TokenSink {
       this.#formElement = null;
       if (
         form === null ||
-        !this.#openElements.hasElementInScope(form, DEFAULT_SCOPE_BOUNDARIES)
+        !this.#openElements.hasElementInScope(
+          form,
+          DEFAULT_SCOPE_BOUNDARIES,
+          FOREIGN_SCOPE_BOUNDARIES
+        )
       ) {
         this.#parseError(token, "in-body");
         return null;
@@ -1454,7 +1638,9 @@ export class HtmlTreeBuilder implements TokenSink {
         return null;
       }
       this.#popCurrent();
-      if (this.#currentNode().localName !== "frameset") this.#setInsertionMode("after-frameset", token);
+      if (this.#fragmentContext === null && this.#currentNode().localName !== "frameset") {
+        this.#setInsertionMode("after-frameset", token);
+      }
       return null;
     }
     if (token.kind === "eof") {
@@ -1462,7 +1648,8 @@ export class HtmlTreeBuilder implements TokenSink {
       this.#finished = true;
       return null;
     }
-    this.#parseError(token, "in-frameset");
+    if (token.kind === "character") this.#parseErrorForEachCharacter(token, "in-frameset");
+    else this.#parseError(token, "in-frameset");
     return null;
   }
 
@@ -1490,7 +1677,8 @@ export class HtmlTreeBuilder implements TokenSink {
       this.#finished = true;
       return null;
     }
-    this.#parseError(token, "after-frameset");
+    if (token.kind === "character") this.#parseErrorForEachCharacter(token, "after-frameset");
+    else this.#parseError(token, "after-frameset");
     return null;
   }
 
@@ -1512,7 +1700,11 @@ export class HtmlTreeBuilder implements TokenSink {
       this.#finished = true;
       return null;
     }
-    this.#parseError(token, "after-after-frameset");
+    if (token.kind === "character") {
+      this.#parseErrorForEachCharacter(token, "after-after-frameset");
+    } else {
+      this.#parseError(token, "after-after-frameset");
+    }
     return null;
   }
 
@@ -1520,11 +1712,12 @@ export class HtmlTreeBuilder implements TokenSink {
     if (isWhitespaceToken(token)) return this.#inBody(token, acknowledge);
     if (token.kind === "comment") {
       const html = requireInternalValue(this.#openElements.at(0), "TREE_BUILDER_STACK_ENTRY_MISSING");
-      this.#insertComment(token, html);
+      this.#insertComment(token, this.#fragmentContext === null ? html : this.#model.root);
       return null;
     }
     if (token.kind === "processing-instruction") {
-      this.#insertProcessingInstruction(token);
+      const html = requireInternalValue(this.#openElements.at(0), "TREE_BUILDER_STACK_ENTRY_MISSING");
+      this.#insertProcessingInstruction(token, this.#fragmentContext === null ? html : this.#model.root);
       return null;
     }
     if (token.kind === "doctype") {
@@ -1533,6 +1726,10 @@ export class HtmlTreeBuilder implements TokenSink {
     }
     if (token.kind === "start-tag" && token.name === "html") return this.#inBody(token, acknowledge);
     if (token.kind === "end-tag" && token.name === "html") {
+      if (this.#fragmentContext !== null) {
+        this.#parseError(token, "after-body");
+        return null;
+      }
       this.#setInsertionMode("after-after-body", token);
       return null;
     }
@@ -1578,6 +1775,21 @@ export class HtmlTreeBuilder implements TokenSink {
     });
   }
 
+  #createForeignElement(
+    token: HtmlStartTagToken,
+    namespaceUri: typeof MATHML_NAMESPACE | typeof SVG_NAMESPACE
+  ): HtmlTreeElement {
+    const localName = adjustedForeignTagName(token.name, namespaceUri);
+    return this.#model.createElement({
+      namespaceUri,
+      prefix: null,
+      localName,
+      qualifiedName: localName,
+      attributes: adjustedForeignAttributes(token.attributes, namespaceUri),
+      sourceSpan: token.span
+    });
+  }
+
   #createElementNamed(name: string): HtmlTreeElement {
     return this.#model.createElement({
       namespaceUri: HTML_NAMESPACE,
@@ -1594,9 +1806,32 @@ export class HtmlTreeBuilder implements TokenSink {
     return element;
   }
 
+  #insertForeignElement(
+    token: HtmlStartTagToken,
+    namespaceUri: typeof MATHML_NAMESPACE | typeof SVG_NAMESPACE
+  ): HtmlTreeElement {
+    const element = this.#createForeignElement(token, namespaceUri);
+    this.#insertAtAppropriateLocation(element);
+    this.#openElements.push(element);
+    return element;
+  }
+
   #insertAtAppropriateLocation(node: HtmlTreeNode, overrideTarget?: HtmlTreeElement): void {
-    const location = this.#appropriateInsertionLocation(overrideTarget);
+    const location = this.#adjustedInsertionLocation(overrideTarget);
     this.#model.insertBefore(location.parent, node, location.before);
+  }
+
+  #adjustedInsertionLocation(overrideTarget?: HtmlTreeElement): InsertionLocation {
+    const location = this.#appropriateInsertionLocation(overrideTarget);
+    const first = this.#openElements.at(0);
+    if (
+      this.#fragmentContext !== null &&
+      first !== null &&
+      location.parent === first
+    ) {
+      return { parent: this.#model.root, before: null };
+    }
+    return location;
   }
 
   #appropriateInsertionLocation(overrideTarget?: HtmlTreeElement): InsertionLocation {
@@ -1649,7 +1884,7 @@ export class HtmlTreeBuilder implements TokenSink {
   }
 
   #insertCharacter(token: Extract<HtmlToken, { readonly kind: "character" }>): void {
-    const location = this.#appropriateInsertionLocation();
+    const location = this.#adjustedInsertionLocation();
     this.#model.insertText(location.parent, token.data, token.span, location.before);
   }
 
@@ -1678,15 +1913,17 @@ export class HtmlTreeBuilder implements TokenSink {
     this.#setInsertionMode("text", token);
   }
 
-  #setInsertionMode(to: InsertionMode, token: HtmlToken): void {
+  #setInsertionMode(to: InsertionMode, token: HtmlToken | null): void {
     const from = this.#insertionMode;
     if (from === to) return;
     this.#insertionMode = to;
-    this.#observer?.onInsertionModeTransition?.(Object.freeze({
-      from,
-      to,
-      token: Object.freeze({ kind: token.kind, tagName: tokenTagName(token), span: token.span })
-    }));
+    if (token !== null) {
+      this.#observer?.onInsertionModeTransition?.(Object.freeze({
+        from,
+        to,
+        token: Object.freeze({ kind: token.kind, tagName: tokenTagName(token), span: token.span })
+      }));
+    }
     this.#resources.ensureActive();
   }
 
@@ -1714,13 +1951,32 @@ export class HtmlTreeBuilder implements TokenSink {
     return this.#openElements.current();
   }
 
+  #adjustedCurrentNode(): HtmlTreeElement {
+    return this.#fragmentContext !== null && this.#openElements.length === 1
+      ? this.#fragmentContext
+      : this.#currentNode();
+  }
+
+  #isHtmlFragmentContext(localName: string): boolean {
+    return this.#fragmentContext?.namespaceUri === HTML_NAMESPACE &&
+      this.#fragmentContext.localName === localName;
+  }
+
+  #updateTokenizerForeignContext(): void {
+    this.#tokenizerControl().setForeignContent(
+      this.#openElements.length > 0 &&
+      this.#adjustedCurrentNode().namespaceUri !== HTML_NAMESPACE
+    );
+  }
+
   #popCurrent(): HtmlTreeElement {
     return this.#openElements.pop();
   }
 
   #popThrough(name: string): void {
     for (;;) {
-      if (this.#popCurrent().localName === name) return;
+      const popped = this.#popCurrent();
+      if (popped.namespaceUri === HTML_NAMESPACE && popped.localName === name) return;
     }
   }
 
@@ -1735,13 +1991,22 @@ export class HtmlTreeBuilder implements TokenSink {
   }
 
   #generateImpliedEndTags(except: string | null = null): void {
-    while (IMPLIED_END_TAGS.has(this.#currentNode().localName) && this.#currentNode().localName !== except) {
+    while (
+      this.#currentNode().namespaceUri === HTML_NAMESPACE &&
+      IMPLIED_END_TAGS.has(this.#currentNode().localName) &&
+      this.#currentNode().localName !== except
+    ) {
       this.#popCurrent();
     }
   }
 
   #generateAllImpliedEndTagsThoroughly(): void {
-    while (THOROUGH_IMPLIED_END_TAGS.has(this.#currentNode().localName)) this.#popCurrent();
+    while (
+      this.#currentNode().namespaceUri === HTML_NAMESPACE &&
+      THOROUGH_IMPLIED_END_TAGS.has(this.#currentNode().localName)
+    ) {
+      this.#popCurrent();
+    }
   }
 
   #closeParagraphIfInButtonScope(token: HtmlToken): void {
@@ -1773,7 +2038,12 @@ export class HtmlTreeBuilder implements TokenSink {
     const boundaries = scope === "button"
       ? BUTTON_SCOPE_BOUNDARIES
       : scope === "list-item" ? LIST_ITEM_SCOPE_BOUNDARIES : DEFAULT_SCOPE_BOUNDARIES;
-    return this.#openElements.hasInScope(HTML_NAMESPACE, name, boundaries);
+    return this.#openElements.hasInScope(
+      HTML_NAMESPACE,
+      name,
+      boundaries,
+      FOREIGN_SCOPE_BOUNDARIES
+    );
   }
 
   #hasInTableScope(name: string): boolean {
@@ -1791,7 +2061,8 @@ export class HtmlTreeBuilder implements TokenSink {
   }
 
   #processTableAnythingElse(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
-    this.#parseError(token, "in-table");
+    if (token.kind === "character") this.#parseErrorForEachCharacter(token, "in-table");
+    else this.#parseError(token, "in-table");
     return this.#processWithFosterParenting(token, acknowledge);
   }
 
@@ -1887,39 +2158,40 @@ export class HtmlTreeBuilder implements TokenSink {
     );
   }
 
-  #resetInsertionMode(token: HtmlToken): void {
+  #resetInsertionMode(token: HtmlToken | null): void {
     for (let index = this.#openElements.length - 1; index >= 0; index -= 1) {
       this.#resources.checkpoint();
-      const node = requireInternalValue(
+      let node = requireInternalValue(
         this.#openElements.at(index),
         "TREE_BUILDER_STACK_ENTRY_MISSING"
       );
       const last = index === 0;
-      if (!last && TABLE_CELL_TAGS.has(node.localName)) {
+      if (last && this.#fragmentContext !== null) node = this.#fragmentContext;
+      if (node.namespaceUri === HTML_NAMESPACE && !last && TABLE_CELL_TAGS.has(node.localName)) {
         this.#setInsertionMode("in-cell", token);
         return;
       }
-      if (node.localName === "tr") {
+      if (node.namespaceUri === HTML_NAMESPACE && node.localName === "tr") {
         this.#setInsertionMode("in-row", token);
         return;
       }
-      if (TABLE_BODY_TAGS.has(node.localName)) {
+      if (node.namespaceUri === HTML_NAMESPACE && TABLE_BODY_TAGS.has(node.localName)) {
         this.#setInsertionMode("in-table-body", token);
         return;
       }
-      if (node.localName === "caption") {
+      if (node.namespaceUri === HTML_NAMESPACE && node.localName === "caption") {
         this.#setInsertionMode("in-caption", token);
         return;
       }
-      if (node.localName === "colgroup") {
+      if (node.namespaceUri === HTML_NAMESPACE && node.localName === "colgroup") {
         this.#setInsertionMode("in-column-group", token);
         return;
       }
-      if (node.localName === "table") {
+      if (node.namespaceUri === HTML_NAMESPACE && node.localName === "table") {
         this.#setInsertionMode("in-table", token);
         return;
       }
-      if (node.localName === "template") {
+      if (node.namespaceUri === HTML_NAMESPACE && node.localName === "template") {
         const mode = requireInternalValue(
           this.#templateInsertionModes.at(-1),
           "TREE_BUILDER_TEMPLATE_MODE_MISSING"
@@ -1927,19 +2199,19 @@ export class HtmlTreeBuilder implements TokenSink {
         this.#setInsertionMode(mode, token);
         return;
       }
-      if (!last && node.localName === "head") {
+      if (node.namespaceUri === HTML_NAMESPACE && !last && node.localName === "head") {
         this.#setInsertionMode("in-head", token);
         return;
       }
-      if (node.localName === "body") {
+      if (node.namespaceUri === HTML_NAMESPACE && node.localName === "body") {
         this.#setInsertionMode("in-body", token);
         return;
       }
-      if (node.localName === "frameset") {
+      if (node.namespaceUri === HTML_NAMESPACE && node.localName === "frameset") {
         this.#setInsertionMode("in-frameset", token);
         return;
       }
-      if (node.localName === "html") {
+      if (node.namespaceUri === HTML_NAMESPACE && node.localName === "html") {
         this.#setInsertionMode(this.#headElement === null ? "before-head" : "after-head", token);
         return;
       }
@@ -2010,7 +2282,11 @@ export class HtmlTreeBuilder implements TokenSink {
         this.#activeFormatting.removeElement(formattingElement);
         return;
       }
-      if (!this.#openElements.hasElementInScope(formattingElement, DEFAULT_SCOPE_BOUNDARIES)) {
+      if (!this.#openElements.hasElementInScope(
+        formattingElement,
+        DEFAULT_SCOPE_BOUNDARIES,
+        FOREIGN_SCOPE_BOUNDARIES
+      )) {
         this.#parseError(token, "in-body");
         return;
       }
@@ -2091,12 +2367,17 @@ export class HtmlTreeBuilder implements TokenSink {
     return this.#openElements.lastInScope(
       HTML_NAMESPACE,
       names,
-      DEFAULT_SCOPE_BOUNDARIES
+      DEFAULT_SCOPE_BOUNDARIES,
+      FOREIGN_SCOPE_BOUNDARIES
     );
   }
 
   #isSpecial(element: HtmlTreeElement): boolean {
-    return element.namespaceUri === HTML_NAMESPACE && SPECIAL_HTML_ELEMENTS.has(element.localName);
+    if (element.namespaceUri === HTML_NAMESPACE) return SPECIAL_HTML_ELEMENTS.has(element.localName);
+    if (element.namespaceUri === MATHML_NAMESPACE) {
+      return SPECIAL_MATHML_ELEMENTS.has(element.localName);
+    }
+    return SPECIAL_SVG_ELEMENTS.has(element.localName);
   }
 
   #hasUnexpectedOpenElementAtBodyEnd(): boolean {

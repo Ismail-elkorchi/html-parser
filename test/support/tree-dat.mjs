@@ -47,7 +47,7 @@ function finishCase(current, fixtureCases, filePath) {
     throw new TreeDatFormatError(filePath, caseNumber, "missing fragment context line");
   }
 
-  if (current.documentLines.at(-1) === "") {
+  while (current.documentLines.at(-1) === "") {
     current.documentLines.pop();
   }
 
@@ -58,6 +58,8 @@ function finishCase(current, fixtureCases, filePath) {
     data: current.dataLines.join("\n"),
     errors: Object.freeze([...current.errors]),
     newErrors: Object.freeze([...current.newErrors]),
+    sawErrors: current.sawErrors,
+    sawNewErrors: current.sawNewErrors,
     errorsDeclared: current.sawErrors || current.sawNewErrors,
     expected: current.documentLines.join("\n"),
     fragmentContext: current.fragmentContext,

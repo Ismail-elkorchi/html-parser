@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -7,16 +7,11 @@ import {
   XLINK_NAMESPACE,
   XML_NAMESPACE,
   XMLNS_NAMESPACE,
-  HtmlTreeBuilderPendingFeatureError,
   runHtmlEngine
 } from "../../dist/internal/html-engine/mod.js";
 import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
 
 const FIXTURE_ROOT = "test/fixtures/upstream/wpt-tree-construction/resources";
-
-function inclusiveRange(first, last) {
-  return Array.from({ length: last - first + 1 }, (_, index) => first + index);
-}
 
 const ASSIGNMENTS = Object.freeze({
   "adoption01.dat": Object.freeze({ cases: Object.freeze([1, 2, 3, 4, 5, 7, 8, 9, 10, 14, 15, 16, 17]) }),
@@ -60,26 +55,13 @@ const ASSIGNMENTS = Object.freeze({
   "tricky01.dat": Object.freeze({ cases: Object.freeze([1]) }),
   "void-in-phrasing.dat": Object.freeze({ first: 1, last: 13 })
 });
-const FOREIGN_CONTENT_CASES = Object.freeze({
-  "tables01.dat": new Set([17, 18]),
-  "template.dat": new Set([99, 100]),
-  "tests9.dat": new Set([...inclusiveRange(1, 21), ...inclusiveRange(24, 27)]),
-  "tests10.dat": new Set([...inclusiveRange(1, 20), ...inclusiveRange(23, 54)]),
-  "tests11.dat": new Set(inclusiveRange(1, 13)),
-  "tests12.dat": new Set([1, 2]),
-  "tests20.dat": new Set([43, 49, 50, ...inclusiveRange(53, 64)]),
-  "tests21.dat": new Set([1, 2, ...inclusiveRange(4, 23)])
-});
 const requestedCase = process.env["ENGINE_FIXTURE_CASE"];
+const includeAllDocumentCases = process.env["ENGINE_ALL_DOCUMENT_CASES"] === "1";
 
 function isAssigned(caseNumber, assignment) {
   return "cases" in assignment
     ? assignment.cases.includes(caseNumber)
     : caseNumber >= assignment.first && caseNumber <= assignment.last;
-}
-
-function isDeferredForeignContent(fileName, caseNumber) {
-  return FOREIGN_CONTENT_CASES[fileName]?.has(caseNumber) ?? false;
 }
 
 function quote(value) {
@@ -131,7 +113,7 @@ function serializeNode(node, level, lines) {
       attributes.push({ name: attributeName(attribute), value: attribute.value });
     }
   }
-  attributes.sort((left, right) => left.name.localeCompare(right.name));
+  attributes.sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
   for (const attribute of attributes) {
     lines.push(`| ${"  ".repeat(level + 1)}${attribute.name}=${quote(attribute.value)}`);
   }
@@ -173,70 +155,95 @@ function serializeModel(model) {
 const failures = [];
 let executed = 0;
 let passed = 0;
-let deferred = 0;
-for (const [fileName, assignment] of Object.entries(ASSIGNMENTS)) {
+let chunkExecutions = 0;
+const fixtureFiles = (await readdir(FIXTURE_ROOT))
+  .filter((fileName) => fileName.endsWith(".dat"))
+  .sort();
+for (const fileName of fixtureFiles) {
+  const assignment = ASSIGNMENTS[fileName];
   const filePath = path.join(FIXTURE_ROOT, fileName);
   const content = await readFile(filePath, "utf8");
   const cases = parseTreeDatFixtures(content, filePath)
     .filter((fixtureCase) =>
-      fixtureCase.fragmentContext === null &&
-      isAssigned(fixtureCase.caseNumber, assignment) &&
+      (fixtureCase.fragmentContext !== null ||
+        includeAllDocumentCases ||
+        (assignment !== undefined && isAssigned(fixtureCase.caseNumber, assignment))) &&
       (requestedCase === undefined || requestedCase === `${fileName}#${String(fixtureCase.caseNumber)}`)
     );
   for (const fixtureCase of expandTreeDatCases(cases, { includeModeInId: true })) {
     executed += 1;
-    const expectsForeignContent = isDeferredForeignContent(fileName, fixtureCase.caseNumber);
-    try {
-      const result = runHtmlEngine({
-        inputChunks: [fixtureCase.data],
-        parser: {
-          kind: "document",
-          scriptingMode: fixtureCase.scriptingEnabled ? "inert" : "disabled"
-        },
-        limits: {
-          maxSteps: 1_000_000,
-          maxNodes: 100_000,
-          maxDepth: 10_000,
-          maxParseErrors: 100_000,
-          maxAttributesPerElement: 10_000,
-          maxAttributeUtf8BytesPerElement: 10_000_000
+    const schedules = fixtureCase.fragmentContext === null
+      ? [{ name: "whole", inputChunks: [fixtureCase.data] }]
+      : [
+          { name: "whole", inputChunks: [fixtureCase.data] },
+          {
+            name: "utf16-unit",
+            inputChunks: Array.from(
+              { length: fixtureCase.data.length },
+              (_, index) => fixtureCase.data[index] ?? ""
+            )
+          }
+        ];
+    let fixturePassed = true;
+    for (const schedule of schedules) {
+      chunkExecutions += 1;
+      try {
+        const result = runHtmlEngine({
+          inputChunks: schedule.inputChunks,
+          parser: fixtureCase.fragmentContext === null
+            ? {
+                kind: "document",
+                scriptingMode: fixtureCase.scriptingEnabled ? "inert" : "disabled"
+              }
+            : {
+                kind: "fragment",
+                scriptingMode: fixtureCase.scriptingEnabled ? "inert" : "disabled",
+                context: { ...fixtureCase.fragmentContext, attributes: [] }
+              },
+          limits: {
+            maxSteps: 1_000_000,
+            maxNodes: 100_000,
+            maxDepth: 10_000,
+            maxParseErrors: 100_000,
+            maxAttributesPerElement: 10_000,
+            maxAttributeUtf8BytesPerElement: 10_000_000
+          }
+        });
+        const actual = serializeModel(result.model);
+        const actualLegacyParseErrorCount = result.parseErrors.length;
+        const actualNamedParseErrorCount = result.parseErrors
+          .filter((error) => error.code !== "unexpected-token").length;
+        const legacyParseErrorCountMatches =
+          !fixtureCase.sawErrors || actualLegacyParseErrorCount === fixtureCase.errors.length;
+        const namedParseErrorCountMatches =
+          !fixtureCase.sawNewErrors || actualNamedParseErrorCount === fixtureCase.newErrors.length;
+        if (actual !== fixtureCase.expected ||
+          !legacyParseErrorCountMatches ||
+          !namedParseErrorCountMatches) {
+          fixturePassed = false;
+          failures.push({
+            id: `${fixtureCase.id}#chunk-${schedule.name}`,
+            expected: fixtureCase.expected,
+            actual,
+            expectedParseErrors: {
+              legacy: fixtureCase.sawErrors ? fixtureCase.errors.length : null,
+              named: fixtureCase.sawNewErrors ? fixtureCase.newErrors.length : null
+            },
+            actualParseErrors: {
+              legacy: actualLegacyParseErrorCount,
+              named: actualNamedParseErrorCount
+            }
+          });
         }
-      });
-      if (expectsForeignContent) {
+      } catch (error) {
+        fixturePassed = false;
         failures.push({
-          id: fixtureCase.id,
-          error: "Expected the staged foreign-content boundary, but parsing completed"
+          id: `${fixtureCase.id}#chunk-${schedule.name}`,
+          error: error instanceof Error ? `${error.name}: ${error.message}` : String(error)
         });
-        continue;
       }
-      const actual = serializeModel(result.model);
-      const parseErrorCountMatches =
-        !fixtureCase.errorsDeclared || result.parseErrors.length === fixtureCase.errors.length;
-      if (actual !== fixtureCase.expected || !parseErrorCountMatches) {
-        failures.push({
-          id: fixtureCase.id,
-          expected: fixtureCase.expected,
-          actual,
-          expectedParseErrors: fixtureCase.errorsDeclared ? fixtureCase.errors.length : null,
-          actualParseErrors: result.parseErrors.length
-        });
-      } else {
-        passed += 1;
-      }
-    } catch (error) {
-      if (
-        expectsForeignContent &&
-        error instanceof HtmlTreeBuilderPendingFeatureError &&
-        error.feature === "foreign-content"
-      ) {
-        deferred += 1;
-        continue;
-      }
-      failures.push({
-        id: fixtureCase.id,
-        error: error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-      });
     }
+    if (fixturePassed) passed += 1;
   }
 }
 
@@ -264,8 +271,8 @@ if (failures.length > 0) {
   ]));
   console.error(JSON.stringify({
     executed,
+    chunkExecutions,
     passed,
-    deferred: { feature: "foreign-content", executions: deferred },
     failed: failures.length,
     treeOrRuntimeFailures,
     diagnosticCountOnlyFailures: failures.length - treeOrRuntimeFailures,
@@ -276,8 +283,8 @@ if (failures.length > 0) {
 } else {
   console.log(JSON.stringify({
     executed,
+    chunkExecutions,
     passed,
-    failed: 0,
-    deferred: { feature: "foreign-content", executions: deferred }
+    failed: 0
   }));
 }

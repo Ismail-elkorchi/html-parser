@@ -68,6 +68,13 @@ and compares the result fingerprint with the checked-in legacy-engine
 baseline. Tree-output conformance and parse-error-count evidence are reported
 separately because the WPT browser harness ignores the `.dat` error sections.
 
+The independent tree-builder runner evaluates every fragment variant plus its
+assigned document cases. Fragment inputs run both whole and one-UTF-16-unit
+chunk schedules. In the fixture format, `#errors` is the legacy total-error
+view and `#new-errors` is the named tokenizer-error view; when both are present,
+the runner asserts both views independently instead of adding or choosing
+between them.
+
 The current snapshot contains 61 `.dat` files, 470,005 fixture bytes, 1,934
 base cases, and 3,828 scripting variants. Of those variants:
 
