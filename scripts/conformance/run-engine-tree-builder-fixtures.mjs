@@ -1,4 +1,5 @@
-import { readFile, readdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -12,6 +13,9 @@ import {
 import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
 
 const FIXTURE_ROOT = "test/fixtures/upstream/wpt-tree-construction/resources";
+const CORPUS_MANIFEST_PATH = "test/fixtures/upstream/wpt-tree-construction/manifest.json";
+const CLASSIFICATION_PATH = "test/fixtures/qualification/wpt-tree-classifications.json";
+const QUALIFICATION_REPORT_PATH = "reports/engine-wpt-tree.json";
 
 const ASSIGNMENTS = Object.freeze({
   "adoption01.dat": Object.freeze({ cases: Object.freeze([1, 2, 3, 4, 5, 7, 8, 9, 10, 14, 15, 16, 17]) }),
@@ -56,7 +60,25 @@ const ASSIGNMENTS = Object.freeze({
   "void-in-phrasing.dat": Object.freeze({ first: 1, last: 13 })
 });
 const requestedCase = process.env["ENGINE_FIXTURE_CASE"];
-const includeAllDocumentCases = process.env["ENGINE_ALL_DOCUMENT_CASES"] === "1";
+const qualificationRun = process.argv.includes("--qualification") ||
+  process.env["ENGINE_QUALIFICATION"] === "1";
+const includeAllDocumentCases = qualificationRun || process.env["ENGINE_ALL_DOCUMENT_CASES"] === "1";
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function failureSignature(failure) {
+  const payload = "error" in failure
+    ? { error: failure.error }
+    : {
+        expected: failure.expected,
+        actual: failure.actual,
+        expectedParseErrors: failure.expectedParseErrors,
+        actualParseErrors: failure.actualParseErrors
+      };
+  return sha256(JSON.stringify(payload));
+}
 
 function isAssigned(caseNumber, assignment) {
   return "cases" in assignment
@@ -247,7 +269,87 @@ for (const fileName of fixtureFiles) {
   }
 }
 
-if (failures.length > 0) {
+if (qualificationRun) {
+  const classificationFile = JSON.parse(await readFile(CLASSIFICATION_PATH, "utf8"));
+  const corpusManifest = JSON.parse(await readFile(CORPUS_MANIFEST_PATH, "utf8"));
+  if (classificationFile.schemaVersion !== 1 || !Array.isArray(classificationFile.entries)) {
+    throw new Error("WPT tree classification manifest must use schemaVersion 1 and contain entries");
+  }
+  if (
+    classificationFile.corpusCommit !== corpusManifest.commit ||
+    classificationFile.corpusCompositeSha256 !== corpusManifest.compositeSha256
+  ) {
+    throw new Error("WPT tree classification manifest does not match the pinned corpus");
+  }
+
+  const acceptedKinds = new Set(["requires-script-execution", "standards-drift"]);
+  const expectedById = new Map();
+  for (const entry of classificationFile.entries) {
+    if (
+      typeof entry.id !== "string" ||
+      typeof entry.signature !== "string" ||
+      typeof entry.reason !== "string" ||
+      !acceptedKinds.has(entry.classification) ||
+      expectedById.has(entry.id)
+    ) {
+      throw new Error(`Invalid WPT tree classification entry: ${String(entry.id)}`);
+    }
+    expectedById.set(entry.id, entry);
+  }
+
+  const classified = [];
+  const unexpected = [];
+  for (const failure of failures) {
+    const signature = failureSignature(failure);
+    const expected = expectedById.get(failure.id);
+    if (expected === undefined || expected.signature !== signature) {
+      unexpected.push({ id: failure.id, signature });
+      continue;
+    }
+    classified.push({
+      id: failure.id,
+      signature,
+      classification: expected.classification,
+      reason: expected.reason
+    });
+    expectedById.delete(failure.id);
+  }
+  const unobserved = [...expectedById.values()].map((entry) => ({
+    id: entry.id,
+    signature: entry.signature,
+    classification: entry.classification
+  }));
+  const classificationCounts = Object.fromEntries(
+    [...acceptedKinds].map((kind) => [
+      kind,
+      classified.filter((entry) => entry.classification === kind).length
+    ])
+  );
+  const report = {
+    schemaVersion: 1,
+    suite: "independent-engine-wpt-tree",
+    generatedAt: new Date().toISOString(),
+    corpusCommit: corpusManifest.commit,
+    corpusCompositeSha256: corpusManifest.compositeSha256,
+    executed,
+    chunkExecutions,
+    exactPasses: passed,
+    classifiedDifferences: classified.length,
+    classificationCounts,
+    unexpected,
+    unobserved,
+    outcomesSha256: sha256(JSON.stringify({
+      executed,
+      passed,
+      classified: classified.map(({ id, signature, classification }) => ({ id, signature, classification }))
+    }))
+  };
+  await writeFile(QUALIFICATION_REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  console.log(JSON.stringify(report, null, 2));
+  if (unexpected.length > 0 || unobserved.length > 0 || executed !== passed + classified.length) {
+    process.exitCode = 1;
+  }
+} else if (failures.length > 0) {
   const treeOrRuntimeFailures = failures.filter((failure) =>
     "error" in failure || failure.expected !== failure.actual
   ).length;

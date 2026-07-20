@@ -136,6 +136,7 @@ void test("template contents have distinct identity, resource cost, depth, and i
   const template = element(model, "template");
   const child = element(model, "p");
   model.append(model.root, template);
+  assert.equal(resources.snapshot().maxDepth, 3);
   model.append(template, child);
 
   const contents = template.templateContents;
@@ -151,7 +152,7 @@ void test("template contents have distinct identity, resource cost, depth, and i
   ]);
   assert.deepEqual(model.validate(), { allocatedNodes: 4, attachedNodes: 4, maxDepth: 4 });
   assert.deepEqual(resources.snapshot(), {
-    steps: 11,
+    steps: 6,
     nodes: 4,
     maxDepth: 4,
     parseErrors: 0,

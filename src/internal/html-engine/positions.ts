@@ -9,12 +9,12 @@ export interface SourceSpan {
   readonly endUtf16Offset: number;
 }
 
-/** Creates an immutable decoded-input position. */
+/** Creates a decoded-input position whose fields are read-only to engine consumers. */
 export function sourcePosition(utf16Offset: number): SourcePosition {
-  return Object.freeze({ utf16Offset });
+  return { utf16Offset };
 }
 
-/** Creates an immutable decoded-input span. */
+/** Creates a decoded-input span whose fields are read-only to engine consumers. */
 export function sourceSpan(startUtf16Offset: number, endUtf16Offset: number): SourceSpan {
-  return Object.freeze({ startUtf16Offset, endUtf16Offset });
+  return { startUtf16Offset, endUtf16Offset };
 }

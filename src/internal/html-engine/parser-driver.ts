@@ -44,6 +44,7 @@ export interface HtmlEngineOptions extends EngineResourceGuardOptions {
   readonly inputChunks: readonly string[];
   readonly parser: HtmlEngineParserConfiguration;
   readonly observer?: EngineObserver;
+  readonly retainNodeSpans?: boolean;
 }
 
 export interface HtmlEngineResult {
@@ -236,12 +237,17 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
   const record = unknownOptions;
   assertAllowedKeys(
     record,
-    new Set(["inputChunks", "parser", "observer", "limits", "signal", "now", "startedAt"]),
+    new Set([
+      "inputChunks", "parser", "observer", "retainNodeSpans", "limits", "signal", "now", "startedAt"
+    ]),
     "options"
   );
   const inputChunks = validateInputChunks(record["inputChunks"]);
   const parser = validateParser(record["parser"]);
   const observer = validateObserver(options.observer);
+  if (options.retainNodeSpans !== undefined && typeof options.retainNodeSpans !== "boolean") {
+    throw new EngineConfigurationError("options.retainNodeSpans", "must be a boolean");
+  }
   const resourceOptions: EngineResourceGuardOptions = {
     ...(options.limits === undefined ? {} : { limits: options.limits }),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
@@ -259,6 +265,7 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
     model,
     resources,
     scriptingMode: parser.scriptingMode,
+    retainNodeSpans: options.retainNodeSpans ?? true,
     ...(parser.kind === "fragment" ? { fragmentContext: parser.context } : {}),
     ...(observer === undefined ? {} : { observer }),
     onParseError(error) { parseErrors.push(error); }
@@ -267,8 +274,11 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
     ...(parser.kind === "fragment"
       ? { initialState: fragmentTokenizerMode(parser.context, parser.scriptingMode) }
       : {}),
+    protectTokenObservations: observer?.onToken !== undefined,
     observer: {
-      onToken(token) { observer?.onToken?.(token); },
+      ...(observer?.onToken === undefined
+        ? {}
+        : { onToken(token) { observer.onToken?.(token); } }),
       onParseError(error) {
         parseErrors.push(error);
         observer?.onParseError?.(error);

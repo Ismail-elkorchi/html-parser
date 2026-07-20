@@ -97,6 +97,11 @@ test("staged document conversion is lossless for processing instructions and tem
   assert.equal(parsed.metadata.resourceUsage.maxDepth, 7);
   assert.equal(parsed.tree.trace?.summary.nodeCount, 12);
   assert.equal(parsed.tree.trace.summary.maxDepth, 7);
+  assert.equal(
+    parsed.metadata.resourceUsage.traceUtf8Bytes,
+    parsed.tree.trace.summary.eventUtf8Bytes
+  );
+  assert.ok(parsed.metadata.resourceUsage.traceUtf8Bytes > 0);
   assert.equal(Object.isFrozen(template.templateContent), true);
 
   const body = html.children.find(
@@ -111,6 +116,29 @@ test("staged document conversion is lossless for processing instructions and tem
   assert.ok(text?.kind === "text");
   const plan = computePatch(parsed, [{ kind: "replaceText", target: text.id, value: "changed" }]);
   assert.equal(plan.result, source.replace("outside", "changed"));
+});
+
+test("staged element spans cover explicit and parser-implied source extents", () => {
+  const source = "<!doctype html><html><body><p class=x>A<table><tr><td>B</table><svg><g>C</svg>";
+  const parsed = parseWithIndependentEngine(source, {
+    captureSpans: true,
+    sourceRetention: "text"
+  });
+  const byName = new Map();
+  walk(parsed.tree, (node) => {
+    if (node.kind === "element") byName.set(node.localName, node);
+  });
+
+  const paragraph = byName.get("p");
+  const table = byName.get("table");
+  const cell = byName.get("td");
+  const svg = byName.get("svg");
+  const body = byName.get("body");
+  assert.equal(source.slice(paragraph.span.start, paragraph.span.end), "<p class=x>A");
+  assert.equal(source.slice(table.span.start, table.span.end), "<table><tr><td>B</table>");
+  assert.equal(source.slice(cell.span.start, cell.span.end), "<td>B");
+  assert.equal(source.slice(svg.span.start, svg.span.end), "<svg><g>C</svg>");
+  assert.equal(source.slice(body.span.start, body.span.end), source.slice(source.indexOf("<body>")));
 });
 
 test("staging does not alter the single production route before atomic cutover", () => {

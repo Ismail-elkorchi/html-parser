@@ -3,6 +3,12 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Qualify the independent engine across the complete pinned tree corpus,
+  browser and legacy differentials, deterministic fuzzing, mutation, resource,
+  performance, cross-runtime, packed-package, audit, SBOM, and provenance
+  gates; correct element-span closure, template depth accounting, model-state
+  ownership, namespace scope lookup, and qualification watchdog semantics found
+  by that work.
 - Unify npm/Node and JSR around one canonical public export and TypeScript
   model, remove JSR-only aliases and wrapper declarations, split public
   features by responsibility, and add exact surface, documentation, and packed

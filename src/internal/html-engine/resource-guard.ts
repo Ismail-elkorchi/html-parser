@@ -215,6 +215,67 @@ export function createEngineResourceGuard(
   let attributes = 0;
   let attributeUtf8Bytes = 0;
 
+  if (Reflect.ownKeys(limits).length === 0 && signal === undefined) {
+    const guard: EngineResourceGuard = {
+      ensureActive(): void {},
+      checkpoint(): void { steps += 1; },
+      reserveNode(): void {
+        steps += 1;
+        nodes += 1;
+      },
+      reserveNodes(count: number): void {
+        if (!Number.isSafeInteger(count) || count < 1) {
+          throw new EngineConfigurationError("node reservation count", "must be a positive safe integer");
+        }
+        steps += count;
+        nodes += count;
+      },
+      reserveNodeAtDepth(depth: number): void {
+        if (!Number.isSafeInteger(depth) || depth < 1) {
+          throw new EngineConfigurationError("depth", "must be a positive safe integer");
+        }
+        steps += 1;
+        nodes += 1;
+        maxDepth = Math.max(maxDepth, depth);
+      },
+      observeDepth(depth: number): void {
+        if (!Number.isSafeInteger(depth) || depth < 1) {
+          throw new EngineConfigurationError("depth", "must be a positive safe integer");
+        }
+        steps += 1;
+        maxDepth = Math.max(maxDepth, depth);
+      },
+      reserveParseError(): void {
+        steps += 1;
+        parseErrors += 1;
+      },
+      beginStartTag(): StartTagResourceGuard {
+        steps += 1;
+        return {
+          beginAttribute(): void {
+            steps += 1;
+            attributes += 1;
+          },
+          appendCodePoint(value: string): void {
+            steps += 1;
+            attributeUtf8Bytes += codePointUtf8ByteLength(value);
+          }
+        };
+      },
+      snapshot(): EngineResourceUsage {
+        return Object.freeze({
+          steps,
+          nodes,
+          maxDepth,
+          parseErrors,
+          attributes,
+          attributeUtf8Bytes
+        });
+      }
+    };
+    return Object.freeze(guard);
+  }
+
   function fail(resource: EngineResourceLimitName, limit: number, actual: number): never {
     throw new EngineResourceLimitError(resource, limit, actual);
   }

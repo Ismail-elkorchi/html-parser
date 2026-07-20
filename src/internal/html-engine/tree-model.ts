@@ -183,10 +183,129 @@ interface TextState {
   data: string;
 }
 
-const NODE_STATES = new WeakMap<HtmlTreeNode, NodeState>();
-const PARENT_STATES = new WeakMap<HtmlTreeParent, ParentState>();
-const ELEMENT_STATES = new WeakMap<HtmlTreeElement, ElementState>();
-const TEXT_STATES = new WeakMap<HtmlTreeText, TextState>();
+const MODEL_OWNER = Symbol("html-tree-model-owner");
+const NODE_STATE = Symbol("html-tree-node-state");
+const PARENT_STATE = Symbol("html-tree-parent-state");
+const ELEMENT_STATE = Symbol("html-tree-element-state");
+const TEXT_STATE = Symbol("html-tree-text-state");
+
+interface ModelOwnedObject {
+  readonly [MODEL_OWNER]?: HtmlTreeModel;
+  readonly [NODE_STATE]?: NodeState;
+  readonly [PARENT_STATE]?: ParentState;
+  readonly [ELEMENT_STATE]?: ElementState;
+  readonly [TEXT_STATE]?: TextState;
+}
+
+function modelOwner(value: object): HtmlTreeModel | undefined {
+  return (value as ModelOwnedObject)[MODEL_OWNER];
+}
+
+class TreeElementNode implements HtmlTreeElement, HtmlTreeNodeIdentity {
+  readonly kind = "element";
+  readonly identity: HtmlTreeNodeIdentity = this;
+  readonly [MODEL_OWNER]: HtmlTreeModel;
+  readonly [NODE_STATE]: NodeState;
+  readonly [PARENT_STATE]: ParentState;
+  readonly [ELEMENT_STATE]: ElementState;
+
+  constructor(
+    owner: HtmlTreeModel,
+    readonly serial: number,
+    readonly namespaceUri: HtmlElementNamespaceUri,
+    readonly prefix: string | null,
+    readonly localName: string,
+    readonly qualifiedName: string,
+    nodeState: NodeState,
+    parentState: ParentState,
+    elementState: ElementState
+  ) {
+    this[MODEL_OWNER] = owner;
+    this[NODE_STATE] = nodeState;
+    this[PARENT_STATE] = parentState;
+    this[ELEMENT_STATE] = elementState;
+    Object.freeze(this);
+  }
+
+  get parent(): HtmlTreeParent | null { return this[NODE_STATE].parent; }
+  get sourceSpan(): SourceSpan | null { return this[NODE_STATE].sourceSpan; }
+  get childCount(): number { return this[PARENT_STATE].children.length; }
+  childAt(index: number): HtmlTreeNode | null { return this[PARENT_STATE].children[index] ?? null; }
+  get attributeCount(): number { return this[ELEMENT_STATE].attributes.length; }
+  attributeAt(index: number): HtmlTreeAttribute | null {
+    return this[ELEMENT_STATE].attributes[index] ?? null;
+  }
+  get templateContents(): HtmlTemplateContents | null {
+    return this[ELEMENT_STATE].templateContents;
+  }
+}
+
+class TreeTemplateContentsNode implements HtmlTemplateContents, HtmlTreeNodeIdentity {
+  readonly kind = "template-contents";
+  readonly identity: HtmlTreeNodeIdentity = this;
+  readonly [MODEL_OWNER]: HtmlTreeModel;
+  readonly [PARENT_STATE]: ParentState;
+
+  constructor(
+    owner: HtmlTreeModel,
+    readonly serial: number,
+    readonly host: HtmlTreeElement,
+    parentState: ParentState
+  ) {
+    this[MODEL_OWNER] = owner;
+    this[PARENT_STATE] = parentState;
+    Object.freeze(this);
+  }
+
+  get childCount(): number { return this[PARENT_STATE].children.length; }
+  childAt(index: number): HtmlTreeNode | null { return this[PARENT_STATE].children[index] ?? null; }
+}
+
+class TreeTextNode implements HtmlTreeText, HtmlTreeNodeIdentity {
+  readonly kind = "text";
+  readonly identity: HtmlTreeNodeIdentity = this;
+  readonly [MODEL_OWNER]: HtmlTreeModel;
+  readonly [NODE_STATE]: NodeState;
+  readonly [TEXT_STATE]: TextState;
+
+  constructor(
+    owner: HtmlTreeModel,
+    readonly serial: number,
+    nodeState: NodeState,
+    textState: TextState
+  ) {
+    this[MODEL_OWNER] = owner;
+    this[NODE_STATE] = nodeState;
+    this[TEXT_STATE] = textState;
+    Object.freeze(this);
+  }
+
+  get parent(): HtmlTreeParent | null { return this[NODE_STATE].parent; }
+  get sourceSpan(): SourceSpan | null { return this[NODE_STATE].sourceSpan; }
+  get data(): string { return this[TEXT_STATE].data; }
+}
+
+class TreeRootNode<Kind extends "document" | "fragment"> {
+  readonly identity: HtmlTreeNodeIdentity = this;
+  readonly [MODEL_OWNER]: HtmlTreeModel;
+  readonly [PARENT_STATE]: ParentState;
+
+  constructor(
+    readonly kind: Kind,
+    readonly serial: number,
+    owner: HtmlTreeModel,
+    parentState: ParentState
+  ) {
+    this[MODEL_OWNER] = owner;
+    this[PARENT_STATE] = parentState;
+    Object.freeze(this);
+  }
+
+  get childCount(): number { return this[PARENT_STATE].children.length; }
+  childAt(index: number): HtmlTreeNode | null {
+    return this[PARENT_STATE].children[index] ?? null;
+  }
+}
 
 function fail(reason: HtmlTreeModelErrorReason): never {
   return failInternalState(reason);
@@ -195,7 +314,9 @@ function fail(reason: HtmlTreeModelErrorReason): never {
 function checkedSpan(span: SourceSpan | null | undefined): SourceSpan | null {
   if (span === null || span === undefined) return null;
   validateSpan(span);
-  return sourceSpan(span.startUtf16Offset, span.endUtf16Offset);
+  return Object.isFrozen(span)
+    ? span
+    : sourceSpan(span.startUtf16Offset, span.endUtf16Offset);
 }
 
 function validateSpan(span: SourceSpan): void {
@@ -212,8 +333,12 @@ function validateSpan(span: SourceSpan): void {
 function validateName(localName: string, prefix: string | null, qualifiedName: string): void {
   if (localName.length === 0) fail("TREE_MODEL_EMPTY_LOCAL_NAME");
   if (prefix !== null && prefix.length === 0) fail("TREE_MODEL_EMPTY_PREFIX");
-  const expected = prefix === null ? localName : `${prefix}:${localName}`;
-  if (qualifiedName !== expected) fail("TREE_MODEL_INVALID_QUALIFIED_NAME");
+  if (
+    (prefix === null && qualifiedName !== localName) ||
+    (prefix !== null && qualifiedName !== `${prefix}:${localName}`)
+  ) {
+    fail("TREE_MODEL_INVALID_QUALIFIED_NAME");
+  }
 }
 
 function validateAttributeNamespace(attribute: HtmlTreeAttributeInput): void {
@@ -232,16 +357,19 @@ function attributeKey(attribute: Pick<HtmlTreeAttributeInput, "namespaceUri" | "
 }
 
 function validateAttributeInputs(attributes: readonly HtmlTreeAttributeInput[]): void {
-  const expandedNames = new Set<string>();
+  let expandedNames: Set<string> | undefined;
   for (const attribute of attributes) {
     validateName(attribute.localName, attribute.prefix, attribute.qualifiedName);
     validateAttributeNamespace(attribute);
     if (attribute.sourceSpan !== null && attribute.sourceSpan !== undefined) {
       validateSpan(attribute.sourceSpan);
     }
-    const key = attributeKey(attribute);
-    if (expandedNames.has(key)) fail("TREE_MODEL_DUPLICATE_ATTRIBUTE");
-    expandedNames.add(key);
+    if (attributes.length > 1) {
+      expandedNames ??= new Set<string>();
+      const key = attributeKey(attribute);
+      if (expandedNames.has(key)) fail("TREE_MODEL_DUPLICATE_ATTRIBUTE");
+      expandedNames.add(key);
+    }
   }
 }
 
@@ -288,27 +416,16 @@ export class HtmlTreeModel {
     this.#observer = options.observer;
     this.#resources.reserveNodeAtDepth(1);
 
-    const identity = this.#newIdentity();
+    const serial = this.#newSerial();
     const parentState: ParentState = { owner: this, children: [] };
     if (options.rootKind === "document") {
-      const root: HtmlTreeDocument = Object.freeze({
-        kind: "document",
-        identity,
-        get childCount(): number { return parentState.children.length; },
-        childAt(index: number): HtmlTreeNode | null { return parentState.children[index] ?? null; }
-      });
+      const root: HtmlTreeDocument = new TreeRootNode("document", serial, this, parentState);
       this.root = root;
     } else {
-      const root: HtmlTreeFragment = Object.freeze({
-        kind: "fragment",
-        identity,
-        get childCount(): number { return parentState.children.length; },
-        childAt(index: number): HtmlTreeNode | null { return parentState.children[index] ?? null; }
-      });
+      const root: HtmlTreeFragment = new TreeRootNode("fragment", serial, this, parentState);
       this.root = root;
     }
-    PARENT_STATES.set(this.root, parentState);
-    this.#emit("node-created", identity.serial, null);
+    this.#emit("node-created", serial, null);
   }
 
   createElement(input: HtmlTreeElementInput): HtmlTreeElement {
@@ -320,51 +437,43 @@ export class HtmlTreeModel {
       input.namespaceUri === HTML_NAMESPACE && input.localName === "template";
     this.#resources.reserveNodes(ownsTemplateContents ? 2 : 1);
 
-    const identity = this.#newIdentity();
-    const nodeState: NodeState = { owner: this, parent: null, sourceSpan: span, depth: null };
-    const parentState: ParentState = { owner: this, children: [] };
-    let templateContents: HtmlTemplateContents | null = null;
-    const elementState: ElementState = {
+    const serial = this.#newSerial();
+    const elementState: NodeState & ParentState & ElementState = {
+      owner: this,
+      parent: null,
+      sourceSpan: span,
+      depth: null,
+      children: [],
       attributes: attributes.map(copyAttribute),
       templateContents: null
     };
-    const element: HtmlTreeElement = Object.freeze({
-      kind: "element",
-      identity,
-      namespaceUri: input.namespaceUri,
-      prefix: input.prefix,
-      localName: input.localName,
-      qualifiedName: input.qualifiedName,
-      get parent(): HtmlTreeParent | null { return nodeState.parent; },
-      get sourceSpan(): SourceSpan | null { return nodeState.sourceSpan; },
-      get childCount(): number { return parentState.children.length; },
-      childAt(index: number): HtmlTreeNode | null { return parentState.children[index] ?? null; },
-      get attributeCount(): number { return elementState.attributes.length; },
-      attributeAt(index: number): HtmlTreeAttribute | null {
-        return elementState.attributes[index] ?? null;
-      },
-      get templateContents(): HtmlTemplateContents | null { return templateContents; }
-    });
+    let templateContents: HtmlTemplateContents | null = null;
+    const element: HtmlTreeElement = new TreeElementNode(
+      this,
+      serial,
+      input.namespaceUri,
+      input.prefix,
+      input.localName,
+      input.qualifiedName,
+      elementState,
+      elementState,
+      elementState
+    );
 
     if (ownsTemplateContents) {
-      const contentsIdentity = this.#newIdentity();
+      const contentsSerial = this.#newSerial();
       const templateState: ParentState = { owner: this, children: [] };
-      templateContents = Object.freeze({
-        kind: "template-contents",
-        identity: contentsIdentity,
-        host: element,
-        get childCount(): number { return templateState.children.length; },
-        childAt(index: number): HtmlTreeNode | null { return templateState.children[index] ?? null; }
-      });
-      PARENT_STATES.set(templateContents, templateState);
-      this.#emit("node-created", contentsIdentity.serial, null);
+      templateContents = new TreeTemplateContentsNode(
+        this,
+        contentsSerial,
+        element,
+        templateState
+      );
+      this.#emit("node-created", contentsSerial, null);
     }
 
     elementState.templateContents = templateContents;
-    NODE_STATES.set(element, nodeState);
-    PARENT_STATES.set(element, parentState);
-    ELEMENT_STATES.set(element, elementState);
-    this.#emit("node-created", identity.serial, null);
+    this.#emit("node-created", serial, null);
     return element;
   }
 
@@ -372,19 +481,16 @@ export class HtmlTreeModel {
     if (data.length === 0) fail("TREE_MODEL_EMPTY_TEXT_DATA");
     const source = checkedSpan(span);
     this.#resources.reserveNode();
-    const identity = this.#newIdentity();
-    const nodeState: NodeState = { owner: this, parent: null, sourceSpan: source, depth: null };
-    const textState: TextState = { data };
-    const text: HtmlTreeText = Object.freeze({
-      kind: "text",
-      identity,
-      get parent(): HtmlTreeParent | null { return nodeState.parent; },
-      get sourceSpan(): SourceSpan | null { return nodeState.sourceSpan; },
-      get data(): string { return textState.data; }
-    });
-    NODE_STATES.set(text, nodeState);
-    TEXT_STATES.set(text, textState);
-    this.#emit("node-created", identity.serial, null);
+    const serial = this.#newSerial();
+    const state: NodeState & TextState = {
+      owner: this,
+      parent: null,
+      sourceSpan: source,
+      depth: null,
+      data
+    };
+    const text: HtmlTreeText = new TreeTextNode(this, serial, state, state);
+    this.#emit("node-created", serial, null);
     return text;
   }
 
@@ -394,13 +500,14 @@ export class HtmlTreeModel {
     const identity = this.#newIdentity();
     const nodeState: NodeState = { owner: this, parent: null, sourceSpan: source, depth: null };
     const comment: HtmlTreeComment = Object.freeze({
+      [MODEL_OWNER]: this,
+      [NODE_STATE]: nodeState,
       kind: "comment",
       identity,
       data,
       get parent(): HtmlTreeParent | null { return nodeState.parent; },
       get sourceSpan(): SourceSpan | null { return nodeState.sourceSpan; }
     });
-    NODE_STATES.set(comment, nodeState);
     this.#emit("node-created", identity.serial, null);
     return comment;
   }
@@ -416,6 +523,8 @@ export class HtmlTreeModel {
     const identity = this.#newIdentity();
     const nodeState: NodeState = { owner: this, parent: null, sourceSpan: source, depth: null };
     const instruction: HtmlTreeProcessingInstruction = Object.freeze({
+      [MODEL_OWNER]: this,
+      [NODE_STATE]: nodeState,
       kind: "processing-instruction",
       identity,
       target,
@@ -423,7 +532,6 @@ export class HtmlTreeModel {
       get parent(): HtmlTreeParent | null { return nodeState.parent; },
       get sourceSpan(): SourceSpan | null { return nodeState.sourceSpan; }
     });
-    NODE_STATES.set(instruction, nodeState);
     this.#emit("node-created", identity.serial, null);
     return instruction;
   }
@@ -434,6 +542,8 @@ export class HtmlTreeModel {
     const identity = this.#newIdentity();
     const nodeState: NodeState = { owner: this, parent: null, sourceSpan: span, depth: null };
     const doctype: HtmlTreeDoctype = Object.freeze({
+      [MODEL_OWNER]: this,
+      [NODE_STATE]: nodeState,
       kind: "doctype",
       identity,
       name: input.name,
@@ -441,7 +551,6 @@ export class HtmlTreeModel {
       get parent(): HtmlTreeParent | null { return nodeState.parent; },
       get sourceSpan(): SourceSpan | null { return nodeState.sourceSpan; }
     });
-    NODE_STATES.set(doctype, nodeState);
     this.#emit("node-created", identity.serial, null);
     return doctype;
   }
@@ -466,7 +575,10 @@ export class HtmlTreeModel {
         reference = targetState.children[currentIndex + 1] ?? null;
       }
     }
-    if (this.#subtreeContainsParent(node, target)) fail("TREE_MODEL_ANCESTOR_CYCLE");
+    const detachedLeaf = oldParent === null && this.#semanticChildren(node).length === 0;
+    if (node === target || (!detachedLeaf && this.#subtreeContainsParent(node, target))) {
+      fail("TREE_MODEL_ANCESTOR_CYCLE");
+    }
     if (node.kind === "doctype" && target.kind !== "document") {
       fail("TREE_MODEL_DOCTYPE_UNDER_NON_DOCUMENT");
     }
@@ -489,15 +601,26 @@ export class HtmlTreeModel {
     }
 
     const parentDepth = this.#parentDepth(target);
-    const depthAssignments = this.#prepareSubtreeDepths(
-      node,
-      parentDepth === null ? null : parentDepth + 1
-    );
-    if (parentDepth !== null) {
-      this.#resources.observeDepth(parentDepth + depthAssignments.maxRelativeDepth);
-      this.#authorizeDepthApplication(depthAssignments.assignments);
+    let depthAssignments: SubtreeDepthAssignment[] | null = null;
+    if (detachedLeaf) {
+      if (parentDepth === null) {
+        this.#resources.checkpoint();
+      } else {
+        const relativeDepth = this.#hasTemplateContents(node) ? 2 : 1;
+        this.#resources.observeDepth(parentDepth + relativeDepth);
+      }
     } else {
-      this.#resources.checkpoint();
+      const prepared = this.#prepareSubtreeDepths(
+        node,
+        parentDepth === null ? null : parentDepth + 1
+      );
+      depthAssignments = prepared.assignments;
+      if (parentDepth !== null) {
+        this.#resources.observeDepth(parentDepth + prepared.maxRelativeDepth);
+        this.#authorizeDepthApplication(prepared.assignments);
+      } else {
+        this.#resources.checkpoint();
+      }
     }
 
     const oldParentSerial = oldParent === null ? null : this.#observableParentSerial(oldParent);
@@ -507,9 +630,11 @@ export class HtmlTreeModel {
       if (oldIndex < 0) fail("TREE_MODEL_REFERENCE_NOT_CHILD");
       oldState.children.splice(oldIndex, 1);
     }
-    targetState.children.splice(insertionIndex, 0, node);
+    if (insertionIndex === targetState.children.length) targetState.children.push(node);
+    else targetState.children.splice(insertionIndex, 0, node);
     nodeState.parent = target;
-    this.#applySubtreeDepths(depthAssignments.assignments);
+    if (depthAssignments === null) nodeState.depth = parentDepth === null ? null : parentDepth + 1;
+    else this.#applySubtreeDepths(depthAssignments);
 
     if (oldParent !== null) this.#emit("node-detached", node.identity.serial, oldParentSerial);
     this.#emit("node-inserted", node.identity.serial, this.#observableParentSerial(target));
@@ -659,8 +784,9 @@ export class HtmlTreeModel {
     const index = before === null ? targetState.children.length : targetState.children.indexOf(before);
     const previous = targetState.children[index - 1];
     if (previous?.kind === "text") {
-      const textState = TEXT_STATES.get(previous);
-      const nodeState = NODE_STATES.get(previous);
+      const ownedPrevious = previous as HtmlTreeText & ModelOwnedObject;
+      const textState = ownedPrevious[TEXT_STATE];
+      const nodeState = ownedPrevious[NODE_STATE];
       if (textState === undefined || nodeState === undefined) fail("TREE_MODEL_UNKNOWN_NODE");
       if (nodeState.owner !== this) fail("TREE_MODEL_FOREIGN_NODE");
       const nextSpan = checkedSpan(span);
@@ -687,6 +813,16 @@ export class HtmlTreeModel {
     if (parent.kind !== "element") return parent;
     const contents = this.#elementState(parent).templateContents;
     return contents ?? parent;
+  }
+
+  /** Returns the model-owned child sequence as a read-only hot-path view. */
+  childrenOf(parent: HtmlTreeParent): readonly HtmlTreeNode[] {
+    return this.#parentState(parent).children;
+  }
+
+  /** Returns the model-owned attribute sequence as a read-only hot-path view. */
+  attributesOf(element: HtmlTreeElement): readonly HtmlTreeAttribute[] {
+    return this.#elementState(element).attributes;
   }
 
   attribute(
@@ -777,9 +913,13 @@ export class HtmlTreeModel {
   }
 
   #newIdentity(): HtmlTreeNodeIdentity {
-    const identity = Object.freeze({ serial: this.#nextSerial });
+    return Object.freeze({ serial: this.#newSerial() });
+  }
+
+  #newSerial(): number {
+    const serial = this.#nextSerial;
     this.#nextSerial += 1;
-    return identity;
+    return serial;
   }
 
   #cloneSubtree(source: HtmlTreeNode): HtmlTreeNode {
@@ -888,22 +1028,28 @@ export class HtmlTreeModel {
   }
 
   #nodeState(node: HtmlTreeNode): NodeState {
-    const state = NODE_STATES.get(node);
-    if (state === undefined) fail("TREE_MODEL_UNKNOWN_NODE");
+    const state = (node as HtmlTreeNode & ModelOwnedObject)[NODE_STATE];
+    if (state === undefined) {
+      if (modelOwner(node) !== undefined) fail("TREE_MODEL_FOREIGN_NODE");
+      fail("TREE_MODEL_UNKNOWN_NODE");
+    }
     if (state.owner !== this) fail("TREE_MODEL_FOREIGN_NODE");
     return state;
   }
 
   #parentState(parent: HtmlTreeParent): ParentState {
-    const state = PARENT_STATES.get(parent);
-    if (state === undefined) fail("TREE_MODEL_UNKNOWN_PARENT");
+    const state = (parent as HtmlTreeParent & ModelOwnedObject)[PARENT_STATE];
+    if (state === undefined) {
+      if (modelOwner(parent) !== undefined) fail("TREE_MODEL_FOREIGN_PARENT");
+      fail("TREE_MODEL_UNKNOWN_PARENT");
+    }
     if (state.owner !== this) fail("TREE_MODEL_FOREIGN_PARENT");
     return state;
   }
 
   #elementState(element: HtmlTreeElement): ElementState {
     this.#nodeState(element);
-    const state = ELEMENT_STATES.get(element);
+    const state = (element as HtmlTreeElement & ModelOwnedObject)[ELEMENT_STATE];
     if (state === undefined) fail("TREE_MODEL_UNKNOWN_NODE");
     return state;
   }
@@ -953,15 +1099,19 @@ export class HtmlTreeModel {
       if (visited.has(entry.node.identity.serial)) fail("TREE_MODEL_ANCESTOR_CYCLE");
       visited.add(entry.node.identity.serial);
       assignments.push({ state, depth: entry.depth });
-      maxRelativeDepth = Math.max(maxRelativeDepth, entry.relativeDepth);
+      const hasTemplateContents = this.#hasTemplateContents(entry.node);
+      maxRelativeDepth = Math.max(
+        maxRelativeDepth,
+        entry.relativeDepth + (hasTemplateContents ? 1 : 0)
+      );
       const childDepth = entry.depth === null
         ? null
-        : entry.depth + (this.#hasTemplateContents(entry.node) ? 2 : 1);
+        : entry.depth + (hasTemplateContents ? 2 : 1);
       for (const child of this.#semanticChildren(entry.node)) {
         stack.push({
           node: child,
           depth: childDepth,
-          relativeDepth: entry.relativeDepth + (this.#hasTemplateContents(entry.node) ? 2 : 1)
+          relativeDepth: entry.relativeDepth + (hasTemplateContents ? 2 : 1)
         });
       }
     }

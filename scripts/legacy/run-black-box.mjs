@@ -3,6 +3,20 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { parse, parseBytes, parseFragment, parseStream } from "../../dist/mod.js";
+import {
+  parseBytesWithIndependentEngine,
+  parseFragmentWithIndependentEngine,
+  parseStreamWithIndependentEngine,
+  parseWithIndependentEngine
+} from "../../dist/integration/html-product-adapter.js";
+
+const LEGACY_API = Object.freeze({ parse, parseBytes, parseFragment, parseStream });
+const INDEPENDENT_API = Object.freeze({
+  parse: parseWithIndependentEngine,
+  parseBytes: parseBytesWithIndependentEngine,
+  parseFragment: parseFragmentWithIndependentEngine,
+  parseStream: parseStreamWithIndependentEngine
+});
 
 function canonicalizeError(error) {
   if (!(error instanceof Error)) {
@@ -66,7 +80,7 @@ function createFixtureStream(request) {
   });
 }
 
-async function executeRequest(request) {
+async function executeRequest(request, api) {
   const options = { ...request.options };
   if (request.traceCallbackFailure) {
     let observed = 0;
@@ -85,19 +99,19 @@ async function executeRequest(request) {
 
   switch (request.operation) {
     case "parse":
-      return parse(request.input, options);
+      return api.parse(request.input, options);
     case "parseBytes":
-      return parseBytes(decodeBase64(request.inputBase64), options);
+      return api.parseBytes(decodeBase64(request.inputBase64), options);
     case "parseFragment":
-      return parseFragment(request.input, request.contextTagName, options);
+      return api.parseFragment(request.input, request.contextTagName, options);
     case "parseStream":
-      return await parseStream(createFixtureStream(request), options);
+      return await api.parseStream(createFixtureStream(request), options);
     default:
       throw new Error(`Unknown black-box fixture operation: ${String(request.operation)}`);
   }
 }
 
-export async function runLegacyBlackBoxFixture(fixture) {
+export async function runBlackBoxFixture(fixture, api) {
   if (fixture?.schemaVersion !== 1 || !Array.isArray(fixture.cases)) {
     throw new Error("Legacy black-box fixture must use schemaVersion 1 and contain cases");
   }
@@ -108,7 +122,7 @@ export async function runLegacyBlackBoxFixture(fixture) {
       outputs.push({
         id: request.id,
         status: "returned",
-        value: canonicalize(await executeRequest(request))
+        value: canonicalize(await executeRequest(request, api))
       });
     } catch (error) {
       outputs.push({
@@ -122,17 +136,29 @@ export async function runLegacyBlackBoxFixture(fixture) {
   return canonicalize({ schemaVersion: 1, cases: outputs });
 }
 
+export function runLegacyBlackBoxFixture(fixture) {
+  return runBlackBoxFixture(fixture, LEGACY_API);
+}
+
+export function runIndependentBlackBoxFixture(fixture) {
+  return runBlackBoxFixture(fixture, INDEPENDENT_API);
+}
+
 export function serializeCanonical(value) {
   return `${JSON.stringify(canonicalize(value), null, 2)}\n`;
 }
 
 async function main() {
-  const fixturePath = process.argv[2];
+  const independent = process.argv.includes("--engine=independent");
+  const fixturePath = process.argv.find((argument) => !argument.startsWith("--") && argument.endsWith(".json"));
   if (!fixturePath) {
-    throw new Error("Usage: node scripts/legacy/run-black-box.mjs <fixture.json>");
+    throw new Error("Usage: node scripts/legacy/run-black-box.mjs [--engine=independent] <fixture.json>");
   }
   const fixture = JSON.parse(await readFile(fixturePath, "utf8"));
-  process.stdout.write(serializeCanonical(await runLegacyBlackBoxFixture(fixture)));
+  const result = independent
+    ? await runIndependentBlackBoxFixture(fixture)
+    : await runLegacyBlackBoxFixture(fixture);
+  process.stdout.write(serializeCanonical(result));
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : null;

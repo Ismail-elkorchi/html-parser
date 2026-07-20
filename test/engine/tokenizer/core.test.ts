@@ -29,9 +29,7 @@ function tokenizeChunks(
     {
       accept(token) {
         tokens.push(token);
-        return {
-          selfClosingAcknowledged: options.acknowledgeSelfClosing ?? true
-        };
+        return options.acknowledgeSelfClosing ?? true;
       }
     },
     {
@@ -230,7 +228,7 @@ void test("tree-builder mode feedback affects the next character synchronously",
       accept(token) {
         tokens.push(token);
         if (token.kind === "start-tag") tokenizer.setMode("plaintext");
-        return { selfClosingAcknowledged: true };
+        return true;
       }
     }
   );
@@ -249,7 +247,7 @@ void test("resource, abort, callback, and reentry failures stop before unavailab
     () => {
       const tokenizer = new HtmlTokenizer(
         createEngineResourceGuard({ limits: { maxAttributesPerElement: 0 } }),
-        { accept: () => ({ selfClosingAcknowledged: true }) }
+        { accept: () => true }
       );
       tokenizer.write("<a b>");
     },
@@ -263,7 +261,7 @@ void test("resource, abort, callback, and reentry failures stop before unavailab
     () => {
       const tokenizer = new HtmlTokenizer(
         createEngineResourceGuard({ limits: { maxAttributeUtf8BytesPerElement: 1 } }),
-        { accept: () => ({ selfClosingAcknowledged: true }) }
+        { accept: () => true }
       );
       tokenizer.write("<a é>");
     },
@@ -279,7 +277,7 @@ void test("resource, abort, callback, and reentry failures stop before unavailab
     () => {
       failedTokenizer = new HtmlTokenizer(
         createEngineResourceGuard(),
-        { accept: () => ({ selfClosingAcknowledged: true }) },
+        { accept: () => true },
         { observer: { onParseError: () => { throw observerFailure; } } }
       );
       failedTokenizer.write("\0");
@@ -294,7 +292,7 @@ void test("resource, abort, callback, and reentry failures stop before unavailab
     () => {
       const tokenizer = new HtmlTokenizer(
         createEngineResourceGuard({ signal: controller.signal }),
-        { accept: () => ({ selfClosingAcknowledged: true }) },
+        { accept: () => true },
         { observer: { onToken: () => { controller.abort(reason); } } }
       );
       tokenizer.write("x");
@@ -314,7 +312,7 @@ void test("resource, abort, callback, and reentry failures stop before unavailab
           reentryFailure = error;
           throw error;
         }
-        return { selfClosingAcknowledged: true };
+        return true;
       }
     }
   );
@@ -333,7 +331,7 @@ void test("completion is idempotent but cannot accept new input", () => {
     {
       accept(token) {
         tokens.push(token);
-        return { selfClosingAcknowledged: true };
+        return true;
       }
     }
   );

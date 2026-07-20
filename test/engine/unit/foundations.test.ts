@@ -24,6 +24,12 @@ function drain(cursor: HtmlInputCursor): InputRead[] {
   }
 }
 
+function readEvidence(read: InputRead) {
+  return read.kind === "character"
+    ? { kind: read.kind, value: read.value, span: read.span }
+    : read;
+}
+
 void test("foundation pins the current HTML parse-error vocabulary", () => {
   assert.equal(HTML_STANDARD_REVISION, "56674fb3ac40279141a202e5d19b84f30d99854d");
   assert.equal(HTML_PARSE_ERROR_CODES.length, 52);
@@ -46,7 +52,7 @@ void test("input cursor normalizes newlines and retains original UTF-16 spans", 
 
   const reads = drain(cursor);
   assert.deepEqual(
-    reads,
+    reads.map(readEvidence),
     [
       {
         kind: "character",
@@ -80,7 +86,11 @@ void test("input cursor waits across surrogate chunks and reports preprocessing 
   const cursor = new HtmlInputCursor(createEngineResourceGuard(), (error) => observed.push(error));
   cursor.write("😀\ud800");
 
-  assert.deepEqual(cursor.consume(), {
+  const first = cursor.consume();
+  assert.equal(first.kind, "character");
+  assert.equal(first.startUtf16Offset, 0);
+  assert.equal(first.endUtf16Offset, 2);
+  assert.deepEqual(readEvidence(first), {
     kind: "character",
     value: "😀",
     span: { startUtf16Offset: 0, endUtf16Offset: 2 }

@@ -16,7 +16,7 @@ const tokenizer = new HtmlTokenizer(
       void kind;
       // @ts-expect-error emitted tokens are immutable
       token.kind = "eof";
-      return { selfClosingAcknowledged: true };
+      return true;
     }
   },
   { initialState: "rcdata", lastStartTagName: "title", foreignContent: false }
@@ -44,7 +44,7 @@ tokenizer.setMode("cdata-section");
 
 new HtmlTokenizer(
   createEngineResourceGuard(),
-  { accept: () => ({ selfClosingAcknowledged: true }) },
+  { accept: () => true },
   {
     // @ts-expect-error the constructor uses the exact initial-state option, not a legacy mode alias
     mode: "data"

@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "corpusCommit": "e4ea1706fa708c3ac4523c534a65160d1ab20db8",
+  "corpusCompositeSha256": "9bf2315b5c8836b0d1bc7375cbabc746f9891735dc958491b99a1855b7cb2acc",
+  "entries": [
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/adoption02.dat#3@script-off#chunk-whole",
+      "signature": "b11a9fb0f4cbd575ec216c0e8cad232a0c3dead654756748278bbfa0052ccfab",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned fixture's aggregate error count differs from the current named diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/adoption02.dat#3@script-on#chunk-whole",
+      "signature": "b11a9fb0f4cbd575ec216c0e8cad232a0c3dead654756748278bbfa0052ccfab",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned fixture's aggregate error count differs from the current named diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/html5test-com.dat#12@script-off#chunk-whole",
+      "signature": "53c29238456d9f82d73b6f2a911951461cea04e248f350ea2d7f1bf6f45dd62a",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned legacy error count predates the current processing-instruction tokenizer states."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/html5test-com.dat#12@script-on#chunk-whole",
+      "signature": "53c29238456d9f82d73b6f2a911951461cea04e248f350ea2d7f1bf6f45dd62a",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned legacy error count predates the current processing-instruction tokenizer states."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/scripted_adoption01.dat#1@script-on#chunk-whole",
+      "signature": "567b7a4d49d8d1058ceaa089dfb7d508ebc2c4e280c9c7a736306111cb804597",
+      "classification": "requires-script-execution",
+      "reason": "The fixture requires live script execution and document mutation; this parser deliberately treats scripts as inert."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/scripted_ark.dat#1@script-on#chunk-whole",
+      "signature": "4da8208f3e81c18c6f04dae2ae94cf5096e72a6aa33e6165934a3e134ad30a29",
+      "classification": "requires-script-execution",
+      "reason": "The fixture requires live script execution and document mutation; this parser deliberately treats scripts as inert."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/scripted_webkit01.dat#1@script-on#chunk-whole",
+      "signature": "a5c913d10a6c8042447c3aeecb4bc44593f01462b1c250aaffff42ee5bf57d3b",
+      "classification": "requires-script-execution",
+      "reason": "The fixture requires live script execution and document mutation; this parser deliberately treats scripts as inert."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/scripted_webkit01.dat#2@script-on#chunk-whole",
+      "signature": "1d5d1955946465efe3527bb98a6c2414a74c5d441c93d4aa94d7508b6a56e818",
+      "classification": "requires-script-execution",
+      "reason": "The fixture requires live script execution and document mutation; this parser deliberately treats scripts as inert."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/tests1.dat#44@script-off#chunk-whole",
+      "signature": "3c58be6218f1d07a98541b7717780fc9a9376559fb7b54bf5fb23f240ced13c4",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned legacy error count predates the current processing-instruction tokenizer states."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/tests1.dat#44@script-on#chunk-whole",
+      "signature": "3c58be6218f1d07a98541b7717780fc9a9376559fb7b54bf5fb23f240ced13c4",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned legacy error count predates the current processing-instruction tokenizer states."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/tests1.dat#47@script-off#chunk-whole",
+      "signature": "5575f5c8096231cab44617a10a910041dfff69015f9fa155c1827bde6ba55725",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned legacy error count predates the current processing-instruction tokenizer states."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/tests1.dat#47@script-on#chunk-whole",
+      "signature": "5575f5c8096231cab44617a10a910041dfff69015f9fa155c1827bde6ba55725",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned legacy error count predates the current processing-instruction tokenizer states."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/tests19.dat#84@script-off#chunk-whole",
+      "signature": "c90bbb4bda8000fc30414fe7cd6b14d4dbbf81de020ad4661d8f8af868002155",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned fixture's aggregate error count differs from the current named diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/tests19.dat#84@script-on#chunk-whole",
+      "signature": "c90bbb4bda8000fc30414fe7cd6b14d4dbbf81de020ad4661d8f8af868002155",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned fixture's aggregate error count differs from the current named diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#39@script-off#chunk-whole",
+      "signature": "35f81ddc096625c4108dba5b35aff45561c1e05233921624da09756b7af677a7",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned fixture's aggregate error count differs from the current named diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#39@script-on#chunk-whole",
+      "signature": "35f81ddc096625c4108dba5b35aff45561c1e05233921624da09756b7af677a7",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned fixture's aggregate error count differs from the current named diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#45@script-off#chunk-whole",
+      "signature": "c7a11ffba80770a39ec9d1f5b062a67d03005d9a3133fde505a9e658fd6e0a6a",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches current selectedcontent behavior; the pinned fixture omits current initial, button, or EOF diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#45@script-on#chunk-whole",
+      "signature": "c7a11ffba80770a39ec9d1f5b062a67d03005d9a3133fde505a9e658fd6e0a6a",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches current selectedcontent behavior; the pinned fixture omits current initial, button, or EOF diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#46@script-off#chunk-whole",
+      "signature": "e00ac9996fd3e5d0fcfe18e02624ecc3cbe3093a6a57a43517311b7c71b94746",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches current selectedcontent behavior; the pinned fixture omits current initial, button, or EOF diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#46@script-on#chunk-whole",
+      "signature": "e00ac9996fd3e5d0fcfe18e02624ecc3cbe3093a6a57a43517311b7c71b94746",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches current selectedcontent behavior; the pinned fixture omits current initial, button, or EOF diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#47@script-off#chunk-whole",
+      "signature": "172c011a06a660722389055550762c592f955b72608134e4da59ad00e964c7eb",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches current selectedcontent behavior; the pinned fixture omits current initial, button, or EOF diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#47@script-on#chunk-whole",
+      "signature": "172c011a06a660722389055550762c592f955b72608134e4da59ad00e964c7eb",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches current selectedcontent behavior; the pinned fixture omits current initial, button, or EOF diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#48@script-off#chunk-whole",
+      "signature": "207da62e6acbbae8eaf1b56dae080245dd3cac4dbe25e3e815f84cdc142efbc6",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches current selectedcontent behavior; the pinned fixture omits current initial, button, or EOF diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#48@script-on#chunk-whole",
+      "signature": "207da62e6acbbae8eaf1b56dae080245dd3cac4dbe25e3e815f84cdc142efbc6",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches current selectedcontent behavior; the pinned fixture omits current initial, button, or EOF diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#49@script-off#chunk-whole",
+      "signature": "c0bb8e35364d22e72c5202ef9d40ec1384201be6764e2e068691f0dc88ab94fd",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned fixture's aggregate error count differs from the current named diagnostics."
+    },
+    {
+      "id": "test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#49@script-on#chunk-whole",
+      "signature": "c0bb8e35364d22e72c5202ef9d40ec1384201be6764e2e068691f0dc88ab94fd",
+      "classification": "standards-drift",
+      "reason": "The exact tree matches; the pinned fixture's aggregate error count differs from the current named diagnostics."
+    }
+  ]
+}

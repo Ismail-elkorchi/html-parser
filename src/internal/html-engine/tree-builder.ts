@@ -14,6 +14,7 @@ import {
 import { fragmentContextAttributes } from "./fragment-context.js";
 import { HTML_NAMESPACE, MATHML_NAMESPACE, SVG_NAMESPACE } from "./namespaces.js";
 import { OpenElementStack } from "./open-element-stack.js";
+import { sourceSpan } from "./positions.js";
 import { HtmlSelectElementState } from "./select-element-state.js";
 
 import type {
@@ -49,6 +50,7 @@ export interface HtmlTreeBuilderOptions {
   readonly model: HtmlTreeModel;
   readonly resources: EngineResourceGuard;
   readonly scriptingMode: NonExecutingScriptingMode;
+  readonly retainNodeSpans?: boolean;
   readonly fragmentContext?: HtmlFragmentContext;
   readonly observer?: EngineObserver;
   readonly onParseError: (error: EngineParseError) => void;
@@ -182,14 +184,17 @@ function isWhitespaceToken(token: HtmlToken): boolean {
   return token.kind === "character" && ASCII_WHITESPACE.test(token.data);
 }
 
-function attributesFromToken(attributes: readonly HtmlTokenAttribute[]): readonly HtmlTreeAttributeInput[] {
+function attributesFromToken(
+  attributes: readonly HtmlTokenAttribute[],
+  retainSpans: boolean
+): readonly HtmlTreeAttributeInput[] {
   return attributes.map((attribute) => Object.freeze({
     namespaceUri: null,
     prefix: null,
     localName: attribute.name,
     qualifiedName: attribute.name,
     value: attribute.value,
-    sourceSpan: attribute.span
+    sourceSpan: retainSpans ? attribute.span : null
   }));
 }
 
@@ -222,6 +227,7 @@ export class HtmlTreeBuilder implements TokenSink {
   readonly #model: HtmlTreeModel;
   readonly #resources: EngineResourceGuard;
   readonly #scriptingMode: NonExecutingScriptingMode;
+  readonly #retainNodeSpans: boolean;
   readonly #observer: EngineObserver | undefined;
   readonly #onParseError: (error: EngineParseError) => void;
   readonly #openElements: OpenElementStack;
@@ -240,11 +246,13 @@ export class HtmlTreeBuilder implements TokenSink {
   #ignoreNextLineFeed = false;
   #pendingTableCharacters: HtmlCharacterToken[] = [];
   #finished = false;
+  #activeToken: HtmlToken | null = null;
 
   constructor(options: HtmlTreeBuilderOptions) {
     this.#model = options.model;
     this.#resources = options.resources;
     this.#scriptingMode = options.scriptingMode;
+    this.#retainNodeSpans = options.retainNodeSpans ?? true;
     this.#observer = options.observer;
     this.#onParseError = options.onParseError;
     this.#openElements = new OpenElementStack(options.resources);
@@ -291,20 +299,25 @@ export class HtmlTreeBuilder implements TokenSink {
     if (this.#tokenizer === null) failInternalState("TREE_BUILDER_TOKENIZER_NOT_CONNECTED");
     if (this.#finished) failInternalState("TREE_BUILDER_TOKEN_AFTER_EOF");
     this.#resources.checkpoint();
-    let mode: InsertionMode = this.#insertionMode;
-    let useForeignRules = !this.#shouldProcessInHtml(token);
+    this.#activeToken = token;
     let acknowledged = false;
-    for (;;) {
-      this.#resources.checkpoint();
-      const nextMode = useForeignRules
-        ? this.#inForeignContent(token, () => { acknowledged = true; })
-        : this.#process(mode, token, () => { acknowledged = true; });
-      useForeignRules = false;
-      if (nextMode === null) break;
-      mode = nextMode;
+    try {
+      let mode: InsertionMode = this.#insertionMode;
+      let useForeignRules = !this.#shouldProcessInHtml(token);
+      for (;;) {
+        this.#resources.checkpoint();
+        const nextMode = useForeignRules
+          ? this.#inForeignContent(token, () => { acknowledged = true; })
+          : this.#process(mode, token, () => { acknowledged = true; });
+        useForeignRules = false;
+        if (nextMode === null) break;
+        mode = nextMode;
+      }
+      this.#updateTokenizerForeignContext();
+      return acknowledged;
+    } finally {
+      this.#activeToken = null;
     }
-    this.#updateTokenizerForeignContext();
-    return Object.freeze({ selfClosingAcknowledged: acknowledged });
   }
 
   state(): HtmlTreeBuilderState {
@@ -488,7 +501,7 @@ export class HtmlTreeBuilder implements TokenSink {
       const doctype = this.#model.createDoctype({
         name: token.name ?? "",
         externalId: doctypeExternalId(token),
-        sourceSpan: token.span
+        sourceSpan: this.#retainNodeSpans ? token.span : null
       });
       this.#model.append(this.#model.root, doctype);
       this.#documentMode = documentModeForDoctype(token);
@@ -776,7 +789,9 @@ export class HtmlTreeBuilder implements TokenSink {
       this.#parseError(token, "in-body");
       if (this.#hasOpenHtmlElement("template")) return null;
       const html = this.#openElements.at(0);
-      if (html !== null) this.#model.adoptAttributes(html, attributesFromToken(token.attributes));
+      if (html !== null) {
+        this.#model.adoptAttributes(html, attributesFromToken(token.attributes, this.#retainNodeSpans));
+      }
       return null;
     }
     if (HEAD_BODY_DELEGATE_TAGS.has(name)) {
@@ -788,7 +803,7 @@ export class HtmlTreeBuilder implements TokenSink {
       const body = this.#openElements.at(1);
       if (body?.localName === "body") {
         this.#framesetOk = false;
-        this.#model.adoptAttributes(body, attributesFromToken(token.attributes));
+        this.#model.adoptAttributes(body, attributesFromToken(token.attributes, this.#retainNodeSpans));
       }
       return null;
     }
@@ -1773,8 +1788,8 @@ export class HtmlTreeBuilder implements TokenSink {
       prefix: null,
       localName: token.name,
       qualifiedName: token.name,
-      attributes: attributesFromToken(token.attributes),
-      sourceSpan: token.span
+      attributes: attributesFromToken(token.attributes, this.#retainNodeSpans),
+      sourceSpan: this.#retainNodeSpans ? token.span : null
     });
   }
 
@@ -1788,8 +1803,11 @@ export class HtmlTreeBuilder implements TokenSink {
       prefix: null,
       localName,
       qualifiedName: localName,
-      attributes: adjustedForeignAttributes(token.attributes, namespaceUri),
-      sourceSpan: token.span
+      attributes: adjustedForeignAttributes(token.attributes, namespaceUri).map((attribute) => ({
+        ...attribute,
+        sourceSpan: this.#retainNodeSpans ? attribute.sourceSpan ?? null : null
+      })),
+      sourceSpan: this.#retainNodeSpans ? token.span : null
     });
   }
 
@@ -1889,14 +1907,22 @@ export class HtmlTreeBuilder implements TokenSink {
 
   #insertCharacter(token: Extract<HtmlToken, { readonly kind: "character" }>): void {
     const location = this.#adjustedInsertionLocation();
-    this.#model.insertText(location.parent, token.data, token.span, location.before);
+    this.#model.insertText(
+      location.parent,
+      token.data,
+      this.#retainNodeSpans ? token.span : null,
+      location.before
+    );
   }
 
   #insertComment(
     token: Extract<HtmlToken, { readonly kind: "comment" }>,
     parent?: HtmlTreeParent
   ): void {
-    const comment = this.#model.createComment(token.data, token.span);
+    const comment = this.#model.createComment(
+      token.data,
+      this.#retainNodeSpans ? token.span : null
+    );
     if (parent !== undefined) this.#model.append(parent, comment);
     else this.#insertAtAppropriateLocation(comment);
   }
@@ -1905,7 +1931,11 @@ export class HtmlTreeBuilder implements TokenSink {
     token: Extract<HtmlToken, { readonly kind: "processing-instruction" }>,
     parent?: HtmlTreeParent
   ): void {
-    const instruction = this.#model.createProcessingInstruction(token.target, token.data, token.span);
+    const instruction = this.#model.createProcessingInstruction(
+      token.target,
+      token.data,
+      this.#retainNodeSpans ? token.span : null
+    );
     if (parent !== undefined) this.#model.append(parent, instruction);
     else this.#insertAtAppropriateLocation(instruction);
   }
@@ -1975,6 +2005,7 @@ export class HtmlTreeBuilder implements TokenSink {
 
   #popCurrent(): HtmlTreeElement {
     const current = this.#currentNode();
+    this.#closeSourceSpan(current);
     this.#selectElements.optionPopped(current);
     return this.#openElements.pop();
   }
@@ -1985,6 +2016,7 @@ export class HtmlTreeBuilder implements TokenSink {
         this.#openElements.at(index),
         "TREE_BUILDER_STACK_ENTRY_MISSING"
       );
+      this.#closeSourceSpan(element);
       this.#selectElements.optionPopped(element);
     }
     this.#finished = true;
@@ -2004,7 +2036,22 @@ export class HtmlTreeBuilder implements TokenSink {
   }
 
   #removeOpenElement(element: HtmlTreeElement): void {
+    this.#closeSourceSpan(element);
     this.#openElements.remove(element);
+  }
+
+  #closeSourceSpan(element: HtmlTreeElement): void {
+    const current = element.sourceSpan;
+    const token = requireInternalValue(this.#activeToken, "TREE_BUILDER_ACTIVE_TOKEN_MISSING");
+    if (current === null) return;
+    const explicitMatch = token.kind === "end-tag" &&
+      element.localName.toLowerCase() === token.name;
+    const end = explicitMatch || token.kind === "eof"
+      ? token.span.endUtf16Offset
+      : token.span.startUtf16Offset;
+    if (end > current.endUtf16Offset) {
+      this.#model.setSourceSpan(element, sourceSpan(current.startUtf16Offset, end));
+    }
   }
 
   #generateImpliedEndTags(except: string | null = null): void {
