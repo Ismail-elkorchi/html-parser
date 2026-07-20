@@ -7,6 +7,7 @@ import {
   XLINK_NAMESPACE,
   XML_NAMESPACE,
   XMLNS_NAMESPACE,
+  HtmlTreeBuilderPendingFeatureError,
   runHtmlEngine
 } from "../../dist/internal/html-engine/mod.js";
 import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
@@ -69,15 +70,16 @@ const FOREIGN_CONTENT_CASES = Object.freeze({
   "tests20.dat": new Set([43, 49, 50, ...inclusiveRange(53, 64)]),
   "tests21.dat": new Set([1, 2, ...inclusiveRange(4, 23)])
 });
-const deferredForeignContentCases = Object.values(FOREIGN_CONTENT_CASES)
-  .reduce((total, cases) => total + cases.size, 0);
 const requestedCase = process.env["ENGINE_FIXTURE_CASE"];
 
-function isAssigned(fileName, caseNumber, assignment) {
-  const assigned = "cases" in assignment
+function isAssigned(caseNumber, assignment) {
+  return "cases" in assignment
     ? assignment.cases.includes(caseNumber)
     : caseNumber >= assignment.first && caseNumber <= assignment.last;
-  return assigned && !FOREIGN_CONTENT_CASES[fileName]?.has(caseNumber);
+}
+
+function isDeferredForeignContent(fileName, caseNumber) {
+  return FOREIGN_CONTENT_CASES[fileName]?.has(caseNumber) ?? false;
 }
 
 function quote(value) {
@@ -170,17 +172,20 @@ function serializeModel(model) {
 
 const failures = [];
 let executed = 0;
+let passed = 0;
+let deferred = 0;
 for (const [fileName, assignment] of Object.entries(ASSIGNMENTS)) {
   const filePath = path.join(FIXTURE_ROOT, fileName);
   const content = await readFile(filePath, "utf8");
   const cases = parseTreeDatFixtures(content, filePath)
     .filter((fixtureCase) =>
       fixtureCase.fragmentContext === null &&
-      isAssigned(fileName, fixtureCase.caseNumber, assignment) &&
+      isAssigned(fixtureCase.caseNumber, assignment) &&
       (requestedCase === undefined || requestedCase === `${fileName}#${String(fixtureCase.caseNumber)}`)
     );
   for (const fixtureCase of expandTreeDatCases(cases, { includeModeInId: true })) {
     executed += 1;
+    const expectsForeignContent = isDeferredForeignContent(fileName, fixtureCase.caseNumber);
     try {
       const result = runHtmlEngine({
         inputChunks: [fixtureCase.data],
@@ -197,6 +202,13 @@ for (const [fileName, assignment] of Object.entries(ASSIGNMENTS)) {
           maxAttributeUtf8BytesPerElement: 10_000_000
         }
       });
+      if (expectsForeignContent) {
+        failures.push({
+          id: fixtureCase.id,
+          error: "Expected the staged foreign-content boundary, but parsing completed"
+        });
+        continue;
+      }
       const actual = serializeModel(result.model);
       const parseErrorCountMatches =
         !fixtureCase.errorsDeclared || result.parseErrors.length === fixtureCase.errors.length;
@@ -208,8 +220,18 @@ for (const [fileName, assignment] of Object.entries(ASSIGNMENTS)) {
           expectedParseErrors: fixtureCase.errorsDeclared ? fixtureCase.errors.length : null,
           actualParseErrors: result.parseErrors.length
         });
+      } else {
+        passed += 1;
       }
     } catch (error) {
+      if (
+        expectsForeignContent &&
+        error instanceof HtmlTreeBuilderPendingFeatureError &&
+        error.feature === "foreign-content"
+      ) {
+        deferred += 1;
+        continue;
+      }
       failures.push({
         id: fixtureCase.id,
         error: error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -242,6 +264,8 @@ if (failures.length > 0) {
   ]));
   console.error(JSON.stringify({
     executed,
+    passed,
+    deferred: { feature: "foreign-content", executions: deferred },
     failed: failures.length,
     treeOrRuntimeFailures,
     diagnosticCountOnlyFailures: failures.length - treeOrRuntimeFailures,
@@ -252,8 +276,8 @@ if (failures.length > 0) {
 } else {
   console.log(JSON.stringify({
     executed,
-    passed: executed,
+    passed,
     failed: 0,
-    deferred: { feature: "foreign-content", cases: deferredForeignContentCases }
+    deferred: { feature: "foreign-content", executions: deferred }
   }));
 }
