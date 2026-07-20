@@ -39,7 +39,7 @@ const REQUIRED_README_PATTERNS = [
   { name: "embedded legacy implementation disclosure", re: /embed[\s\S]{0,160}parse5[\s\S]{0,80}entities/i }
 ];
 
-const API_ENTRYPOINT_PATH = "src/public/mod.ts";
+const API_ENTRYPOINT_PATH = "src/mod.ts";
 const API_REFERENCE_PATH = "docs/api.md";
 
 function collectRuntimeExports(entrypointSource) {
@@ -49,6 +49,14 @@ function collectRuntimeExports(entrypointSource) {
   }
   for (const match of entrypointSource.matchAll(/export\s+(?:async\s+)?function\*?\s+([A-Za-z0-9_]+)/g)) {
     exports.add(match[1]);
+  }
+  for (const match of entrypointSource.matchAll(/export\s*\{([\s\S]*?)\}\s*from\s*["'][^"']+["']/g)) {
+    for (const rawSpecifier of (match[1] ?? "").split(",")) {
+      const specifier = rawSpecifier.trim();
+      if (specifier.length === 0 || specifier.startsWith("type ")) continue;
+      const exportedName = specifier.split(/\s+as\s+/).at(-1);
+      if (exportedName) exports.add(exportedName);
+    }
   }
   return [...exports].sort((left, right) => left.localeCompare(right));
 }

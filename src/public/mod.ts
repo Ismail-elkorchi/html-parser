@@ -1,4 +1,4 @@
-import { decodeHtmlBytes, sniffHtmlEncoding } from "../internal/encoding/mod.js";
+import { decodeHtmlBytes } from "../internal/encoding/mod.js";
 import { requireInternalValue } from "../internal/foundation/internal-state-error.js";
 import { tokenize, type HtmlToken } from "../internal/tokenizer/mod.js";
 import {
@@ -12,6 +12,7 @@ import {
   type TreeSpan
 } from "../internal/tree/mod.js";
 
+import { enforceBudget } from "./budgets.js";
 import {
   HtmlAbortError,
   HtmlBudgetExceededError,
@@ -26,6 +27,14 @@ import {
   isHtmlStreamReadError
 } from "./errors.js";
 import {
+  DecodedUtf8BudgetCounter,
+  decodeStreamToText,
+  requireByteArray,
+  requireReadableByteStream,
+  requireString,
+  utf8ByteLength
+} from "./html-input.js";
+import {
   createOperationContext,
   normalizeChunkOptions,
   normalizeOperationOptions,
@@ -37,6 +46,13 @@ import {
   normalizeTokenizeByteStreamEagerOptions,
   type OperationContext
 } from "./operation.js";
+import { normalizeParseErrorId, TraceSink } from "./parse-trace.js";
+import {
+  parsedDocumentRegistration,
+  patchPlanBelongsTo,
+  registerParsedDocument,
+  registerPatchPlan
+} from "./parsed-document-registry.js";
 
 import type {
   Attribute,
@@ -47,7 +63,6 @@ import type {
   Edit,
   ElementVisitor,
   FragmentTree,
-  HtmlBudgetName,
   HtmlNode,
   HtmlPatchPlanningReason,
   NodeId,
@@ -63,7 +78,6 @@ import type {
   ParseOptions,
   ParsedDocument,
   ParsedDocumentMetadata,
-  ParseStreamBudgetOptions,
   ParseStreamOptions,
   ParseResourceUsage,
   Span,
@@ -79,11 +93,6 @@ import type {
   TextProvenanceRange,
   Token,
   TokenizeByteStreamEagerOptions,
-  TraceEvent,
-  TraceEventCallback,
-  TraceMode,
-  TraceResult,
-  TraceSummary,
   VisibleTextExtractionOptions
 } from "./types.js";
 
@@ -128,8 +137,11 @@ export type {
   ParseResourceUsage,
   ParseStreamBudgetOptions,
   ParseStreamOptions,
+  ProcessingInstructionNode,
+  ProcessingInstructionToken,
   Span,
   SpanProvenance,
+  TemplateContentNode,
   TextContentExtractionOptions,
   TextExtractionOptions,
   TextExtractionOptionsBase,
@@ -212,11 +224,6 @@ export const XMLNS_NAMESPACE_URI = "http://www.w3.org/2000/xmlns/";
 export const VISIBLE_TEXT_HTML_POLICY = "visible-text-html-v1";
 /** Stable semantic identity for raw DOM text-content extraction. */
 export const TEXT_CONTENT_POLICY = "text-content-v1";
-const DEFAULT_STREAM_ENCODING_PRESCAN_BYTES = 16_384;
-const parsedDocumentSources = new WeakMap<object, string | null>();
-const parsedDocumentSpans = new WeakMap<object, boolean>();
-const patchPlanDocuments = new WeakMap<object, ParsedDocument>();
-
 class NodeIdAssigner {
   #next: NodeId = 1;
 
@@ -232,24 +239,6 @@ interface NodeMetrics {
   readonly maxDepth: number;
 }
 
-function enforceBudget(
-  budget: HtmlBudgetName,
-  limit: number | undefined,
-  actual: number
-): void {
-  if (limit === undefined || actual <= limit) {
-    return;
-  }
-
-  throw new HtmlBudgetExceededError(budget, limit, limit + 1);
-}
-
-function requireString(value: unknown, option: string): asserts value is string {
-  if (typeof value !== "string") {
-    throw new HtmlConfigurationError(option, "INVALID_VALUE", "must be a string");
-  }
-}
-
 function asciiLowercase(value: string): string {
   return value.replace(/[A-Z]/g, (character) => character.toLowerCase());
 }
@@ -258,197 +247,18 @@ function isHtmlElement(node: HtmlNode): node is Extract<HtmlNode, { kind: "eleme
   return node.kind === "element" && node.namespaceUri === HTML_NAMESPACE_URI;
 }
 
-function requireByteArray(value: unknown, option: string): asserts value is Uint8Array {
-  if (!(value instanceof Uint8Array)) {
-    throw new HtmlConfigurationError(option, "INVALID_VALUE", "must be a Uint8Array");
+function ownedChildNodes(node: HtmlNode): readonly HtmlNode[] {
+  if (node.kind === "templateContent") {
+    return node.children;
   }
-}
-
-function requireReadableByteStream(
-  value: unknown,
-  option: string
-): asserts value is ReadableStream<Uint8Array> {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    typeof (value as Readonly<Record<PropertyKey, unknown>>)["getReader"] !== "function"
-  ) {
-    throw new HtmlConfigurationError(
-      option,
-      "INVALID_VALUE",
-      "must be a ReadableStream of Uint8Array chunks"
-    );
+  if (node.kind !== "element") {
+    return [];
   }
+  return node.templateContent === undefined ? node.children : [node.templateContent];
 }
 
 function parseOperationContext(options: ParseOptions, startedAt: number): OperationContext {
   return createOperationContext(options.budgets?.maxTimeMs, options.signal, startedAt);
-}
-
-function utf8ByteLength(value: string, operation?: OperationContext): number {
-  let bytes = 0;
-  let cursor = 0;
-  while (cursor < value.length) {
-    operation?.checkpoint();
-    const codePoint = value.codePointAt(cursor);
-    if (codePoint === undefined) {
-      break;
-    }
-    const width = codePoint > 0xffff ? 2 : 1;
-    bytes += codePointUtf8ByteLength(codePoint);
-    cursor += width;
-  }
-  return bytes;
-}
-
-class DecodedUtf8BudgetCounter {
-  readonly #limit: number | undefined;
-  readonly #operation: OperationContext;
-  readonly #encoder = new TextEncoder();
-  #bytes = 0;
-
-  constructor(limit: number | undefined, operation: OperationContext) {
-    this.#limit = limit;
-    this.#operation = operation;
-  }
-
-  append(value: string): void {
-    this.#operation.checkpoint();
-    this.#bytes += this.#encoder.encode(value).byteLength;
-    enforceBudget("maxDecodedUtf8Bytes", this.#limit, this.#bytes);
-  }
-
-  get bytes(): number {
-    return this.#bytes;
-  }
-}
-
-type TraceEventInput =
-  TraceEvent extends infer Event
-    ? Event extends { readonly seq: number }
-      ? Omit<Event, "seq">
-      : never
-    : never;
-
-interface TraceFinalMetrics {
-  readonly tokenCount: number;
-  readonly nodeCount: number;
-  readonly maxDepth: number;
-  readonly parseErrorCount: number;
-  readonly encoding: TraceSummary["encoding"];
-  readonly inputBytes: number;
-  readonly decodedUtf8Bytes: number;
-  readonly bytesRead: number | null;
-  readonly encodingPrescanBytes: number | null;
-  readonly encodingPrescanLimitBytes: number | null;
-}
-
-function freezeTraceEvent(seq: number, input: TraceEventInput): TraceEvent {
-  if (input.kind === "insertionModeTransition") {
-    return Object.freeze({
-      seq,
-      ...input,
-      tokenContext: Object.freeze({ ...input.tokenContext })
-    });
-  }
-  return Object.freeze({ seq, ...input });
-}
-
-class TraceSink {
-  readonly #mode: TraceMode;
-  readonly #callback: TraceEventCallback | undefined;
-  readonly #budgets: ParseOptions["budgets"] | undefined;
-  readonly #operation: OperationContext;
-  readonly #encoder = new TextEncoder();
-  readonly #events: TraceEvent[] | undefined;
-  readonly #eventKinds = new Set<TraceEvent["kind"]>();
-  #eventCount = 0;
-  #eventUtf8Bytes = 0;
-
-  constructor(
-    mode: TraceMode,
-    callback: TraceEventCallback | undefined,
-    budgets: ParseOptions["budgets"] | undefined,
-    operation: OperationContext
-  ) {
-    this.#mode = mode;
-    this.#callback = callback;
-    this.#budgets = budgets;
-    this.#operation = operation;
-    this.#events = mode === "events" ? [] : undefined;
-  }
-
-  get active(): boolean {
-    return this.#mode !== "none" || this.#callback !== undefined;
-  }
-
-  get eventCount(): number {
-    return this.#eventCount;
-  }
-
-  get eventUtf8Bytes(): number {
-    return this.#eventUtf8Bytes;
-  }
-
-  emit(input: TraceEventInput): void {
-    if (!this.active) {
-      return;
-    }
-    this.#operation.checkpoint();
-    const event = freezeTraceEvent(this.#eventCount + 1, input);
-    const eventBytes = this.#mode === "none"
-      ? 0
-      : this.#encoder.encode(JSON.stringify(event)).byteLength;
-
-    if (this.#events !== undefined) {
-      enforceBudget("maxTraceEvents", this.#budgets?.maxTraceEvents, this.#events.length + 1);
-      enforceBudget(
-        "maxTraceBytes",
-        this.#budgets?.maxTraceBytes,
-        this.#eventUtf8Bytes + eventBytes
-      );
-      this.#events.push(event);
-    }
-
-    this.#eventCount += 1;
-    if (this.#mode !== "none") {
-      this.#eventUtf8Bytes += eventBytes;
-      this.#eventKinds.add(event.kind);
-    }
-    this.#callback?.(event);
-    this.#operation.checkpoint();
-  }
-
-  emitBudget(budget: HtmlBudgetName, limit: number | undefined, actual: number): void {
-    this.emit({
-      kind: "budget",
-      budget,
-      limit: limit ?? null,
-      actual,
-      status: limit === undefined || actual <= limit ? "ok" : "exceeded"
-    });
-  }
-
-  finish(metrics: TraceFinalMetrics): TraceResult | undefined {
-    if (this.#mode === "none") {
-      return undefined;
-    }
-    const summary: TraceSummary = Object.freeze({
-      ...metrics,
-      encoding: Object.freeze({ ...metrics.encoding }),
-      eventCount: this.#eventCount,
-      eventUtf8Bytes: this.#eventUtf8Bytes,
-      eventKinds: Object.freeze([...this.#eventKinds].sort())
-    });
-    if (this.#events === undefined) {
-      return Object.freeze({ mode: "summary", summary });
-    }
-    return Object.freeze({
-      mode: "events",
-      summary,
-      events: Object.freeze(this.#events)
-    });
-  }
 }
 
 function toPublicSpan(span: TreeSpan | undefined, captureSpans: boolean): Span | undefined {
@@ -486,18 +296,7 @@ function toAttributes(
 }
 
 const WHATWG_PARSE_ERRORS_SECTION_URL = "https://html.spec.whatwg.org/multipage/parsing.html#parse-errors";
-const WHATWG_PARSE_ERROR_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-
-function normalizeParseErrorId(rawErrorCode: string): string {
-  const normalized = rawErrorCode.trim();
-  if (normalized.length === 0) {
-    return "vendor:unknown";
-  }
-  if (WHATWG_PARSE_ERROR_ID_PATTERN.test(normalized)) {
-    return normalized;
-  }
-  return `vendor:${normalized}`;
-}/**
+/**
  * Returns deterministic public metadata for `getParseErrorSpecRef`.
  */
 
@@ -744,9 +543,10 @@ function collectMetrics(nodes: readonly HtmlNode[], operation: OperationContext)
     operation.checkpoint();
     totalNodes += 1;
     maxDepth = Math.max(maxDepth, entry.depth);
-    if (entry.node.kind === "element") {
-      for (let index = entry.node.children.length - 1; index >= 0; index -= 1) {
-        const child = entry.node.children[index];
+    const descendants = ownedChildNodes(entry.node);
+    if (descendants.length > 0) {
+      for (let index = descendants.length - 1; index >= 0; index -= 1) {
+        const child = descendants[index];
         if (child !== undefined) {
           stack.push({ node: child, depth: entry.depth + 1 });
         }
@@ -960,8 +760,7 @@ function parseDocumentInternal(
     sourceText,
     metadata
   });
-  parsedDocumentSources.set(result, sourceText);
-  parsedDocumentSpans.set(result, captureSpans);
+  registerParsedDocument(result, sourceText, captureSpans);
   return result;
 }/**
  * Parses input deterministically for the `parse` public API.
@@ -1175,223 +974,7 @@ export function parseFragment(
   });
 }
 
-interface StreamDecodeResult {
-  readonly text: string;
-  readonly sniff: StreamEncodingSniff;
-  readonly totalBytes: number;
-  readonly decodedUtf8Bytes: number;
-  readonly encodingPrescanBytes: number;
-  readonly encodingPrescanLimitBytes: number;
-}
-
-interface StreamEncodingSniff {
-  readonly encoding: string;
-  readonly source: "bom" | "transport" | "meta" | "default";
-}
-
-interface StreamDecoderState {
-  readonly decoder: TextDecoder;
-  readonly sniff: StreamEncodingSniff;
-}
-
-async function readStreamChunk(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  operation: OperationContext
-): Promise<ReadableStreamReadResult<Uint8Array>> {
-  operation.checkpoint();
-  let readPromise: Promise<ReadableStreamReadResult<Uint8Array>>;
-  try {
-    readPromise = reader.read();
-  } catch (cause) {
-    throw new HtmlStreamReadError(cause);
-  }
-
-  const signal = operation.signal;
-  const remainingTimeMs = operation.remainingTimeMs();
-  if (!signal && remainingTimeMs === undefined) {
-    try {
-      return await readPromise;
-    } catch (cause) {
-      throw new HtmlStreamReadError(cause);
-    }
-  }
-
-  let abortListener: (() => void) | undefined;
-  const abortPromise = signal
-    ? new Promise<never>((_resolve, reject) => {
-        abortListener = () => {
-          reject(new HtmlAbortError(signal.reason));
-        };
-        signal.addEventListener("abort", abortListener, { once: true });
-        if (signal.aborted) {
-          abortListener();
-        }
-      })
-    : undefined;
-  let deadlineTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
-  const deadlinePromise = remainingTimeMs === undefined
-    ? undefined
-    : new Promise<never>((_resolve, reject) => {
-        deadlineTimer = globalThis.setTimeout(() => {
-          const limit = operation.timeLimit ?? 0;
-          reject(new HtmlBudgetExceededError("maxTimeMs", limit, limit + 1));
-        }, Math.ceil(remainingTimeMs));
-      });
-
-  try {
-    return await Promise.race([
-      readPromise,
-      ...(abortPromise ? [abortPromise] : []),
-      ...(deadlinePromise ? [deadlinePromise] : [])
-    ]);
-  } catch (cause) {
-    if (cause instanceof HtmlAbortError || cause instanceof HtmlBudgetExceededError) {
-      throw cause;
-    }
-    throw new HtmlStreamReadError(cause);
-  } finally {
-    if (abortListener) {
-      signal?.removeEventListener("abort", abortListener);
-    }
-    if (deadlineTimer !== undefined) {
-      globalThis.clearTimeout(deadlineTimer);
-    }
-  }
-}
-
-async function decodeStreamToText(
-  stream: ReadableStream<Uint8Array>,
-  options: {
-    readonly transportEncodingLabel?: string;
-    readonly budgets?: ParseStreamBudgetOptions | TokenizeByteStreamEagerOptions["budgets"];
-  },
-  operation: OperationContext
-): Promise<StreamDecodeResult> {
-  const budgets = options.budgets;
-  operation.checkpoint();
-  let reader: ReadableStreamDefaultReader<Uint8Array>;
-  try {
-    reader = stream.getReader();
-  } catch (cause) {
-    throw new HtmlStreamReadError(cause);
-  }
-  let total = 0;
-  const prescanLimit = Math.min(
-    DEFAULT_STREAM_ENCODING_PRESCAN_BYTES,
-    budgets?.maxEncodingPrescanBytes ?? DEFAULT_STREAM_ENCODING_PRESCAN_BYTES
-  );
-  const pendingBytesBuffer = new Uint8Array(prescanLimit);
-  let pendingBytes = 0;
-  let encodingPrescanBytes = 0;
-  let decoderState: StreamDecoderState | undefined;
-  const decodedParts: string[] = [];
-  const decodedBudget = new DecodedUtf8BudgetCounter(
-    budgets?.maxDecodedUtf8Bytes,
-    operation
-  );
-  const sniffOptions =
-    options.transportEncodingLabel === undefined
-      ? { maxPrescanBytes: prescanLimit }
-      : {
-          transportEncodingLabel: options.transportEncodingLabel,
-          maxPrescanBytes: prescanLimit
-        };
-
-  const appendDecoded = (value: string): void => {
-    if (value.length > 0) {
-      decodedBudget.append(value);
-      decodedParts.push(value);
-    }
-  };
-
-  const decodeBytes = (decoder: TextDecoder, bytes: Uint8Array): void => {
-    const decodeChunkBytes = 16_384;
-    for (let offset = 0; offset < bytes.byteLength; offset += decodeChunkBytes) {
-      operation.checkpoint();
-      appendDecoded(
-        decoder.decode(bytes.subarray(offset, offset + decodeChunkBytes), { stream: true })
-      );
-    }
-  };
-
-  const initializeDecoder = (): StreamDecoderState => {
-    const bufferedBytes = pendingBytesBuffer.subarray(0, pendingBytes);
-    const sniff = sniffHtmlEncoding(bufferedBytes, sniffOptions);
-    const state = {
-      decoder: new TextDecoder(sniff.encoding),
-      sniff
-    };
-    decoderState = state;
-    decodeBytes(state.decoder, bufferedBytes);
-    return state;
-  };
-
-  try {
-    if (prescanLimit === 0) {
-      initializeDecoder();
-    }
-
-    for (;;) {
-      const next = await readStreamChunk(reader, operation);
-      if (next.done) {
-        break;
-      }
-
-      const chunkValue = next.value;
-      if (!(chunkValue instanceof Uint8Array)) {
-        throw new HtmlStreamReadError(
-          new TypeError("HTML byte stream yielded a non-Uint8Array chunk")
-        );
-      }
-      total += chunkValue.byteLength;
-
-      enforceBudget("maxInputBytes", budgets?.maxInputBytes, total);
-      operation.checkpoint();
-
-      if (decoderState === undefined) {
-        const bytesToBuffer = Math.min(chunkValue.byteLength, prescanLimit - pendingBytes);
-        pendingBytesBuffer.set(chunkValue.subarray(0, bytesToBuffer), pendingBytes);
-        pendingBytes += bytesToBuffer;
-        encodingPrescanBytes = Math.max(encodingPrescanBytes, pendingBytes);
-        if (pendingBytes < prescanLimit) {
-          continue;
-        }
-
-        const activeDecoder = initializeDecoder().decoder;
-        if (bytesToBuffer < chunkValue.byteLength) {
-          decodeBytes(activeDecoder, chunkValue.subarray(bytesToBuffer));
-        }
-        continue;
-      }
-
-      decodeBytes(decoderState.decoder, chunkValue);
-    }
-
-    const finalState = decoderState ?? initializeDecoder();
-    appendDecoded(finalState.decoder.decode());
-
-    return {
-      text: decodedParts.join(""),
-      sniff: finalState.sniff,
-      totalBytes: total,
-      decodedUtf8Bytes: decodedBudget.bytes,
-      encodingPrescanBytes,
-      encodingPrescanLimitBytes: prescanLimit
-    };
-  } catch (error) {
-    try {
-      const cancellation = reader.cancel(error);
-      void cancellation.catch(() => {
-        // Cleanup failures never replace or delay the original operation failure.
-      });
-    } catch {
-      // Preserve the original read, decode, or budget failure.
-    }
-    throw error;
-  } finally {
-    reader.releaseLock();
-  }
-}/**
+/**
  * Tokenizes input deterministically for the `tokenizeByteStreamEager` public API.
  */
 
@@ -1568,8 +1151,15 @@ function serializeNodes(nodes: readonly HtmlNode[], operation: OperationContext)
       parts.push(escapeText(node.value));
     } else if (node.kind === "comment") {
       parts.push(`<!--${node.value}-->`);
+    } else if (node.kind === "processingInstruction") {
+      parts.push(`<?${node.target} ${node.data}?>`);
     } else if (node.kind === "doctype") {
       parts.push(serializeDoctype(node));
+    } else if (node.kind === "templateContent") {
+      for (let index = node.children.length - 1; index >= 0; index -= 1) {
+        const child = node.children[index];
+        if (child !== undefined) stack.push({ kind: "node", node: child });
+      }
     } else {
       const attributes = node.attributes
         .map((entry) => `${entry.name}="${escapeAttribute(entry.value)}"`)
@@ -1582,8 +1172,9 @@ function serializeNodes(nodes: readonly HtmlNode[], operation: OperationContext)
         VOID_ELEMENTS.has(asciiLowercase(node.localName));
       if (!isHtmlVoid) {
         stack.push({ kind: "text", value: `</${node.tagName}>` });
-        for (let index = node.children.length - 1; index >= 0; index -= 1) {
-          const child = node.children[index];
+        const children = node.templateContent?.children ?? node.children;
+        for (let index = children.length - 1; index >= 0; index -= 1) {
+          const child = children[index];
           if (child !== undefined) {
             stack.push({ kind: "node", node: child });
           }
@@ -1660,6 +1251,11 @@ type ResolvedVisibleTextOptions = VisibleTextPolicyOptions & {
   readonly operation: OperationContext;
   readonly maxFallbackInputBytes: number;
   readonly maxFallbackNodes: number;
+  readonly parseNestedFragment: (
+    html: string,
+    contextTagName: string,
+    options: ParseFragmentOptions
+  ) => FragmentTree;
 };
 
 const DEFAULT_VISIBLE_TEXT_OPTIONS: VisibleTextPolicyOptions = Object.freeze({
@@ -2364,7 +1960,7 @@ function boundedNoscriptFallbackChildren(
   const remainingTimeMs = options.operation.remainingTimeMs();
   let fallbackFragment: FragmentTree;
   try {
-    fallbackFragment = parseFragment(rawMarkup, "body", {
+    fallbackFragment = options.parseNestedFragment(rawMarkup, "body", {
       ...(options.operation.signal === undefined ? {} : { signal: options.operation.signal }),
       budgets: {
         maxNodes: options.maxFallbackNodes,
@@ -2650,7 +2246,12 @@ function* iterateRawExtractionChunks(
       }
       continue;
     }
-    if (node.kind === "element") {
+    if (node.kind === "templateContent") {
+      for (let index = node.children.length - 1; index >= 0; index -= 1) {
+        const child = node.children[index];
+        if (child !== undefined) stack.push(child);
+      }
+    } else if (node.kind === "element") {
       for (let index = node.children.length - 1; index >= 0; index -= 1) {
         const child = node.children[index];
         if (child !== undefined) {
@@ -2663,7 +2264,8 @@ function* iterateRawExtractionChunks(
 
 function resolvedVisibleTextOptions(
   options: VisibleTextExtractionOptions,
-  operation: OperationContext
+  operation: OperationContext,
+  parseNestedFragment: ResolvedVisibleTextOptions["parseNestedFragment"]
 ): ResolvedVisibleTextOptions {
   return {
     ...DEFAULT_VISIBLE_TEXT_OPTIONS,
@@ -2674,16 +2276,18 @@ function resolvedVisibleTextOptions(
     trim: options.trim ?? DEFAULT_VISIBLE_TEXT_OPTIONS.trim,
     maxFallbackInputBytes: options.maxFallbackInputBytes,
     maxFallbackNodes: options.maxFallbackNodes,
-    operation
+    operation,
+    parseNestedFragment
   };
 }
 
 function* iterateVisibleTextInternal(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
   options: VisibleTextExtractionOptions,
-  operation: OperationContext
+  operation: OperationContext,
+  parseNestedFragment: ResolvedVisibleTextOptions["parseNestedFragment"]
 ): Generator<TextExtractionToken, TextExtractionResult, void> {
-  const resolved = resolvedVisibleTextOptions(options, operation);
+  const resolved = resolvedVisibleTextOptions(options, operation, parseNestedFragment);
   const collector = new BoundedTextCollector(options.policy, options.maxOutputBytes, options.maxTokens);
   const normalizer = new StreamingVisibleTextNormalizer(
     resolved.trim,
@@ -2746,10 +2350,10 @@ function* iterateRawTextInternal(
   return result;
 }
 
-/** Iterates bounded policy tokens and returns the final result when fully drained. */
-export function iterateText(
+function iterateTextUsing(
   nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
-  options: TextExtractionOptions
+  options: TextExtractionOptions,
+  parseNestedFragment: ResolvedVisibleTextOptions["parseNestedFragment"]
 ): Generator<TextExtractionToken, TextExtractionResult, void> {
   const startedAt = performance.now();
   const normalizedOptions = normalizeTextExtractionOptions(options);
@@ -2760,22 +2364,57 @@ export function iterateText(
   );
   operation.checkpoint();
   return normalizedOptions.policy === VISIBLE_TEXT_HTML_POLICY
-    ? iterateVisibleTextInternal(nodeOrTree, normalizedOptions, operation)
+    ? iterateVisibleTextInternal(nodeOrTree, normalizedOptions, operation, parseNestedFragment)
     : iterateRawTextInternal(nodeOrTree, normalizedOptions, operation);
 }
 
-/** Extracts bounded text under an explicit, versioned semantic policy. */
-export function extractText(
-  nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
-  options: TextExtractionOptions
-): TextExtractionResult {
-  const iterator = iterateText(nodeOrTree, options);
-  let next = iterator.next();
-  while (!next.done) {
-    next = iterator.next();
-  }
-  return next.value;
+/**
+ * Creates the text operations for one explicit nested-markup parser.
+ *
+ * This integration seam is intentionally absent from the package root. It
+ * keeps nested `noscript` work on the same parser route as the owning tree
+ * without a global selector or tree-origin registry.
+ */
+export function createTextOperations(
+  parseNestedFragment: ResolvedVisibleTextOptions["parseNestedFragment"]
+): Readonly<{
+  iterateText(
+    nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
+    options: TextExtractionOptions
+  ): Generator<TextExtractionToken, TextExtractionResult, void>;
+  extractText(
+    nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
+    options: TextExtractionOptions
+  ): TextExtractionResult;
+}> {
+  const iterate = (
+    nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
+    options: TextExtractionOptions
+  ): Generator<TextExtractionToken, TextExtractionResult, void> =>
+    iterateTextUsing(nodeOrTree, options, parseNestedFragment);
+  return Object.freeze({
+    iterateText: iterate,
+    extractText(
+      nodeOrTree: DocumentTree | FragmentTree | HtmlNode,
+      options: TextExtractionOptions
+    ): TextExtractionResult {
+      const iterator = iterate(nodeOrTree, options);
+      let next = iterator.next();
+      while (!next.done) {
+        next = iterator.next();
+      }
+      return next.value;
+    }
+  });
 }
+
+const textOperations = createTextOperations(parseFragment);
+
+/** Iterates bounded policy tokens and returns the final result when fully drained. */
+export const iterateText = textOperations.iterateText;
+
+/** Extracts bounded text under an explicit, versioned semantic policy. */
+export const extractText = textOperations.extractText;
 
 function* iterateNodes(
   nodes: readonly HtmlNode[],
@@ -2796,9 +2435,10 @@ function* iterateNodes(
     }
     operation.checkpoint();
     yield entry;
-    if (entry.node.kind === "element") {
-      for (let index = entry.node.children.length - 1; index >= 0; index -= 1) {
-        const child = entry.node.children[index];
+    const descendants = ownedChildNodes(entry.node);
+    if (descendants.length > 0) {
+      for (let index = descendants.length - 1; index >= 0; index -= 1) {
+        const child = descendants[index];
         if (child !== undefined) {
           stack.push({ node: child, depth: entry.depth + 1 });
         }
@@ -3091,9 +2731,10 @@ function countNodes(node: HtmlNode, operation: OperationContext): number {
     }
     operation.checkpoint();
     count += 1;
-    if (current.kind === "element") {
-      for (let index = current.children.length - 1; index >= 0; index -= 1) {
-        const child = current.children[index];
+    const descendants = ownedChildNodes(current);
+    if (descendants.length > 0) {
+      for (let index = descendants.length - 1; index >= 0; index -= 1) {
+        const child = descendants[index];
         if (child !== undefined) {
           stack.push(child);
         }
@@ -3117,12 +2758,13 @@ function indexNodeSpans(nodes: readonly HtmlNode[], into: Map<NodeId, IndexedNod
     }
     into.set(node.id, {
       provenance: node.spanProvenance,
-      ...(node.span ? { span: node.span } : {})
+      ...(node.kind !== "templateContent" && node.span ? { span: node.span } : {})
     });
 
-    if (node.kind === "element") {
-      for (let index = node.children.length - 1; index >= 0; index -= 1) {
-        const child = node.children[index];
+    const descendants = ownedChildNodes(node);
+    if (descendants.length > 0) {
+      for (let index = descendants.length - 1; index >= 0; index -= 1) {
+        const child = descendants[index];
         if (child !== undefined) {
           stack.push(child);
         }
@@ -3139,9 +2781,10 @@ function indexNodes(nodes: readonly HtmlNode[], into: Map<NodeId, HtmlNode>): vo
       continue;
     }
     into.set(node.id, node);
-    if (node.kind === "element") {
-      for (let index = node.children.length - 1; index >= 0; index -= 1) {
-        const child = node.children[index];
+    const descendants = ownedChildNodes(node);
+    if (descendants.length > 0) {
+      for (let index = descendants.length - 1; index >= 0; index -= 1) {
+        const child = descendants[index];
         if (child !== undefined) {
           stack.push(child);
         }
@@ -3227,13 +2870,14 @@ function applyPatchSteps(originalHtml: string, plan: PatchPlan): string {
 }
 
 function requireParsedDocumentSource(document: ParsedDocument): string {
-  if (!parsedDocumentSources.has(document)) {
+  const registration = parsedDocumentRegistration(document);
+  if (registration === undefined) {
     failPatchPlanning("UNRECOGNIZED_PARSED_DOCUMENT", {
       detail: "document must be the exact object returned by a full-document parse"
     });
   }
-  const source = parsedDocumentSources.get(document);
-  if (source === null || source === undefined) {
+  const source = registration.sourceText;
+  if (source === null) {
     failPatchPlanning("SOURCE_NOT_RETAINED", {
       detail: 'parse with sourceRetention: "text" before planning or applying patches'
     });
@@ -3244,7 +2888,7 @@ function requireParsedDocumentSource(document: ParsedDocument): string {
 /** Applies a registered patch plan to the exact parsed document that produced it. */
 export function applyPatchPlan(document: ParsedDocument, plan: PatchPlan): string {
   const originalHtml = requireParsedDocumentSource(document);
-  if (patchPlanDocuments.get(plan) !== document) {
+  if (!patchPlanBelongsTo(plan, document)) {
     failPatchPlanning("PLAN_SOURCE_MISMATCH", {
       detail: "plan must be applied to the exact parsed document used to create it"
     });
@@ -3448,7 +3092,7 @@ function buildReplacement(
 
 export function computePatch(document: ParsedDocument, edits: readonly Edit[]): PatchPlan {
   const originalHtml = requireParsedDocumentSource(document);
-  if (parsedDocumentSpans.get(document) !== true) {
+  if (parsedDocumentRegistration(document)?.spansCaptured !== true) {
     failPatchPlanning("SPANS_NOT_CAPTURED", {
       detail: "parse with captureSpans: true before planning patches"
     });
@@ -3463,7 +3107,7 @@ export function computePatch(document: ParsedDocument, edits: readonly Edit[]): 
       steps,
       result: originalHtml
     });
-    patchPlanDocuments.set(plan, document);
+    registerPatchPlan(plan, document);
     return plan;
   }
 
@@ -3542,7 +3186,7 @@ export function computePatch(document: ParsedDocument, edits: readonly Edit[]): 
     steps: frozenSteps,
     result
   });
-  patchPlanDocuments.set(plan, document);
+  registerPatchPlan(plan, document);
   return plan;
 }/**
  * Provides deterministic public behavior for `chunk`.

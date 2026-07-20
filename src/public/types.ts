@@ -1,7 +1,15 @@
 /** Deterministic numeric identifier assigned to a node within one parsed tree. */
 export type NodeId = number;
 
-export type NodeKind = "document" | "fragment" | "element" | "text" | "comment" | "doctype";
+export type NodeKind =
+  | "document"
+  | "fragment"
+  | "templateContent"
+  | "element"
+  | "text"
+  | "comment"
+  | "processingInstruction"
+  | "doctype";
 
 export interface Span {
   /** Zero-based UTF-16 code-unit offset into the decoded input, inclusive. */
@@ -148,9 +156,16 @@ export interface CommentToken {
   readonly value: string;
 }
 
+/** Processing-instruction token defined by the current HTML syntax. */
+export interface ProcessingInstructionToken {
+  readonly kind: "processingInstruction";
+  readonly target: string;
+  readonly data: string;
+}
+
 export interface DoctypeToken {
   readonly kind: "doctype";
-  readonly name: string;
+  readonly name: string | null;
   readonly publicId: string | null;
   readonly systemId: string | null;
   readonly forceQuirks: boolean;
@@ -165,6 +180,7 @@ export type Token =
   | EndTagToken
   | CharsToken
   | CommentToken
+  | ProcessingInstructionToken
   | DoctypeToken
   | EofToken;
 
@@ -182,7 +198,7 @@ export interface TraceDecodeEvent {
   readonly sniffSource: "input" | "bom" | "transport" | "meta" | "default";
 }
 
-/** Logical tokenizer output count for the parse5 pass that built the tree. */
+/** Logical tokenizer output count for the parser operation that built the tree. */
 export interface TraceTokenEvent {
   /** One-based event order within this parse. */
   readonly seq: number;
@@ -359,6 +375,16 @@ export interface CommentNode {
   readonly span?: Span;
 }
 
+/** Processing instruction retained as a distinct DOM node. */
+export interface ProcessingInstructionNode {
+  readonly id: NodeId;
+  readonly kind: "processingInstruction";
+  readonly target: string;
+  readonly data: string;
+  readonly spanProvenance: SpanProvenance;
+  readonly span?: Span;
+}
+
 /** External identifier syntax retained from a document type declaration. */
 export type DoctypeExternalId =
   | { readonly kind: "none" }
@@ -390,12 +416,29 @@ export interface ElementNode {
   /** Qualified element name, including the prefix when one exists. */
   readonly tagName: string;
   readonly attributes: readonly Attribute[];
+  /** DOM child nodes; empty for an HTML template element. */
   readonly children: readonly HtmlNode[];
+  /** Owned DocumentFragment, present only for an HTML template element. */
+  readonly templateContent?: TemplateContentNode;
   readonly spanProvenance: SpanProvenance;
   readonly span?: Span;
 }
 
-export type HtmlNode = ElementNode | TextNode | CommentNode | DoctypeNode;
+/** The distinct DocumentFragment owned by an HTML template element. */
+export interface TemplateContentNode {
+  readonly id: NodeId;
+  readonly kind: "templateContent";
+  readonly children: readonly HtmlNode[];
+  readonly spanProvenance: "inferred";
+}
+
+export type HtmlNode =
+  | ElementNode
+  | TemplateContentNode
+  | TextNode
+  | CommentNode
+  | ProcessingInstructionNode
+  | DoctypeNode;
 
 export type NodeVisitor = (node: HtmlNode, depth: number) => void;
 export type ElementVisitor = (node: ElementNode, depth: number) => void;

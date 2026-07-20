@@ -27,6 +27,7 @@
   "files": [
     "dist",
     "!dist/internal/html-engine/**",
+    "!dist/integration/**",
     "docs",
     "README.md",
     "CONTRIBUTING.md",
@@ -80,6 +81,7 @@
     "test:bench:engine-tree": "npm run build && node --expose-gc scripts/bench/run-engine-tree-evidence.mjs",
     "test:bench:engine-tree-builder": "npm run build && node --expose-gc scripts/bench/run-engine-tree-builder-evidence.mjs",
     "test:bench:engine-formatting": "npm run build && node --expose-gc scripts/bench/run-engine-formatting-evidence.mjs",
+    "test:bench:independent-product": "npm run build && node --expose-gc scripts/bench/run-independent-product-evidence.mjs",
     "test:bench:stability": "npm run build && node scripts/bench/run-bench-stability.mjs",
     "examples:run": "npm run build && node examples/run-all.mjs",
     "smoke:node": "npm run build && node scripts/smoke/control.mjs --runtime=node --report=reports/smoke-node.json",

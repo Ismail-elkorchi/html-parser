@@ -76,6 +76,7 @@ export interface EngineResourceGuard {
   ensureActive(): void;
   checkpoint(): void;
   reserveNode(): void;
+  reserveNodes(count: number): void;
   reserveNodeAtDepth(depth: number): void;
   observeDepth(depth: number): void;
   reserveParseError(): void;
@@ -247,9 +248,24 @@ export function createEngineResourceGuard(
       steps = actual;
     },
     reserveNode(): void {
-      guard.checkpoint();
-      const actualNodes = nodes + 1;
-      checkLimit("maxNodes", actualNodes);
+      guard.reserveNodes(1);
+    },
+    reserveNodes(count: number): void {
+      if (!Number.isSafeInteger(count) || count < 1) {
+        throw new EngineConfigurationError("node reservation count", "must be a positive safe integer");
+      }
+      guard.ensureActive();
+      const actualSteps = steps + count;
+      const stepLimit = limits.maxSteps;
+      if (stepLimit !== undefined && actualSteps > stepLimit) {
+        fail("maxSteps", stepLimit, stepLimit + 1);
+      }
+      const actualNodes = nodes + count;
+      const nodeLimit = limits.maxNodes;
+      if (nodeLimit !== undefined && actualNodes > nodeLimit) {
+        fail("maxNodes", nodeLimit, nodeLimit + 1);
+      }
+      steps = actualSteps;
       nodes = actualNodes;
     },
     reserveNodeAtDepth(depth: number): void {

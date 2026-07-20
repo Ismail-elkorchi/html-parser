@@ -130,8 +130,8 @@ void test("processing instructions retain their distinct node identity and sourc
   );
 });
 
-void test("template contents are explicit, redirected, hosted, and not separately budgeted", () => {
-  const resources = createEngineResourceGuard({ limits: { maxNodes: 3, maxDepth: 3 } });
+void test("template contents have distinct identity, resource cost, depth, and insertion ownership", () => {
+  const resources = createEngineResourceGuard({ limits: { maxNodes: 4, maxDepth: 4 } });
   const model = new HtmlTreeModel({ rootKind: "fragment", resources });
   const template = element(model, "template");
   const child = element(model, "p");
@@ -141,17 +141,19 @@ void test("template contents are explicit, redirected, hosted, and not separatel
   const contents = template.templateContents;
   assert.equal(template.childCount, 0);
   assert.ok(contents);
+  assert.notEqual(contents.identity.serial, template.identity.serial);
   assert.equal(contents.host, template);
   assert.equal(contents.childAt(0), child);
   assert.equal(child.parent, contents);
   assert.deepEqual([...model.walk()].map(({ node, depth }) => [node.kind, depth]), [
     ["element", 2],
-    ["element", 3]
+    ["element", 4]
   ]);
+  assert.deepEqual(model.validate(), { allocatedNodes: 4, attachedNodes: 4, maxDepth: 4 });
   assert.deepEqual(resources.snapshot(), {
-    steps: 10,
-    nodes: 3,
-    maxDepth: 3,
+    steps: 11,
+    nodes: 4,
+    maxDepth: 4,
     parseErrors: 0,
     attributes: 0,
     attributeUtf8Bytes: 0
@@ -415,6 +417,25 @@ void test("resource failures precede node allocation and structural mutation", (
   );
   assert.equal(nodeResources.snapshot().nodes, 1);
   assert.equal(nodeModel.root.childCount, 0);
+
+  const templateResources = createEngineResourceGuard({ limits: { maxNodes: 2 } });
+  const templateModel = new HtmlTreeModel({
+    rootKind: "fragment",
+    resources: templateResources
+  });
+  assert.throws(
+    () => element(templateModel, "template"),
+    (error) => error instanceof EngineResourceLimitError &&
+      error.resource === "maxNodes" && error.actual === 3
+  );
+  assert.deepEqual(templateResources.snapshot(), {
+    steps: 1,
+    nodes: 1,
+    maxDepth: 1,
+    parseErrors: 0,
+    attributes: 0,
+    attributeUtf8Bytes: 0
+  });
 
   const depthResources = createEngineResourceGuard({ limits: { maxDepth: 3 } });
   const depthModel = new HtmlTreeModel({ rootKind: "fragment", resources: depthResources });
