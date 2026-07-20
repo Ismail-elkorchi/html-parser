@@ -4,10 +4,10 @@ import {
   XLINK_NAMESPACE,
   XML_NAMESPACE,
   XMLNS_NAMESPACE
-} from "./namespaces.js";
+} from "./namespaces.ts";
 
-import type { HtmlStartTagToken, HtmlTokenAttribute } from "./tokens.js";
-import type { HtmlTreeAttributeInput, HtmlTreeElement } from "./tree-model.js";
+import type { HtmlStartTagToken, HtmlTokenAttribute } from "./tokens.ts";
+import type { HtmlTreeAttributeInput, HtmlTreeElement } from "./tree-model.ts";
 
 export type ForeignElementNamespaceUri = typeof MATHML_NAMESPACE | typeof SVG_NAMESPACE;
 

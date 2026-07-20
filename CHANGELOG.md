@@ -3,8 +3,13 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Route every public parsing entrypoint through the independent TypeScript
+  engine; delete the embedded parse5/entities runtime, compatibility facade,
+  copy/seal/differential infrastructure, stale notices, and copied-source
+  fingerprints; and require self-contained npm and strict Deno/JSR module
+  graphs with no installed runtime dependencies.
 - Qualify the independent engine across the complete pinned tree corpus,
-  browser and legacy differentials, deterministic fuzzing, mutation, resource,
+  browser and frozen product differentials, deterministic fuzzing, mutation, resource,
   performance, cross-runtime, packed-package, audit, SBOM, and provenance
   gates; correct element-span closure, template depth accounting, model-state
   ownership, namespace scope lookup, and qualification watchdog semantics found
@@ -61,9 +66,6 @@ All notable changes are documented in this file.
 - Pin the maintained WPT tree-construction corpus for deterministic offline
   testing, preserve exact provenance and licenses, and consolidate `.dat`
   decoding in test support while retaining every existing tree fixture.
-- Seal the embedded legacy runtime with exact per-file provenance and SHA-256
-  verification, frozen public black-box fixtures, controlled mutation tests,
-  and separate package metrics for installed dependencies and embedded code.
 - Return one `ParsedDocument` from all full-document entrypoints with optional
   exact decoded-source retention, encoding evidence, and successful resource
   observations; freeze parser-owned trees and require patch plans to retain the
@@ -94,9 +96,6 @@ All notable changes are documented in this file.
 - Replace nested generic error payloads with HTML-specific operational error
   classes, direct frozen fields, cross-realm structural guards, and preserved
   stream-read causes.
-- Parse documents and fragments in a single parse5 pass, report the actual
-  context-sensitive token count, and remove the catch-all legacy tokenizer
-  fallback and its unused generated entity dataset.
 - Decode long zero-prefixed and out-of-range numeric character references
   without arithmetic overflow failures.
 - Remove obsolete governance references, dead decision-file validation, and unreachable evaluation wrappers left behind by the documentation consolidation.

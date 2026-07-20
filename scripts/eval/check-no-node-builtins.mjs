@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { builtinModules } from "node:module";
 import { nowIso, writeJson } from "./eval-primitives.mjs";
+import { collectModuleSpecifiers } from "./module-specifiers.mjs";
 
 const SRC_DIR = "src";
 
@@ -30,16 +31,6 @@ async function listFiles(dir) {
   return collectedPaths;
 }
 
-function extractImportSpecifiers(text) {
-  const importSpecifiers = [];
-  const importFromPattern = /\bimport\s+[^'"]*?\s+from\s+['"]([^'"]+)['"]/g;
-  const sideEffectImportPattern = /\bimport\s+['"]([^'"]+)['"]/g;
-  let regexMatch;
-  while ((regexMatch = importFromPattern.exec(text))) importSpecifiers.push(regexMatch[1]);
-  while ((regexMatch = sideEffectImportPattern.exec(text))) importSpecifiers.push(regexMatch[1]);
-  return importSpecifiers;
-}
-
 async function main() {
   const findings = [];
 
@@ -61,17 +52,20 @@ async function main() {
   for (const file of files) {
     const text = await readFile(file, "utf8");
 
-    if (/\brequire\s*\(/.test(text)) {
-      findings.push({ file, kind: "require", message: "require(...) found in src runtime code" });
-    }
-
-    const importSpecifiers = extractImportSpecifiers(text);
-    for (const importSpecifier of importSpecifiers) {
-      if (BUILTINS.has(importSpecifier)) {
+    for (const reference of collectModuleSpecifiers(text, file)) {
+      if (reference.kind === "require") {
+        findings.push({
+          file,
+          kind: "require",
+          specifier: reference.specifier,
+          message: "require(...) found in src runtime code"
+        });
+      }
+      if (BUILTINS.has(reference.specifier)) {
         findings.push({
           file,
           kind: "builtin-import",
-          specifier: importSpecifier,
+          specifier: reference.specifier,
           message: "Node builtin import found in src runtime code"
         });
       }

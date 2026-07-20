@@ -1,17 +1,25 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 
-import { buildTreeFromHtml, normalizeTree } from "../../dist/internal/tree/mod.js";
+import {
+  buildTreeFromHtml,
+  normalizeTree
+} from "../../test/support/engine-tree-fixture-adapter.mjs";
 import {
   requireFixtureFiles,
   TREE_FIXTURE_FILES
 } from "../../test/support/fixture-sources.mjs";
 import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
+import { isStaleTreeProcessingInstructionExpectation } from "../../test/support/stale-fixture-classification.mjs";
 import { writeJson } from "../eval/eval-primitives.mjs";
 
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
 const DIVERGENCE_LIMIT = 25;
+const EXPECTED_CLASSIFIED_DIFFERENCES = 3;
+const EXPECTED_CLASSIFICATION_SHA256 =
+  "b6165e721ece7d14fe117f18e0bb4194cf8b6e97cd297945e4ef3df48f46d259";
 
 function computeHoldout(fixtureId) {
   let hash = 0;
@@ -69,6 +77,7 @@ let failed = 0;
 let holdoutExcluded = 0;
 let divergenceCreated = 0;
 const failures = [];
+const classified = [];
 
 for (const testCase of allTests) {
   if (computeHoldout(testCase.id)) {
@@ -85,7 +94,7 @@ for (const testCase of allTests) {
       maxAttributeBytes: 65536
     },
     {
-      fragmentContextTagName: testCase.fragmentContext?.localName,
+      fragmentContext: testCase.fragmentContext,
       scriptingEnabled: testCase.scriptingEnabled
     }
   );
@@ -95,6 +104,22 @@ for (const testCase of allTests) {
 
   if (actualTree === expectedTree) {
     passed += 1;
+    continue;
+  }
+
+  if (isStaleTreeProcessingInstructionExpectation(
+    testCase.data,
+    expectedTree,
+    actualTree,
+    treeBuildResult.errors
+  )) {
+    classified.push({
+      id: testCase.id,
+      classification: "stale-processing-instruction-expectation",
+      expectedTree,
+      actualTree,
+      errors: treeBuildResult.errors.map((error) => error.code)
+    });
     continue;
   }
 
@@ -113,11 +138,16 @@ for (const testCase of allTests) {
   });
 }
 
+const classificationSha256 = createHash("sha256")
+  .update(JSON.stringify(classified))
+  .digest("hex");
+const classificationsMatch = classified.length === EXPECTED_CLASSIFIED_DIFFERENCES &&
+  classificationSha256 === EXPECTED_CLASSIFICATION_SHA256;
 const report = {
   suite: "tree",
   timestamp: new Date().toISOString(),
   cases: {
-    total: allTests.length - holdoutExcluded,
+    total: passed + failed,
     passed,
     failed,
     skipped: 0
@@ -131,12 +161,16 @@ const report = {
   holdoutRule: HOLDOUT_RULE,
   holdoutMod: HOLDOUT_MOD,
   skips: [],
+  classifiedDifferences: classified.length,
+  classificationSha256,
+  classificationsMatch,
+  classified,
   failures
 };
 
 await writeJson("reports/tree.json", report);
 
-if (failed > 0) {
+if (failed > 0 || !classificationsMatch) {
   console.error(`Tree fixture hard failures: ${failed}`);
   process.exit(1);
 }

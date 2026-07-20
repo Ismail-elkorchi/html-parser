@@ -1,10 +1,10 @@
-import { failInternalState, requireInternalValue } from "../foundation/internal-state-error.js";
+import { failInternalState, requireInternalValue } from "../foundation/internal-state-error.ts";
 
 import {
   MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
   NAMED_CHARACTER_REFERENCE_DATA,
   NAMED_CHARACTER_REFERENCE_ENTRY_COUNT
-} from "./generated/named-character-references.js";
+} from "./generated/named-character-references.ts";
 
 /** One bounded binary-search observation over the generated reference table. */
 export interface NamedCharacterReferenceProbe {
@@ -57,4 +57,4 @@ export {
   LEGACY_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
   MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
   NAMED_CHARACTER_REFERENCE_ENTRY_COUNT
-} from "./generated/named-character-references.js";
+} from "./generated/named-character-references.ts";

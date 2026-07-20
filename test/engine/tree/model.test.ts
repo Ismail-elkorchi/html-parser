@@ -386,6 +386,45 @@ void test("attribute adoption uses expanded names and preserves first-seen order
   assert.equal(html.attributeAt(1)?.qualifiedName, "xml:lang");
 });
 
+void test("element attribute limits cover initial and atomically adopted final attributes", () => {
+  const countResources = createEngineResourceGuard({ limits: { maxAttributesPerElement: 1 } });
+  const countModel = new HtmlTreeModel({ rootKind: "fragment", resources: countResources });
+  assert.throws(
+    () => element(countModel, "x", [
+      { namespaceUri: null, prefix: null, localName: "a", qualifiedName: "a", value: "" },
+      { namespaceUri: null, prefix: null, localName: "b", qualifiedName: "b", value: "" }
+    ]),
+    (error) => error instanceof EngineResourceLimitError &&
+      error.resource === "maxAttributesPerElement" && error.limit === 1 && error.actual === 2
+  );
+
+  const target = element(countModel, "html", [
+    { namespaceUri: null, prefix: null, localName: "a", qualifiedName: "a", value: "" }
+  ]);
+  assert.throws(
+    () => countModel.adoptAttributes(target, [
+      { namespaceUri: null, prefix: null, localName: "b", qualifiedName: "b", value: "" }
+    ]),
+    (error) => error instanceof EngineResourceLimitError &&
+      error.resource === "maxAttributesPerElement" && error.limit === 1 && error.actual === 2
+  );
+  assert.equal(target.attributeCount, 1);
+
+  const byteResources = createEngineResourceGuard({ limits: { maxAttributeUtf8BytesPerElement: 3 } });
+  const byteModel = new HtmlTreeModel({ rootKind: "fragment", resources: byteResources });
+  const byteTarget = element(byteModel, "html", [
+    { namespaceUri: null, prefix: null, localName: "a", qualifiedName: "a", value: "x" }
+  ]);
+  assert.throws(
+    () => byteModel.adoptAttributes(byteTarget, [
+      { namespaceUri: null, prefix: null, localName: "b", qualifiedName: "b", value: "y" }
+    ]),
+    (error) => error instanceof EngineResourceLimitError &&
+      error.resource === "maxAttributeUtf8BytesPerElement" && error.limit === 3 && error.actual === 4
+  );
+  assert.equal(byteTarget.attributeCount, 1);
+});
+
 void test("text insertion coalesces only at the insertion point and retains only exact spans", () => {
   const model = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });
   const paragraph = element(model, "p");

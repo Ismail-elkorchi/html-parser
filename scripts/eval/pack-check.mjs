@@ -3,8 +3,30 @@ import { createHash } from "node:crypto";
 import { readFile, unlink } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
 
-import { verifyLegacyRuntimeSeal } from "../legacy/verify-runtime-seal.mjs";
 import { nowIso, writeJson, fileExists, readJson } from "./eval-primitives.mjs";
+
+const REMOVED_RUNTIME_HASHES = new Set([
+  "5d8ee93923d609724c69c8c356147176af5226585d4f343c87a5eec6590ebca9",
+  "de563a36e2cca4264751e27221783fe2b987e3bf012cb002063df40960a49ee8",
+  "b035b71d6969983297e39df1a06d760f2a8000a0f98444c4fe845fe1155da451",
+  "e28599f48fddd869435e44e6ae8644e70a610450d97562e33c869c056e3b129f",
+  "855d8cd764782cdc73003a9847d03ed261c5158f6a6901e563ccd4d3b92c8b16",
+  "b38ae5ac4f2a31ce2e1cfeca35cf7b89cc66736cd5be068cc433a3ccaca78be2",
+  "129a84a9d04b6050b6896de45a70e1ee468434e19bdd6486e3aef3405d137cac",
+  "e6cf93f387be70ddcd4f2bec67fbeb53161094f6306d834de461ec888a9dab76",
+  "52dac9efba3a637771818d633a5cf1df30c7913d05ff23235150c88319ea035a",
+  "69a0a52be895d2bcf88850beead4a098c5305c0b5669d1e8a0fe26f621ea25c6",
+  "a6e04b000b228a0bf7eba4e5462b343ec1e13dbfbe40bce913ade646bbde4461",
+  "2ea256f2e3a2821ecb093e0693fd1f69b67512ce26f7f9511d0ac0873c54c81f",
+  "fe4b609a572c9aa06fbd45ac53632b3ad565168903f4126a6f98d5a9d1f42999",
+  "48337e871cbe717aae264c5486c68d4a10f60f79e749bcf2c5d5c73b5e7fdca6",
+  "12199175a31eb461dcecefa10ce2536c69ab92cdd2a1f67da3ea20b214599ac1",
+  "14b6408b0abb1c041e645644f977db34da280239be8a59a2eb3c9e282e89b7c4"
+]);
+const REMOVED_RUNTIME_PATH_PARTS = Object.freeze([
+  ["dist", "internal", "vendor"].join("/"),
+  ["dist", "internal", ["parse", "5-runtime"].join("")].join("/")
+]);
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -74,9 +96,6 @@ async function main() {
     empty: dependenciesEmpty
   };
 
-  const legacyManifest = JSON.parse(await readFile("legacy-runtime-manifest.json", "utf8"));
-  const sourceLegacySeal = await verifyLegacyRuntimeSeal();
-
   const esmOnly = packageManifest.type === "module" && !JSON.stringify(packageManifest.exports || {}).includes('"require"');
 
   const exportsOk = typeof packageManifest.exports === "object" || typeof packageManifest.exports === "string";
@@ -141,22 +160,19 @@ async function main() {
     path: entry.path.replace(/^package\//, "")
   }));
   const normalizedPaths = archivedEntries.map((entry) => entry.path);
-  const unpublishedEngineIncluded = normalizedPaths.some((tarPath) =>
-    tarPath.startsWith("dist/internal/html-engine/")
+  const removedRuntimePaths = normalizedPaths.filter((tarPath) =>
+    REMOVED_RUNTIME_PATH_PARTS.some((part) => tarPath.startsWith(part))
   );
-  const stagedIntegrationIncluded = normalizedPaths.some((tarPath) =>
-    tarPath.startsWith("dist/integration/")
-  );
+  const removedRuntimeFingerprints = archivedEntries
+    .filter((entry) => REMOVED_RUNTIME_HASHES.has(sha256(entry.content)))
+    .map((entry) => entry.path);
   const jsrEngineExcluded = Array.isArray(jsrManifest.exclude) &&
     jsrManifest.exclude.includes("src/internal/html-engine/**");
-  const jsrIntegrationExcluded = Array.isArray(jsrManifest.exclude) &&
-    jsrManifest.exclude.includes("src/integration/**");
 
   const forbiddenIncluded = normalizedPaths.filter((tarPath) =>
     forbiddenPrefixes.some((forbiddenPrefix) => tarPath.startsWith(forbiddenPrefix))
   );
   const thirdPartyNoticesIncluded = normalizedPaths.includes("THIRD_PARTY_NOTICES.md");
-  const legacyManifestIncluded = normalizedPaths.includes("legacy-runtime-manifest.json");
   const requiredDocumentation = [
     "README.md",
     "CONTRIBUTING.md",
@@ -171,84 +187,8 @@ async function main() {
     (documentationPath) => !normalizedPaths.includes(documentationPath)
   );
 
-  const expectedLegacyFiles = new Map(
-    legacyManifest.files.map((file) => [file.packagedPath, file])
-  );
-  const packagedLegacyEntries = archivedEntries.filter((entry) =>
-    entry.path.startsWith(`${legacyManifest.packagedRoot}/`)
-  );
-  const packagedLegacyByPath = new Map(
-    packagedLegacyEntries.map((entry) => [entry.path, entry])
-  );
-  const embeddedSealProblems = [];
-  for (const [filePath, expected] of expectedLegacyFiles) {
-    const actual = packagedLegacyByPath.get(filePath);
-    if (!actual) {
-      embeddedSealProblems.push(`missing packaged legacy file: ${filePath}`);
-      continue;
-    }
-    const actualSha256 = sha256(actual.content);
-    if (actual.size !== expected.bytes) {
-      embeddedSealProblems.push(
-        `packaged legacy byte count mismatch: ${filePath} expected=${String(expected.bytes)} actual=${String(actual.size)}`
-      );
-    }
-    if (actualSha256 !== expected.sha256) {
-      embeddedSealProblems.push(
-        `packaged legacy SHA-256 mismatch: ${filePath} expected=${expected.sha256} actual=${actualSha256}`
-      );
-    }
-  }
-  for (const filePath of packagedLegacyByPath.keys()) {
-    if (!expectedLegacyFiles.has(filePath)) {
-      embeddedSealProblems.push(`unexpected packaged legacy file: ${filePath}`);
-    }
-  }
-
-  const packagedLegacyCanonicalLines = packagedLegacyEntries
-    .map((entry) => {
-      const sourcePath = `${legacyManifest.sealedRoot}/${entry.path.slice(legacyManifest.packagedRoot.length + 1)}`;
-      return { sourcePath, sha256: sha256(entry.content) };
-    })
-    .sort((left, right) =>
-      left.sourcePath < right.sourcePath ? -1 : left.sourcePath > right.sourcePath ? 1 : 0
-    )
-    .map((entry) => `${entry.sha256}  ${entry.sourcePath}\n`)
-    .join("");
-  const packagedLegacyCompositeSha256 = sha256(
-    Buffer.from(packagedLegacyCanonicalLines, "utf8")
-  );
-  if (packagedLegacyCompositeSha256 !== legacyManifest.composite.sha256) {
-    embeddedSealProblems.push(
-      `packaged legacy composite SHA-256 mismatch: expected=${legacyManifest.composite.sha256} actual=${packagedLegacyCompositeSha256}`
-    );
-  }
-
-  const embeddedImplementationEntries = packagedLegacyEntries.filter((entry) =>
-    entry.path.endsWith(".js")
-  );
-  const embeddedLicenseEntries = packagedLegacyEntries.filter((entry) =>
-    !entry.path.endsWith(".js")
-  );
-  const embeddedLegacyImplementation = {
-    delivery: "copied source inside dist; not an installed dependency",
-    root: legacyManifest.packagedRoot,
-    present: packagedLegacyEntries.length > 0,
-    matchesSeal: embeddedSealProblems.length === 0,
-    manifestIncluded: legacyManifestIncluded,
-    files: embeddedImplementationEntries.length,
-    bytes: embeddedImplementationEntries.reduce((total, entry) => total + entry.size, 0),
-    licenseFiles: embeddedLicenseEntries.length,
-    licenseBytes: embeddedLicenseEntries.reduce((total, entry) => total + entry.size, 0),
-    totalFiles: packagedLegacyEntries.length,
-    totalBytes: packagedLegacyEntries.reduce((total, entry) => total + entry.size, 0),
-    compositeSha256: packagedLegacyCompositeSha256,
-    expectedCompositeSha256: legacyManifest.composite.sha256,
-    problems: embeddedSealProblems
-  };
-
   const firstPartyDistEntries = archivedEntries.filter((entry) =>
-    entry.path.startsWith("dist/") && !entry.path.startsWith(`${legacyManifest.packagedRoot}/`)
+    entry.path.startsWith("dist/")
   );
   const firstPartyDist = {
     files: firstPartyDistEntries.length,
@@ -261,12 +201,9 @@ async function main() {
     exportsOk &&
     forbiddenIncluded.length === 0 &&
     thirdPartyNoticesIncluded &&
-    legacyManifestIncluded &&
-    embeddedLegacyImplementation.matchesSeal &&
-    !unpublishedEngineIncluded &&
-    !stagedIntegrationIncluded &&
-    jsrEngineExcluded &&
-    jsrIntegrationExcluded &&
+    removedRuntimePaths.length === 0 &&
+    removedRuntimeFingerprints.length === 0 &&
+    !jsrEngineExcluded &&
     missingDocumentation.length === 0;
 
   const report = {
@@ -279,19 +216,15 @@ async function main() {
     dependenciesEmpty,
     runtimeComposition: {
       installedDependencies,
-      embeddedLegacyImplementation,
       firstPartyDist
     },
-    sourceLegacySeal,
     esmOnly,
     exportsOk,
-    unpublishedEngineIncluded,
-    stagedIntegrationIncluded,
+    removedRuntimePaths,
+    removedRuntimeFingerprints,
     jsrEngineExcluded,
-    jsrIntegrationExcluded,
     forbiddenIncluded,
     thirdPartyNoticesIncluded,
-    legacyManifestIncluded,
     missingDocumentation
   };
 

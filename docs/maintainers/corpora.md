@@ -58,66 +58,48 @@ and expected inventory.
 Run the complete snapshot with:
 
 ```bash
-npm run test:wpt-tree
+npm run qualification:wpt
 ```
 
 The runner expands cases without a scripting marker into script-on and
-script-off variants. It reports a visible `current-primary` and
-`current-holdout` partition, verifies two consecutive results are identical,
-and compares the result fingerprint with the checked-in legacy-engine
-baseline. Tree-output conformance and parse-error-count evidence are reported
-separately because the WPT browser harness ignores the `.dat` error sections.
-
-The independent tree-builder runner evaluates every fragment variant plus its
-assigned document cases. Fragment inputs run both whole and one-UTF-16-unit
-chunk schedules. In the fixture format, `#errors` is the legacy total-error
-view and `#new-errors` is the named tokenizer-error view; when both are present,
-the runner asserts both views independently instead of adding or choosing
-between them.
+script-off variants and evaluates all 3,828 document and fragment executions.
+Fragment inputs run both whole and one-UTF-16-unit chunk schedules. Exact
+fingerprinted classifications live in
+`test/fixtures/qualification/wpt-tree-classifications.json`; an outcome whose
+fingerprint or reason changes fails instead of becoming a silent skip.
 
 The current snapshot contains 61 `.dat` files, 470,005 fixture bytes, 1,934
 base cases, and 3,828 scripting variants. Of those variants:
 
-- 3,690 execute through the current string-parser facade;
-- 134 are applicable but explicitly reported as unsupported because the
-  legacy fragment API cannot express an SVG or MathML context element; and
-- four are inapplicable to a static parser-library harness because they require
-  live DOM mutation or `document.write`.
+- 3,802 match the pinned expected tree and diagnostic contract exactly;
+- 22 retain exact classifications for pinned-versus-current standards drift;
+  and
+- four require live DOM mutation or `document.write` and are inapplicable to a
+  static parser-library harness.
 
-Every non-executed variant appears in `reports/wpt-tree.json` with its exact ID
-and reason. Files whose names contain `unsafe` remain applicable: their NUL,
-CR, and other raw input is preserved by the shared `.dat` reader.
+Every classified variant appears in `reports/engine-wpt-tree.json` with its
+exact ID and reason. Files whose names contain `unsafe` remain applicable:
+their NUL, CR, and other raw input is preserved by the shared `.dat` reader.
 
-## Legacy corpus retained during migration
+## html5lib corpus
 
 `vendor/html5lib-tests` remains a Git submodule at
-`8f43b7ec8c9d02179f5f38e0ea08cb5000fb9c9e`. It still supplies tokenizer,
-encoding, serializer, and the previous six-file tree corpus. Initialize it
+`8f43b7ec8c9d02179f5f38e0ea08cb5000fb9c9e`. It supplies tokenizer,
+encoding, serializer, and six-file tree conformance. Initialize it
 when running those suites:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-The live coverage comparison proves that all 277 previous tree cases are
-represented in the WPT snapshot:
+All 277 tree cases were proven represented in the maintained WPT snapshot when
+that snapshot was pinned. Do not update, remove, or narrow the html5lib
+submodule until its tokenizer, encoding, serializer, and tree consumers have an
+authoritative replacement.
 
-```bash
-npm run test:wpt-tree:coverage
-```
-
-The inputs, contexts, and scripting requirements match. WPT has three updated
-expected trees in `tests1.dat` for processing-instruction handling. This is
-recorded standards drift; the corpus-only change does not alter production
-parser behavior.
-
-Do not update, remove, or narrow the html5lib submodule until the consumer
-suites have been assigned another authoritative pin and the live comparison
-still proves no coverage loss.
-
-The isolated tokenizer runner expands the 14 tokenizer files to 7,036 entry
-mode cases and applies the same visible primary/holdout partition as the legacy
-runner. The complete isolated tokenizer matches 6,297 primary and 701 holdout
+The tokenizer runner expands the 14 tokenizer files to 7,036 entry-mode cases
+and applies the same visible primary/holdout partition. It matches 6,297
+primary and 701 holdout
 cases. The other 38 cases exercise processing instructions and retain stale
 comment-token expectations from before the pinned HTML Standard added its five
 processing-instruction states. They are classified by the observed standard
@@ -144,16 +126,11 @@ After a refresh:
 
 1. inspect the upstream commit and license;
 2. review added, removed, scripted, raw, and foreign-fragment cases;
-3. run `npm run test:wpt-tree:coverage`;
-4. inspect `reports/wpt-tree.json`, especially every skip and semantic change;
-5. update the result baseline only after accepting the evidence:
-
-   ```bash
-   npm run build
-   node scripts/conformance/run-wpt-tree-fixtures.mjs \
-     --require-legacy-coverage --update-baseline
-   ```
-
+3. investigate every changed outcome against the pinned and current standard;
+4. update exact classification IDs, reasons, and fingerprints only for reviewed
+   script requirements or standards drift;
+5. run `npm run qualification:wpt` and inspect
+   `reports/engine-wpt-tree.json`; and
 6. rerun the full checks and confirm normal tests remain offline.
 
 Fixture decoding and expected-output formatting belong in test support, never

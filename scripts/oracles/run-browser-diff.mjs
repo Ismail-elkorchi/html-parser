@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { chromium, firefox, webkit } from "playwright";
 
-import { parseWithIndependentEngine } from "../../dist/integration/html-product-adapter.js";
+import { parse } from "../../dist/mod.js";
 import { readJson, safeDiv, writeJson } from "../eval/eval-primitives.mjs";
 
 const SEED = 0x5f3759df;
@@ -89,7 +89,7 @@ function normalizeLibraryNode(node) {
 }
 
 function normalizeLibrary(html) {
-  const { tree } = parseWithIndependentEngine(html);
+  const { tree } = parse(html);
   return tree.children.map((child) => normalizeLibraryNode(child));
 }
 

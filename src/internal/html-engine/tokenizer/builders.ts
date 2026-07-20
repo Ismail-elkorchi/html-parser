@@ -1,7 +1,7 @@
-import { requireInternalValue } from "../../foundation/internal-state-error.js";
-import { sourceSpan, type SourceSpan } from "../positions.js";
+import { requireInternalValue } from "../../foundation/internal-state-error.ts";
+import { sourceSpan, type SourceSpan } from "../positions.ts";
 
-import type { StartTagResourceGuard } from "../resource-guard.js";
+import type { StartTagResourceGuard } from "../resource-guard.ts";
 import type {
   HtmlCommentToken,
   HtmlDoctypeToken,
@@ -9,7 +9,7 @@ import type {
   HtmlProcessingInstructionToken,
   HtmlStartTagToken,
   HtmlTokenAttribute
-} from "../tokens.js";
+} from "../tokens.ts";
 
 type DoctypeFieldMissingReason =
   | "TOKENIZER_DOCTYPE_NAME_MISSING"

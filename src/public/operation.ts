@@ -2,7 +2,7 @@ import {
   HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError
-} from "./errors.js";
+} from "./errors.ts";
 
 import type {
   ParseBudgetOptions,
@@ -17,7 +17,7 @@ import type {
   TextExtractionOptions,
   TokenizeByteStreamEagerBudgetOptions,
   TokenizeByteStreamEagerOptions
-} from "./types.js";
+} from "./types.ts";
 
 const PARSE_BUDGET_KEYS = Object.freeze([
   "maxInputBytes",

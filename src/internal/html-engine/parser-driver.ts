@@ -1,4 +1,4 @@
-import { fragmentTokenizerMode } from "./fragment-context.js";
+import { fragmentTokenizerMode } from "./fragment-context.ts";
 import {
   HTML_NAMESPACE,
   MATHML_NAMESPACE,
@@ -6,22 +6,22 @@ import {
   XLINK_NAMESPACE,
   XML_NAMESPACE,
   XMLNS_NAMESPACE
-} from "./namespaces.js";
+} from "./namespaces.ts";
 import {
   createEngineResourceGuard,
   EngineConfigurationError,
   type EngineResourceGuardOptions,
   type EngineResourceUsage
-} from "./resource-guard.js";
-import { ENGINE_STANDARD_BASELINE } from "./standards.js";
-import { HtmlTokenizer } from "./tokenizer/tokenizer.js";
-import { HtmlTreeBuilder, type HtmlTreeBuilderState } from "./tree-builder.js";
-import { HtmlTreeModel } from "./tree-model.js";
+} from "./resource-guard.ts";
+import { ENGINE_STANDARD_BASELINE } from "./standards.ts";
+import { HtmlTokenizer } from "./tokenizer/tokenizer.ts";
+import { HtmlTreeBuilder, type HtmlTreeBuilderState } from "./tree-builder.ts";
+import { HtmlTreeModel } from "./tree-model.ts";
 
-import type { EngineParseError } from "./diagnostics.js";
-import type { HtmlFragmentContext, HtmlFragmentContextAttribute } from "./fragment-context.js";
-import type { EngineObserver } from "./observer.js";
-import type { NonExecutingScriptingMode } from "./parser-state.js";
+import type { EngineParseError } from "./diagnostics.ts";
+import type { HtmlFragmentContext, HtmlFragmentContextAttribute } from "./fragment-context.ts";
+import type { EngineObserver } from "./observer.ts";
+import type { NonExecutingScriptingMode } from "./parser-state.ts";
 
 /** Document parser configuration supported by the independent engine. */
 export interface HtmlEngineDocumentConfiguration {

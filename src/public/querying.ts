@@ -1,15 +1,15 @@
-import { requireString } from "./html-input.js";
+import { requireString } from "./html-input.ts";
 import {
   asciiLowercase,
   isHtmlElement,
   iterateNodes
-} from "./model.js";
+} from "./model.ts";
 import {
   createOperationContext,
   normalizeOperationOptions
-} from "./operation.js";
+} from "./operation.ts";
 
-import type { OperationContext } from "./operation.js";
+import type { OperationContext } from "./operation.ts";
 import type {
   DocumentTree,
   ElementVisitor,
@@ -18,7 +18,7 @@ import type {
   NodeId,
   NodeVisitor,
   OperationOptions
-} from "./types.js";
+} from "./types.ts";
 
 /** Visits every node in depth-first tree order. */
 export function walk(

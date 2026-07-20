@@ -1,11 +1,11 @@
-import { HtmlPatchPlanningError } from "./errors.js";
-import { ownedChildNodes } from "./model.js";
+import { HtmlPatchPlanningError } from "./errors.ts";
+import { ownedChildNodes } from "./model.ts";
 import {
   parsedDocumentRegistration,
   patchPlanBelongsTo,
   registerPatchPlan
-} from "./parsed-document-registry.js";
-import { escapeAttribute, escapeText } from "./serialization.js";
+} from "./parsed-document-registry.ts";
+import { escapeAttribute, escapeText } from "./serialization.ts";
 
 import type {
   Edit,
@@ -17,7 +17,7 @@ import type {
   PatchStep,
   Span,
   SpanProvenance
-} from "./types.js";
+} from "./types.ts";
 
 interface IndexedNodeSpan {
   readonly span?: Span;

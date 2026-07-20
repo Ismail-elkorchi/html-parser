@@ -28,9 +28,6 @@ import {
   serialize,
   walk
 } from "../../dist/mod.js";
-import { serializeTreeDocument } from "../../dist/internal/serializer/serialize.js";
-import { buildTreeFromHtml } from "../../dist/internal/tree/build.js";
-import { normalizeTree } from "../../dist/internal/tree/normalize.js";
 
 function only(iterable) {
   const values = [...iterable];
@@ -118,10 +115,6 @@ test("tree nodes retain namespace identity and adjusted foreign attributes", () 
   assert.ok(xlink?.span);
   assert.equal(html.slice(xlink.span.start, xlink.span.end), "xlink:href=icon");
 
-  const normalizedFixtureTree = normalizeTree(buildTreeFromHtml(html).document);
-  assert.match(normalizedFixtureTree, /<svg svg>/);
-  assert.match(normalizedFixtureTree, /xlink href="icon"/);
-  assert.match(normalizedFixtureTree, /xml lang="fr"/);
 });
 
 test("doctype external identifiers preserve missing and explicit empty states", () => {
@@ -232,24 +225,8 @@ test("deep parsed and caller-built trees remain stack-safe across the public sur
   assert.equal(chunk(manual, { maxChars: 100_000, maxNodes: 10_000, maxBytes: 100_000 }).length, 1);
 });
 
-test("deep normalization, internal serialization, and patch indexing use explicit stacks", () => {
+test("deep public serialization and patch indexing use explicit stacks", () => {
   const depth = 3_200;
-  let child = { kind: "text", value: "x" };
-  for (let index = 0; index < depth; index += 1) {
-    child = {
-      kind: "element",
-      namespaceUri: HTML_NAMESPACE_URI,
-      prefix: null,
-      localName: "div",
-      name: "div",
-      attributes: [],
-      children: [child]
-    };
-  }
-  const internalDocument = { kind: "document", children: [child] };
-  assert.equal(normalizeTree(internalDocument).split("\n").length, depth + 1);
-  assert.equal(serializeTreeDocument(internalDocument).includes("x"), true);
-
   const input = `${"<div>".repeat(depth)}x${"</div>".repeat(depth)}`;
   const parsed = parse(input, { captureSpans: true, sourceRetention: "text" });
   let textNode = null;

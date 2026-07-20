@@ -2,8 +2,7 @@ import { fork } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
-import { parseWithIndependentEngine } from "../../dist/integration/html-product-adapter.js";
-import { HtmlBudgetExceededError } from "../../dist/mod.js";
+import { HtmlBudgetExceededError, parse } from "../../dist/mod.js";
 import { writeJson } from "../eval/eval-primitives.mjs";
 
 const RUNS = 600;
@@ -202,7 +201,7 @@ function generateStructuredHtml(seed, runIndex) {
 
 function parseWithProfile(html, budgetProfile) {
   if (budgetProfile === "tight") {
-    return parseWithIndependentEngine(html, {
+    return parse(html, {
       trace: "events",
       budgets: {
         maxInputBytes: 2048,
@@ -215,7 +214,7 @@ function parseWithProfile(html, budgetProfile) {
     });
   }
 
-  return parseWithIndependentEngine(html, {
+  return parse(html, {
     trace: "events",
     budgets: {
       maxInputBytes: 8192,

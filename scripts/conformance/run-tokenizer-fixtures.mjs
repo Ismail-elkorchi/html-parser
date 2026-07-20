@@ -1,14 +1,19 @@
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 
 import {
   requireFixtureFiles,
   TOKENIZER_FIXTURE_FILES
 } from "../../test/support/fixture-sources.mjs";
 import { tokenizeFixtureCase } from "../../test/support/tokenizer-fixture-adapter.mjs";
+import { isStaleTokenizerProcessingInstructionExpectation } from "../../test/support/stale-fixture-classification.mjs";
 import { writeJson } from "../eval/eval-primitives.mjs";
 
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
+const EXPECTED_CLASSIFIED_DIFFERENCES = 10;
+const EXPECTED_CLASSIFICATION_SHA256 =
+  "889a2c31c2b3fbe94223a50a9601c5f98fe2851628f2dfa0f99985c8c5333632";
 
 function fixtureTokenToComparable(token) {
   return JSON.stringify(token);
@@ -30,12 +35,16 @@ function tokenizerTokenToFixture(token) {
   }
 
   if (token.type === "Doctype") {
-    const name = token.name.length === 0 ? null : token.name;
+    const name = token.name === "" ? null : token.name;
     return ["DOCTYPE", name, token.publicId, token.systemId, !token.forceQuirks];
   }
 
   if (token.type === "Character") {
     return ["Character", token.data];
+  }
+
+  if (token.type === "ProcessingInstruction") {
+    return ["ProcessingInstruction", token.target, token.data];
   }
 
   return null;
@@ -47,13 +56,6 @@ function computeHoldout(fixtureId) {
     hash = (Math.imul(hash, 33) + fixtureId.charCodeAt(charIndex)) >>> 0;
   }
   return hash % HOLDOUT_MOD === 0;
-}
-
-function normalizeTokenArray(tokens) {
-  return tokens
-    .map((token) => tokenizerTokenToFixture(token))
-    .filter((token) => token !== null)
-    .map((token) => fixtureTokenToComparable(token));
 }
 
 const parsedCases = [];
@@ -88,6 +90,7 @@ let passed = 0;
 let failed = 0;
 let holdoutExcluded = 0;
 const failures = [];
+const classified = [];
 
 for (const fixtureCase of parsedCases) {
   if (computeHoldout(fixtureCase.fixtureId)) {
@@ -127,11 +130,30 @@ for (const fixtureCase of parsedCases) {
   }
 
   const expectedTokens = fixtureCase.output.map((token) => fixtureTokenToComparable(token));
-  const actualTokens = normalizeTokenArray(tokenizeResult.tokens);
+  const actualFixtureTokens = tokenizeResult.tokens
+    .map((token) => tokenizerTokenToFixture(token))
+    .filter((token) => token !== null);
+  const actualTokens = actualFixtureTokens.map((token) => fixtureTokenToComparable(token));
   const isTokenSequenceMatch = JSON.stringify(expectedTokens) === JSON.stringify(actualTokens);
 
   if (isTokenSequenceMatch) {
     passed += 1;
+    continue;
+  }
+
+  if (isStaleTokenizerProcessingInstructionExpectation(
+    fixtureCase.input,
+    fixtureCase.output,
+    actualFixtureTokens,
+    tokenizeResult.errors
+  )) {
+    classified.push({
+      id: fixtureCase.id,
+      classification: "stale-processing-instruction-expectation",
+      expected: fixtureCase.output,
+      actual: actualFixtureTokens,
+      errors: tokenizeResult.errors.map((error) => error.code)
+    });
     continue;
   }
 
@@ -144,11 +166,16 @@ for (const fixtureCase of parsedCases) {
   });
 }
 
+const classificationSha256 = createHash("sha256")
+  .update(JSON.stringify(classified))
+  .digest("hex");
+const classificationsMatch = classified.length === EXPECTED_CLASSIFIED_DIFFERENCES &&
+  classificationSha256 === EXPECTED_CLASSIFICATION_SHA256;
 const report = {
   suite: "tokenizer",
   timestamp: new Date().toISOString(),
   cases: {
-    total: parsedCases.length - holdoutExcluded,
+    total: passed + failed,
     passed,
     failed,
     skipped: 0
@@ -162,12 +189,16 @@ const report = {
   holdoutRule: HOLDOUT_RULE,
   holdoutMod: HOLDOUT_MOD,
   skips: [],
+  classifiedDifferences: classified.length,
+  classificationSha256,
+  classificationsMatch,
+  classified,
   failures
 };
 
 await writeJson("reports/tokenizer.json", report);
 
-if (failed > 0) {
+if (failed > 0 || !classificationsMatch) {
   console.error(`Tokenizer conformance hard failures: ${failed}`);
   process.exit(1);
 }

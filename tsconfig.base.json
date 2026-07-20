@@ -16,6 +16,7 @@
     "forceConsistentCasingInFileNames": true,
     "noEmitOnError": true,
     "isolatedModules": true,
+    "rewriteRelativeImportExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noErrorTruncation": true,

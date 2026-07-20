@@ -18,7 +18,7 @@ string / bytes / byte stream
         │
         ├─ validate closed options, signal, and budgets
         ├─ sniff and decode when input is bytes
-        ├─ build the HTML tree with the embedded legacy engine
+        ├─ tokenize and construct one direct internal HTML tree
         └─ convert and freeze the public tree, metadata, and trace
 
 public tree
@@ -35,33 +35,20 @@ the work or allocation boundary. Public tree walking and downstream operations
 use explicit stacks so accepted input depth does not depend on JavaScript's
 call-stack limit.
 
-The current production parser is a modified vendored parse5/entities runtime.
-It installs no packages at runtime, but it remains third-party-derived code and
-is identified as such in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
-
-## Replacement direction
-
-The legacy engine will be replaced by an independent standards-based
-TypeScript implementation. Migration is incremental internally and atomic at
-the public production boundary:
-
-- the legacy engine remains the only production engine until the replacement
-  passes its complete qualification gates;
-- new engine code has test-only internal entry points while incomplete;
-- there is no public engine selector, fallback, or hybrid parser;
-- cutover removes the legacy engine, facade, build copy step, compatibility
-  patches, and notices that no longer apply.
-
-This avoids committing consumers to transitional architecture and prevents two
-parsers from becoming a permanent compatibility burden. The allowed sources
-and implementation-isolation rules are in the
-[source policy](./maintainers/source-policy.md).
+Production uses one independent standards-based TypeScript engine. There is no
+public engine selector, fallback, hybrid parser, installed runtime dependency,
+or copied third-party parser implementation. The allowed implementation
+sources and isolation rules are in the [source policy](./maintainers/source-policy.md).
 
 ## Module boundaries
 
 `src/mod.ts` is the sole public export list, and `src/public/types.ts` is the
 sole portable public type model. The JSR entrypoint re-exports that root; it
 does not redeclare types or wrap functions.
+
+Source modules use explicit `.ts` relative specifiers so Deno checks the same
+graph without resolution flags. TypeScript rewrites those specifiers to `.js`
+in npm runtime output; there is no second implementation tree.
 
 Public implementation is separated by independently testable responsibility:
 parsing, serialization, text extraction, querying/traversal, outlining,
@@ -73,16 +60,14 @@ owner. Platform entrypoints contain no business logic.
 New code must be strict TypeScript from its first change; generated standards
 data must be reproducible and separated from handwritten algorithms.
 
-The replacement engine foundations live under `src/internal/html-engine` while
-they are incomplete. That subtree has no production importer, is excluded from
-npm and JSR artifacts, and is reachable only by repository tests. Its initial
-standards baseline is pinned in code so later implementation work cannot
-silently follow a moving Living Standard revision.
+The parser engine lives under `src/internal/html-engine` and is imported only
+through the public parsing owner. It is included in npm and JSR artifacts as
+private runtime code but is not exported. Its standards baseline is pinned in
+code so maintenance cannot silently follow a moving Living Standard revision.
 
 Within that boundary, tokenization feeds tree construction synchronously. The
-current document driver builds the direct internal tree without a token batch
-or adapter; insertion-mode families not implemented yet fail explicitly rather
-than returning a plausible but knowingly incorrect tree.
+document and fragment drivers build the direct internal tree without a token
+batch or compatibility adapter.
 
 Formatting recovery is also mutation-time state, not a post-parse correction:
 a marker-generation-aware active-formatting list owns Noah-family and subject
@@ -103,7 +88,7 @@ the test boundary.
 
 ## Design rules
 
-- Standards conformance takes precedence over historical legacy behavior.
+- Standards conformance takes precedence over historical behavior.
 - No public compatibility alias, dual result shape, or catch-all fallback.
 - Limits are explicit and checked before or at the unavailable unit.
 - Results and observable event data are immutable and deterministic.

@@ -1,7 +1,11 @@
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 
 import { sniffHtmlEncoding } from "../../dist/internal/encoding/sniff.js";
-import { buildTreeFromHtml, normalizeTree } from "../../dist/internal/tree/mod.js";
+import {
+  buildTreeFromHtml,
+  normalizeTree
+} from "../../test/support/engine-tree-fixture-adapter.mjs";
 import {
   ALL_HTML5LIB_FIXTURE_FILES,
   ENCODING_FIXTURE_FILES,
@@ -13,10 +17,20 @@ import {
 import { serializeFixtureTokenStream } from "../../tmp/test-runtime/test/support/fixture-serializer.js";
 import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
 import { tokenizeFixtureCase } from "../../test/support/tokenizer-fixture-adapter.mjs";
+import {
+  isStaleTokenizerProcessingInstructionExpectation,
+  isStaleTreeProcessingInstructionExpectation
+} from "../../test/support/stale-fixture-classification.mjs";
 import { writeJson } from "../eval/eval-primitives.mjs";
 
 const HOLDOUT_MOD = 10;
 const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
+const EXPECTED_TOKENIZER_CLASSIFIED_DIFFERENCES = 1;
+const EXPECTED_TOKENIZER_CLASSIFICATION_SHA256 =
+  "e2def757244c0aa0ab4781f81bb68093368510c0ae165d451e3d9aba56ffd4ef";
+const EXPECTED_TREE_CLASSIFIED_DIFFERENCES = 0;
+const EXPECTED_TREE_CLASSIFICATION_SHA256 =
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
 
 const encoder = new TextEncoder();
 
@@ -64,7 +78,7 @@ function tokenizerTokenToFixture(token) {
   }
 
   if (token.type === "Doctype") {
-    const name = token.name.length === 0 ? null : token.name;
+    const name = token.name === "" ? null : token.name;
     return ["DOCTYPE", name, token.publicId, token.systemId, !token.forceQuirks];
   }
 
@@ -72,14 +86,11 @@ function tokenizerTokenToFixture(token) {
     return ["Character", token.data];
   }
 
-  return null;
-}
+  if (token.type === "ProcessingInstruction") {
+    return ["ProcessingInstruction", token.target, token.data];
+  }
 
-function normalizeTokenArray(tokens) {
-  return tokens
-    .map((token) => tokenizerTokenToFixture(token))
-    .filter((token) => token !== null)
-    .map((token) => fixtureTokenToComparable(token));
+  return null;
 }
 
 function parseEncodingDatFixtures(text, fixtureFilePath) {
@@ -186,6 +197,7 @@ async function runTokenizerHoldout() {
   let passed = 0;
   let failed = 0;
   const failures = [];
+  const classified = [];
 
   for (const fixtureCase of selectedCases) {
     const tokenizeResult = tokenizeFixtureCase(fixtureCase.input, {
@@ -202,11 +214,30 @@ async function runTokenizerHoldout() {
     });
 
     const expectedTokens = fixtureCase.output.map((token) => fixtureTokenToComparable(token));
-    const actualTokens = normalizeTokenArray(tokenizeResult.tokens);
+    const actualFixtureTokens = tokenizeResult.tokens
+      .map((token) => tokenizerTokenToFixture(token))
+      .filter((token) => token !== null);
+    const actualTokens = actualFixtureTokens.map((token) => fixtureTokenToComparable(token));
     const isTokenSequenceMatch = JSON.stringify(expectedTokens) === JSON.stringify(actualTokens);
 
     if (isTokenSequenceMatch) {
       passed += 1;
+      continue;
+    }
+
+    if (isStaleTokenizerProcessingInstructionExpectation(
+      fixtureCase.input,
+      fixtureCase.output,
+      actualFixtureTokens,
+      tokenizeResult.errors
+    )) {
+      classified.push({
+        id: fixtureCase.id,
+        classification: "stale-processing-instruction-expectation",
+        expected: fixtureCase.output,
+        actual: actualFixtureTokens,
+        errors: tokenizeResult.errors.map((error) => error.code)
+      });
       continue;
     }
 
@@ -219,9 +250,12 @@ async function runTokenizerHoldout() {
     });
   }
 
+  const classificationSha256 = createHash("sha256")
+    .update(JSON.stringify(classified))
+    .digest("hex");
   return {
     cases: {
-      total: selectedCases.length,
+      total: passed + failed,
       passed,
       failed,
       skipped: 0
@@ -229,6 +263,12 @@ async function runTokenizerHoldout() {
     holdoutRule: HOLDOUT_RULE,
     holdoutMod: HOLDOUT_MOD,
     totalSurface: parsedCases.length,
+    classifiedDifferences: classified.length,
+    classificationSha256,
+    classificationsMatch:
+      classified.length === EXPECTED_TOKENIZER_CLASSIFIED_DIFFERENCES &&
+      classificationSha256 === EXPECTED_TOKENIZER_CLASSIFICATION_SHA256,
+    classified,
     failures
   };
 }
@@ -248,6 +288,7 @@ async function runTreeHoldout() {
   let passed = 0;
   let failed = 0;
   const failures = [];
+  const classified = [];
 
   for (const testCase of selectedCases) {
     const treeBuildResult = buildTreeFromHtml(
@@ -259,7 +300,7 @@ async function runTreeHoldout() {
         maxAttributeBytes: 65536
       },
       {
-        fragmentContextTagName: testCase.fragmentContext?.localName,
+        fragmentContext: testCase.fragmentContext,
         scriptingEnabled: testCase.scriptingEnabled
       }
     );
@@ -269,6 +310,22 @@ async function runTreeHoldout() {
 
     if (actualTree === expectedTree) {
       passed += 1;
+      continue;
+    }
+
+    if (isStaleTreeProcessingInstructionExpectation(
+      testCase.data,
+      expectedTree,
+      actualTree,
+      treeBuildResult.errors
+    )) {
+      classified.push({
+        id: testCase.id,
+        classification: "stale-processing-instruction-expectation",
+        expectedTree,
+        actualTree,
+        errors: treeBuildResult.errors.map((error) => error.code)
+      });
       continue;
     }
 
@@ -282,9 +339,12 @@ async function runTreeHoldout() {
     });
   }
 
+  const classificationSha256 = createHash("sha256")
+    .update(JSON.stringify(classified))
+    .digest("hex");
   return {
     cases: {
-      total: selectedCases.length,
+      total: passed + failed,
       passed,
       failed,
       skipped: 0
@@ -292,6 +352,12 @@ async function runTreeHoldout() {
     holdoutRule: HOLDOUT_RULE,
     holdoutMod: HOLDOUT_MOD,
     totalSurface: allTests.length,
+    classifiedDifferences: classified.length,
+    classificationSha256,
+    classificationsMatch:
+      classified.length === EXPECTED_TREE_CLASSIFIED_DIFFERENCES &&
+      classificationSha256 === EXPECTED_TREE_CLASSIFICATION_SHA256,
+    classified,
     failures
   };
 }
@@ -424,7 +490,8 @@ await writeJson("reports/holdout.json", {
   failures
 });
 
-if (cases.failed > 0) {
+if (cases.failed > 0 || !tokenizerHoldout.classificationsMatch ||
+    !treeHoldout.classificationsMatch) {
   console.error(`Holdout hard failures: ${cases.failed}`);
   process.exit(1);
 }

@@ -106,8 +106,8 @@ try {
 
   revisions.candidate = {
     commit: run("git", ["rev-parse", "HEAD"]).trim(),
-    engine: "candidate",
-    ...measure(ROOT, "candidate")
+    engine: "public",
+    ...measure(ROOT, "public")
   };
 } finally {
   for (const worktree of worktrees.reverse()) {

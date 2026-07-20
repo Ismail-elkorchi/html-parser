@@ -1,8 +1,8 @@
-import { failInternalState, requireInternalValue } from "../foundation/internal-state-error.js";
+import { failInternalState, requireInternalValue } from "../foundation/internal-state-error.ts";
 
-import { ActiveFormattingList } from "./active-formatting-list.js";
-import { createTreeBuilderParseError } from "./diagnostics.js";
-import { documentModeForDoctype, type HtmlDocumentMode } from "./doctype-mode.js";
+import { ActiveFormattingList } from "./active-formatting-list.ts";
+import { createTreeBuilderParseError } from "./diagnostics.ts";
+import { documentModeForDoctype, type HtmlDocumentMode } from "./doctype-mode.ts";
 import {
   adjustedForeignAttributes,
   adjustedForeignTagName,
@@ -10,41 +10,41 @@ import {
   isForeignBreakoutStartTag,
   isHtmlIntegrationPoint,
   isMathMLTextIntegrationPoint
-} from "./foreign-content.js";
-import { fragmentContextAttributes } from "./fragment-context.js";
-import { HTML_NAMESPACE, MATHML_NAMESPACE, SVG_NAMESPACE } from "./namespaces.js";
-import { OpenElementStack } from "./open-element-stack.js";
-import { sourceSpan } from "./positions.js";
-import { HtmlSelectElementState } from "./select-element-state.js";
+} from "./foreign-content.ts";
+import { fragmentContextAttributes } from "./fragment-context.ts";
+import { HTML_NAMESPACE, MATHML_NAMESPACE, SVG_NAMESPACE } from "./namespaces.ts";
+import { OpenElementStack } from "./open-element-stack.ts";
+import { sourceSpan } from "./positions.ts";
+import { HtmlSelectElementState } from "./select-element-state.ts";
 
 import type {
   ActiveFormattingEntry
-} from "./active-formatting-list.js";
-import type { EngineParseError } from "./diagnostics.js";
-import type { HtmlFragmentContext } from "./fragment-context.js";
+} from "./active-formatting-list.ts";
+import type { EngineParseError } from "./diagnostics.ts";
+import type { HtmlFragmentContext } from "./fragment-context.ts";
 import type {
   EngineObserver,
   TokenAcceptance,
   TokenizerControl,
   TokenSink
-} from "./observer.js";
-import type { OpenElementName } from "./open-element-stack.js";
-import type { InsertionMode, NonExecutingScriptingMode, TokenizerMode } from "./parser-state.js";
-import type { EngineResourceGuard } from "./resource-guard.js";
+} from "./observer.ts";
+import type { OpenElementName } from "./open-element-stack.ts";
+import type { InsertionMode, NonExecutingScriptingMode, TokenizerMode } from "./parser-state.ts";
+import type { EngineResourceGuard } from "./resource-guard.ts";
 import type {
   HtmlEndTagToken,
   HtmlCharacterToken,
   HtmlStartTagToken,
   HtmlToken,
   HtmlTokenAttribute
-} from "./tokens.js";
+} from "./tokens.ts";
 import type {
   HtmlTreeAttributeInput,
   HtmlTreeElement,
   HtmlTreeModel,
   HtmlTreeNode,
   HtmlTreeParent
-} from "./tree-model.js";
+} from "./tree-model.ts";
 
 export interface HtmlTreeBuilderOptions {
   readonly model: HtmlTreeModel;

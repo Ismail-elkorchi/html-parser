@@ -80,6 +80,18 @@
           "description": "Reserve only one node for every atomic multi-node allocation.",
           "search": "const actualNodes = nodes + count;",
           "replace": "const actualNodes = nodes + 1;"
+        },
+        {
+          "id": "guard-final-element-attribute-count",
+          "description": "Allow recovery to retain more attributes on an element than the configured count limit.",
+          "search": "if (attributeLimit !== undefined && elementAttributes.length > attributeLimit) {",
+          "replace": "if (false && attributeLimit !== undefined && elementAttributes.length > attributeLimit) {"
+        },
+        {
+          "id": "guard-final-element-attribute-bytes",
+          "description": "Allow recovery to retain an attribute set larger than the configured UTF-8 byte limit.",
+          "search": "if (bytes > byteLimit) {",
+          "replace": "if (false && bytes > byteLimit) {"
         }
       ]
     },
@@ -510,20 +522,8 @@
       ]
     },
     {
-      "targetFile": "dist/public/text-extraction.js",
-      "testCommand": ["node", "--test", "test/behavior/independent-product-adapter.test.js"],
-      "mutants": [
-        {
-          "id": "text-nested-parser-injection",
-          "description": "Route nested visible-text parsing through the production parser instead of its explicit owner.",
-          "search": "const iterate = (nodeOrTree, options) => iterateTextUsing(nodeOrTree, options, parseNestedFragment);",
-          "replace": "const iterate = (nodeOrTree, options) => iterateTextUsing(nodeOrTree, options, parseFragment);"
-        }
-      ]
-    },
-    {
-      "targetFile": "dist/integration/html-product-adapter.js",
-      "testCommand": ["node", "--test", "test/behavior/independent-product-adapter.test.js"],
+      "targetFile": "dist/public/parsing.js",
+      "testCommand": ["node", "--test", "test/behavior/independent-product-contract.test.js"],
       "mutants": [
         {
           "id": "product-attribute-budget-map",

@@ -1,20 +1,20 @@
-import { enforceBudget } from "./budgets.js";
+import { enforceBudget } from "./budgets.ts";
 import {
   HtmlBudgetExceededError,
   isHtmlBudgetExceededError
-} from "./errors.js";
-import { utf8ByteLength } from "./html-input.js";
+} from "./errors.ts";
+import { utf8ByteLength } from "./html-input.ts";
 import {
   HTML_NAMESPACE_URI,
   asciiLowercase,
   isHtmlElement
-} from "./model.js";
+} from "./model.ts";
 import {
   createOperationContext,
   normalizeTextExtractionOptions,
   type OperationContext
-} from "./operation.js";
-import { parseFragment } from "./parsing.js";
+} from "./operation.ts";
+import { parseFragment } from "./parsing.ts";
 
 import type {
   DocumentTree,
@@ -32,7 +32,7 @@ import type {
   TextExtractionTokenKind,
   TextProvenanceRange,
   VisibleTextExtractionOptions
-} from "./types.js";
+} from "./types.ts";
 
 /** Stable semantic identity for visible HTML text extraction. */
 export const VISIBLE_TEXT_HTML_POLICY = "visible-text-html-v1";

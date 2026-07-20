@@ -1,7 +1,7 @@
 # Third-party notices
 
 Scope:
-- This notice file covers all vendored runtime sources and vendored datasets currently used by this repository.
+- This notice file covers the third-party test corpora and standards datasets used by this repository.
 - First-party generated artifacts (for example `reports/*`) are not third-party materials.
 
 ## html5lib-tests
@@ -26,21 +26,5 @@ Scope:
   BSD-3-Clause, as stated in the colocated WHATWG license.
 - Notice: The exact test/generator input, license, rendered-standard snapshot
   identity, retrieval date, SHA-256 values, byte counts, and schema counts are
-  recorded in the colocated `manifest.json`. The generated first-party table is
-  excluded from published packages while the independent engine is incomplete.
-
-## parse5 runtime source (vendored subset)
-- Source: https://github.com/inikulin/parse5
-- Location in repository: `src/internal/vendor/parse5`
-- License: MIT
-- Notice: Vendored parser/tokenizer runtime subset used to keep production artifacts self-contained.
-
-## entities runtime source (vendored subset)
-- Source: https://github.com/fb55/entities
-- Location in repository: `src/internal/vendor/entities`
-- License: BSD-2-Clause
-- Notice: Vendored entity decoder subset used by the vendored tokenizer runtime.
-
-Exact source versions, registry artifacts, upstream and local SHA-256 values,
-and the responsibilities of the three local patches are recorded in
-[`legacy-runtime-manifest.json`](./legacy-runtime-manifest.json).
+  recorded in the colocated `manifest.json`. A deterministic first-party
+  generator produces the private runtime lookup table from that snapshot.

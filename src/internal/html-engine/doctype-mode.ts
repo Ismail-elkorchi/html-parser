@@ -1,4 +1,4 @@
-import type { HtmlDoctypeToken } from "./tokens.js";
+import type { HtmlDoctypeToken } from "./tokens.ts";
 
 /** Rendering mode selected by the tree builder's initial insertion mode. */
 export type HtmlDocumentMode = "no-quirks" | "limited-quirks" | "quirks";

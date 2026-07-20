@@ -5,7 +5,7 @@ import { collectDocSymbols } from "./doc-jsr-shape.mjs";
 const ENTRYPOINT = "jsr/mod.ts";
 const REQUIRED_SYMBOLS = ["extractText", "iterateText", "parse", "parseFragment", "parseStream"];
 
-const docJson = JSON.parse(execFileSync("deno", ["doc", "--json", "--sloppy-imports", ENTRYPOINT], {
+const docJson = JSON.parse(execFileSync("deno", ["doc", "--json", ENTRYPOINT], {
   encoding: "utf8",
   maxBuffer: 10 * 1024 * 1024
 }));

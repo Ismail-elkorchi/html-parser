@@ -10,18 +10,16 @@ const argumentsByName = new Map(process.argv.slice(2).map((argument) => {
 }));
 const moduleRoot = argumentsByName.get("--module-root");
 const engine = argumentsByName.get("--engine");
-if (moduleRoot === undefined || (engine !== "public" && engine !== "candidate")) {
-  throw new Error("Usage: benchmark-engine.mjs --module-root=<path> --engine=public|candidate");
+if (moduleRoot === undefined || engine !== "public") {
+  throw new Error("Usage: benchmark-engine.mjs --module-root=<path> --engine=public");
 }
 if (typeof globalThis.gc !== "function") {
   throw new Error("benchmark-engine.mjs requires --expose-gc");
 }
 
-const modulePath = engine === "candidate"
-  ? `${moduleRoot}/dist/integration/html-product-adapter.js`
-  : `${moduleRoot}/dist/mod.js`;
+const modulePath = `${moduleRoot}/dist/mod.js`;
 const module = await import(pathToFileURL(modulePath).href);
-const parse = engine === "candidate" ? module.parseWithIndependentEngine : module.parse;
+const parse = module.parse;
 if (typeof parse !== "function") throw new Error(`Benchmark parser export missing for ${engine}`);
 
 const fixtures = Object.freeze([

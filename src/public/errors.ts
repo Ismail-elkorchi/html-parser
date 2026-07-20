@@ -3,7 +3,7 @@ import type {
   HtmlConfigurationErrorReason,
   HtmlPatchPlanningReason,
   NodeId
-} from "./types.js";
+} from "./types.ts";
 
 type UnknownRecord = Readonly<Record<PropertyKey, unknown>>;
 

@@ -1,15 +1,15 @@
-import { sniffHtmlEncoding } from "../internal/encoding/mod.js";
+import { sniffHtmlEncoding } from "../internal/encoding/mod.ts";
 
-import { enforceBudget } from "./budgets.js";
+import { enforceBudget } from "./budgets.ts";
 import {
   HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
   HtmlStreamReadError
-} from "./errors.js";
+} from "./errors.ts";
 
-import type { OperationContext } from "./operation.js";
-import type { ParseStreamBudgetOptions, TokenizeByteStreamEagerOptions } from "./types.js";
+import type { OperationContext } from "./operation.ts";
+import type { ParseStreamBudgetOptions, TokenizeByteStreamEagerOptions } from "./types.ts";
 
 const DEFAULT_STREAM_ENCODING_PRESCAN_BYTES = 16_384;
 
