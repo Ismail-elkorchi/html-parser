@@ -81,6 +81,8 @@ const cases = [
     {
       kind: "fragment",
       scriptingMode: "disabled",
+      documentMode: "no-quirks",
+      hasFormInContextChain: false,
       context: { namespaceUri: SVG_NAMESPACE, localName: "svg", attributes: [] }
     }
   ),
@@ -125,6 +127,8 @@ const fragmentBudgetInput = "<g><lineargradient viewbox='0 0 1 1'/>x</g>";
 const fragmentParser = {
   kind: "fragment",
   scriptingMode: "disabled",
+  documentMode: "no-quirks",
+  hasFormInContextChain: false,
   context: { namespaceUri: SVG_NAMESPACE, localName: "svg", attributes: [] }
 };
 const fragmentBudgetBaseline = runHtmlEngine({

@@ -93,7 +93,10 @@ async function runBrowserSmoke(baseUrl) {
       const serialized = mod.serialize(parsed);
       const parsedBytes = mod.parseBytes(new TextEncoder().encode(sampleHtml)).tree;
       const bytesSerialized = mod.serialize(parsedBytes);
-      const fragment = mod.parseFragment("child", "section");
+      const fragment = mod.parseFragment("child", {
+        namespaceUri: mod.HTML_NAMESPACE_URI,
+        localName: "section"
+      });
       const streamParsed = (await mod.parseStream(streamFromText(sampleHtml))).tree;
       const streamSerialized = mod.serialize(streamParsed);
 
@@ -122,7 +125,7 @@ async function runBrowserSmoke(baseUrl) {
         serialized,
         bytesSerialized,
         streamSerialized,
-        fragmentContextTagName: fragment.contextTagName,
+        fragmentContext: fragment.context,
         tokenKinds
       };
       const hashBuffer = await globalThis.crypto.subtle.digest(
@@ -140,7 +143,8 @@ async function runBrowserSmoke(baseUrl) {
         parseSerialize: serialized.includes("<p>smoke</p>"),
         parseBytes: bytesSerialized.includes("<p>smoke</p>"),
         parseStream: streamSerialized.includes("<p>smoke</p>"),
-        parseFragment: fragment.contextTagName === "section",
+        parseFragment: fragment.context.localName === "section" &&
+          fragment.context.namespaceUri === mod.HTML_NAMESPACE_URI,
         traceSummary: traceSummary?.mode === "summary" &&
           !("events" in traceSummary) &&
           traceSummary.summary.eventCount > 0 &&

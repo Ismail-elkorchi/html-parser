@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  HTML_NAMESPACE_URI,
   HtmlAbortError,
   HtmlBudgetExceededError,
   computePatch,
@@ -153,8 +154,12 @@ test("text, byte, stream, and fragment entrypoints preserve their input contract
   assert.equal(fromStream.metadata.inputKind, "stream");
   assert.equal(fromStream.metadata.resourceUsage.encodingPrescanBytes, bytes.byteLength);
 
-  const fragment = parseFragment("<td>x", "table", { captureSpans: true });
-  assert.equal(fragment.contextTagName, "table");
+  const fragment = parseFragment(
+    "<td>x",
+    { namespaceUri: HTML_NAMESPACE_URI, localName: "table" },
+    { captureSpans: true }
+  );
+  assert.equal(fragment.context.localName, "table");
   assert.equal(serialize(fragment), "<tbody><tr><td>x</td></tr></tbody>");
   assert.deepEqual(fragment.children[0]?.spanProvenance, "inferred");
 });

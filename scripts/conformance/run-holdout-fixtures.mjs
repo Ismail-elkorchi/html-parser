@@ -259,7 +259,7 @@ async function runTreeHoldout() {
     failures.push({
       suite: "tree",
       id: testCase.id,
-      fragmentContextTagName: testCase.fragmentContext?.localName ?? null,
+      fragmentContext: testCase.fragmentContext,
       scriptingEnabled: testCase.scriptingEnabled,
       treeErrors: treeBuildResult.errors.slice(0, 10)
     });

@@ -81,6 +81,18 @@ Every classified variant appears in `reports/engine-wpt-tree.json` with its
 exact ID and reason. Files whose names contain `unsafe` remain applicable:
 their NUL, CR, and other raw input is preserved by the shared `.dat` reader.
 
+The same snapshot independently qualifies the built public fragment API:
+
+```bash
+npm run qualification:fragments
+npm run test:browser-diff:fragments
+```
+
+The offline public gate executes all 196 fragment cases in both required
+scripting variants where applicable (392 executions) and compares the public
+tree plus declared diagnostic counts. The browser gate covers context
+attributes and environment inputs that the `.dat` format does not encode.
+
 ## Maintained serialization corpus
 
 The complete nine-file WPT directory under

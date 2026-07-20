@@ -139,8 +139,10 @@ export function serialize(
     startedAt
   );
   operation.checkpoint();
+  const scriptingMode = normalizedOptions.scriptingMode ??
+    (tree.kind === "fragment" ? tree.scriptingMode : "inert");
   if (tree.kind === "document" || tree.kind === "fragment") {
-    return serializeNodes(tree.children, operation, null, normalizedOptions.scriptingMode);
+    return serializeNodes(tree.children, operation, null, scriptingMode);
   }
-  return serializeNodes([tree], operation, null, normalizedOptions.scriptingMode);
+  return serializeNodes([tree], operation, null, scriptingMode);
 }

@@ -1,5 +1,4 @@
 import {
-  HTML_NAMESPACE,
   MATHML_NAMESPACE,
   SVG_NAMESPACE,
   XLINK_NAMESPACE,
@@ -96,14 +95,7 @@ export function normalizeTree(model) {
 
 /** Runs one html5lib tree fixture through the production engine. */
 export function buildTreeFromHtml(html, budgets = {}, options = {}) {
-  const fragmentContext = options.fragmentContext ??
-    (options.fragmentContextTagName === undefined
-      ? null
-      : {
-          namespaceUri: HTML_NAMESPACE,
-          localName: options.fragmentContextTagName,
-          attributes: []
-        });
+  const fragmentContext = options.fragmentContext ?? null;
   const result = runHtmlEngine({
     inputChunks: [html],
     parser: fragmentContext === null
@@ -114,6 +106,8 @@ export function buildTreeFromHtml(html, budgets = {}, options = {}) {
       : {
           kind: "fragment",
           scriptingMode: options.scriptingEnabled ? "inert" : "disabled",
+          documentMode: options.documentMode ?? "no-quirks",
+          hasFormInContextChain: options.hasFormInContextChain ?? false,
           context: {
             namespaceUri: fragmentContext.namespaceUri,
             localName: fragmentContext.localName,

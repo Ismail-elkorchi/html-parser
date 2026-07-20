@@ -62,7 +62,12 @@ const PARSE_BYTES_OPTION_KEYS = new Set<PropertyKey>([
   "sourceRetention",
   "transportEncodingLabel"
 ]);
-const PARSE_FRAGMENT_OPTION_KEYS = new Set<PropertyKey>(PARSE_COMMON_OPTION_KEYS);
+const PARSE_FRAGMENT_OPTION_KEYS = new Set<PropertyKey>([
+  ...PARSE_COMMON_OPTION_KEYS,
+  "scriptingMode",
+  "documentMode",
+  "hasFormInContextChain"
+]);
 const TOKENIZE_BYTE_STREAM_EAGER_OPTION_KEYS = new Set<PropertyKey>([
   "transportEncodingLabel",
   "budgets",
@@ -268,7 +273,7 @@ function normalizeParseLikeOptions(
     readonly sourceRetention: boolean;
     readonly transportEncoding: boolean;
   }
-): ParseStreamOptions {
+): { readonly record: UnknownRecord; readonly normalized: ParseStreamOptions } {
   const record = asClosedRecord(options, "options", allowedKeys);
   const captureSpans = optionalBoolean(
     read(record, "captureSpans", "options.captureSpans"),
@@ -303,15 +308,18 @@ function normalizeParseLikeOptions(
     );
   }
   return Object.freeze({
-    ...(captureSpans === undefined ? {} : { captureSpans }),
-    ...(capabilities.sourceRetention
-      ? { sourceRetention: normalizedSourceRetention ?? "none" }
-      : {}),
-    trace: normalizedTrace ?? "none",
-    ...(onTraceEvent === undefined ? {} : { onTraceEvent }),
-    ...(transportEncodingLabel === undefined ? {} : { transportEncodingLabel }),
-    ...(budgets === undefined ? {} : { budgets }),
-    ...(normalizedSignal === undefined ? {} : { signal: normalizedSignal })
+    record,
+    normalized: Object.freeze({
+      ...(captureSpans === undefined ? {} : { captureSpans }),
+      ...(capabilities.sourceRetention
+        ? { sourceRetention: normalizedSourceRetention ?? "none" }
+        : {}),
+      trace: normalizedTrace ?? "none",
+      ...(onTraceEvent === undefined ? {} : { onTraceEvent }),
+      ...(transportEncodingLabel === undefined ? {} : { transportEncodingLabel }),
+      ...(budgets === undefined ? {} : { budgets }),
+      ...(normalizedSignal === undefined ? {} : { signal: normalizedSignal })
+    })
   });
 }
 
@@ -322,7 +330,7 @@ export function normalizeParseOptions(options: ParseOptions): ParseOptions {
     PARSE_BUDGET_KEYS,
     PARSE_OPTION_KEYS,
     { sourceRetention: true, transportEncoding: false }
-  );
+  ).normalized;
 }
 
 /** Validates and snapshots full-document byte options exactly once. */
@@ -332,17 +340,43 @@ export function normalizeParseBytesOptions(options: ParseBytesOptions): ParseByt
     PARSE_BUDGET_KEYS,
     PARSE_BYTES_OPTION_KEYS,
     { sourceRetention: true, transportEncoding: true }
-  );
+  ).normalized;
 }
 
 /** Validates and snapshots already-decoded fragment options exactly once. */
 export function normalizeParseFragmentOptions(options: ParseFragmentOptions): ParseFragmentOptions {
-  return normalizeParseLikeOptions(
+  const { record, normalized: common } = normalizeParseLikeOptions(
     options,
     PARSE_BUDGET_KEYS,
     PARSE_FRAGMENT_OPTION_KEYS,
     { sourceRetention: false, transportEncoding: false }
   );
+  const scriptingMode = read(record, "scriptingMode", "options.scriptingMode");
+  if (scriptingMode !== undefined && scriptingMode !== "inert" && scriptingMode !== "disabled") {
+    invalidConfiguration("options.scriptingMode", 'must be "inert" or "disabled"');
+  }
+  const documentMode = read(record, "documentMode", "options.documentMode");
+  if (
+    documentMode !== undefined &&
+    documentMode !== "no-quirks" &&
+    documentMode !== "limited-quirks" &&
+    documentMode !== "quirks"
+  ) {
+    invalidConfiguration(
+      "options.documentMode",
+      'must be "no-quirks", "limited-quirks", or "quirks"'
+    );
+  }
+  const hasFormInContextChain = optionalBoolean(
+    read(record, "hasFormInContextChain", "options.hasFormInContextChain"),
+    "options.hasFormInContextChain"
+  );
+  return Object.freeze({
+    ...common,
+    scriptingMode: scriptingMode ?? "inert",
+    documentMode: documentMode ?? "no-quirks",
+    hasFormInContextChain: hasFormInContextChain ?? false
+  });
 }
 
 /** Validates and snapshots full-document stream options exactly once. */
@@ -352,7 +386,7 @@ export function normalizeParseStreamOptions(options: ParseStreamOptions): ParseS
     PARSE_STREAM_BUDGET_KEYS,
     PARSE_BYTES_OPTION_KEYS,
     { sourceRetention: true, transportEncoding: true }
-  );
+  ).normalized;
 }
 
 /** Validates and snapshots eager stream-tokenization options exactly once. */
@@ -382,7 +416,7 @@ export function normalizeOperationOptions(options: OperationOptions): OperationO
 }
 
 /** Validates and snapshots HTML serialization controls. */
-export function normalizeSerializeOptions(options: SerializeOptions): Required<Pick<SerializeOptions, "scriptingMode">> & OperationOptions {
+export function normalizeSerializeOptions(options: SerializeOptions): SerializeOptions {
   const { record, normalized } = normalizeCommonOperationOptions(
     options,
     SERIALIZE_OPTION_KEYS,
@@ -394,7 +428,7 @@ export function normalizeSerializeOptions(options: SerializeOptions): Required<P
   }
   return Object.freeze({
     ...normalized,
-    scriptingMode: scriptingMode ?? "inert"
+    ...(scriptingMode === undefined ? {} : { scriptingMode })
   });
 }
 

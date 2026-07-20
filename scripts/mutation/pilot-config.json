@@ -1,6 +1,54 @@
 {
   "targets": [
     {
+      "targetFile": "dist/public/fragment-context.js",
+      "testCommand": ["node", "--test", "test/behavior/fragment-context.test.js"],
+      "mutants": [
+        {
+          "id": "fragment-public-html-name-normalization",
+          "description": "Preserve HTML context element case instead of applying ASCII lowercase normalization.",
+          "search": "localName: namespaceUri === HTML_NAMESPACE_URI ? asciiLowercase(rawLocalName) : rawLocalName,",
+          "replace": "localName: rawLocalName,"
+        },
+        {
+          "id": "fragment-public-expanded-attribute-uniqueness",
+          "description": "Allow duplicate semantic attributes with the same namespace and local name.",
+          "search": "if (expandedNames.has(expandedName)) {",
+          "replace": "if (false && expandedNames.has(expandedName)) {"
+        },
+        {
+          "id": "fragment-public-xlink-prefix-derivation",
+          "description": "Derive no prefix for XLink context attributes.",
+          "search": "const prefix = attribute.namespaceUri === XLINK_NAMESPACE_URI\n        ? \"xlink\"",
+          "replace": "const prefix = false && attribute.namespaceUri === XLINK_NAMESPACE_URI\n        ? \"xlink\""
+        }
+      ]
+    },
+    {
+      "targetFile": "dist/public/serialization.js",
+      "testCommand": ["node", "--test", "test/behavior/fragment-context.test.js"],
+      "mutants": [
+        {
+          "id": "fragment-serializer-scripting-inheritance",
+          "description": "Serialize every fragment under the inert scripting environment.",
+          "search": "(tree.kind === \"fragment\" ? tree.scriptingMode : \"inert\")",
+          "replace": "(tree.kind === \"fragment\" ? \"inert\" : \"inert\")"
+        }
+      ]
+    },
+    {
+      "targetFile": "dist/public/chunking.js",
+      "testCommand": ["node", "--test", "test/behavior/fragment-context.test.js"],
+      "mutants": [
+        {
+          "id": "fragment-chunk-scripting-inheritance",
+          "description": "Chunk every fragment under the inert scripting environment.",
+          "search": "tree.kind === \"fragment\" ? tree.scriptingMode : \"inert\"",
+          "replace": "tree.kind === \"fragment\" ? \"inert\" : \"inert\""
+        }
+      ]
+    },
+    {
       "targetFile": "scripts/qualification/performance-policy.mjs",
       "testCommand": ["node", "--test", "test/behavior/performance-policy.test.js"],
       "mutants": [
@@ -542,6 +590,18 @@
           "description": "Reset insertion mode from the fake root instead of the external context.",
           "search": "if (last && this.#fragmentContext !== null)\n                node = this.#fragmentContext;",
           "replace": "if (false && last && this.#fragmentContext !== null)\n                node = this.#fragmentContext;"
+        },
+        {
+          "id": "tree-builder-fragment-document-mode",
+          "description": "Ignore the owner-document mode supplied for fragment construction.",
+          "search": "this.#documentMode = options.fragmentDocumentMode;",
+          "replace": "this.#documentMode = \"no-quirks\";"
+        },
+        {
+          "id": "tree-builder-fragment-form-chain",
+          "description": "Do not seed the form element pointer from the fragment context chain.",
+          "search": "if (options.hasFormInContextChain)\n                this.#formElement = this.#fragmentContext;",
+          "replace": "if (false && options.hasFormInContextChain)\n                this.#formElement = this.#fragmentContext;"
         },
         {
           "id": "tree-builder-formatting-reconstruction",

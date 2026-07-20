@@ -51,7 +51,7 @@ function summarizeStepResult(stepName, result) {
 }
 
 function createRuntimeSmokeScript(packageName) {
-  return `import { parse, parseBytes, parseFragment, parseStream, serialize } from "${packageName}";
+  return `import { HTML_NAMESPACE_URI, parse, parseBytes, parseFragment, parseStream, serialize } from "${packageName}";
 
 const document = parse("<p>ok</p>");
 if (serialize(document.tree).length === 0) {
@@ -63,7 +63,7 @@ if (bytesDocument.tree.kind !== "document") {
   throw new Error("parseBytes did not return a document tree");
 }
 
-const fragment = parseFragment("ok", "section");
+const fragment = parseFragment("ok", { namespaceUri: HTML_NAMESPACE_URI, localName: "section" });
 if (fragment.kind !== "fragment") {
   throw new Error("parseFragment did not return a fragment tree");
 }

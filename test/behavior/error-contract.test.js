@@ -110,12 +110,15 @@ test("structural guards classify errors across realms and package copies", async
 
 test("configuration, patch, and stream failures use distinct structural categories", async () => {
   assert.throws(
-    () => parseFragment("x", "  "),
+    () => parseFragment("x", {
+      namespaceUri: "http://www.w3.org/1999/xhtml",
+      localName: "  "
+    }),
     (error) => {
       assert.ok(error instanceof HtmlConfigurationError);
       assert.equal(isHtmlConfigurationError(error), true);
       assert.equal(error.code, "INVALID_CONFIGURATION");
-      assert.equal(error.option, "contextTagName");
+      assert.equal(error.option, "context.localName");
       assert.equal(error.reason, "INVALID_VALUE");
       return true;
     }

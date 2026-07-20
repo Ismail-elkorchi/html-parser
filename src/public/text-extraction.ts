@@ -19,6 +19,7 @@ import { parseFragment } from "./parsing.ts";
 import type {
   DocumentTree,
   FragmentTree,
+  HtmlFragmentContextInput,
   HtmlNode,
   NodeId,
   ParseFragmentOptions,
@@ -85,7 +86,7 @@ type ResolvedVisibleTextOptions = VisibleTextPolicyOptions & {
   readonly maxFallbackNodes: number;
   readonly parseNestedFragment: (
     html: string,
-    contextTagName: string,
+    context: HtmlFragmentContextInput,
     options: ParseFragmentOptions
   ) => FragmentTree;
 };
@@ -792,7 +793,10 @@ function boundedNoscriptFallbackChildren(
   const remainingTimeMs = options.operation.remainingTimeMs();
   let fallbackFragment: FragmentTree;
   try {
-    fallbackFragment = options.parseNestedFragment(rawMarkup, "body", {
+    fallbackFragment = options.parseNestedFragment(rawMarkup, {
+      namespaceUri: HTML_NAMESPACE_URI,
+      localName: "body"
+    }, {
       ...(options.operation.signal === undefined ? {} : { signal: options.operation.signal }),
       budgets: {
         maxNodes: options.maxFallbackNodes,

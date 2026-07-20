@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  HTML_NAMESPACE_URI,
   HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
@@ -10,6 +11,8 @@ import {
   parseFragment,
   parseStream
 } from "../../dist/mod.js";
+
+const htmlContext = (localName) => ({ namespaceUri: HTML_NAMESPACE_URI, localName });
 
 const encoder = new TextEncoder();
 
@@ -117,7 +120,11 @@ test("trace counts logical parser tokens once, including EOF", () => {
     tokenCount(parse("<!doctype html><main><p>alpha &amp; beta</p></main>", { trace: "events" })),
     7
   );
-  assert.equal(tokenCount(parseFragment("a<b>&amp;</b>", "textarea", { trace: "events" })), 2);
+  assert.equal(tokenCount(parseFragment(
+    "a<b>&amp;</b>",
+    htmlContext("textarea"),
+    { trace: "events" }
+  )), 2);
 });
 
 test("trace includes parseError events for malformed input", () => {
@@ -279,7 +286,7 @@ test("every parse input variant uses a single validated option snapshot", async 
 
   const operations = [
     (options) => parse("<p>x</p>", options),
-    (options) => parseFragment("<p>x</p>", "div", options)
+    (options) => parseFragment("<p>x</p>", htmlContext("div"), options)
   ];
   for (const operation of operations) {
     const tracked = trackedOptions({ trace: "summary" });

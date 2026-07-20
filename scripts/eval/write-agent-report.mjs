@@ -1,4 +1,5 @@
 import {
+  HTML_NAMESPACE_URI,
   isHtmlBudgetExceededError,
   isHtmlPatchPlanningError,
   TEXT_CONTENT_POLICY,
@@ -361,8 +362,9 @@ function evaluateOutlineFeature() {
 
 function evaluateChunkFeature() {
   const html = "<p>alpha</p><p>beta</p><p>gamma</p><p>delta</p>";
-  const firstTree = parseFragment(html, "section");
-  const secondTree = parseFragment(html, "section");
+  const context = { namespaceUri: HTML_NAMESPACE_URI, localName: "section" };
+  const firstTree = parseFragment(html, context);
+  const secondTree = parseFragment(html, context);
 
   const chunkOptions = {
     maxChars: 4096,

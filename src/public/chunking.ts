@@ -55,7 +55,12 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
 
   for (const node of tree.children) {
     operation.checkpoint();
-    const content = serializeNodes([node], operation);
+    const content = serializeNodes(
+      [node],
+      operation,
+      null,
+      tree.kind === "fragment" ? tree.scriptingMode : "inert"
+    );
     const nodes = countNodes(node, operation);
     const bytes = textEncoder.encode(content).length;
     const nextChars = activeContent.length + content.length;

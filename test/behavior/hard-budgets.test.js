@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 
 import {
+  HTML_NAMESPACE_URI,
   HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
@@ -22,6 +23,8 @@ import {
   tokenizeByteStreamEager,
   walk
 } from "../../dist/mod.js";
+
+const HTML_DIV_CONTEXT = Object.freeze({ namespaceUri: HTML_NAMESPACE_URI, localName: "div" });
 
 const VISIBLE_EXTRACTION = Object.freeze({
   policy: VISIBLE_TEXT_HTML_POLICY,
@@ -312,7 +315,7 @@ test("abort signals preserve their exact reason and stream cleanup", async () =>
   for (const operation of [
     () => parse("x", { signal: controller.signal }),
     () => parseBytes(new Uint8Array(), { signal: controller.signal }),
-    () => parseFragment("", "div", { signal: controller.signal }),
+    () => parseFragment("", HTML_DIV_CONTEXT, { signal: controller.signal }),
     () => serialize(parse("").tree, { signal: controller.signal }),
     () => extractText(parse("").tree, { ...VISIBLE_EXTRACTION, signal: controller.signal })
   ]) {

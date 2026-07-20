@@ -224,6 +224,8 @@ void test("driver configuration and resource limits fail before unavailable work
       parser: {
         kind: "fragment",
         scriptingMode: "disabled",
+        documentMode: "no-quirks",
+        hasFormInContextChain: false,
         context: {
           namespaceUri: MATHML_NAMESPACE,
           localName: "annotation-xml",
@@ -316,6 +318,8 @@ void test("fragment parsing targets the fragment and respects HTML and foreign c
     parser: {
       kind: "fragment",
       scriptingMode: "inert",
+      documentMode: "no-quirks",
+      hasFormInContextChain: false,
       context: { namespaceUri: HTML_NAMESPACE, localName: "div", attributes: [] }
     }
   });
@@ -328,6 +332,8 @@ void test("fragment parsing targets the fragment and respects HTML and foreign c
     parser: {
       kind: "fragment",
       scriptingMode: "disabled",
+      documentMode: "no-quirks",
+      hasFormInContextChain: false,
       context: { namespaceUri: SVG_NAMESPACE, localName: "svg", attributes: [] }
     }
   });
@@ -343,6 +349,8 @@ void test("fragment parsing targets the fragment and respects HTML and foreign c
     parser: {
       kind: "fragment",
       scriptingMode: "disabled",
+      documentMode: "no-quirks",
+      hasFormInContextChain: false,
       context: {
         namespaceUri: MATHML_NAMESPACE,
         localName: "annotation-xml",
@@ -358,6 +366,37 @@ void test("fragment parsing targets the fragment and respects HTML and foreign c
   });
   const annotationChild = annotationXml.model.root.childAt(0);
   assert.equal(annotationChild?.kind === "element" ? annotationChild.namespaceUri : null, HTML_NAMESPACE);
+
+  const quirks = runHtmlEngine({
+    inputChunks: ["<p>x<table><tr><td>y"],
+    parser: {
+      kind: "fragment",
+      scriptingMode: "disabled",
+      documentMode: "quirks",
+      hasFormInContextChain: false,
+      context: { namespaceUri: HTML_NAMESPACE, localName: "div", attributes: [] }
+    }
+  });
+  assert.equal(quirks.state.documentMode, "quirks");
+  const quirksParagraph = quirks.model.root.childAt(0);
+  assert.ok(quirksParagraph?.kind === "element");
+  assert.equal(quirksParagraph.localName, "p");
+  const quirksTable = quirksParagraph.childAt(1);
+  assert.equal(quirksTable?.kind === "element" ? quirksTable.localName : null, "table");
+
+  const formChain = runHtmlEngine({
+    inputChunks: ["<form><input>"],
+    parser: {
+      kind: "fragment",
+      scriptingMode: "disabled",
+      documentMode: "no-quirks",
+      hasFormInContextChain: true,
+      context: { namespaceUri: HTML_NAMESPACE, localName: "form", attributes: [] }
+    }
+  });
+  const formChainChild = formChain.model.root.childAt(0);
+  assert.equal(formChainChild?.kind === "element" ? formChainChild.localName : null, "input");
+  assert.notEqual(formChain.state.formElement, null);
 });
 
 void test("option parser-pop state clones the selected subtree into selectedcontent", () => {
