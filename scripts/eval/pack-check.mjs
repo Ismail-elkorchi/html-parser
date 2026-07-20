@@ -144,8 +144,13 @@ async function main() {
   const unpublishedEngineIncluded = normalizedPaths.some((tarPath) =>
     tarPath.startsWith("dist/internal/html-engine/")
   );
+  const stagedIntegrationIncluded = normalizedPaths.some((tarPath) =>
+    tarPath.startsWith("dist/integration/")
+  );
   const jsrEngineExcluded = Array.isArray(jsrManifest.exclude) &&
     jsrManifest.exclude.includes("src/internal/html-engine/**");
+  const jsrIntegrationExcluded = Array.isArray(jsrManifest.exclude) &&
+    jsrManifest.exclude.includes("src/integration/**");
 
   const forbiddenIncluded = normalizedPaths.filter((tarPath) =>
     forbiddenPrefixes.some((forbiddenPrefix) => tarPath.startsWith(forbiddenPrefix))
@@ -259,7 +264,9 @@ async function main() {
     legacyManifestIncluded &&
     embeddedLegacyImplementation.matchesSeal &&
     !unpublishedEngineIncluded &&
+    !stagedIntegrationIncluded &&
     jsrEngineExcluded &&
+    jsrIntegrationExcluded &&
     missingDocumentation.length === 0;
 
   const report = {
@@ -279,7 +286,9 @@ async function main() {
     esmOnly,
     exportsOk,
     unpublishedEngineIncluded,
+    stagedIntegrationIncluded,
     jsrEngineExcluded,
+    jsrIntegrationExcluded,
     forbiddenIncluded,
     thirdPartyNoticesIncluded,
     legacyManifestIncluded,

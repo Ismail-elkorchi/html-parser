@@ -56,6 +56,7 @@ export interface HtmlTreeFragment extends HtmlTreeContainer {
 
 export interface HtmlTemplateContents extends HtmlTreeContainer {
   readonly kind: "template-contents";
+  readonly identity: HtmlTreeNodeIdentity;
   readonly host: HtmlTreeElement;
 }
 
@@ -315,7 +316,9 @@ export class HtmlTreeModel {
     const attributes = input.attributes ?? [];
     validateAttributeInputs(attributes);
     const span = checkedSpan(input.sourceSpan);
-    this.#resources.reserveNode();
+    const ownsTemplateContents =
+      input.namespaceUri === HTML_NAMESPACE && input.localName === "template";
+    this.#resources.reserveNodes(ownsTemplateContents ? 2 : 1);
 
     const identity = this.#newIdentity();
     const nodeState: NodeState = { owner: this, parent: null, sourceSpan: span, depth: null };
@@ -343,15 +346,18 @@ export class HtmlTreeModel {
       get templateContents(): HtmlTemplateContents | null { return templateContents; }
     });
 
-    if (input.namespaceUri === HTML_NAMESPACE && input.localName === "template") {
+    if (ownsTemplateContents) {
+      const contentsIdentity = this.#newIdentity();
       const templateState: ParentState = { owner: this, children: [] };
       templateContents = Object.freeze({
         kind: "template-contents",
+        identity: contentsIdentity,
         host: element,
         get childCount(): number { return templateState.children.length; },
         childAt(index: number): HtmlTreeNode | null { return templateState.children[index] ?? null; }
       });
       PARENT_STATES.set(templateContents, templateState);
+      this.#emit("node-created", contentsIdentity.serial, null);
     }
 
     elementState.templateContents = templateContents;
@@ -707,9 +713,10 @@ export class HtmlTreeModel {
       if (entry === undefined) break;
       yield Object.freeze(entry);
       const descendants = this.#semanticChildren(entry.node);
+      const descendantDepth = entry.depth + (this.#hasTemplateContents(entry.node) ? 2 : 1);
       for (let index = descendants.length - 1; index >= 0; index -= 1) {
         const child = descendants[index];
-        if (child !== undefined) stack.push({ node: child, depth: entry.depth + 1 });
+        if (child !== undefined) stack.push({ node: child, depth: descendantDepth });
       }
     }
   }
@@ -746,7 +753,18 @@ export class HtmlTreeModel {
           const element = this.#elementState(child);
           validateAttributeInputs(element.attributes);
           const childParent = element.templateContents ?? child;
-          stack.push({ parent: childParent, depth: entry.depth + 1 });
+          if (element.templateContents !== null) {
+            if (visited.has(element.templateContents.identity.serial)) {
+              fail("TREE_MODEL_ANCESTOR_CYCLE");
+            }
+            visited.add(element.templateContents.identity.serial);
+            attachedNodes += 1;
+            maxDepth = Math.max(maxDepth, entry.depth + 2);
+          }
+          stack.push({
+            parent: childParent,
+            depth: entry.depth + (element.templateContents === null ? 1 : 2)
+          });
         }
       }
     }
@@ -891,15 +909,20 @@ export class HtmlTreeModel {
   }
 
   #observableParentSerial(parent: HtmlTreeParent): number {
-    return parent.kind === "template-contents"
-      ? parent.host.identity.serial
-      : parent.identity.serial;
+    return parent.identity.serial;
   }
 
   #parentDepth(parent: HtmlTreeParent): number | null {
     if (isRoot(parent)) return 1;
-    if (parent.kind === "template-contents") return this.#nodeState(parent.host).depth;
+    if (parent.kind === "template-contents") {
+      const hostDepth = this.#nodeState(parent.host).depth;
+      return hostDepth === null ? null : hostDepth + 1;
+    }
     return this.#nodeState(parent).depth;
+  }
+
+  #hasTemplateContents(node: HtmlTreeNode): boolean {
+    return node.kind === "element" && this.#elementState(node).templateContents !== null;
   }
 
   #semanticChildren(node: HtmlTreeNode): readonly HtmlTreeNode[] {
@@ -931,9 +954,15 @@ export class HtmlTreeModel {
       visited.add(entry.node.identity.serial);
       assignments.push({ state, depth: entry.depth });
       maxRelativeDepth = Math.max(maxRelativeDepth, entry.relativeDepth);
-      const childDepth = entry.depth === null ? null : entry.depth + 1;
+      const childDepth = entry.depth === null
+        ? null
+        : entry.depth + (this.#hasTemplateContents(entry.node) ? 2 : 1);
       for (const child of this.#semanticChildren(entry.node)) {
-        stack.push({ node: child, depth: childDepth, relativeDepth: entry.relativeDepth + 1 });
+        stack.push({
+          node: child,
+          depth: childDepth,
+          relativeDepth: entry.relativeDepth + (this.#hasTemplateContents(entry.node) ? 2 : 1)
+        });
       }
     }
     return { assignments, maxRelativeDepth };

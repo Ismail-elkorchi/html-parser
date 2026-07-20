@@ -58,6 +58,7 @@ export default [
       ],
       "boundaries/elements": [
         { "type": "public", "pattern": "src/public/**" },
+        { "type": "integration", "pattern": "src/integration/**" },
         { "type": "internal-foundation", "pattern": "src/internal/foundation/**" },
         { "type": "engine", "pattern": "src/internal/html-engine/**" },
         { "type": "internal", "pattern": "src/internal/**" },
@@ -95,6 +96,18 @@ export default [
               "allow": {
                 "to": {
                   "element": { "types": { "anyOf": ["public", "internal", "internal-foundation"] } }
+                }
+              }
+            },
+            {
+              "from": { "element": { "types": "integration" } },
+              "allow": {
+                "to": {
+                  "element": {
+                    "types": {
+                      "anyOf": ["integration", "public", "engine", "internal", "internal-foundation"]
+                    }
+                  }
                 }
               }
             },

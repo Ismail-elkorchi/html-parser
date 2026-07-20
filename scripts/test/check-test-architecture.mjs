@@ -83,6 +83,22 @@ for (const filePath of await listFiles("src/internal/html-engine")) {
   }
 }
 
+for (const filePath of await listFiles("src/integration")) {
+  const source = await readFile(filePath, "utf8");
+  for (const pattern of FORBIDDEN_ENGINE_SOURCE_PATTERNS) {
+    if (pattern.test(source)) {
+      throw new Error(`test architecture: prohibited implementation reference in ${filePath}`);
+    }
+  }
+}
+
+for (const filePath of await listFiles("src/public")) {
+  const source = await readFile(filePath, "utf8");
+  if (source.includes("../integration/")) {
+    throw new Error(`test architecture: production selected staged integration in ${filePath}`);
+  }
+}
+
 process.stdout.write(
   "test architecture: one root, production/test-support boundaries, and engine isolation verified\n"
 );

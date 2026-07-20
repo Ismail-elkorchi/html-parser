@@ -8,6 +8,7 @@
   "exclude": [
     "vendor/**",
     "src/internal/html-engine/**",
+    "src/integration/**",
     "test/**",
     "reports/**",
     "tmp/**",

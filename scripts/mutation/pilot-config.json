@@ -56,7 +56,12 @@
     },
     {
       "targetFile": "tmp/test-runtime/src/internal/html-engine/resource-guard.js",
-      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/unit/foundations.test.js"],
+      "testCommand": [
+        "node",
+        "--test",
+        "tmp/test-runtime/test/engine/unit/foundations.test.js",
+        "tmp/test-runtime/test/engine/tree/model.test.js"
+      ],
       "mutants": [
         {
           "id": "guard-abort-checkpoint",
@@ -69,6 +74,12 @@
           "description": "Disable the engine step limit.",
           "search": "checkLimit(\"maxSteps\", actual);",
           "replace": "if (false) checkLimit(\"maxSteps\", actual);"
+        },
+        {
+          "id": "guard-atomic-node-reservation",
+          "description": "Reserve only one node for every atomic multi-node allocation.",
+          "search": "const actualNodes = nodes + count;",
+          "replace": "const actualNodes = nodes + 1;"
         }
       ]
     },
@@ -273,6 +284,12 @@
           "description": "Report the next unused identity as an allocated node.",
           "search": "allocatedNodes: this.#nextSerial - 1,",
           "replace": "allocatedNodes: this.#nextSerial,"
+        },
+        {
+          "id": "tree-template-content-depth",
+          "description": "Treat template contents as sharing their host's DOM depth.",
+          "search": "return hostDepth === null ? null : hostDepth + 1;",
+          "replace": "return hostDepth;"
         }
       ]
     },
@@ -489,6 +506,42 @@
           "description": "Keep the parser in frameset mode after the outer frameset closes.",
           "search": "if (this.#fragmentContext === null && this.#currentNode().localName !== \"frameset\") {",
           "replace": "if (false && this.#fragmentContext === null && this.#currentNode().localName !== \"frameset\") {"
+        }
+      ]
+    },
+    {
+      "targetFile": "dist/public/mod.js",
+      "testCommand": ["node", "--test", "test/behavior/independent-product-adapter.test.js"],
+      "mutants": [
+        {
+          "id": "text-nested-parser-injection",
+          "description": "Route nested visible-text parsing through the production parser instead of its explicit owner.",
+          "search": "const iterate = (nodeOrTree, options) => iterateTextUsing(nodeOrTree, options, parseNestedFragment);",
+          "replace": "const iterate = (nodeOrTree, options) => iterateTextUsing(nodeOrTree, options, parseFragment);"
+        }
+      ]
+    },
+    {
+      "targetFile": "dist/integration/html-product-adapter.js",
+      "testCommand": ["node", "--test", "test/behavior/independent-product-adapter.test.js"],
+      "mutants": [
+        {
+          "id": "product-attribute-budget-map",
+          "description": "Expose the engine attribute-byte resource name instead of the public budget name.",
+          "search": "if (resource === \"maxAttributeUtf8BytesPerElement\")",
+          "replace": "if (false && resource === \"maxAttributeUtf8BytesPerElement\")"
+        },
+        {
+          "id": "product-template-content-conversion",
+          "description": "Drop the owned template-content fragment during public conversion.",
+          "search": "...(templateContent === undefined ? {} : { templateContent }),",
+          "replace": "...(templateContent === undefined ? {} : {}),"
+        },
+        {
+          "id": "product-processing-instruction-token",
+          "description": "Drop processing-instruction token data during public conversion.",
+          "search": "return Object.freeze({ kind: \"processingInstruction\", target: token.target, data: token.data });",
+          "replace": "return Object.freeze({ kind: \"processingInstruction\", target: token.target, data: \"\" });"
         }
       ]
     }
