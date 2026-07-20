@@ -15,7 +15,8 @@ const INCLUDED_PREFIXES = [
 ];
 
 const EXCLUDED_PREFIXES = [
-  "vendor/",
+  "test/fixtures/upstream/html5lib-encoding/",
+  "test/fixtures/upstream/html5lib-tokenizer/",
   "test/fixtures/upstream/wpt-tree-construction/resources/",
   "test/fixtures/upstream/whatwg-named-character-references/",
   "node_modules/",

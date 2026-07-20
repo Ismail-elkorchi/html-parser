@@ -9,7 +9,6 @@ import {
 } from "../../dist/mod.js";
 
 const DATA = "<&>\u00a0";
-let nextNodeId = 100000;
 
 export const WPT_OUTER_HTML_ELEMENTS = Object.freeze([
   "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo",
@@ -62,16 +61,16 @@ const element = (
     : { templateChildren: Object.freeze(options.templateChildren) })
 });
 
-function publicNode(descriptor) {
+function publicNode(descriptor, ids) {
   if (descriptor.type === "text") {
-    return { id: nextNodeId++, kind: "text", value: descriptor.value, spanProvenance: "none" };
+    return { id: ids.next++, kind: "text", value: descriptor.value, spanProvenance: "none" };
   }
   if (descriptor.type === "comment") {
-    return { id: nextNodeId++, kind: "comment", value: descriptor.value, spanProvenance: "none" };
+    return { id: ids.next++, kind: "comment", value: descriptor.value, spanProvenance: "none" };
   }
   if (descriptor.type === "processingInstruction") {
     return {
-      id: nextNodeId++,
+      id: ids.next++,
       kind: "processingInstruction",
       target: descriptor.target,
       data: descriptor.data,
@@ -80,7 +79,7 @@ function publicNode(descriptor) {
   }
   if (descriptor.type === "doctype") {
     return {
-      id: nextNodeId++,
+      id: ids.next++,
       kind: "doctype",
       name: descriptor.name,
       externalId: descriptor.externalId,
@@ -88,7 +87,7 @@ function publicNode(descriptor) {
     };
   }
   const node = {
-    id: nextNodeId++,
+    id: ids.next++,
     kind: "element",
     namespaceUri: descriptor.namespaceUri,
     prefix: descriptor.qualifiedName.includes(":")
@@ -103,14 +102,14 @@ function publicNode(descriptor) {
       name: entry.qualifiedName,
       value: entry.value
     })),
-    children: descriptor.children.map(publicNode),
+    children: descriptor.children.map((child) => publicNode(child, ids)),
     spanProvenance: "none"
   };
   if (descriptor.templateChildren !== undefined) {
     node.templateContent = {
-      id: nextNodeId++,
+      id: ids.next++,
       kind: "templateContent",
-      children: descriptor.templateChildren.map(publicNode),
+      children: descriptor.templateChildren.map((child) => publicNode(child, ids)),
       spanProvenance: "inferred"
     };
   }
@@ -385,9 +384,9 @@ export const WPT_SERIALIZING_OUTER_EXPECTATIONS = Object.freeze([
 ]);
 
 export function createPublicSerializationNode(descriptor) {
-  return publicNode(descriptor);
+  return publicNode(descriptor, { next: 100000 });
 }
 
 export function runPublicSerializationQualificationCase(testCase) {
-  return serialize(publicNode(testCase.descriptor), testCase.serializationOptions);
+  return serialize(createPublicSerializationNode(testCase.descriptor), testCase.serializationOptions);
 }

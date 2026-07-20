@@ -1,4 +1,0 @@
-Diagram
-Architecture overview
-
-Next section

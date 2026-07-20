@@ -4,6 +4,14 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Make WPT the sole tree-construction corpus, remove the html5lib-tests
+  submodule and duplicate legacy tree runner, and retain only manifest-verified
+  tokenizer and encoding snapshots with stable upstream fixture identities.
+- Separate product, engine, type-contract, tooling, support, and fixture test
+  ownership; delete inert bootstrap tests and misleading terminal-oracle code;
+  consolidate visible-text snapshots; and execute complete conformance corpora
+  without artificial holdout partitions.
+
 - Replace the tag-name-only fragment API with one normalized namespace-aware
   context and explicit scripting, owner-document mode, and external
   form-ancestor inputs; derive and retain the effective environment on fragment
@@ -72,8 +80,8 @@ All notable changes are documented in this file.
   escaped and double-escaped states, CDATA, processing instructions, exact
   diagnostics, synchronous parser feedback, and bounded resources; integrate
   the independent character-reference consumer in text and attribute contexts,
-  and verify all applicable primary and holdout fixtures across adversarial
-  chunk schedules.
+  and verify the complete applicable fixture corpus across adversarial chunk
+  schedules.
 - Generate a compact named-character-reference table from separately pinned
   WHATWG data and add an isolated incremental consumer with longest-match,
   attribute-context, numeric-replacement, exact diagnostic, and resource

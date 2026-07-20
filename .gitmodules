@@ -1,3 +1,0 @@
-[submodule "vendor/html5lib-tests"]
-	path = vendor/html5lib-tests
-	url = https://github.com/html5lib/html5lib-tests.git

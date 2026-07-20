@@ -1,0 +1,2016 @@
+{
+  "visibleText": [
+    {
+      "id": "case-001",
+      "input": "<div>Hello world</div>\n",
+      "expectedText": "Hello world",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Hello world"
+        }
+      ]
+    },
+    {
+      "id": "case-002",
+      "input": "<div> Hello   world  again </div>\n",
+      "expectedText": "Hello world again",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Hello world again"
+        }
+      ]
+    },
+    {
+      "id": "case-003",
+      "input": "<p>Line A<br>Line B</p>\n",
+      "expectedText": "Line A\nLine B",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Line A"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "Line B"
+        }
+      ]
+    },
+    {
+      "id": "case-004",
+      "input": "<p>Para A</p><p>Para B</p>\n",
+      "expectedText": "Para A\n\nPara B",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Para A"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Para B"
+        }
+      ]
+    },
+    {
+      "id": "case-005",
+      "input": "<article><h1>Title</h1><div>Body text</div></article>\n",
+      "expectedText": "Title\n\nBody text",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Title"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Body text"
+        }
+      ]
+    },
+    {
+      "id": "case-006",
+      "input": "<html><head><title>T</title><script>x=1</script></head><body><p>Visible</p></body></html>\n",
+      "expectedText": "Visible",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Visible"
+        }
+      ]
+    },
+    {
+      "id": "case-007",
+      "input": "<pre>  keep\n  spaces\n</pre>\n",
+      "expectedText": "keep\nspaces",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "keep"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "spaces"
+        }
+      ]
+    },
+    {
+      "id": "case-008",
+      "input": "<textarea>first\n  second\nthird</textarea>\n",
+      "expectedText": "first\nsecond\nthird",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "first"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "second"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "third"
+        }
+      ]
+    },
+    {
+      "id": "case-009",
+      "input": "<p>Photo <img alt=\"sunrise image\"></p>\n",
+      "expectedText": "Photo sunrise image",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Photo sunrise image"
+        }
+      ]
+    },
+    {
+      "id": "case-010",
+      "input": "<p>Photo <img src=\"x.png\"></p>\n",
+      "expectedText": "Photo",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Photo"
+        }
+      ]
+    },
+    {
+      "id": "case-011",
+      "input": "<form><input type=\"text\" value=\"alpha\"></form>\n",
+      "expectedText": "",
+      "expectedTokens": []
+    },
+    {
+      "id": "case-012",
+      "input": "<form><input type=\"hidden\" value=\"secret\"><input value=\"visible\"></form>\n",
+      "expectedText": "",
+      "expectedTokens": []
+    },
+    {
+      "id": "case-013",
+      "input": "<button value=\"submit-now\"></button>\n",
+      "expectedText": "submit-now",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "submit-now"
+        }
+      ]
+    },
+    {
+      "id": "case-014",
+      "input": "<button>Button Label</button>\n",
+      "expectedText": "Button Label",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Button Label"
+        }
+      ]
+    },
+    {
+      "id": "case-015",
+      "input": "<div aria-hidden=\"true\"><p>skip me</p></div><p>keep me</p>\n",
+      "expectedText": "keep me",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "keep me"
+        }
+      ]
+    },
+    {
+      "id": "case-016",
+      "input": "<div hidden><p>skip me</p></div><p>keep hidden attr out</p>\n",
+      "expectedText": "keep hidden attr out",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "keep hidden attr out"
+        }
+      ]
+    },
+    {
+      "id": "case-017",
+      "input": "<table><tr><td>a</td><td>b</td><td>c</td></tr></table>\n",
+      "expectedText": "a\tb\tc",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "a"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "b"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "c"
+        }
+      ]
+    },
+    {
+      "id": "case-018",
+      "input": "<table><tr><th>k</th><th>v</th></tr><tr><td>alpha</td><td>beta</td></tr></table>\n",
+      "expectedText": "k\tv\n\nalpha\tbeta",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "k"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "v"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "alpha"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "beta"
+        }
+      ]
+    },
+    {
+      "id": "case-019",
+      "input": "<ul><li>one</li><li>two</li><li>three</li></ul>\n",
+      "expectedText": "one\n\ntwo\n\nthree",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "one"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "two"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "three"
+        }
+      ]
+    },
+    {
+      "id": "case-020",
+      "input": "<section><p>first</p><p>second</p></section>\n",
+      "expectedText": "first\n\nsecond",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "first"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "second"
+        }
+      ]
+    },
+    {
+      "id": "case-021",
+      "input": "<!doctype html><!--comment--><p>text</p>\n",
+      "expectedText": "text",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "text"
+        }
+      ]
+    },
+    {
+      "id": "case-022",
+      "input": "<span>inline</span><div>block next</div><span>tail</span>\n",
+      "expectedText": "inline\nblock next\ntail",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "inline"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "block next"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "tail"
+        }
+      ]
+    },
+    {
+      "id": "case-023",
+      "input": "<p><code>  code   sample  </code></p>\n",
+      "expectedText": "code sample",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "code sample"
+        }
+      ]
+    },
+    {
+      "id": "case-024",
+      "input": "<p><kbd>  ctrl   c </kbd> now</p>\n",
+      "expectedText": "ctrl c now",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "ctrl c now"
+        }
+      ]
+    },
+    {
+      "id": "case-025",
+      "input": "<p><samp> result   output </samp></p>\n",
+      "expectedText": "result output",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "result output"
+        }
+      ]
+    },
+    {
+      "id": "case-026",
+      "input": "<template><p>tmpl</p></template><style>p{color:red}</style><p>live</p>\n",
+      "expectedText": "live",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "live"
+        }
+      ]
+    },
+    {
+      "id": "case-027",
+      "input": "<div><p>keep</p><p hidden>drop</p><p aria-hidden=\"true\">drop2</p></div>\n",
+      "expectedText": "keep",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "keep"
+        }
+      ]
+    },
+    {
+      "id": "case-028",
+      "input": "<p>tab\tinside text</p>\n",
+      "expectedText": "tab inside text",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "tab inside text"
+        }
+      ]
+    },
+    {
+      "id": "case-029",
+      "input": "<p>مرحبا بالعالم</p><p>こんにちは 世界</p>\n",
+      "expectedText": "مرحبا بالعالم\n\nこんにちは 世界",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "مرحبا بالعالم"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "こんにちは 世界"
+        }
+      ]
+    },
+    {
+      "id": "case-030",
+      "input": "<p>line1\r\nline2\rline3</p>\n",
+      "expectedText": "line1 line2 line3",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "line1 line2 line3"
+        }
+      ]
+    },
+    {
+      "id": "case-031",
+      "input": "<table><tbody><tr><td>A</td><td>B</td></tr></tbody></table>\n",
+      "expectedText": "A\tB",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "A"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "B"
+        }
+      ]
+    },
+    {
+      "id": "case-032",
+      "input": "<main><form><input value=\"v1\"><button>go</button></form><img alt=\"banner\"></main>\n",
+      "expectedText": "go\nbanner",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "go"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "banner"
+        }
+      ]
+    },
+    {
+      "id": "case-033",
+      "input": "<p>a<script>drop</script>b</p><noscript>fallback text</noscript>\n",
+      "expectedText": "ab\n\nfallback text",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "ab"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "fallback text"
+        }
+      ]
+    },
+    {
+      "id": "case-034",
+      "input": "<noscript>first <b>second</b></noscript><p>tail</p>\n",
+      "expectedText": "tail",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "tail"
+        }
+      ]
+    },
+    {
+      "id": "case-035",
+      "input": "<div hidden><noscript>hidden fallback</noscript></div><noscript>shown fallback</noscript>\n",
+      "expectedText": "shown fallback",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "shown fallback"
+        }
+      ]
+    },
+    {
+      "id": "case-036",
+      "input": "<div aria-hidden=\"true\"><noscript>aria hidden fallback</noscript></div><noscript>shown</noscript>\n",
+      "expectedText": "shown",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "shown"
+        }
+      ]
+    },
+    {
+      "id": "case-037",
+      "input": "<svg><title>alpha</title><text>beta</text></svg>\n",
+      "expectedText": "beta",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "beta"
+        }
+      ]
+    },
+    {
+      "id": "case-038",
+      "input": "<svg><title>alpha</title><text>beta</text></svg><p>tail</p>\n",
+      "expectedText": "beta\ntail",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "beta"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "tail"
+        }
+      ]
+    },
+    {
+      "id": "case-039",
+      "input": "<math><mi>alpha</mi><mo>+</mo><mi>beta</mi></math>\n",
+      "expectedText": "alpha+beta",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "alpha+beta"
+        }
+      ]
+    },
+    {
+      "id": "case-040",
+      "input": "<math><mi>alpha</mi><mi>beta</mi></math>\n",
+      "expectedText": "alphabeta",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "alphabeta"
+        }
+      ]
+    },
+    {
+      "id": "case-041",
+      "input": "<svg><text>alpha</text></svg><math><mi>beta</mi><mo>+</mo><mi>gamma</mi></math>\n",
+      "expectedText": "alphabeta+gamma",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "alphabeta+gamma"
+        }
+      ]
+    },
+    {
+      "id": "case-042",
+      "input": "<p>start</p><svg><title>x</title><text>y</text></svg><p>end</p>\n",
+      "expectedText": "start\n\ny\nend",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "start"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "y"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "end"
+        }
+      ]
+    },
+    {
+      "id": "case-043",
+      "input": "<p>row</p><table><tr><td><svg><text>a</text></svg></td><td><math><mi>b</mi><mo>+</mo><mi>c</mi></math></td></tr></table>\n",
+      "expectedText": "row\n\na\tb+c",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "row"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "a"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "b+c"
+        }
+      ]
+    },
+    {
+      "id": "case-044",
+      "input": "<noscript><svg><title>x</title><text>y</text></svg></noscript><p>z</p>\n",
+      "expectedText": "z",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "z"
+        }
+      ]
+    },
+    {
+      "id": "case-045",
+      "input": "<nav><a href='/a'>Alpha</a> <a href='/b'>Beta</a></nav><article><h1>Guide</h1><p>Start here</p></article><footer>End note</footer>\n",
+      "expectedText": "Alpha Beta\n\nGuide\n\nStart here\n\nEnd note",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Alpha Beta"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Guide"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Start here"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "End note"
+        }
+      ]
+    },
+    {
+      "id": "case-046",
+      "input": "<figure><img alt='Diagram'><figcaption>Architecture overview</figcaption></figure><p>Next section</p>\n",
+      "expectedText": "Diagram\nArchitecture overview\n\nNext section",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Diagram"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "Architecture overview"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Next section"
+        }
+      ]
+    },
+    {
+      "id": "case-047",
+      "input": "<ul><li><a href='/x'>Install</a></li><li><a href='/y'>Configure</a><ul><li>Linux</li><li>macOS</li></ul></li></ul>\n",
+      "expectedText": "Install\n\nConfigure\n\nLinux\n\nmacOS",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Install"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Configure"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Linux"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "macOS"
+        }
+      ]
+    },
+    {
+      "id": "case-048",
+      "input": "<table><tr><th>Key</th><th>Value</th></tr><tr><td>Host</td><td>api<br>backup</td></tr></table>\n",
+      "expectedText": "Key\tValue\n\nHost\tapi\nbackup",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Key"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "Value"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Host"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "api"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "backup"
+        }
+      ]
+    },
+    {
+      "id": "case-049",
+      "input": "<p>Command:</p><pre>npm run build\n  npm test</pre><p>Done</p>\n",
+      "expectedText": "Command:\n\nnpm run build\nnpm test\nDone",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Command:"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "npm run build"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "npm test"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "Done"
+        }
+      ]
+    },
+    {
+      "id": "case-050",
+      "input": "<p><a href='/logo'><img alt='Project logo'></a> Release notes</p>\n",
+      "expectedText": "Project logo Release notes",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Project logo Release notes"
+        }
+      ]
+    },
+    {
+      "id": "case-051",
+      "input": "<form><input type='hidden' value='secret'><input type='text' value='visible'><button value='Apply'>Ignored</button></form>\n",
+      "expectedText": "Apply",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Apply"
+        }
+      ]
+    },
+    {
+      "id": "case-052",
+      "input": "<div aria-hidden='1'><p>Skip me</p></div><section><h2>Status</h2><p>All green</p></section>\n",
+      "expectedText": "Status\n\nAll green",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Status"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "All green"
+        }
+      ]
+    },
+    {
+      "id": "case-053",
+      "input": "<details><summary>Read more</summary><p>Extended explanation</p></details><p>Tail</p>\n",
+      "expectedText": "Read more\nExtended explanation\n\nTail",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Read more"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "Extended explanation"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Tail"
+        }
+      ]
+    },
+    {
+      "id": "case-054",
+      "input": "<p>Before<script>const x = 1;</script>After</p><noscript>Fallback text</noscript>\n",
+      "expectedText": "BeforeAfter\n\nFallback text",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "BeforeAfter"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Fallback text"
+        }
+      ]
+    },
+    {
+      "id": "case-055",
+      "input": "<template><p>Template body</p></template><p>Visible body</p>\n",
+      "expectedText": "Visible body",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Visible body"
+        }
+      ]
+    },
+    {
+      "id": "case-056",
+      "input": "<p><svg><text>Node</text></svg><math><mi>A</mi><mo>=</mo><mi>B</mi></math></p><p>Equation</p>\n",
+      "expectedText": "NodeA=B\n\nEquation",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "NodeA=B"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Equation"
+        }
+      ]
+    },
+    {
+      "id": "case-057",
+      "input": "<html><head><link rel=\"alternate\" href=\"/fr\" hreflang=\"fr\"><link rel=\"canonical\" href=\"/en\"><meta name=\"description\" content=\"head words\"><title>Head title</title></head><body><p>Body text</p></body></html>\n",
+      "expectedText": "Body text",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Body text"
+        }
+      ]
+    },
+    {
+      "id": "case-058",
+      "input": "<p><a href=\"/logo\"><img src=\"logo.png\"></a>Release notes</p>\n",
+      "expectedText": "Release notes",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Release notes"
+        }
+      ]
+    },
+    {
+      "id": "case-059",
+      "input": "<p>Start <svg aria-hidden=\"true\"><text>icon label</text></svg> End</p>\n",
+      "expectedText": "Start End",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Start End"
+        }
+      ]
+    },
+    {
+      "id": "case-060",
+      "input": "<html><head><link rel=\"preload\" href=\"/bundle.js\" as=\"script\"><script>ignored()</script></head><body><span>Visible runtime text</span> <input type=\"hidden\" value=\"secret\"><input value=\"shown\"></body></html>\n",
+      "expectedText": "Visible runtime text",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Visible runtime text"
+        }
+      ]
+    },
+    {
+      "id": "case-061",
+      "input": "<body><noscript><div class=\"h2\"><span id=\"challenge-error-text\">Enable JavaScript and cookies to continue</span></div></noscript></body>\n",
+      "expectedText": "Enable JavaScript and cookies to continue",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Enable JavaScript and cookies to continue"
+        }
+      ]
+    },
+    {
+      "id": "case-062",
+      "input": "<body><noscript><style>.a{display:none}</style><p>Fallback <a href=\"/x\">content</a></p></noscript></body>\n",
+      "expectedText": "Fallback content",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Fallback content"
+        }
+      ]
+    },
+    {
+      "id": "case-063",
+      "input": "<body><noscript><div>Alpha<br>Beta</div><table><tr><td>x</td><td>y</td></tr></table></noscript></body>\n",
+      "expectedText": "Alpha\nBeta\n\nx\ty",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Alpha"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "Beta"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "x"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "y"
+        }
+      ]
+    },
+    {
+      "id": "case-064",
+      "input": "<p>Alpha</p><iframe src=\"/status/latest\"></iframe><p>Omega</p>\n",
+      "expectedText": "Alpha\n\nOmega",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Alpha"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Omega"
+        }
+      ]
+    },
+    {
+      "id": "case-065",
+      "input": "<p>Alpha</p><iframe src=\"/status/latest\">IFrame unavailable</iframe><p>Omega</p>\n",
+      "expectedText": "Alpha\n\nIFrame unavailable\nOmega",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Alpha"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "IFrame unavailable"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "Omega"
+        }
+      ]
+    },
+    {
+      "id": "case-066",
+      "input": "<html><head><meta http-equiv=\"refresh\" content=\"0;url=/login\"><title>Redirecting</title></head><body><p>Continue</p></body></html>\n",
+      "expectedText": "Continue",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Continue"
+        }
+      ]
+    },
+    {
+      "id": "case-067",
+      "input": "<html><head><link rel=\"alternate\" href=\"/fr\" hreflang=\"fr\"><link rel=\"alternate\" href=\"/es\" hreflang=\"es\"><link rel=\"canonical\" href=\"/en\"></head><body><nav><a href=\"/docs\">Docs</a><a href=\"/api\">API</a></nav></body></html>\n",
+      "expectedText": "DocsAPI",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "DocsAPI"
+        }
+      ]
+    },
+    {
+      "id": "case-068",
+      "input": "<button><img src=\"icon.png\">Run</button>\n",
+      "expectedText": "Run",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Run"
+        }
+      ]
+    },
+    {
+      "id": "case-069",
+      "input": "<button value=\"Submit\">Ignore child</button>\n",
+      "expectedText": "Submit",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Submit"
+        }
+      ]
+    },
+    {
+      "id": "case-070",
+      "input": "<div aria-hidden=\"\">Hidden panel</div><div>Visible panel</div>\n",
+      "expectedText": "Visible panel",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Visible panel"
+        }
+      ]
+    },
+    {
+      "id": "case-071",
+      "input": "<section hidden><p>Hidden text</p></section><section><p>Visible text</p></section>\n",
+      "expectedText": "Visible text",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Visible text"
+        }
+      ]
+    },
+    {
+      "id": "case-072",
+      "input": "<div hidden><iframe src=\"/challenge\">Secret fallback</iframe></div><p>Public</p>\n",
+      "expectedText": "Public",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Public"
+        }
+      ]
+    },
+    {
+      "id": "case-073",
+      "input": "<body><noscript><div><p>Enable JavaScript and cookies to continue</p><iframe src=\"/challenge\"></iframe></div></noscript></body>\n",
+      "expectedText": "Enable JavaScript and cookies to continue",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Enable JavaScript and cookies to continue"
+        }
+      ]
+    },
+    {
+      "id": "case-074",
+      "input": "<html><head><title>Head only</title><style>.x{display:none}</style><script>ignored()</script></head><body><img alt=\"Logo\"> <input type=\"text\" value=\"Search\"></body></html>\n",
+      "expectedText": "Logo",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Logo"
+        }
+      ]
+    },
+    {
+      "id": "case-075",
+      "input": "<main><a href=\"#home\">Home</a><span> / </span><a href=\"#news\">News</a></main><p>Ready</p>\n",
+      "expectedText": "Home / News\n\nReady",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Home / News"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Ready"
+        }
+      ]
+    },
+    {
+      "id": "case-076",
+      "input": "<nav><a href=\"/en\">English</a><a href=\"/fr\">Francais</a><a href=\"/ar\">Arabic</a></nav><p>Home</p>\n",
+      "expectedText": "EnglishFrancaisArabic\n\nHome",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "EnglishFrancaisArabic"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Home"
+        }
+      ]
+    },
+    {
+      "id": "case-077",
+      "input": "<nav><ul><li><a href=\"/en\">English</a></li><li><a href=\"/fr\">Francais</a></li><li><a href=\"/ar\">Arabic</a></li></ul></nav>\n",
+      "expectedText": "English\n\nFrancais\n\nArabic",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "English"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Francais"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Arabic"
+        }
+      ]
+    },
+    {
+      "id": "case-078",
+      "input": "<header><span>Languages:</span><a href=\"/en\">EN</a><a href=\"/de\">DE</a><a href=\"/es\">ES</a><a href=\"/it\">IT</a></header><main><h1>Portal</h1></main>\n",
+      "expectedText": "Languages:ENDEESIT\n\nPortal",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Languages:ENDEESIT"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Portal"
+        }
+      ]
+    },
+    {
+      "id": "case-079",
+      "input": "<nav><a href=\"/home\"><img src=\"home.svg\" alt=\"Home icon\"></a><a href=\"/docs\">Docs</a><a href=\"/api\">API</a></nav>\n",
+      "expectedText": "Home iconDocsAPI",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Home iconDocsAPI"
+        }
+      ]
+    },
+    {
+      "id": "case-080",
+      "input": "<nav><a href=\"/start\"><img src=\"logo.svg\"></a><a href=\"/pricing\">Pricing</a><a href=\"/about\">About</a></nav><footer>Contact</footer>\n",
+      "expectedText": "PricingAbout\n\nContact",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "PricingAbout"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Contact"
+        }
+      ]
+    },
+    {
+      "id": "case-081",
+      "input": "<div><nav><a href=\"/overview\">Overview</a><a href=\"/status\">Status</a></nav><aside><a href=\"/support\">Support</a></aside></div>\n",
+      "expectedText": "OverviewStatus\n\nSupport",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "OverviewStatus"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Support"
+        }
+      ]
+    },
+    {
+      "id": "case-082",
+      "input": "<form><label>Search</label><input type=\"text\" value=\"Query\"><button value=\"Go\">Ignored child</button></form>\n",
+      "expectedText": "SearchGo",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "SearchGo"
+        }
+      ]
+    },
+    {
+      "id": "case-083",
+      "input": "<section aria-hidden=\"true\"><a href=\"/en\">English</a><a href=\"/fr\">Francais</a></section><section><a href=\"/public\">Public</a></section>\n",
+      "expectedText": "Public",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Public"
+        }
+      ]
+    },
+    {
+      "id": "case-084",
+      "input": "<article><iframe src=\"/frame\">Frame fallback text</iframe><p>Body paragraph</p></article>\n",
+      "expectedText": "Frame fallback text\nBody paragraph",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Frame fallback text"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "Body paragraph"
+        }
+      ]
+    },
+    {
+      "id": "case-085",
+      "input": "<div><button value=\"Submit\">Send</button><button><img alt=\"Play icon\" src=\"play.svg\">Play</button></div>\n",
+      "expectedText": "SubmitPlay iconPlay",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "SubmitPlay iconPlay"
+        }
+      ]
+    },
+    {
+      "id": "case-086",
+      "input": "<body><link rel=\"canonical\" href=\"/en\"><link rel=\"alternate\" href=\"/fr\"><main><p>Visible body</p></main></body>\n",
+      "expectedText": "Visible body",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Visible body"
+        }
+      ]
+    },
+    {
+      "id": "case-087",
+      "input": "<main><a href=\"/products\">Products</a><span>|</span><a href=\"/solutions\">Solutions</a><span>|</span><a href=\"/resources\">Resources</a><span>|</span><a href=\"/contact\">Contact</a></main>\n",
+      "expectedText": "Products|Solutions|Resources|Contact",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Products|Solutions|Resources|Contact"
+        }
+      ]
+    },
+    {
+      "id": "case-088",
+      "input": "<main>\n  <h1>Document status</h1>\n  <section>\n    <h2>Area AD review</h2>\n    <p>Waiting for IESG review.</p>\n    <p>Sent in for review.</p>\n  </section>\n</main>\n",
+      "expectedText": "Document status\n\nArea AD review\n\nWaiting for IESG review.\n\nSent in for review.",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Document status"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Area AD review"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Waiting for IESG review."
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Sent in for review."
+        }
+      ]
+    },
+    {
+      "id": "case-089",
+      "input": "<section>\n  <button value=\"Read report\"></button>\n  <button aria-label=\"Read report\"></button>\n  <button>Read report</button>\n</section>\n",
+      "expectedText": "Read report Read report",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Read report Read report"
+        }
+      ]
+    },
+    {
+      "id": "case-090",
+      "input": "<article>\n  <a href=\"/video\"><img src=\"thumb.jpg\" alt=\"\"></a>\n  <a href=\"/video\"><img src=\"play.svg\" alt=\"Play\"></a>\n  <button value=\"Play\"></button>\n</article>\n",
+      "expectedText": "Play Play",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Play Play"
+        }
+      ]
+    },
+    {
+      "id": "case-091",
+      "input": "<nav>\n  <h2>On this page</h2>\n  <ol>\n    <li><a href=\"#intro\">1 Introduction</a></li>\n    <li><a href=\"#syntax\">2 Syntax</a></li>\n    <li><a href=\"#examples\">3 Examples</a></li>\n    <li><a href=\"#specs\">4 Specifications</a></li>\n  </ol>\n</nav>\n",
+      "expectedText": "On this page\n\n1 Introduction\n\n2 Syntax\n\n3 Examples\n\n4 Specifications",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "On this page"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "1 Introduction"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "2 Syntax"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "3 Examples"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "4 Specifications"
+        }
+      ]
+    },
+    {
+      "id": "case-092",
+      "input": "<header>\n  <a href=\"/home\">Home</a>\n  <a href=\"/docs\" aria-label=\"Docs\" title=\"Docs\"></a>\n  <a href=\"/status\">Status</a>\n</header>\n",
+      "expectedText": "Home Status",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Home Status"
+        }
+      ]
+    },
+    {
+      "id": "case-093",
+      "input": "<section>\n  <p>Press Enter or Space to select.</p>\n  <p aria-hidden=\"true\">Press Enter or Space to select.</p>\n  <p>Then choose a node region.</p>\n</section>\n",
+      "expectedText": "Press Enter or Space to select.\n\nThen choose a node region.",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Press Enter or Space to select."
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Then choose a node region."
+        }
+      ]
+    },
+    {
+      "id": "case-094",
+      "input": "<table>\n  <tr><th>Status</th><th>Latest action</th></tr>\n  <tr><td>Waiting for review</td><td><button value=\"View\"></button></td></tr>\n  <tr><td>Sent in for review</td><td><button>Open</button></td></tr>\n</table>\n",
+      "expectedText": "Status\tLatest action\n\nWaiting for review\tView\n\nSent in for review\tOpen",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Status"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "Latest action"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Waiting for review"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "View"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Sent in for review"
+        },
+        {
+          "kind": "tab",
+          "value": "\t"
+        },
+        {
+          "kind": "text",
+          "value": "Open"
+        }
+      ]
+    },
+    {
+      "id": "case-095",
+      "input": "<nav>\n  <ul>\n    <li><a href=\"/en\">English</a></li>\n    <li><a href=\"/fr\">Francais</a></li>\n    <li><a href=\"/es\">Espanol</a></li>\n  </ul>\n  <ul hidden>\n    <li><a href=\"/ar\">Arabic</a></li>\n    <li><a href=\"/de\">Deutsch</a></li>\n  </ul>\n</nav>\n",
+      "expectedText": "English\n\nFrancais\n\nEspanol",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "English"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Francais"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Espanol"
+        }
+      ]
+    },
+    {
+      "id": "case-096",
+      "input": "<section>\n  <p>Cloud service overview</p>\n  <button value=\"Read report\"></button>\n  <p>Background image alternate text is not emitted unless represented as text nodes.</p>\n</section>\n",
+      "expectedText": "Cloud service overview\n\nRead report\nBackground image alternate text is not emitted unless represented as text nodes.",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Cloud service overview"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Read report"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "Background image alternate text is not emitted unless represented as text nodes."
+        }
+      ]
+    },
+    {
+      "id": "case-097",
+      "input": "<article>\n  <noscript><div><p>Enable JavaScript to continue.</p><style>.x{display:none}</style></div></noscript>\n  <p>Fallback content ready.</p>\n</article>\n",
+      "expectedText": "Enable JavaScript to continue.\n\nFallback content ready.",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Enable JavaScript to continue."
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Fallback content ready."
+        }
+      ]
+    },
+    {
+      "id": "case-098",
+      "input": "<main>\n  <a href=\"/watch\"><img src=\"play.svg\" alt=\"Play icon\"></a>\n  <a href=\"/watch\">Watch now</a>\n  <span>|</span>\n  <a href=\"/docs\">Documentation</a>\n</main>\n",
+      "expectedText": "Play icon Watch now | Documentation",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Play icon Watch now | Documentation"
+        }
+      ]
+    },
+    {
+      "id": "case-099",
+      "input": "<nav>\n  <a href=\"#ref-1\">Reference 1</a>\n  <a href=\"#ref-2\">Reference 2</a>\n  <a href=\"#ref-3\">Reference 3</a>\n  <a href=\"#ref-10\">Reference 10</a>\n</nav>\n",
+      "expectedText": "Reference 1 Reference 2 Reference 3 Reference 10",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Reference 1 Reference 2 Reference 3 Reference 10"
+        }
+      ]
+    },
+    {
+      "id": "case-100",
+      "input": "<main><p>alpha <strong>beta</strong> gamma</p></main>\n",
+      "expectedText": "alpha beta gamma",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "alpha beta gamma"
+        }
+      ]
+    },
+    {
+      "id": "case-101",
+      "input": "<main><input type=\"hidden\" value=\"secret\"><input type=\"submit\" value=\"send\"><p>end</p></main>\n",
+      "expectedText": "send\nend",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "send"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "end"
+        }
+      ]
+    },
+    {
+      "id": "case-102",
+      "input": "<main><button value=\"Continue\"></button><p>end</p></main>\n",
+      "expectedText": "Continue\nend",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Continue"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "end"
+        }
+      ]
+    },
+    {
+      "id": "case-103",
+      "input": "<body><noscript>fallback text</noscript><p>tail</p></body>\n",
+      "expectedText": "fallback text\ntail",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "fallback text"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "tail"
+        }
+      ]
+    },
+    {
+      "id": "case-104",
+      "input": "<main><a href=\"/one\">Alpha</a> <a href=\"/two\">Beta</a></main>\n",
+      "expectedText": "Alpha Beta",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Alpha Beta"
+        }
+      ]
+    },
+    {
+      "id": "case-105",
+      "input": "<main><ol><li>First item</li><li>Second item</li></ol></main>\n",
+      "expectedText": "First item\n\nSecond item",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "First item"
+        },
+        {
+          "kind": "paragraphBreak",
+          "value": "\n\n"
+        },
+        {
+          "kind": "text",
+          "value": "Second item"
+        }
+      ]
+    },
+    {
+      "id": "case-106",
+      "input": "<main><img alt=\"brand logo\"><p>end</p></main>\n",
+      "expectedText": "brand logo\nend",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "brand logo"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "end"
+        }
+      ]
+    },
+    {
+      "id": "case-107",
+      "input": "<main><select><option>English</option><option>Francais</option></select> <span>docs</span></main>\n",
+      "expectedText": "docs",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "docs"
+        }
+      ]
+    },
+    {
+      "id": "case-108",
+      "input": "<main><select><option>English</option><option selected>Francais</option></select><p>end</p></main>\n",
+      "expectedText": "end",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "end"
+        }
+      ]
+    },
+    {
+      "id": "case-109",
+      "input": "<main><svg><title>Decorative title</title><text>Logo</text></svg><p>end</p></main>\n",
+      "expectedText": "Logo\nend",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "Logo"
+        },
+        {
+          "kind": "lineBreak",
+          "value": "\n"
+        },
+        {
+          "kind": "text",
+          "value": "end"
+        }
+      ]
+    },
+    {
+      "id": "case-110",
+      "input": "<main><option>Detached</option><p>end</p></main>\n",
+      "expectedText": "end",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "end"
+        }
+      ]
+    },
+    {
+      "id": "case-111",
+      "input": "<main><div style=\"display: none\">hidden menu</div><p>shown</p></main>\n",
+      "expectedText": "shown",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "shown"
+        }
+      ]
+    },
+    {
+      "id": "case-112",
+      "input": "<main><span style=\"visibility: hidden\">hidden</span><span>visible</span></main>\n",
+      "expectedText": "visible",
+      "expectedTokens": [
+        {
+          "kind": "text",
+          "value": "visible"
+        }
+      ]
+    }
+  ],
+  "accessibleNameFallback": [
+    {
+      "id": "case-001",
+      "input": "<a href=\"/x\" aria-label=\"Docs\"></a>\n",
+      "expectedDefaultText": "",
+      "expectedFallbackText": "",
+      "expectedFallbackTokens": []
+    },
+    {
+      "id": "case-002",
+      "input": "<button aria-label=\"Run\"></button>\n",
+      "expectedDefaultText": "",
+      "expectedFallbackText": "",
+      "expectedFallbackTokens": []
+    },
+    {
+      "id": "case-003",
+      "input": "<input type=\"button\" aria-label=\"Submit\">\n",
+      "expectedDefaultText": "",
+      "expectedFallbackText": "Submit",
+      "expectedFallbackTokens": [
+        {
+          "kind": "text",
+          "value": "Submit"
+        }
+      ]
+    },
+    {
+      "id": "case-004",
+      "input": "<input type=\"button\" title=\"Submit\"></input>\n",
+      "expectedDefaultText": "",
+      "expectedFallbackText": "",
+      "expectedFallbackTokens": []
+    },
+    {
+      "id": "case-005",
+      "input": "<input type=\"hidden\" aria-label=\"Hidden\">\n",
+      "expectedDefaultText": "",
+      "expectedFallbackText": "",
+      "expectedFallbackTokens": []
+    },
+    {
+      "id": "case-006",
+      "input": "<input type=\"button\" value=\"Go\" aria-label=\"Submit\">\n",
+      "expectedDefaultText": "Go",
+      "expectedFallbackText": "Go",
+      "expectedFallbackTokens": [
+        {
+          "kind": "text",
+          "value": "Go"
+        }
+      ]
+    },
+    {
+      "id": "case-007",
+      "input": "<div hidden><input type=\"button\" aria-label=\"Skip\"></div><p>Shown</p>\n",
+      "expectedDefaultText": "Shown",
+      "expectedFallbackText": "Shown",
+      "expectedFallbackTokens": [
+        {
+          "kind": "text",
+          "value": "Shown"
+        }
+      ]
+    },
+    {
+      "id": "case-008",
+      "input": "<div aria-hidden=\"true\"><input type=\"button\" aria-label=\"Skip\"></div><p>Shown</p>\n",
+      "expectedDefaultText": "Shown",
+      "expectedFallbackText": "Shown",
+      "expectedFallbackTokens": [
+        {
+          "kind": "text",
+          "value": "Shown"
+        }
+      ]
+    },
+    {
+      "id": "case-009",
+      "input": "<input type=\"text\" aria-label=\"Search\">\n",
+      "expectedDefaultText": "",
+      "expectedFallbackText": "Search",
+      "expectedFallbackTokens": [
+        {
+          "kind": "text",
+          "value": "Search"
+        }
+      ]
+    },
+    {
+      "id": "case-010",
+      "input": "<input aria-label=\"Search\">\n",
+      "expectedDefaultText": "",
+      "expectedFallbackText": "Search",
+      "expectedFallbackTokens": [
+        {
+          "kind": "text",
+          "value": "Search"
+        }
+      ]
+    },
+    {
+      "id": "case-011",
+      "input": "<input type=\"text\" value=\"Alpha\" aria-label=\"Search\">\n",
+      "expectedDefaultText": "",
+      "expectedFallbackText": "Search",
+      "expectedFallbackTokens": [
+        {
+          "kind": "text",
+          "value": "Search"
+        }
+      ]
+    },
+    {
+      "id": "case-012",
+      "input": "<main><a href=\"/x\" aria-label=\"Docs\"></a><button aria-label=\"Run\"></button><input type=\"button\" aria-label=\"Submit\"> <span>Next</span></main>\n",
+      "expectedDefaultText": "Next",
+      "expectedFallbackText": "Submit Next",
+      "expectedFallbackTokens": [
+        {
+          "kind": "text",
+          "value": "Submit Next"
+        }
+      ]
+    }
+  ]
+}

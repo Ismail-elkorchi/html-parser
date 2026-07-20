@@ -9,25 +9,10 @@ import {
   type HtmlTokenizerInitialState
 } from "../../src/internal/html-engine/tokenizer/tokenizer.js";
 
+import { loadHtml5libTokenizerInventory } from "./html5lib-fixture-inventory.js";
+
 import type { EngineParseError } from "../../src/internal/html-engine/diagnostics.js";
 import type { HtmlToken } from "../../src/internal/html-engine/tokens.js";
-
-const TOKENIZER_FIXTURE_PATHS = Object.freeze([
-  "vendor/html5lib-tests/tokenizer/test1.test",
-  "vendor/html5lib-tests/tokenizer/test2.test",
-  "vendor/html5lib-tests/tokenizer/test3.test",
-  "vendor/html5lib-tests/tokenizer/test4.test",
-  "vendor/html5lib-tests/tokenizer/entities.test",
-  "vendor/html5lib-tests/tokenizer/namedEntities.test",
-  "vendor/html5lib-tests/tokenizer/numericEntities.test",
-  "vendor/html5lib-tests/tokenizer/unicodeChars.test",
-  "vendor/html5lib-tests/tokenizer/unicodeCharsProblematic.test",
-  "vendor/html5lib-tests/tokenizer/domjs.test",
-  "vendor/html5lib-tests/tokenizer/escapeFlag.test",
-  "vendor/html5lib-tests/tokenizer/contentModelFlags.test",
-  "vendor/html5lib-tests/tokenizer/pendingSpecChanges.test",
-  "vendor/html5lib-tests/tokenizer/xmlViolation.test"
-]);
 
 type FixtureToken = readonly unknown[];
 
@@ -63,7 +48,6 @@ export interface EngineTokenizerFixtureCase {
   readonly lastStartTagName: string | null;
   readonly doubleEscaped: boolean;
   readonly xmlViolationMode: boolean;
-  readonly holdout: boolean;
 }
 
 export interface EngineTokenizerFixtureOutcome {
@@ -71,6 +55,22 @@ export interface EngineTokenizerFixtureOutcome {
   readonly fixtureTokens: readonly FixtureToken[];
   readonly errors: readonly EngineParseError[];
   readonly resources: EngineResourceUsage;
+}
+
+export interface EngineTokenizerFixtureDifference {
+  readonly id: string;
+  readonly initialState: string;
+  readonly input: string;
+  readonly expectedTokens: readonly FixtureToken[];
+  readonly expectedErrors: readonly string[] | null;
+  readonly actualTokens: readonly FixtureToken[];
+  readonly actualErrors: readonly string[];
+}
+
+export interface EngineTokenizerFixtureComparison {
+  readonly matches: boolean;
+  readonly recognizedStandardsDifference: boolean;
+  readonly difference: EngineTokenizerFixtureDifference | null;
 }
 
 function fixtureInitialState(initialState: string): HtmlTokenizerInitialState {
@@ -85,23 +85,17 @@ function fixtureInitialState(initialState: string): HtmlTokenizerInitialState {
   }
 }
 
-function computeHoldout(fixtureId: string): boolean {
-  let hash = 0;
-  for (let index = 0; index < fixtureId.length; index += 1) {
-    hash = (Math.imul(hash, 33) + fixtureId.charCodeAt(index)) >>> 0;
-  }
-  return hash % 10 === 0;
-}
-
 export function loadEngineTokenizerFixtures(): readonly EngineTokenizerFixtureCase[] {
   const cases: EngineTokenizerFixtureCase[] = [];
-  for (const path of TOKENIZER_FIXTURE_PATHS) {
-    const fixtureFile = JSON.parse(readFileSync(path, "utf8")) as RawTokenizerFixtureFile;
+  for (const fixtureSource of loadHtml5libTokenizerInventory()) {
+    const fixtureFile = JSON.parse(
+      readFileSync(fixtureSource.path, "utf8")
+    ) as RawTokenizerFixtureFile;
     const fixtures = fixtureFile.tests ?? fixtureFile.xmlViolationTests ?? [];
     for (let index = 0; index < fixtures.length; index += 1) {
       const fixture = fixtures[index];
       if (fixture === undefined) continue;
-      const fixtureId = `${path}#${String(index + 1)}`;
+      const fixtureId = `${fixtureSource.upstreamPath}#${String(index + 1)}`;
       for (const initialState of fixture.initialStates ?? ["Data state"]) {
         cases.push(Object.freeze({
           id: `${fixtureId}@${initialState}`,
@@ -115,8 +109,7 @@ export function loadEngineTokenizerFixtures(): readonly EngineTokenizerFixtureCa
           tokenizerInitialState: fixtureInitialState(initialState),
           lastStartTagName: fixture.lastStartTag ?? null,
           doubleEscaped: fixture.doubleEscaped ?? false,
-          xmlViolationMode: path.endsWith("xmlViolation.test"),
-          holdout: computeHoldout(fixtureId)
+          xmlViolationMode: fixtureSource.upstreamPath.endsWith("xmlViolation.test")
         }));
       }
     }
@@ -236,5 +229,41 @@ export function runEngineTokenizerFixture(
     fixtureTokens: toFixtureTokens(tokens, fixture),
     errors: Object.freeze(errors),
     resources: guard.snapshot()
+  });
+}
+
+/** Compares one tokenizer result with the complete token and diagnostic fixture contract. */
+export function compareEngineTokenizerFixture(
+  fixture: EngineTokenizerFixtureCase,
+  outcome: EngineTokenizerFixtureOutcome
+): EngineTokenizerFixtureComparison {
+  const actualErrors = Object.freeze(outcome.errors.map((error) => error.code));
+  const tokensMatch = JSON.stringify(outcome.fixtureTokens) === JSON.stringify(fixture.expectedTokens);
+  const errorsMatch = fixture.expectedErrorCodes === null || fixture.doubleEscaped ||
+    JSON.stringify(actualErrors) === JSON.stringify(fixture.expectedErrorCodes);
+  if (tokensMatch && errorsMatch) {
+    return Object.freeze({
+      matches: true,
+      recognizedStandardsDifference: false,
+      difference: null
+    });
+  }
+
+  const recognizedStandardsDifference = fixture.input.includes("<?") && (
+    outcome.tokens.some((token) => token.kind === "processing-instruction") ||
+    actualErrors.some((code) => code.includes("processing-instruction"))
+  );
+  return Object.freeze({
+    matches: false,
+    recognizedStandardsDifference,
+    difference: Object.freeze({
+      id: fixture.id,
+      initialState: fixture.initialState,
+      input: fixture.input,
+      expectedTokens: fixture.expectedTokens,
+      expectedErrors: fixture.expectedErrorCodes,
+      actualTokens: outcome.fixtureTokens,
+      actualErrors
+    })
   });
 }

@@ -1,3 +1,0 @@
-BeforeAfter
-
-Fallback text

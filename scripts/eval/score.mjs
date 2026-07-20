@@ -25,6 +25,14 @@ function passRate(report) {
   return safeDiv(passed, executedCaseCount);
 }
 
+function wptTreePassRate(report) {
+  const executed = Number(report?.executed ?? 0);
+  const exactPasses = Number(report?.exactPasses ?? 0);
+  const classifiedDifferences = Number(report?.classifiedDifferences ?? 0);
+  const unobserved = Array.isArray(report?.unobserved) ? report.unobserved.length : 0;
+  return safeDiv(exactPasses + classifiedDifferences, executed + unobserved);
+}
+
 function weighted(points, fraction01) {
   return points * Math.max(0, Math.min(1, fraction01));
 }
@@ -91,12 +99,12 @@ async function main() {
   let correctnessDetails = { skippedByWeight: true };
   if (correctnessPoints > 0) {
     const tokenizer = await loadRequired("reports/tokenizer.json");
-    const tree = await loadRequired("reports/tree.json");
+    const tree = await loadRequired("reports/engine-wpt-tree.json");
     const encoding = await loadRequired("reports/encoding.json");
     const serializer = await loadRequired("reports/serializer.json");
 
     const tokenizerPassRate = passRate(tokenizer);
-    const treePassRate = passRate(tree);
+    const treePassRate = wptTreePassRate(tree);
     const encodingPassRate = passRate(encoding);
     const serializerPassRate = passRate(serializer);
 

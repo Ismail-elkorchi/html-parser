@@ -50,7 +50,7 @@
     },
     {
       "targetFile": "scripts/qualification/performance-policy.mjs",
-      "testCommand": ["node", "--test", "test/behavior/performance-policy.test.js"],
+      "testCommand": ["node", "--test", "test/tooling/performance-policy.test.js"],
       "mutants": [
         {
           "id": "performance-throughput-threshold",
@@ -164,7 +164,7 @@
     },
     {
       "targetFile": "tmp/test-runtime/src/internal/html-engine/input-cursor.js",
-      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/unit/foundations.test.js"],
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/foundation/foundations.test.js"],
       "mutants": [
         {
           "id": "cursor-crlf-width",
@@ -191,7 +191,7 @@
       "testCommand": [
         "node",
         "--test",
-        "tmp/test-runtime/test/engine/unit/foundations.test.js",
+        "tmp/test-runtime/test/engine/foundation/foundations.test.js",
         "tmp/test-runtime/test/engine/tree/model.test.js"
       ],
       "mutants": [
@@ -670,7 +670,7 @@
       "testCommand": [
         "node",
         "--test",
-        "test/behavior/independent-product-contract.test.js",
+        "test/behavior/public-integration.test.js",
         "test/behavior/fragment-context.test.js"
       ],
       "mutants": [

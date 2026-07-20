@@ -7,7 +7,7 @@ import ts from "typescript";
 
 const ROOT_SOURCE = resolve("src/mod.ts");
 const JSR_SOURCE = resolve("jsr/mod.ts");
-const JSR_CONSUMER = resolve("test/fixtures/consumers/jsr.ts");
+const JSR_CONSUMER = resolve("test/contracts/consumers/jsr.ts");
 const NPM_DECLARATION = resolve("dist/mod.d.ts");
 
 function moduleInventory(program, filePath) {

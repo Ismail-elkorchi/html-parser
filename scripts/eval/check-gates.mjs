@@ -1,6 +1,10 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  loadVisibleTextFixtures,
+  VISIBLE_TEXT_FIXTURES_PATH
+} from "../../test/support/visible-text-fixtures.mjs";
 import {
   nowIso,
   readJson,
@@ -97,7 +101,7 @@ async function main() {
     )
   );
 
-  async function evaluateConformanceGate(gateId, gateName, reportPath, threshold, options = {}) {
+  async function evaluateConformanceGate(gateId, gateName, reportPath, threshold) {
     const report = await loadOptionalReport(reportPath);
     if (!report) {
       gates.push(makeGate(gateId, gateName, false, { missingReport: reportPath }));
@@ -108,24 +112,7 @@ async function main() {
     const passRate = safeDiv(passed, executed === 0 ? (passed + failed) : executed);
     const minPassRate = threshold.minPassRate;
     const maxSkips = threshold.maxSkips;
-    const holdoutExcluded = Number(report?.holdoutExcluded ?? report?.holdout?.excluded ?? 0);
-    const holdoutRule = typeof report?.holdoutRule === "string" ? report.holdoutRule : report?.holdout?.rule;
-    const holdoutMod = Number(report?.holdoutMod ?? report?.holdout?.mod ?? Number.NaN);
-    const totalSurface = passed + failed + skipped + holdoutExcluded;
-    const executedSurface = passed + failed;
-    const holdoutExcludedFraction = safeDiv(holdoutExcluded, totalSurface);
-    const enforceHoldoutDiscipline = Boolean(options.enforceHoldoutDiscipline);
-    const holdoutDisciplinePass =
-      !enforceHoldoutDiscipline ||
-      (holdoutExcludedFraction >= 0.05 &&
-        holdoutExcludedFraction <= 0.15 &&
-        typeof holdoutRule === "string" &&
-        Number.isFinite(holdoutMod));
-
-    const pass =
-      passRate >= minPassRate &&
-      skipped <= maxSkips &&
-      holdoutDisciplinePass;
+    const pass = passRate >= minPassRate && skipped <= maxSkips;
 
     gates.push(
       makeGate(gateId, gateName, pass, {
@@ -135,37 +122,74 @@ async function main() {
         failed,
         skipped,
         total,
-        executedSurface,
-        totalSurface,
-        holdoutExcluded,
-        holdoutExcludedFraction,
-        holdoutRule,
-        holdoutMod,
-        holdoutDisciplineRange: { min: 0.05, max: 0.15 },
-        holdoutDisciplinePass,
+        executed,
         maxSkips
       })
     );
   }
 
+  async function evaluateWptTreeGate(gateId, gateName, reportPath, threshold) {
+    const report = await loadOptionalReport(reportPath);
+    if (!report) {
+      gates.push(makeGate(gateId, gateName, false, { missingReport: reportPath }));
+      return;
+    }
+
+    const executed = Number(report.executed ?? 0);
+    const exactPasses = Number(report.exactPasses ?? 0);
+    const classifiedDifferences = Number(report.classifiedDifferences ?? 0);
+    const unexpected = Array.isArray(report.unexpected) ? report.unexpected : [];
+    const unobserved = Array.isArray(report.unobserved) ? report.unobserved : [];
+    const accepted = exactPasses + classifiedDifferences;
+    const passRate = safeDiv(accepted, executed + unobserved.length);
+    const accountingPass = executed > 0 && executed === accepted;
+    const pass =
+      report.suite === "html-parser-wpt-tree" &&
+      passRate >= threshold.minPassRate &&
+      unexpected.length === 0 &&
+      unobserved.length <= threshold.maxSkips &&
+      accountingPass;
+
+    gates.push(makeGate(gateId, gateName, pass, {
+      report: reportPath,
+      corpusCommit: report.corpusCommit,
+      corpusCompositeSha256: report.corpusCompositeSha256,
+      passRate,
+      minPassRate: threshold.minPassRate,
+      executed,
+      exactPasses,
+      classifiedDifferences,
+      unexpected: unexpected.length,
+      unobserved: unobserved.length,
+      maxUnobserved: threshold.maxSkips,
+      accountingPass
+    }));
+  }
+
   const conformanceThresholds = config.thresholds?.conformance || {};
-  await evaluateConformanceGate("G-040", "Conformance tokenizer", "reports/tokenizer.json", conformanceThresholds.tokenizer, {
-    enforceHoldoutDiscipline: true
-  });
-  await evaluateConformanceGate("G-050", "Conformance tree construction", "reports/tree.json", conformanceThresholds.tree, {
-    enforceHoldoutDiscipline: true
-  });
-  await evaluateConformanceGate("G-060", "Conformance encoding", "reports/encoding.json", conformanceThresholds.encoding, {
-    enforceHoldoutDiscipline: true
-  });
+  await evaluateConformanceGate(
+    "G-040",
+    "Conformance tokenizer",
+    "reports/tokenizer.json",
+    conformanceThresholds.tokenizer
+  );
+  await evaluateWptTreeGate(
+    "G-050",
+    "WPT tree-construction qualification",
+    "reports/engine-wpt-tree.json",
+    conformanceThresholds.tree
+  );
+  await evaluateConformanceGate(
+    "G-060",
+    "Conformance encoding",
+    "reports/encoding.json",
+    conformanceThresholds.encoding
+  );
   await evaluateConformanceGate(
     "G-070",
     "Conformance serializer",
     "reports/serializer.json",
-    conformanceThresholds.serializer,
-    {
-      enforceHoldoutDiscipline: true
-    }
+    conformanceThresholds.serializer
   );
 
   const determinismReport = await loadOptionalReport("reports/determinism.json");
@@ -256,30 +280,16 @@ async function main() {
   const textExtractionDocsExist = await fileExists("docs/querying-and-text.md");
   const textExtractionTestsExist = await fileExists("test/behavior/visible-text.test.js");
 
-  const fixtureRoot = "test/fixtures/visible-text/v1";
+  const fixturePath = VISIBLE_TEXT_FIXTURES_PATH;
   let fixtureCaseCount = 0;
+  let fallbackFixtureCaseCount = 0;
   let fixtureShapeOk = false;
   let fixtureScanError = null;
   try {
-    const fixtureEntries = await readdir(fixtureRoot, { withFileTypes: true });
-    const fixtureIds = fixtureEntries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-    fixtureCaseCount = fixtureIds.length;
-
-    let allFixtureFilesPresent = true;
-    for (const fixtureId of fixtureIds) {
-      const inputPath = `${fixtureRoot}/${fixtureId}/input.html`;
-      const expectedTextPath = `${fixtureRoot}/${fixtureId}/expected.txt`;
-      const expectedTokensPath = `${fixtureRoot}/${fixtureId}/expected.tokens.json`;
-      const hasAllFiles =
-        (await fileExists(inputPath)) &&
-        (await fileExists(expectedTextPath)) &&
-        (await fileExists(expectedTokensPath));
-      if (!hasAllFiles) {
-        allFixtureFilesPresent = false;
-        break;
-      }
-    }
-    fixtureShapeOk = allFixtureFilesPresent && fixtureCaseCount >= 30;
+    const fixtures = await loadVisibleTextFixtures();
+    fixtureCaseCount = fixtures.visibleText.length;
+    fallbackFixtureCaseCount = fixtures.accessibleNameFallback.length;
+    fixtureShapeOk = true;
   } catch (error) {
     fixtureScanError = error instanceof Error ? error.message : String(error);
   }
@@ -306,8 +316,9 @@ async function main() {
         textExtractionApiError,
         textExtractionDocsExist,
         textExtractionTestsExist,
-        fixtureRoot,
+        fixturePath,
         fixtureCaseCount,
+        fallbackFixtureCaseCount,
         fixtureShapeOk,
         fixtureScanError,
         agentTextExtractionFeaturePresent,
@@ -513,7 +524,7 @@ async function main() {
       if (performanceReport.schemaVersion !== 4) {
         performanceFailures.push("Performance report schemaVersion must be 4");
       }
-      if (performanceReport.suite !== "independent-engine-cross-revision-performance") {
+      if (performanceReport.suite !== "html-parser-cross-revision-performance") {
         performanceFailures.push("Performance report suite is invalid");
       }
       if (!performanceReport.ok || (performanceReport.failures ?? []).length > 0) {
@@ -641,7 +652,6 @@ async function main() {
   );
 
   const requireFlagReportMap = {
-    requireHoldouts: ["reports/holdout.json"],
     requireBrowserDiff: ["reports/browser-diff.json"],
     requireDeno: ["reports/smoke.json"],
     requireBun: ["reports/smoke.json"],
@@ -651,7 +661,7 @@ async function main() {
     requireAgentReport: ["reports/agent.json"],
     requireConformanceReports: [
       "reports/tokenizer.json",
-      "reports/tree.json",
+      "reports/engine-wpt-tree.json",
       "reports/encoding.json",
       "reports/serializer.json"
     ],
@@ -685,10 +695,6 @@ async function main() {
       missingProducerReports
     })
   );
-
-  if (profilePolicy.requireHoldouts) {
-    await evaluateConformanceGate("R-200", "Holdout suite", "reports/holdout.json", conformanceThresholds.holdout);
-  }
 
   if (profilePolicy.requireBrowserDiff) {
     const browserDiffReport = await loadOptionalReport("reports/browser-diff.json");

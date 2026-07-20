@@ -3,11 +3,10 @@
 ## Set up the repository
 
 Create changes on a short-lived branch and submit them through a pull request.
-Install the locked toolchain and initialize the conformance fixtures:
+Install the locked toolchain; all conformance fixtures are checked in:
 
 ```bash
 npm ci
-git submodule update --init --recursive
 ```
 
 ## Verify a change

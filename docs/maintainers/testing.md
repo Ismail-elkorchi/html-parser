@@ -1,10 +1,10 @@
 # Testing
 
-Install from the lockfile and initialize the conformance corpus once:
+Install from the lockfile. All conformance corpora are checked in and normal
+tests do not fetch fixture data:
 
 ```bash
 npm ci
-git submodule update --init --recursive
 ```
 
 ## Everyday changes
@@ -20,14 +20,15 @@ Use narrower commands while iterating:
 | Do owned sources satisfy lint rules? | `npm run lint` |
 | Do production TypeScript sources compile? | `npm run typecheck` |
 | Does the package build? | `npm run build` |
-| Do engine foundation units pass? | `npm run test:engine:unit` |
+| Do engine foundation units pass? | `npm run test:engine:foundations` |
 | Do character references match pinned data and fixtures? | `npm run test:engine:character-references` |
-| Do tokenizer states match their assigned primary and holdout fixtures? | `npm run test:engine:tokenizer` |
+| Does the tokenizer match the complete pinned corpus? | `npm run test:engine:tokenizer` |
 | Do direct tree-model mutations and resource boundaries pass? | `npm run test:engine:tree` |
 | Do assigned document cases and every fragment case match WPT trees and diagnostic views? | `npm run test:engine:tree-builder:conformance` |
 | Do all compiled TypeScript runtime tests pass? | `npm run test:runtime` |
 | Do compile-only API contracts pass? | `npm run test:types` |
 | Do production behavior and regression tests pass? | `npm run test:behavior` |
+| Do repository tooling and corpus readers pass? | `npm run test:tooling` |
 | Does the normal local test set pass? | `npm test` |
 | Does the complete maintained WPT tree snapshot pass its exact classifications? | `npm run qualification:wpt` |
 | Does public serialization match pinned expectations and classified round trips? | `npm run qualification:serialization` |
@@ -42,8 +43,11 @@ Use narrower commands while iterating:
 All tests live under one `test` root. `test/behavior` owns public and current
 production regressions, `test/engine` owns parser-engine units,
 `test/contracts` owns compile-only positive and deliberate negative type
-contracts, `test/support` owns fixture adapters/readers, and `test/fixtures`
-owns checked-in data. Differential, fuzz, benchmark, and corpus-scale
+contracts and consumer projects, `test/tooling` owns tests of repository
+scripts and corpus readers, `test/support` owns shared fixture adapters, and
+`test/fixtures` owns checked-in data. Behavior and tooling directories contain
+only discoverable `*.test.js` modules; their runner rejects other files instead
+of silently ignoring them. Differential, fuzz, benchmark, and corpus-scale
 conformance drivers stay in their matching `scripts` subdirectories because
 they are executable test programs rather than Node test modules.
 
@@ -56,19 +60,16 @@ parsing imports them and are never exported as package entrypoints.
 
 ## Parser semantics
 
-`npm run test:conformance` runs the pinned tokenizer, tree, encoding,
-serializer, and currently named holdout suites. The tokenizer, tree, and
-encoding adapters exercise the production parser. The serializer suite calls
-the built package's public `serialize` export directly; it does not use a
-test-only rendering implementation. Individual commands are available as
-`test:tokenizer`, `test:tree`, `test:encoding`, `test:serializer`, and
-`test:holdout`. The maintained WPT tree suite is separate because it runs the
-complete snapshot, adversarial fragment chunks, and exact fingerprinted
-classifications.
-
-The aggregate command currently executes every partition, including holdout;
-the label does not make those cases hidden. Treat all of its results as one
-visible conformance signal. Corpus details and refresh constraints are in
+`npm run test:conformance` runs every applicable case in the pinned tokenizer
+and encoding corpora, the complete public serializer suite, and the maintained
+WPT tree-construction snapshot. The tokenizer and encoding adapters exercise
+the production parser. The serializer suite calls the built package's public
+`serialize` export directly; it does not use a test-only rendering
+implementation. Individual commands are available as `test:tokenizer`,
+`test:encoding`, `test:serializer`, and `qualification:wpt`. WPT is the sole
+tree-construction authority and its qualification covers all document and
+fragment cases, adversarial fragment chunks, and exact fingerprinted
+classifications. Corpus details and refresh constraints are in
 [corpora.md](./corpora.md).
 
 `npm run qualification:serialization` verifies the exact pinned WPT
@@ -115,6 +116,8 @@ an oracle's behavior blindly.
   fragment node-budget failures.
 - `npm run test:bench:engine-formatting` records indexed Noah-family handling,
   full reconstruction, repeated adoption, and first-unavailable-step evidence.
+- `npm run test:bench:public-api` records large document, template, and deep
+  fragment behavior through the public package surface.
 - `npm run test:browser-diff:engine-formatting` compares focused independent
   formatting/recovery trees with every locally available browser engine.
 - `npm run test:browser-diff:engine-contextual` compares focused table,

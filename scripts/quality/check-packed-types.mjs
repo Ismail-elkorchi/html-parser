@@ -22,8 +22,8 @@ try {
 
   await rm(WORK_DIRECTORY, { recursive: true, force: true });
   await mkdir(WORK_DIRECTORY, { recursive: true });
-  await copyFile("test/fixtures/consumers/npm/index.ts", `${WORK_DIRECTORY}/index.ts`);
-  await copyFile("test/fixtures/consumers/npm/tsconfig.json", `${WORK_DIRECTORY}/tsconfig.json`);
+  await copyFile("test/contracts/consumers/npm/index.ts", `${WORK_DIRECTORY}/index.ts`);
+  await copyFile("test/contracts/consumers/npm/tsconfig.json", `${WORK_DIRECTORY}/tsconfig.json`);
   await copyFile(tarballPath, `${WORK_DIRECTORY}/${basename(tarballPath)}`);
   await writeFile(
     `${WORK_DIRECTORY}/package.json`,

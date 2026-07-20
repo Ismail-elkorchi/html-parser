@@ -176,14 +176,7 @@ export const PUBLIC_SERIALIZER_CASES = Object.freeze([
   }
 ]);
 
-export function isPublicSerializerHoldout(caseId) {
-  let hash = 0;
-  for (let index = 0; index < caseId.length; index += 1) {
-    hash = (Math.imul(hash, 37) + caseId.charCodeAt(index)) >>> 0;
-  }
-  return hash % 10 === 0;
-}
-
 export function runPublicSerializerCase(testCase) {
+  nextNodeId = 1;
   return serialize(testCase.input(), testCase.options ?? {});
 }
