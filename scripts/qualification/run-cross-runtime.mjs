@@ -56,7 +56,7 @@ const hashes = new Set(results.map((result) => result.determinismHash).filter(Bo
 const exactAgreement = results.length === runtimes.length &&
   results.every((result) => result.status === "pass") && hashes.size === 1;
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 1,
   suite: "html-parser-cross-runtime",
   generatedAt: new Date().toISOString(),
   expectedRuntimes: runtimes.map((runtime) => runtime.id),

@@ -72,7 +72,7 @@ for (const relativePath of corpus.fixtureFiles) {
 }
 
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 1,
   suite: "html-parser-public-fragments",
   generatedAt: new Date().toISOString(),
   implementation: "dist/mod.js#parseFragment",

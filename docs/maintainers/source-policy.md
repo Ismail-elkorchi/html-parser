@@ -6,8 +6,8 @@ parser implementation.
 
 Do not call the work formally “clean-room” unless a separately reviewed
 two-role isolation process and appropriate legal review are actually in place.
-Maintainers who have inspected the current vendored engine cannot establish
-that claim merely by writing new code from scratch.
+Earlier repository history exposed maintainers to a third-party implementation,
+so this repository does not claim that formal process.
 
 ## Allowed implementation sources
 
@@ -19,9 +19,9 @@ that claim merely by writing new code from scratch.
 - html-parser public types, user documentation, and accepted product regression
   tests for package-specific contracts
 
-Pin the exact HTML and Encoding revisions used by an implementation phase.
-Living standards change; do not silently change the normative baseline in the
-middle of a feature.
+Pin the exact HTML and Encoding revisions used by the maintained engine.
+Living standards change; update the normative baseline as an explicit,
+reviewable change.
 
 Authoritative tests may come from WPT, html5lib-tests, product regressions, and
 black-box results from standards-conforming browsers. Preserve exact snapshot

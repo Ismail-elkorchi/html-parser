@@ -194,7 +194,7 @@ async function main() {
     const baseUrl = `http://127.0.0.1:${String(address.port)}`;
     const smoke = await runBrowserSmoke(baseUrl);
     const report = {
-      schemaVersion: 2,
+      schemaVersion: 1,
       suite: "html-parser-browser-smoke",
       runtime: "browser",
       generatedAt: new Date().toISOString(),

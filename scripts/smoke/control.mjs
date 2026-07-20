@@ -280,7 +280,7 @@ async function main() {
 
   if (args.report !== undefined) {
     await writeReport(args.report, {
-      schemaVersion: 2,
+      schemaVersion: 1,
       suite: "html-parser-runtime-smoke",
       runtime,
       generatedAt,

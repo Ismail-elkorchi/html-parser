@@ -7,7 +7,11 @@ All notable changes are documented in this file.
 - Replace staged parser evidence and score-based evaluation wrappers with one
   direct test/qualification command surface; make fixture refreshes
   transactional, package checks exercise the installed tarball, mutation run
-  in an isolated workspace, and release/publish validation fail closed.
+  in an isolated workspace, and release metadata and publication preflight
+  validation fail closed.
+- Keep unreleased diagnostic report formats at schema version 1, align public
+  attribute helpers with query-module ownership, and simplify project guidance
+  and runnable examples around the current package surface.
 - Make WPT the sole tree-construction corpus, remove the html5lib-tests
   submodule and duplicate legacy tree runner, and retain only manifest-verified
   tokenizer and encoding snapshots with stable upstream fixture identities.
@@ -149,8 +153,7 @@ All notable changes are documented in this file.
   accounting across decoding and parsing.
 - Remove the `includeSpans` compatibility alias and impossible parse-diagnostic
   variants from the public type surface.
-- Support both structured and flat Deno documentation output, and add actionable
-  conformance-submodule setup guidance.
+- Support both structured and flat Deno documentation output.
 
 ## [0.1.1] - 2026-03-04
 - Add OIDC `publish.yml` workflow for npm Trusted Publishing and JSR publish on release events.

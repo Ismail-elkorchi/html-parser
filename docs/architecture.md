@@ -61,11 +61,7 @@ owner. Platform entrypoints contain no business logic.
 New code must be strict TypeScript from its first change; generated standards
 data must be reproducible and separated from handwritten algorithms.
 The compiler checks library declarations instead of using `skipLibCheck`.
-Declaration output remains compiler-generated from the canonical source graph;
-`isolatedDeclarations` is intentionally not enabled because the project does
-not use an alternate or parallel declaration emitter. Its remaining required
-annotations would duplicate the inferred internal reason map and standards
-baseline without changing the declarations emitted by the current compiler.
+Declaration output remains compiler-generated from the canonical source graph.
 
 The parser engine lives under `src/internal/html-engine` and is imported only
 through the public parsing owner. It is included in npm and JSR artifacts as

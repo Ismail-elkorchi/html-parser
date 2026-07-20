@@ -1,5 +1,6 @@
 import { requireString } from "./html-input.ts";
 import {
+  HTML_NAMESPACE_URI,
   asciiLowercase,
   isHtmlElement,
   iterateNodes
@@ -83,6 +84,51 @@ export function findById(
   }
 
   return null;
+}
+
+/** Returns an unnamespaced HTML attribute value using ASCII case-insensitive matching. */
+export function getAttributeValue(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  name: string
+): string | undefined {
+  if (node.namespaceUri !== HTML_NAMESPACE_URI) {
+    return undefined;
+  }
+  const target = asciiLowercase(name);
+  for (const attribute of node.attributes) {
+    if (attribute.namespaceUri === null && asciiLowercase(attribute.localName) === target) {
+      return attribute.value;
+    }
+  }
+  return undefined;
+}
+
+/** Tests for an unnamespaced HTML attribute using ASCII case-insensitive matching. */
+export function hasAttribute(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  name: string
+): boolean {
+  return getAttributeValue(node, name) !== undefined;
+}
+
+/** Returns an attribute value by exact namespace URI and local name. */
+export function getAttributeValueNS(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  namespaceUri: string | null,
+  localName: string
+): string | undefined {
+  return node.attributes.find((attribute) =>
+    attribute.namespaceUri === namespaceUri && attribute.localName === localName
+  )?.value;
+}
+
+/** Tests for an attribute by exact namespace URI and local name. */
+export function hasAttributeNS(
+  node: Extract<HtmlNode, { kind: "element" }>,
+  namespaceUri: string | null,
+  localName: string
+): boolean {
+  return getAttributeValueNS(node, namespaceUri, localName) !== undefined;
 }
 
 function* findAllByTagNameIterator(

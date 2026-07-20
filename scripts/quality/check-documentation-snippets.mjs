@@ -166,7 +166,7 @@ async function main() {
   }
 
   const report = {
-    schemaVersion: 2,
+    schemaVersion: 1,
     suite: "html-parser-documentation-snippets",
     generatedAt: nowIso(),
     ok: failures.length === 0,

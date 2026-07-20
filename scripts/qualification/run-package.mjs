@@ -188,7 +188,7 @@ try {
   }
 
   report = {
-    schemaVersion: 2,
+    schemaVersion: 1,
     suite: "html-parser-package",
     generatedAt: nowIso(),
     ok: failures.length === 0,
@@ -218,7 +218,7 @@ try {
   };
 } catch (error) {
   report = {
-    schemaVersion: 2,
+    schemaVersion: 1,
     suite: "html-parser-package",
     generatedAt: nowIso(),
     ok: false,

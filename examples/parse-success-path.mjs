@@ -1,9 +1,4 @@
-/**
- * What it does: parses HTML, extracts visible text, then serializes the tree.
- * Expected output: prints "parse-success-path ok" and non-zero text/serialization lengths.
- * Constraints: expects parser outputs to remain deterministic for the same input string.
- * Run: npm run build && node examples/parse-success-path.mjs
- */
+/** Parses HTML, extracts visible text, and serializes the tree. Run after `npm run build`. */
 import { VISIBLE_TEXT_HTML_POLICY, extractText, parse, serialize } from "../dist/mod.js";
 
 function assert(condition, message) {

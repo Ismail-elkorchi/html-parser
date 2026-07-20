@@ -115,7 +115,7 @@ function main() {
   const workspaceRoot = createWorkspace(repoRoot);
 
   const report = {
-    schemaVersion: 3,
+    schemaVersion: 1,
     suite: "html-parser-mutation",
     generatedAt: new Date().toISOString(),
     config: path.relative(repoRoot, configPath).split(path.sep).join("/"),
