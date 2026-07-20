@@ -21,7 +21,6 @@ import {
   requireString,
   utf8ByteLength
 } from "../public/html-input.js";
-import { createTextOperations } from "../public/mod.js";
 import {
   createOperationContext,
   normalizeParseBytesOptions,
@@ -32,6 +31,7 @@ import {
 } from "../public/operation.js";
 import { normalizeParseErrorId, TraceSink } from "../public/parse-trace.js";
 import { registerParsedDocument } from "../public/parsed-document-registry.js";
+import { createTextOperations } from "../public/text-extraction.js";
 
 import type {
   EngineParseError,

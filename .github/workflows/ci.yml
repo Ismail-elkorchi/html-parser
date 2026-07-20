@@ -54,6 +54,14 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Public surface parity
+        if: matrix.node-version == 20
+        run: npm run test:public-surface
+
+      - name: Packed type consumers
+        if: matrix.node-version == 20
+        run: npm run test:packed-types
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 

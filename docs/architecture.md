@@ -59,15 +59,19 @@ and implementation-isolation rules are in the
 
 ## Module boundaries
 
-Public entry points should contain public contracts and thin orchestration.
-Parsing mechanics, encoding, serialization, extraction, and source editing
-belong in focused internal modules. New code must be strict TypeScript from its
-first change; generated standards data must be reproducible and separated from
-handwritten algorithms.
+`src/mod.ts` is the sole public export list, and `src/public/types.ts` is the
+sole portable public type model. The JSR entrypoint re-exports that root; it
+does not redeclare types or wrap functions.
 
-The current large `src/public/mod.ts` and manually duplicated JSR declarations
-are migration debt, not templates. Until they are split, contract changes must
-update npm and JSR surfaces together and run both documentation/type checks.
+Public implementation is separated by independently testable responsibility:
+parsing, serialization, text extraction, querying/traversal, outlining,
+patching, and chunking. Shared public-tree ownership rules and namespace
+constants live in the model module. Input/decoding, option normalization,
+tracing, budgets, and parsed-document identity each have one operation-level
+owner. Platform entrypoints contain no business logic.
+
+New code must be strict TypeScript from its first change; generated standards
+data must be reproducible and separated from handwritten algorithms.
 
 The replacement engine foundations live under `src/internal/html-engine` while
 they are incomplete. That subtree has no production importer, is excluded from
