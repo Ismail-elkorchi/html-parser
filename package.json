@@ -70,6 +70,7 @@
     "test:browser-diff": "npm run build && node scripts/oracles/run-browser-diff.mjs",
     "test:browser-diff:engine-formatting": "npm run build && node scripts/oracles/run-engine-formatting-browser-diff.mjs",
     "test:browser-diff:engine-contextual": "npm run build && node scripts/oracles/run-engine-contextual-browser-diff.mjs",
+    "test:browser-diff:engine-foreign-fragment": "npm run build && node scripts/oracles/run-engine-foreign-fragment-browser-diff.mjs",
     "test:fuzz": "npm run build && node scripts/fuzz/run-fuzz.mjs",
     "test:bench": "npm run build && node scripts/bench/run-bench.mjs",
     "test:bench:hard-budgets": "npm run build && node --expose-gc scripts/bench/run-hard-budget-evidence.mjs",

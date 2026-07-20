@@ -24,7 +24,7 @@ Use narrower commands while iterating:
 | Do independent character references match pinned data and fixtures? | `npm run test:engine:character-references` |
 | Do isolated tokenizer states match their assigned primary and holdout fixtures? | `npm run test:engine:tokenizer` |
 | Do direct tree-model mutations and resource boundaries pass? | `npm run test:engine:tree` |
-| Do assigned basic tree-construction cases match WPT trees and declared error counts? | `npm run test:engine:tree-builder:conformance` |
+| Do assigned document cases and every fragment case match WPT trees and diagnostic views? | `npm run test:engine:tree-builder:conformance` |
 | Do all compiled TypeScript runtime tests pass? | `npm run test:runtime` |
 | Do compile-only API contracts pass? | `npm run test:types` |
 | Do production behavior and regression tests pass? | `npm run test:behavior` |
@@ -84,8 +84,9 @@ an oracle's behavior blindly.
 - `npm run test:bench:engine-tree` records isolated deep and wide direct-tree
   construction, traversal, validation, heap, and resource evidence.
 - `npm run test:bench:engine-tree-builder` records immediate parsing for deep,
-  whitespace-boundary-heavy, error-heavy, table, foster-parent, and template
-  document inputs, including exact contextual step-budget failure.
+  whitespace-boundary-heavy, error-heavy, table, foster-parent, template,
+  foreign-content, and fragment inputs, including exact contextual step and
+  fragment node-budget failures.
 - `npm run test:bench:engine-formatting` records indexed Noah-family handling,
   full reconstruction, repeated adoption, and first-unavailable-step evidence.
 - `npm run test:browser-diff:engine-formatting` compares focused independent
@@ -93,6 +94,10 @@ an oracle's behavior blindly.
 - `npm run test:browser-diff:engine-contextual` compares focused table,
   template, relaxed-select, and frameset trees. Accepted browser lag is tied to
   exact normalized-tree fingerprints so a different disagreement still fails.
+- `npm run test:browser-diff:engine-foreign-fragment` compares namespace,
+  adjustment, integration-point, CDATA, and fragment-context trees. Known
+  browser differences are likewise accepted only by exact fingerprints backed
+  by the pinned WPT result.
 - `npm run mutation:pilot` writes a disposable report under `reports/`.
 
 Do not commit generated benchmark or mutation JSON as documentation. Record a

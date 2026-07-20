@@ -3,9 +3,11 @@ import test from "node:test";
 
 import {
   HTML_NAMESPACE,
+  MATHML_NAMESPACE,
+  SVG_NAMESPACE,
+  XLINK_NAMESPACE,
   EngineConfigurationError,
   EngineResourceLimitError,
-  HtmlTreeBuilderPendingFeatureError,
   runHtmlEngine,
   type EngineObserver,
   type HtmlTreeElement,
@@ -201,6 +203,30 @@ void test("driver configuration and resource limits fail before unavailable work
     }),
     (error) => error instanceof EngineResourceLimitError && error.resource === "maxNodes"
   );
+
+  const duplicateContextAttribute = {
+    namespaceUri: null,
+    prefix: null,
+    localName: "encoding",
+    qualifiedName: "encoding",
+    value: "text/html"
+  } as const;
+  assert.throws(
+    () => runHtmlEngine({
+      inputChunks: ["<p>x"],
+      parser: {
+        kind: "fragment",
+        scriptingMode: "disabled",
+        context: {
+          namespaceUri: MATHML_NAMESPACE,
+          localName: "annotation-xml",
+          attributes: [duplicateContextAttribute, duplicateContextAttribute]
+        }
+      }
+    }),
+    (error) => error instanceof EngineConfigurationError &&
+      error.option === "options.parser.context.attributes[1]"
+  );
 });
 
 void test("DOCTYPE modes and unnamed tree-construction diagnostics retain exact token spans", () => {
@@ -258,14 +284,73 @@ void test("leading ASCII whitespace is ignored without absorbing following body 
   assert.deepEqual(texts[0]?.sourceSpan, { startUtf16Offset: 2, endUtf16Offset: 3 });
 });
 
-void test("the remaining foreign-content boundary fails before constructing a known-wrong tree", () => {
-  assert.throws(
-    () => runHtmlEngine({
-      inputChunks: ["<svg>"],
-      parser: { kind: "document", scriptingMode: "disabled" }
-    }),
-    (error) => error instanceof HtmlTreeBuilderPendingFeatureError
+void test("foreign content is built in place with adjusted names, namespaces, and integration points", () => {
+  const result = runHtmlEngine({
+    inputChunks: ["<svg viewbox='0 0 1 1'><lineargradient xlink:href='#x'/><foreignObject><p>x</p></foreignObject></svg><math definitionurl='u'><mi><b>y</b></mi></math>"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  const elements = [...result.model.walk()]
+    .map(({ node }) => node)
+    .filter((node): node is HtmlTreeElement => node.kind === "element");
+  const svg = elements.find((element) => element.namespaceUri === SVG_NAMESPACE && element.localName === "svg");
+  const gradient = elements.find((element) => element.localName === "linearGradient");
+  const paragraph = elements.find((element) => element.localName === "p");
+  const math = elements.find((element) => element.namespaceUri === MATHML_NAMESPACE && element.localName === "math");
+  assert.ok(svg && gradient && paragraph && math);
+  assert.equal(svg.attributeAt(0)?.localName, "viewBox");
+  assert.equal(gradient.attributeAt(0)?.namespaceUri, XLINK_NAMESPACE);
+  assert.equal(paragraph.namespaceUri, HTML_NAMESPACE);
+  assert.equal(math.attributeAt(0)?.localName, "definitionURL");
+});
+
+void test("fragment parsing targets the fragment and respects HTML and foreign contexts", () => {
+  const html = runHtmlEngine({
+    inputChunks: ["<b>x</b>"],
+    parser: {
+      kind: "fragment",
+      scriptingMode: "inert",
+      context: { namespaceUri: HTML_NAMESPACE, localName: "div", attributes: [] }
+    }
+  });
+  assert.equal(html.model.root.kind, "fragment");
+  const htmlChild = html.model.root.childAt(0);
+  assert.equal(htmlChild?.kind === "element" ? htmlChild.localName : null, "b");
+
+  const svg = runHtmlEngine({
+    inputChunks: ["<![CDATA[x]]><foreignObject><p>y</p></foreignObject>"],
+    parser: {
+      kind: "fragment",
+      scriptingMode: "disabled",
+      context: { namespaceUri: SVG_NAMESPACE, localName: "svg", attributes: [] }
+    }
+  });
+  assert.deepEqual(
+    [...svg.model.walk()].map(({ node }) =>
+      node.kind === "element" ? [node.namespaceUri, node.localName] : [node.kind]
+    ),
+    [["text"], [SVG_NAMESPACE, "foreignObject"], [HTML_NAMESPACE, "p"], ["text"]]
   );
+
+  const annotationXml = runHtmlEngine({
+    inputChunks: ["<p>x</p>"],
+    parser: {
+      kind: "fragment",
+      scriptingMode: "disabled",
+      context: {
+        namespaceUri: MATHML_NAMESPACE,
+        localName: "annotation-xml",
+        attributes: [{
+          namespaceUri: null,
+          prefix: null,
+          localName: "encoding",
+          qualifiedName: "encoding",
+          value: "APPLICATION/XHTML+XML"
+        }]
+      }
+    }
+  });
+  const annotationChild = annotationXml.model.root.childAt(0);
+  assert.equal(annotationChild?.kind === "element" ? annotationChild.namespaceUri : null, HTML_NAMESPACE);
 });
 
 void test("table construction synthesizes containers and foster-parents text during token handling", () => {

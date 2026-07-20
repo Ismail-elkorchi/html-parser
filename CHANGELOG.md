@@ -3,6 +3,11 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Implement standards-derived foreign-content dispatch and fragment parsing in
+  the independent engine, including HTML/SVG/MathML integration points, exact
+  SVG/MathML/foreign attribute adjustment, CDATA feedback, context-sensitive
+  tokenizer entry states, namespace-aware scope recovery, and whole/unit-chunk
+  WPT and browser qualification.
 - Add direct table, foster-parenting, template, relaxed-select, frameset, and
   trailing-document tree construction to the independent engine, with exact
   contextual diagnostics, deterministic mutation traces, and WPT/browser/

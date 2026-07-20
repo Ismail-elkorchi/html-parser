@@ -10,7 +10,11 @@ function normalizeAttributes(element) {
     const attribute = element.attributeAt(index);
     if (attribute !== null) attributes.push([attribute.namespaceUri, attribute.localName, attribute.value]);
   }
-  attributes.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+  attributes.sort((left, right) => {
+    const leftKey = JSON.stringify(left);
+    const rightKey = JSON.stringify(right);
+    return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+  });
   return attributes;
 }
 
@@ -38,10 +42,16 @@ function normalizeEngineNode(node) {
   return ["element", node.namespaceUri, node.localName, normalizeAttributes(node), children];
 }
 
-function normalizeEngine(html) {
+function normalizeEngine(testCase) {
   const result = runHtmlEngine({
-    inputChunks: [html],
-    parser: { kind: "document", scriptingMode: "inert" }
+    inputChunks: [testCase.html],
+    parser: testCase.fragmentContext === undefined
+      ? { kind: "document", scriptingMode: "inert" }
+      : {
+          kind: "fragment",
+          scriptingMode: "inert",
+          context: testCase.fragmentContext
+        }
   });
   const nodes = [];
   for (let index = 0; index < result.model.root.childCount; index += 1) {
@@ -51,25 +61,45 @@ function normalizeEngine(html) {
   return nodes;
 }
 
-async function normalizeBrowser(page, html) {
-  return page.evaluate((input) => {
-    const document = new globalThis.DOMParser().parseFromString(input, "text/html");
+async function normalizeBrowser(page, testCase) {
+  return page.evaluate(({ html, fragmentContext }) => {
     const normalize = (node) => {
       if (node.nodeType === globalThis.Node.TEXT_NODE) return ["text", node.nodeValue ?? ""];
       if (node.nodeType === globalThis.Node.COMMENT_NODE) return ["comment", node.nodeValue ?? ""];
+      if (node.nodeType === globalThis.Node.PROCESSING_INSTRUCTION_NODE) {
+        return ["processing-instruction", node.nodeName, node.nodeValue ?? ""];
+      }
       if (node.nodeType === globalThis.Node.DOCUMENT_TYPE_NODE) {
         return ["doctype", node.name ?? "", node.publicId ?? "", node.systemId ?? ""];
       }
       if (node.nodeType !== globalThis.Node.ELEMENT_NODE) return ["other", node.nodeType];
       const attributes = Array.from(node.attributes)
         .map((attribute) => [attribute.namespaceURI, attribute.localName, attribute.value])
-        .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+        .sort((left, right) => {
+          const leftKey = JSON.stringify(left);
+          const rightKey = JSON.stringify(right);
+          return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+        });
       const parent = node.localName === "template" ? node.content : node;
       const children = Array.from(parent.childNodes).map(normalize);
       return ["element", node.namespaceURI, node.localName, attributes, children];
     };
-    return Array.from(document.childNodes).map(normalize);
-  }, html);
+    if (fragmentContext === undefined) {
+      const document = new globalThis.DOMParser().parseFromString(html, "text/html");
+      return Array.from(document.childNodes).map(normalize);
+    }
+    const owner = globalThis.document.implementation.createHTMLDocument("");
+    const context = owner.createElementNS(fragmentContext.namespaceUri, fragmentContext.localName);
+    for (const attribute of fragmentContext.attributes) {
+      context.setAttributeNS(attribute.namespaceUri, attribute.qualifiedName, attribute.value);
+    }
+    context.innerHTML = html;
+    const parent = context.namespaceURI === "http://www.w3.org/1999/xhtml" &&
+        context.localName === "template"
+      ? context.content
+      : context;
+    return Array.from(parent.childNodes).map(normalize);
+  }, testCase);
 }
 
 const ENGINES = Object.freeze([
@@ -83,6 +113,7 @@ function sha256(value) {
 }
 
 export async function runBrowserTreeDifferential({ schema, cases }) {
+  const verbose = process.env["BROWSER_DIFF_VERBOSE"] === "1";
   if (
     process.platform === "linux" &&
     process.env["PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS"] === undefined
@@ -108,13 +139,14 @@ export async function runBrowserTreeDifferential({ schema, cases }) {
       const disagreements = [];
       const acceptedDisagreements = [];
       for (const testCase of cases) {
-        const actual = normalizeEngine(testCase.html);
-        const expected = await normalizeBrowser(page, testCase.html);
+        const actual = normalizeEngine(testCase);
+        const expected = await normalizeBrowser(page, testCase);
         if (JSON.stringify(actual) === JSON.stringify(expected)) continue;
         const disagreement = {
           id: testCase.id,
           engineSha256: sha256(actual),
-          browserSha256: sha256(expected)
+          browserSha256: sha256(expected),
+          ...(verbose ? { engineTree: actual, browserTree: expected } : {})
         };
         const accepted = testCase.acceptedBrowserTrees?.[name];
         if (

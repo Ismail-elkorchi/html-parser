@@ -1,4 +1,19 @@
 export {
+  fragmentContextAttributes,
+  fragmentTokenizerMode,
+  type HtmlFragmentContext,
+  type HtmlFragmentContextAttribute
+} from "./fragment-context.js";
+export {
+  adjustedForeignAttributes,
+  adjustedForeignTagName,
+  hasForeignBreakoutFontAttribute,
+  isForeignBreakoutStartTag,
+  isHtmlIntegrationPoint,
+  isMathMLTextIntegrationPoint,
+  type ForeignElementNamespaceUri
+} from "./foreign-content.js";
+export {
   HTML_NAMESPACE,
   MATHML_NAMESPACE,
   SVG_NAMESPACE,
@@ -94,15 +109,14 @@ export { ENGINE_STANDARD_BASELINE, HTML_STANDARD_REVISION } from "./standards.js
 export {
   runHtmlEngine,
   type HtmlEngineDocumentConfiguration,
+  type HtmlEngineFragmentConfiguration,
   type HtmlEngineOptions,
   type HtmlEngineParserConfiguration,
   type HtmlEngineResult
 } from "./parser-driver.js";
 export {
   HtmlTreeBuilder,
-  HtmlTreeBuilderPendingFeatureError,
   type HtmlTreeBuilderOptions,
-  type HtmlTreeBuilderPendingFeature,
   type HtmlTreeBuilderState
 } from "./tree-builder.js";
 export {

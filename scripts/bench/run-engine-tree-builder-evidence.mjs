@@ -3,6 +3,7 @@ import process from "node:process";
 
 import {
   EngineResourceLimitError,
+  SVG_NAMESPACE,
   runHtmlEngine
 } from "../../dist/internal/html-engine/mod.js";
 
@@ -10,14 +11,14 @@ if (typeof globalThis.gc !== "function") {
   throw new Error("Run the tree-builder evidence script with --expose-gc");
 }
 
-function measure(name, input) {
+function measure(name, input, parser = { kind: "document", scriptingMode: "disabled" }) {
   globalThis.gc();
   const before = process.memoryUsage().heapUsed;
   let tokenCount = 0;
   const startedAt = performance.now();
   const result = runHtmlEngine({
     inputChunks: [input],
-    parser: { kind: "document", scriptingMode: "disabled" },
+    parser,
     limits: {
       maxSteps: 10_000_000,
       maxNodes: 100_000,
@@ -48,6 +49,8 @@ const errorCount = 10_000;
 const tableRowCount = 4_000;
 const fosterCharacterCount = 20_000;
 const nestedTemplateCount = 2_000;
+const foreignDepth = 5_000;
+const integrationPointCount = 3_000;
 const cases = [
   measure(
     "nested-elements",
@@ -72,6 +75,19 @@ const cases = [
   measure(
     "nested-template-cleanup",
     `<!doctype html>${"<template>".repeat(nestedTemplateCount)}<td>x${"</template>".repeat(nestedTemplateCount)}`
+  ),
+  measure(
+    "foreign-fragment-depth",
+    `${"<g>".repeat(foreignDepth)}x${"</g>".repeat(foreignDepth)}`,
+    {
+      kind: "fragment",
+      scriptingMode: "disabled",
+      context: { namespaceUri: SVG_NAMESPACE, localName: "svg", attributes: [] }
+    }
+  ),
+  measure(
+    "foreign-integration-boundaries",
+    `<!doctype html>${"<svg><foreignObject><p>x</p></foreignObject></svg>".repeat(integrationPointCount)}`
   )
 ];
 
@@ -102,12 +118,48 @@ if (
   throw new Error("contextual tree construction did not fail at the first unavailable step");
 }
 
+const fragmentBudgetInput = "<g><lineargradient viewbox='0 0 1 1'/>x</g>";
+const fragmentParser = {
+  kind: "fragment",
+  scriptingMode: "disabled",
+  context: { namespaceUri: SVG_NAMESPACE, localName: "svg", attributes: [] }
+};
+const fragmentBudgetBaseline = runHtmlEngine({
+  inputChunks: [fragmentBudgetInput],
+  parser: fragmentParser
+});
+let fragmentNodeFailure = null;
+try {
+  runHtmlEngine({
+    inputChunks: [fragmentBudgetInput],
+    parser: fragmentParser,
+    limits: { maxNodes: fragmentBudgetBaseline.resources.nodes - 1 }
+  });
+} catch (error) {
+  if (!(error instanceof EngineResourceLimitError)) throw error;
+  fragmentNodeFailure = Object.freeze({
+    resource: error.resource,
+    limit: error.limit,
+    actual: error.actual
+  });
+}
+if (
+  fragmentNodeFailure?.resource !== "maxNodes" ||
+  fragmentNodeFailure.actual !== fragmentBudgetBaseline.resources.nodes
+) {
+  throw new Error("fragment construction did not fail at the first unavailable node");
+}
+
 process.stdout.write(`${JSON.stringify({
-  schema: "engine-tree-builder-evidence/v2",
+  schema: "engine-tree-builder-evidence/v3",
   runtime: process.version,
   cases,
   contextualBudget: {
     baselineSteps: tableBudgetBaseline.resources.steps,
     failure: tableBudgetFailure
+  },
+  fragmentBudget: {
+    baselineNodes: fragmentBudgetBaseline.resources.nodes,
+    failure: fragmentNodeFailure
   }
 }, null, 2)}\n`);

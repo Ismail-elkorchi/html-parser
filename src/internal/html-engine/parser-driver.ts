@@ -1,3 +1,12 @@
+import { fragmentTokenizerMode } from "./fragment-context.js";
+import {
+  HTML_NAMESPACE,
+  MATHML_NAMESPACE,
+  SVG_NAMESPACE,
+  XLINK_NAMESPACE,
+  XML_NAMESPACE,
+  XMLNS_NAMESPACE
+} from "./namespaces.js";
 import {
   createEngineResourceGuard,
   EngineConfigurationError,
@@ -10,6 +19,7 @@ import { HtmlTreeBuilder, type HtmlTreeBuilderState } from "./tree-builder.js";
 import { HtmlTreeModel } from "./tree-model.js";
 
 import type { EngineParseError } from "./diagnostics.js";
+import type { HtmlFragmentContext, HtmlFragmentContextAttribute } from "./fragment-context.js";
 import type { EngineObserver } from "./observer.js";
 import type { NonExecutingScriptingMode } from "./parser-state.js";
 
@@ -19,7 +29,16 @@ export interface HtmlEngineDocumentConfiguration {
   readonly scriptingMode: NonExecutingScriptingMode;
 }
 
-export type HtmlEngineParserConfiguration = HtmlEngineDocumentConfiguration;
+/** Fragment parser configuration supported by the independent engine. */
+export interface HtmlEngineFragmentConfiguration {
+  readonly kind: "fragment";
+  readonly scriptingMode: NonExecutingScriptingMode;
+  readonly context: HtmlFragmentContext;
+}
+
+export type HtmlEngineParserConfiguration =
+  | HtmlEngineDocumentConfiguration
+  | HtmlEngineFragmentConfiguration;
 
 export interface HtmlEngineOptions extends EngineResourceGuardOptions {
   readonly inputChunks: readonly string[];
@@ -66,22 +85,125 @@ function validateInputChunks(inputChunks: unknown): readonly string[] {
   return Object.freeze(validated);
 }
 
+function validateFragmentAttribute(value: unknown, index: number): HtmlFragmentContextAttribute {
+  const option = `options.parser.context.attributes[${String(index)}]`;
+  if (!isRecord(value)) throw new EngineConfigurationError(option, "must be an object");
+  assertAllowedKeys(
+    value,
+    new Set(["namespaceUri", "prefix", "localName", "qualifiedName", "value"]),
+    option
+  );
+  const namespaceUri = value["namespaceUri"];
+  const prefix = value["prefix"];
+  const localName = value["localName"];
+  const qualifiedName = value["qualifiedName"];
+  const attributeValue = value["value"];
+  if (
+    namespaceUri !== null &&
+    namespaceUri !== XLINK_NAMESPACE &&
+    namespaceUri !== XML_NAMESPACE &&
+    namespaceUri !== XMLNS_NAMESPACE
+  ) {
+    throw new EngineConfigurationError(`${option}.namespaceUri`, "must be a supported attribute namespace");
+  }
+  if (prefix !== null && typeof prefix !== "string") {
+    throw new EngineConfigurationError(`${option}.prefix`, "must be a string or null");
+  }
+  if (typeof localName !== "string" || localName.length === 0) {
+    throw new EngineConfigurationError(`${option}.localName`, "must be a non-empty string");
+  }
+  if (typeof qualifiedName !== "string" || qualifiedName.length === 0) {
+    throw new EngineConfigurationError(`${option}.qualifiedName`, "must be a non-empty string");
+  }
+  if (typeof attributeValue !== "string") {
+    throw new EngineConfigurationError(`${option}.value`, "must be a string");
+  }
+  const expectedQualifiedName = prefix === null ? localName : `${prefix}:${localName}`;
+  const validNamespacePrefix =
+    (namespaceUri === null && prefix === null) ||
+    (namespaceUri === XLINK_NAMESPACE && prefix === "xlink") ||
+    (namespaceUri === XML_NAMESPACE && prefix === "xml") ||
+    (namespaceUri === XMLNS_NAMESPACE &&
+      ((prefix === null && localName === "xmlns") || prefix === "xmlns"));
+  if (!validNamespacePrefix || qualifiedName !== expectedQualifiedName) {
+    throw new EngineConfigurationError(option, "has inconsistent namespace, prefix, or qualified name");
+  }
+  return Object.freeze({ namespaceUri, prefix, localName, qualifiedName, value: attributeValue });
+}
+
+function validateFragmentContext(value: unknown): HtmlFragmentContext {
+  const option = "options.parser.context";
+  if (!isRecord(value)) throw new EngineConfigurationError(option, "must be an object");
+  assertAllowedKeys(value, new Set(["namespaceUri", "localName", "attributes"]), option);
+  const namespaceUri = value["namespaceUri"];
+  if (
+    namespaceUri !== HTML_NAMESPACE &&
+    namespaceUri !== SVG_NAMESPACE &&
+    namespaceUri !== MATHML_NAMESPACE
+  ) {
+    throw new EngineConfigurationError(`${option}.namespaceUri`, "must be an HTML, SVG, or MathML namespace");
+  }
+  const localName = value["localName"];
+  if (typeof localName !== "string" || localName.length === 0) {
+    throw new EngineConfigurationError(`${option}.localName`, "must be a non-empty string");
+  }
+  const rawAttributes = value["attributes"] ?? [];
+  if (!Array.isArray(rawAttributes)) {
+    throw new EngineConfigurationError(`${option}.attributes`, "must be an array");
+  }
+  const attributes: HtmlFragmentContextAttribute[] = [];
+  const expandedNames = new Set<string>();
+  for (let index = 0; index < rawAttributes.length; index += 1) {
+    if (!Object.hasOwn(rawAttributes, index)) {
+      throw new EngineConfigurationError(
+        `${option}.attributes[${String(index)}]`,
+        "must be an attribute object"
+      );
+    }
+    const attribute = validateFragmentAttribute(rawAttributes[index], index);
+    const expandedName = `${attribute.namespaceUri ?? ""}\u0000${attribute.localName}`;
+    if (expandedNames.has(expandedName)) {
+      throw new EngineConfigurationError(
+        `${option}.attributes[${String(index)}]`,
+        "must have a unique namespace and local name"
+      );
+    }
+    expandedNames.add(expandedName);
+    attributes.push(attribute);
+  }
+  return Object.freeze({ namespaceUri, localName, attributes: Object.freeze(attributes) });
+}
+
 function validateParser(parser: unknown): HtmlEngineParserConfiguration {
   if (!isRecord(parser)) {
-    throw new EngineConfigurationError("options.parser", "must be a document configuration");
+    throw new EngineConfigurationError("options.parser", "must be a parser configuration");
   }
   const record = parser;
-  assertAllowedKeys(record, new Set(["kind", "scriptingMode"]), "options.parser");
-  if (record["kind"] !== "document") {
-    throw new EngineConfigurationError("options.parser.kind", 'must be "document"');
+  const kind = record["kind"];
+  if (kind !== "document" && kind !== "fragment") {
+    throw new EngineConfigurationError("options.parser.kind", 'must be "document" or "fragment"');
   }
+  assertAllowedKeys(
+    record,
+    kind === "document"
+      ? new Set(["kind", "scriptingMode"])
+      : new Set(["kind", "scriptingMode", "context"]),
+    "options.parser"
+  );
   if (record["scriptingMode"] !== "disabled" && record["scriptingMode"] !== "inert") {
     throw new EngineConfigurationError(
       "options.parser.scriptingMode",
       'must be "disabled" or "inert"'
     );
   }
-  return Object.freeze({ kind: "document", scriptingMode: record["scriptingMode"] });
+  if (kind === "document") {
+    return Object.freeze({ kind, scriptingMode: record["scriptingMode"] });
+  }
+  return Object.freeze({
+    kind,
+    scriptingMode: record["scriptingMode"],
+    context: validateFragmentContext(record["context"])
+  });
 }
 
 function validateObserver(observer: EngineObserver | undefined): EngineObserver | undefined {
@@ -129,7 +251,7 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
   const resources = createEngineResourceGuard(resourceOptions);
   const parseErrors: EngineParseError[] = [];
   const model = new HtmlTreeModel({
-    rootKind: "document",
+    rootKind: parser.kind,
     resources,
     ...(observer === undefined ? {} : { observer })
   });
@@ -137,10 +259,14 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
     model,
     resources,
     scriptingMode: parser.scriptingMode,
+    ...(parser.kind === "fragment" ? { fragmentContext: parser.context } : {}),
     ...(observer === undefined ? {} : { observer }),
     onParseError(error) { parseErrors.push(error); }
   });
   const tokenizer = new HtmlTokenizer(resources, builder, {
+    ...(parser.kind === "fragment"
+      ? { initialState: fragmentTokenizerMode(parser.context, parser.scriptingMode) }
+      : {}),
     observer: {
       onToken(token) { observer?.onToken?.(token); },
       onParseError(error) {

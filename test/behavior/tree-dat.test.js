@@ -33,11 +33,35 @@ test("tree .dat reader preserves raw input and fragment namespace identity", () 
   });
   assert.equal(cases[0].scripting, "disabled");
   assert.equal(cases[0].errorsDeclared, true);
+  assert.equal(cases[0].sawErrors, true);
+  assert.equal(cases[0].sawNewErrors, false);
 
   const executions = expandTreeDatCases(cases);
   assert.deepEqual(executions.map((fixtureCase) => fixtureCase.id), [
     "resources/raw.dat#1@script-off"
   ]);
+});
+
+test("tree .dat reader retains separate legacy and named diagnostic sections", () => {
+  const content = [
+    "#data",
+    "<?target?>",
+    "#errors",
+    "legacy error",
+    "#new-errors",
+    "named-error",
+    "#document",
+    "| <?target ?>",
+    "",
+    ""
+  ].join("\n");
+  const [fixtureCase] = parseTreeDatFixtures(content, "resources/errors.dat");
+
+  assert.deepEqual(fixtureCase.errors, ["legacy error"]);
+  assert.deepEqual(fixtureCase.newErrors, ["named-error"]);
+  assert.equal(fixtureCase.sawErrors, true);
+  assert.equal(fixtureCase.sawNewErrors, true);
+  assert.equal(fixtureCase.expected, "| <?target ?>");
 });
 
 test("tree .dat reader expands an unspecified scripting flag in both modes", () => {

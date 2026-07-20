@@ -46,6 +46,19 @@ runHtmlEngine({
   parser: { kind: "document", scriptingMode: "inert" }
 });
 
+runHtmlEngine({
+  inputChunks: ["<b>x"],
+  parser: {
+    kind: "fragment",
+    scriptingMode: "disabled",
+    context: {
+      namespaceUri: "http://www.w3.org/1999/xhtml",
+      localName: "div",
+      attributes: []
+    }
+  }
+});
+
 // @ts-expect-error - the tokenizer mode vocabulary is closed.
 const invalidTokenizerMode: TokenizerMode = "script";
 void invalidTokenizerMode;
@@ -57,7 +70,7 @@ void invalidInsertionMode;
 // @ts-expect-error - the non-executing driver cannot select a script-executing mode.
 runHtmlEngine({ inputChunks: [], parser: { kind: "document", scriptingMode: "normal" } });
 
-// @ts-expect-error - fragment parsing is introduced with its real algorithm in IHP-10.
+// @ts-expect-error - fragment parsing requires an explicit namespace-aware context.
 runHtmlEngine({ inputChunks: [], parser: { kind: "fragment", scriptingMode: "inert" } });
 
 // @ts-expect-error - tokens are immutable once emitted.

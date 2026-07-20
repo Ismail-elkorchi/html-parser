@@ -6,6 +6,11 @@ import type { HtmlElementNamespaceUri } from "./namespaces.js";
 import type { EngineResourceGuard } from "./resource-guard.js";
 import type { HtmlTreeElement } from "./tree-model.js";
 
+export interface OpenElementName {
+  readonly namespaceUri: HtmlElementNamespaceUri;
+  readonly localName: string;
+}
+
 function expandedName(namespaceUri: HtmlElementNamespaceUri, localName: string): string {
   return `${namespaceUri}\u0000${localName}`;
 }
@@ -113,22 +118,29 @@ export class OpenElementStack {
   hasInScope(
     namespaceUri: HtmlElementNamespaceUri,
     localName: string,
-    htmlBoundaryNames: ReadonlySet<string>
+    htmlBoundaryNames: ReadonlySet<string>,
+    additionalBoundaries: readonly OpenElementName[] = []
   ): boolean {
     const target = this.#lastByName(namespaceUri, localName);
     if (target === null) return false;
     const targetOrder = this.#elementOrder(target);
     let latestBoundaryOrder = -1;
     for (const boundaryName of htmlBoundaryNames) {
-      const boundary = this.#lastByName(namespaceUri, boundaryName);
+      this.#checkpoint();
+      const boundary = this.#lastByName(HTML_NAMESPACE, boundaryName);
       if (boundary !== null) latestBoundaryOrder = Math.max(latestBoundaryOrder, this.#elementOrder(boundary));
     }
+    latestBoundaryOrder = this.#latestAdditionalBoundaryOrder(
+      additionalBoundaries,
+      latestBoundaryOrder
+    );
     return targetOrder >= latestBoundaryOrder;
   }
 
   hasElementInScope(
     element: HtmlTreeElement,
-    htmlBoundaryNames: ReadonlySet<string>
+    htmlBoundaryNames: ReadonlySet<string>,
+    additionalBoundaries: readonly OpenElementName[] = []
   ): boolean {
     if (!this.#open.has(element)) return false;
     const targetOrder = this.#elementOrder(element);
@@ -138,13 +150,18 @@ export class OpenElementStack {
       const boundary = this.#lastByName(HTML_NAMESPACE, boundaryName);
       if (boundary !== null) latestBoundaryOrder = Math.max(latestBoundaryOrder, this.#elementOrder(boundary));
     }
+    latestBoundaryOrder = this.#latestAdditionalBoundaryOrder(
+      additionalBoundaries,
+      latestBoundaryOrder
+    );
     return targetOrder >= latestBoundaryOrder;
   }
 
   lastInScope(
     namespaceUri: HtmlElementNamespaceUri,
     localNames: ReadonlySet<string>,
-    htmlBoundaryNames: ReadonlySet<string>
+    htmlBoundaryNames: ReadonlySet<string>,
+    additionalBoundaries: readonly OpenElementName[] = []
   ): HtmlTreeElement | null {
     let target: HtmlTreeElement | null = null;
     let targetOrder = -1;
@@ -160,9 +177,14 @@ export class OpenElementStack {
     if (target === null) return null;
     let latestBoundaryOrder = -1;
     for (const boundaryName of htmlBoundaryNames) {
-      const boundary = this.#lastByName(namespaceUri, boundaryName);
+      this.#checkpoint();
+      const boundary = this.#lastByName(HTML_NAMESPACE, boundaryName);
       if (boundary !== null) latestBoundaryOrder = Math.max(latestBoundaryOrder, this.#elementOrder(boundary));
     }
+    latestBoundaryOrder = this.#latestAdditionalBoundaryOrder(
+      additionalBoundaries,
+      latestBoundaryOrder
+    );
     return targetOrder >= latestBoundaryOrder ? target : null;
   }
 
@@ -176,6 +198,19 @@ export class OpenElementStack {
 
   #lastByName(namespaceUri: HtmlElementNamespaceUri, localName: string): HtmlTreeElement | null {
     return this.#byExpandedName.get(expandedName(namespaceUri, localName))?.at(-1) ?? null;
+  }
+
+  #latestAdditionalBoundaryOrder(
+    boundaries: readonly OpenElementName[],
+    initialOrder: number
+  ): number {
+    let order = initialOrder;
+    for (const boundaryName of boundaries) {
+      this.#checkpoint();
+      const boundary = this.#lastByName(boundaryName.namespaceUri, boundaryName.localName);
+      if (boundary !== null) order = Math.max(order, this.#elementOrder(boundary));
+    }
+    return order;
   }
 
   #elementOrder(element: HtmlTreeElement): number {

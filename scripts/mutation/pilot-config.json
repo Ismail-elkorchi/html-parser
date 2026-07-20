@@ -289,6 +289,78 @@
       ]
     },
     {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/fragment-context.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/foreign-content.test.js"],
+      "mutants": [
+        {
+          "id": "fragment-context-namespace-entry-state",
+          "description": "Select an HTML tokenizer entry state for a foreign context with the same local name.",
+          "search": "if (context.namespaceUri !== HTML_NAMESPACE)\n        return \"data\";",
+          "replace": "if (false && context.namespaceUri !== HTML_NAMESPACE)\n        return \"data\";"
+        },
+        {
+          "id": "fragment-context-noscript-scripting-mode",
+          "description": "Use RAWTEXT for noscript when scripting is disabled.",
+          "search": "return scriptingMode === \"disabled\" ? \"data\" : \"rawtext\";",
+          "replace": "return scriptingMode === \"disabled\" ? \"rawtext\" : \"data\";"
+        },
+        {
+          "id": "fragment-context-attribute-span",
+          "description": "Give external context attributes an invented source span.",
+          "search": "sourceSpan: null",
+          "replace": "sourceSpan: { startUtf16Offset: 0, endUtf16Offset: 0 }"
+        }
+      ]
+    },
+    {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/foreign-content.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/foreign-content.test.js"],
+      "mutants": [
+        {
+          "id": "foreign-breakout-table",
+          "description": "Disable foreign-content breakout recognition.",
+          "search": "return FOREIGN_BREAKOUT_START_TAGS.has(name);",
+          "replace": "return false && FOREIGN_BREAKOUT_START_TAGS.has(name);"
+        },
+        {
+          "id": "foreign-mathml-text-integration-namespace",
+          "description": "Treat an HTML element with a MathML integration-point name as MathML.",
+          "search": "return element.namespaceUri === MATHML_NAMESPACE &&\n        MATHML_TEXT_INTEGRATION_POINTS.has(element.localName);",
+          "replace": "return true &&\n        MATHML_TEXT_INTEGRATION_POINTS.has(element.localName);"
+        },
+        {
+          "id": "foreign-svg-tag-adjustment",
+          "description": "Keep lower-case tokenizer names for SVG elements.",
+          "search": "return namespaceUri === SVG_NAMESPACE ? SVG_TAG_NAMES.get(name) ?? name : name;",
+          "replace": "return name;"
+        },
+        {
+          "id": "foreign-expanded-attribute",
+          "description": "Leave recognized XLink attributes in no namespace.",
+          "search": "if (foreign !== undefined)\n        return foreign;",
+          "replace": "if (false && foreign !== undefined)\n        return foreign;"
+        },
+        {
+          "id": "foreign-mathml-attribute-adjustment",
+          "description": "Keep definitionurl lower-case in MathML.",
+          "search": "localName = \"definitionURL\";",
+          "replace": "localName = \"definitionurl\";"
+        }
+      ]
+    },
+    {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/parser-driver.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/builder.test.js"],
+      "mutants": [
+        {
+          "id": "fragment-context-duplicate-expanded-attribute",
+          "description": "Allow duplicate expanded names on an external fragment context.",
+          "search": "if (expandedNames.has(expandedName)) {",
+          "replace": "if (false && expandedNames.has(expandedName)) {"
+        }
+      ]
+    },
+    {
       "targetFile": "tmp/test-runtime/src/internal/html-engine/tree-builder.js",
       "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/builder.test.js"],
       "mutants": [
@@ -309,6 +381,24 @@
           "description": "Keep the tokenizer in Data instead of entering RCDATA for title.",
           "search": "if (token.name === \"title\") {\n                this.#insertTextElement(token, \"rcdata\");",
           "replace": "if (token.name === \"title\") {\n                this.#insertTextElement(token, \"data\");"
+        },
+        {
+          "id": "tree-builder-foreign-dispatch",
+          "description": "Route every token through the HTML insertion-mode rules.",
+          "search": "let useForeignRules = !this.#shouldProcessInHtml(token);",
+          "replace": "let useForeignRules = false && !this.#shouldProcessInHtml(token);"
+        },
+        {
+          "id": "tree-builder-fragment-root-target",
+          "description": "Leave fragment output attached to the fake stack root.",
+          "search": "if (this.#fragmentContext !== null &&\n            first !== null &&\n            location.parent === first) {",
+          "replace": "if (false && this.#fragmentContext !== null &&\n            first !== null &&\n            location.parent === first) {"
+        },
+        {
+          "id": "tree-builder-fragment-reset-context",
+          "description": "Reset insertion mode from the fake root instead of the external context.",
+          "search": "if (last && this.#fragmentContext !== null)\n                node = this.#fragmentContext;",
+          "replace": "if (false && last && this.#fragmentContext !== null)\n                node = this.#fragmentContext;"
         },
         {
           "id": "tree-builder-formatting-reconstruction",
@@ -349,8 +439,8 @@
         {
           "id": "tree-builder-relaxed-nested-select",
           "description": "Allow a nested select to remain on the open-element stack.",
-          "search": "if (name === \"select\") {\n            if (this.#hasInScope(\"select\", \"default\")) {",
-          "replace": "if (name === \"select\") {\n            if (false && this.#hasInScope(\"select\", \"default\")) {"
+          "search": "if (this.#hasInScope(\"select\", \"default\")) {\n                this.#parseError(token, \"in-body\");\n                this.#popThrough(\"select\");\n                return null;",
+          "replace": "if (false && this.#hasInScope(\"select\", \"default\")) {\n                this.#parseError(token, \"in-body\");\n                this.#popThrough(\"select\");\n                return null;"
         },
         {
           "id": "tree-builder-foster-parenting",
@@ -367,8 +457,8 @@
         {
           "id": "tree-builder-frameset-trailing-mode",
           "description": "Keep the parser in frameset mode after the outer frameset closes.",
-          "search": "if (this.#currentNode().localName !== \"frameset\")\n                this.#setInsertionMode(\"after-frameset\", token);",
-          "replace": "if (false && this.#currentNode().localName !== \"frameset\")\n                this.#setInsertionMode(\"after-frameset\", token);"
+          "search": "if (this.#fragmentContext === null && this.#currentNode().localName !== \"frameset\") {",
+          "replace": "if (false && this.#fragmentContext === null && this.#currentNode().localName !== \"frameset\") {"
         }
       ]
     }
