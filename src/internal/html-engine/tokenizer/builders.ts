@@ -16,6 +16,8 @@ type DoctypeFieldMissingReason =
   | "TOKENIZER_DOCTYPE_PUBLIC_IDENTIFIER_MISSING"
   | "TOKENIZER_DOCTYPE_SYSTEM_IDENTIFIER_MISSING";
 
+const EMPTY_TOKEN_ATTRIBUTES: readonly HtmlTokenAttribute[] = Object.freeze([]);
+
 function appendCodePoints(guard: StartTagResourceGuard, value: string): void {
   for (const codePoint of value) guard.appendCodePoint(codePoint);
 }
@@ -24,7 +26,7 @@ class AttributeBuilder {
   readonly #guard: StartTagResourceGuard;
   readonly #start: number;
   #end: number;
-  #nameParts: string[] = [];
+  #nameBuffer = "";
   #nameEnd: number;
   #valueParts: string[] = [];
   #valueStart: number | null = null;
@@ -44,15 +46,14 @@ class AttributeBuilder {
 
   appendName(value: string, span: SourceSpan): void {
     appendCodePoints(this.#guard, value);
-    this.#nameParts.push(value);
+    this.#nameBuffer += value;
     this.#nameEnd = span.endUtf16Offset;
     this.#end = span.endUtf16Offset;
   }
 
   finishName(existingNames: Set<string>): boolean {
     if (this.#name !== null) return false;
-    this.#name = this.#nameParts.join("");
-    this.#nameParts = [];
+    this.#name = this.#nameBuffer;
     if (existingNames.has(this.#name)) {
       this.#duplicate = true;
       return true;
@@ -121,8 +122,9 @@ export class TagTokenBuilder {
   readonly kind: "start-tag" | "end-tag";
   readonly startUtf16Offset: number;
   readonly #resource: StartTagResourceGuard;
-  readonly #attributeNames = new Set<string>();
-  #nameParts: string[] = [];
+  readonly #protectTokenObservation: boolean;
+  #attributeNames: Set<string> | null = null;
+  #name = "";
   #attributes: HtmlTokenAttribute[] = [];
   #currentAttribute: AttributeBuilder | null = null;
   #selfClosing = false;
@@ -130,23 +132,26 @@ export class TagTokenBuilder {
   constructor(
     kind: "start-tag" | "end-tag",
     startUtf16Offset: number,
-    resource: StartTagResourceGuard
+    resource: StartTagResourceGuard,
+    protectTokenObservation = true
   ) {
     this.kind = kind;
     this.startUtf16Offset = startUtf16Offset;
     this.#resource = resource;
+    this.#protectTokenObservation = protectTokenObservation;
   }
 
   appendName(value: string): void {
-    this.#nameParts.push(value);
+    this.#name += value;
   }
 
   name(): string {
-    return this.#nameParts.join("");
+    return this.#name;
   }
 
   beginAttribute(startUtf16Offset: number): void {
     this.finishAttribute();
+    this.#attributeNames ??= new Set<string>();
     this.#currentAttribute = new AttributeBuilder(startUtf16Offset, this.#resource);
   }
 
@@ -155,7 +160,9 @@ export class TagTokenBuilder {
   }
 
   finishAttributeName(): boolean {
-    return this.#requireAttribute().finishName(this.#attributeNames);
+    return this.#requireAttribute().finishName(
+      requireInternalValue(this.#attributeNames, "TOKENIZER_CURRENT_ATTRIBUTE_MISSING")
+    );
   }
 
   touchAttribute(span: SourceSpan): void {
@@ -180,7 +187,9 @@ export class TagTokenBuilder {
 
   finishAttribute(): void {
     if (this.#currentAttribute === null) return;
-    const attribute = this.#currentAttribute.finish(this.#attributeNames);
+    const attribute = this.#currentAttribute.finish(
+      requireInternalValue(this.#attributeNames, "TOKENIZER_CURRENT_ATTRIBUTE_MISSING")
+    );
     if (attribute !== null) this.#attributes.push(attribute);
     this.#currentAttribute = null;
   }
@@ -191,19 +200,15 @@ export class TagTokenBuilder {
 
   toToken(endUtf16Offset: number): HtmlStartTagToken | HtmlEndTagToken {
     this.finishAttribute();
-    const base = {
-      name: this.#nameParts.join(""),
-      attributes: Object.freeze(this.#attributes.slice()),
-      selfClosing: this.#selfClosing,
-      span: sourceSpan(this.startUtf16Offset, endUtf16Offset)
-    };
-    this.#nameParts = [];
-    this.#attributes = [];
-    return Object.freeze(
-      this.kind === "start-tag"
-        ? { kind: "start-tag", ...base }
-        : { kind: "end-tag", ...base }
-    );
+    const name = this.#name;
+    const attributes = this.#attributes.length === 0
+      ? EMPTY_TOKEN_ATTRIBUTES
+      : Object.freeze(this.#attributes);
+    const span = sourceSpan(this.startUtf16Offset, endUtf16Offset);
+    const token: HtmlStartTagToken | HtmlEndTagToken = this.kind === "start-tag"
+      ? { kind: "start-tag", name, attributes, selfClosing: this.#selfClosing, span }
+      : { kind: "end-tag", name, attributes, selfClosing: this.#selfClosing, span };
+    return this.#protectTokenObservation ? Object.freeze(token) : token;
   }
 
   #requireAttribute(): AttributeBuilder {

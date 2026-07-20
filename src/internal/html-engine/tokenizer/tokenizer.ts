@@ -51,6 +51,7 @@ export interface HtmlTokenizerOptions {
   readonly lastStartTagName?: string | null;
   readonly foreignContent?: boolean;
   readonly observer?: EngineObserver;
+  readonly protectTokenObservations?: boolean;
 }
 
 type StepResult = HtmlTokenizerRunResult | null;
@@ -83,10 +84,8 @@ interface KeywordProbeNoMatch {
 
 type KeywordProbe = KeywordProbeMatch | KeywordProbeNeedMore | KeywordProbeNoMatch;
 
-const WHITESPACE = new Set(["\t", "\n", "\f", " "]);
-
 function isAsciiWhitespace(value: string): boolean {
-  return WHITESPACE.has(value);
+  return value === "\t" || value === "\n" || value === "\f" || value === " ";
 }
 
 function isAsciiAlpha(value: string): boolean {
@@ -98,19 +97,15 @@ function isAsciiAlpha(value: string): boolean {
 function isAsciiAlphanumeric(value: string): boolean {
   if (value.length !== 1) return false;
   const code = value.charCodeAt(0);
-  return isAsciiAlpha(value) || (code >= 0x30 && code <= 0x39);
-}
-
-function isAsciiUpper(value: string): boolean {
-  if (value.length !== 1) return false;
-  const code = value.charCodeAt(0);
-  return code >= 0x41 && code <= 0x5a;
+  return (code >= 0x30 && code <= 0x39) ||
+    (code >= 0x41 && code <= 0x5a) ||
+    (code >= 0x61 && code <= 0x7a);
 }
 
 function asciiLower(value: string): string {
-  return isAsciiUpper(value)
-    ? String.fromCharCode(value.charCodeAt(0) + 0x20)
-    : value;
+  if (value.length !== 1) return value;
+  const code = value.charCodeAt(0);
+  return code >= 0x41 && code <= 0x5a ? String.fromCharCode(code + 0x20) : value;
 }
 
 function initialState(value: HtmlTokenizerInitialState): TextState | "cdata-section-state" {
@@ -157,6 +152,7 @@ export class HtmlTokenizer implements TokenizerControl {
   readonly #sink: TokenSink;
   readonly #observer: EngineObserver | undefined;
   readonly #cursor: HtmlInputCursor;
+  readonly #protectTokenObservations: boolean;
   #state: HtmlTokenizerExecutionState;
   #lastStartTagName: string | null;
   #foreignContent: boolean;
@@ -166,7 +162,7 @@ export class HtmlTokenizer implements TokenizerControl {
   #failed = false;
   #failure: unknown;
   #markupStartUtf16Offset = 0;
-  #characterParts: string[] = [];
+  #characterData = "";
   #characterStartUtf16Offset: number | null = null;
   #characterEndUtf16Offset: number | null = null;
   #characterCategory: "ascii-whitespace" | "line-feed" | "null" | "other" | null = null;
@@ -194,7 +190,9 @@ export class HtmlTokenizer implements TokenizerControl {
       throw new EngineConfigurationError("tokenizer options", "must be an object");
     }
     const record = unknownOptions as Readonly<Record<PropertyKey, unknown>>;
-    const allowed = new Set<PropertyKey>(["initialState", "lastStartTagName", "foreignContent", "observer"]);
+    const allowed = new Set<PropertyKey>([
+      "initialState", "lastStartTagName", "foreignContent", "observer", "protectTokenObservations"
+    ]);
     for (const key of Reflect.ownKeys(record)) {
       if (!allowed.has(key)) {
         throw new EngineConfigurationError(`tokenizer options.${String(key)}`, "is not supported");
@@ -211,11 +209,18 @@ export class HtmlTokenizer implements TokenizerControl {
     if (options.foreignContent !== undefined && typeof options.foreignContent !== "boolean") {
       throw new EngineConfigurationError("foreign content", "must be a boolean");
     }
+    if (
+      options.protectTokenObservations !== undefined &&
+      typeof options.protectTokenObservations !== "boolean"
+    ) {
+      throw new EngineConfigurationError("token observation protection", "must be a boolean");
+    }
     this.#validateObserver(options.observer);
     guard.ensureActive();
     this.#guard = guard;
     this.#sink = sink;
     this.#observer = options.observer;
+    this.#protectTokenObservations = options.protectTokenObservations ?? true;
     this.#state = initialState(entry);
     this.#lastStartTagName = options.lastStartTagName ?? null;
     this.#foreignContent = options.foreignContent ?? false;
@@ -397,19 +402,23 @@ export class HtmlTokenizer implements TokenizerControl {
   }
 
   #stepData(): StepResult {
-    const read = this.#cursor.consume();
-    if (read.kind === "need-more-input") return this.#wait(read.position);
-    if (read.kind === "eof") return this.#emitEof(read.position);
-    if (read.value === "&") {
-      this.#startCharacterReference(read, "data-state");
-    } else if (read.value === "<") {
-      this.#markupStartUtf16Offset = read.span.startUtf16Offset;
-      this.#state = "tag-open-state";
-    } else {
+    for (;;) {
+      const read = this.#cursor.consume();
+      if (read.kind === "need-more-input") return this.#wait(read.position);
+      if (read.kind === "eof") return this.#emitEof(read.position);
+      if (read.value === "&") {
+        this.#startCharacterReference(read, "data-state");
+        return null;
+      }
+      if (read.value === "<") {
+        this.#markupStartUtf16Offset = read.span.startUtf16Offset;
+        this.#state = "tag-open-state";
+        return null;
+      }
       if (read.value === "\0") this.#emitParseError("unexpected-null-character", read.span);
-      this.#appendCharacters(read.value, read.span);
+      this.#appendInputCharacter(read.value, read);
+      if (this.#state !== "data-state") return null;
     }
-    return null;
   }
 
   #stepRcdata(): StepResult {
@@ -495,7 +504,8 @@ export class HtmlTokenizer implements TokenizerControl {
       this.#tag = new TagTokenBuilder(
         "end-tag",
         this.#requireLessThanSpan().startUtf16Offset,
-        this.#guard.beginStartTag()
+        this.#guard.beginStartTag(),
+        this.#protectTokenObservations
       );
       this.#cursor.reconsumeCurrent();
       this.#state = this.#textEndTagNameState(family);
@@ -811,7 +821,12 @@ export class HtmlTokenizer implements TokenizerControl {
     } else if (read.value === "/") {
       this.#state = "end-tag-open-state";
     } else if (isAsciiAlpha(read.value)) {
-      this.#tag = new TagTokenBuilder("start-tag", this.#markupStartUtf16Offset, this.#guard.beginStartTag());
+      this.#tag = new TagTokenBuilder(
+        "start-tag",
+        this.#markupStartUtf16Offset,
+        this.#guard.beginStartTag(),
+        this.#protectTokenObservations
+      );
       this.#cursor.reconsumeCurrent();
       this.#state = "tag-name-state";
     } else if (read.value === "?") {
@@ -835,7 +850,12 @@ export class HtmlTokenizer implements TokenizerControl {
       return this.#emitEof(read.position);
     }
     if (isAsciiAlpha(read.value)) {
-      this.#tag = new TagTokenBuilder("end-tag", this.#markupStartUtf16Offset, this.#guard.beginStartTag());
+      this.#tag = new TagTokenBuilder(
+        "end-tag",
+        this.#markupStartUtf16Offset,
+        this.#guard.beginStartTag(),
+        this.#protectTokenObservations
+      );
       this.#cursor.reconsumeCurrent();
       this.#state = "tag-name-state";
     } else if (read.value === ">") {
@@ -851,28 +871,36 @@ export class HtmlTokenizer implements TokenizerControl {
   }
 
   #stepTagName(): StepResult {
-    const read = this.#cursor.consume();
-    if (read.kind === "need-more-input") return this.#wait(read.position);
-    if (read.kind === "eof") {
-      this.#emitParseError("eof-in-tag", decisionSpan(read));
-      this.#tag = null;
-      return this.#emitEof(read.position);
+    for (;;) {
+      const read = this.#cursor.consume();
+      if (read.kind === "need-more-input") return this.#wait(read.position);
+      if (read.kind === "eof") {
+        this.#emitParseError("eof-in-tag", decisionSpan(read));
+        this.#tag = null;
+        return this.#emitEof(read.position);
+      }
+      const tag = this.#requireTag();
+      if (isAsciiWhitespace(read.value)) {
+        this.#state = "before-attribute-name-state";
+        return null;
+      }
+      if (read.value === "/") {
+        this.#state = "self-closing-start-tag-state";
+        return null;
+      }
+      if (read.value === ">") {
+        this.#state = "data-state";
+        this.#emitTag(read.span);
+        return null;
+      }
+      if (read.value === "\0") {
+        this.#emitParseError("unexpected-null-character", read.span);
+        tag.appendName("\uFFFD");
+        if (this.#state !== "tag-name-state") return null;
+      } else {
+        tag.appendName(asciiLower(read.value));
+      }
     }
-    const tag = this.#requireTag();
-    if (isAsciiWhitespace(read.value)) {
-      this.#state = "before-attribute-name-state";
-    } else if (read.value === "/") {
-      this.#state = "self-closing-start-tag-state";
-    } else if (read.value === ">") {
-      this.#state = "data-state";
-      this.#emitTag(read.span);
-    } else if (read.value === "\0") {
-      this.#emitParseError("unexpected-null-character", read.span);
-      tag.appendName("\uFFFD");
-    } else {
-      tag.appendName(asciiLower(read.value));
-    }
-    return null;
   }
 
   #stepBeforeAttributeName(): StepResult {
@@ -1807,7 +1835,7 @@ export class HtmlTokenizer implements TokenizerControl {
       this.#lastStartTagName = token.name;
     }
     const acceptance = this.#emitToken(token);
-    if (token.kind === "start-tag" && token.selfClosing && !acceptance.selfClosingAcknowledged) {
+    if (token.kind === "start-tag" && token.selfClosing && !acceptance) {
       this.#emitParseError("non-void-html-element-start-tag-with-trailing-solidus", decision);
     }
   }
@@ -1832,69 +1860,80 @@ export class HtmlTokenizer implements TokenizerControl {
 
   #emitEof(position: SourcePosition): HtmlTokenizerDone {
     if (this.#done) return Object.freeze({ status: "done", position });
-    const token = Object.freeze({
+    const token = {
       kind: "eof",
       span: sourceSpan(position.utf16Offset, position.utf16Offset)
-    } as const);
+    } as const;
+    if (this.#protectTokenObservations) Object.freeze(token);
     this.#emitToken(token);
     this.#done = true;
     return Object.freeze({ status: "done", position });
   }
 
-  #emitToken(token: HtmlToken): { readonly selfClosingAcknowledged: boolean } {
+  #emitToken(token: HtmlToken): boolean {
     this.#flushCharacters();
     return this.#deliverToken(token);
   }
 
-  #deliverToken(token: HtmlToken): { readonly selfClosingAcknowledged: boolean } {
+  #deliverToken(token: HtmlToken): boolean {
     this.#observer?.onToken?.(token);
     this.#guard.ensureActive();
     const acceptance: unknown = this.#sink.accept(token);
     this.#guard.ensureActive();
-    if (
-      typeof acceptance !== "object" ||
-      acceptance === null ||
-      Array.isArray(acceptance) ||
-      typeof (acceptance as { readonly selfClosingAcknowledged?: unknown }).selfClosingAcknowledged !== "boolean"
-    ) {
+    if (typeof acceptance !== "boolean") {
       throw new EngineConfigurationError(
         "token sink acceptance",
-        "must provide a boolean selfClosingAcknowledged value"
+        "must be a boolean self-closing acknowledgement"
       );
     }
-    return acceptance as { readonly selfClosingAcknowledged: boolean };
+    return acceptance;
   }
 
   #appendCharacters(value: string, span: SourceSpan): void {
+    this.#appendCharactersRange(value, span.startUtf16Offset, span.endUtf16Offset);
+  }
+
+  #appendInputCharacter(value: string, read: InputCharacter): void {
+    this.#appendCharactersRange(value, read.startUtf16Offset, read.endUtf16Offset);
+  }
+
+  #appendCharactersRange(
+    value: string,
+    startUtf16Offset: number,
+    endUtf16Offset: number
+  ): void {
     if (value.length === 0) return;
     const category = value === "\n"
       ? "line-feed"
       : value === "\u0000" ? "null"
-      : /^[\t\f\r ]+$/u.test(value) ? "ascii-whitespace" : "other";
+      : value === "\t" || value === "\f" || value === "\r" || value === " "
+        ? "ascii-whitespace"
+        : "other";
     if (
       this.#characterStartUtf16Offset !== null &&
-      (this.#characterEndUtf16Offset !== span.startUtf16Offset ||
+      (this.#characterEndUtf16Offset !== startUtf16Offset ||
         this.#characterCategory !== category)
     ) {
       this.#flushCharacters();
     }
     if (this.#characterStartUtf16Offset === null) {
-      this.#characterStartUtf16Offset = span.startUtf16Offset;
+      this.#characterStartUtf16Offset = startUtf16Offset;
       this.#characterCategory = category;
     }
-    this.#characterEndUtf16Offset = span.endUtf16Offset;
-    this.#characterParts.push(value);
+    this.#characterEndUtf16Offset = endUtf16Offset;
+    this.#characterData += value;
     if (category === "line-feed" || category === "null") this.#flushCharacters();
   }
 
   #flushCharacters(): void {
     if (this.#characterStartUtf16Offset === null || this.#characterEndUtf16Offset === null) return;
-    const token = Object.freeze({
+    const token = {
       kind: "character",
-      data: this.#characterParts.join(""),
+      data: this.#characterData,
       span: sourceSpan(this.#characterStartUtf16Offset, this.#characterEndUtf16Offset)
-    } as const);
-    this.#characterParts = [];
+    } as const;
+    if (this.#protectTokenObservations) Object.freeze(token);
+    this.#characterData = "";
     this.#characterStartUtf16Offset = null;
     this.#characterEndUtf16Offset = null;
     this.#characterCategory = null;

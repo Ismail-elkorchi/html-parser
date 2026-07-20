@@ -8,6 +8,8 @@ import { EngineConfigurationError, type EngineResourceGuard } from "./resource-g
 export interface InputCharacter {
   readonly kind: "character";
   readonly value: string;
+  readonly startUtf16Offset: number;
+  readonly endUtf16Offset: number;
   readonly span: SourceSpan;
 }
 
@@ -37,6 +39,25 @@ export interface InputCodeUnit {
 export type InputCodeUnitRead = InputCodeUnit | InputNeedMore | InputEof;
 
 export type InputParseErrorObserver = (error: EngineParseError) => void;
+
+class CursorInputCharacter implements InputCharacter {
+  readonly kind = "character";
+  readonly value: string;
+  #span: SourceSpan | null = null;
+
+  constructor(
+    value: string,
+    readonly startUtf16Offset: number,
+    readonly endUtf16Offset: number
+  ) {
+    this.value = value;
+  }
+
+  get span(): SourceSpan {
+    this.#span ??= sourceSpan(this.startUtf16Offset, this.endUtf16Offset);
+    return this.#span;
+  }
+}
 
 function isLeadingSurrogate(codeUnit: number): boolean {
   return codeUnit >= 0xd800 && codeUnit <= 0xdbff;
@@ -169,17 +190,18 @@ export class HtmlInputCursor {
       );
     }
 
-    const second = this.#codeUnitAt(1);
     let width = 1;
     let codePoint = first;
     let value: string;
     if (first === 0x0d) {
+      const second = this.#codeUnitAt(1);
       if (second === undefined && !this.#closed) {
         return Object.freeze({ kind: "need-more-input", position: this.position() });
       }
       if (second === 0x0a) width = 2;
       value = "\n";
     } else if (isLeadingSurrogate(first)) {
+      const second = this.#codeUnitAt(1);
       if (second === undefined && !this.#closed) {
         return Object.freeze({ kind: "need-more-input", position: this.position() });
       }
@@ -194,9 +216,11 @@ export class HtmlInputCursor {
       value = String.fromCharCode(first);
     }
 
-    const span = sourceSpan(this.#utf16Offset, this.#utf16Offset + width);
+    const startUtf16Offset = this.#utf16Offset;
+    const endUtf16Offset = startUtf16Offset + width;
     const parseErrorCode = inputError(codePoint);
     if (parseErrorCode !== null) {
+      const span = sourceSpan(startUtf16Offset, endUtf16Offset);
       this.#guard.reserveParseError();
       const diagnostic = createParseError(parseErrorCode, "preprocessing", span);
       this.#onParseError?.(diagnostic);
@@ -204,12 +228,21 @@ export class HtmlInputCursor {
     }
 
     this.#advance(width);
-    const result = Object.freeze({ kind: "character", value, span } as const);
+    const result: InputCharacter = new CursorInputCharacter(
+      value,
+      startUtf16Offset,
+      endUtf16Offset
+    );
     this.#current = result;
     return result;
   }
 
   #codeUnitAt(distance: number): number | undefined {
+    const head = this.#chunks[this.#headChunk];
+    if (head === undefined) return undefined;
+    const headPosition = this.#headOffset + distance;
+    if (headPosition < head.length) return head.charCodeAt(headPosition);
+
     let chunkIndex = this.#headChunk;
     let chunkOffset = this.#headOffset;
     let remaining = distance;
@@ -226,6 +259,26 @@ export class HtmlInputCursor {
   }
 
   #advance(codeUnits: number): void {
+    const head = requireInternalValue(
+      this.#chunks[this.#headChunk],
+      "INPUT_CURSOR_BUFFER_UNDERRUN"
+    );
+    const availableAtHead = head.length - this.#headOffset;
+    if (codeUnits <= availableAtHead) {
+      this.#headOffset += codeUnits;
+      this.#utf16Offset += codeUnits;
+      if (this.#headOffset === head.length) {
+        this.#chunks[this.#headChunk] = "";
+        this.#headChunk += 1;
+        this.#headOffset = 0;
+      }
+      if (this.#headChunk >= 1024 && this.#headChunk * 2 >= this.#chunks.length) {
+        this.#chunks = this.#chunks.slice(this.#headChunk);
+        this.#headChunk = 0;
+      }
+      return;
+    }
+
     let remaining = codeUnits;
     while (remaining > 0) {
       const chunk = requireInternalValue(

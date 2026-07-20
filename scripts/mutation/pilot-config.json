@@ -126,8 +126,8 @@
         {
           "id": "tokenizer-data-character-reference",
           "description": "Treat an ampersand in Data as ordinary text instead of invoking the reference consumer.",
-          "search": "if (read.value === \"&\") {\n            this.#startCharacterReference(read, \"data-state\");\n        }",
-          "replace": "if (false && read.value === \"&\") {\n            this.#startCharacterReference(read, \"data-state\");\n        }"
+          "search": "if (read.value === \"&\") {\n                this.#startCharacterReference(read, \"data-state\");\n                return null;\n            }",
+          "replace": "if (false && read.value === \"&\") {\n                this.#startCharacterReference(read, \"data-state\");\n                return null;\n            }"
         },
         {
           "id": "tokenizer-duplicate-attribute",
@@ -144,8 +144,8 @@
         {
           "id": "tokenizer-self-closing-acknowledgement",
           "description": "Ignore a rejected self-closing acknowledgement from the synchronous sink.",
-          "search": "if (token.kind === \"start-tag\" && token.selfClosing && !acceptance.selfClosingAcknowledged) {",
-          "replace": "if (false && token.kind === \"start-tag\" && token.selfClosing && !acceptance.selfClosingAcknowledged) {"
+          "search": "if (token.kind === \"start-tag\" && token.selfClosing && !acceptance) {",
+          "replace": "if (false && token.kind === \"start-tag\" && token.selfClosing && !acceptance) {"
         },
         {
           "id": "tokenizer-appropriate-end-tag",
@@ -180,8 +180,8 @@
         {
           "id": "tokenizer-character-whitespace-boundary",
           "description": "Coalesce ASCII whitespace with following non-whitespace text.",
-          "search": "this.#characterEndUtf16Offset !== span.startUtf16Offset ||\n                this.#characterCategory !== category",
-          "replace": "this.#characterEndUtf16Offset !== span.startUtf16Offset ||\n                false"
+          "search": "this.#characterEndUtf16Offset !== startUtf16Offset ||\n                this.#characterCategory !== category",
+          "replace": "this.#characterEndUtf16Offset !== startUtf16Offset ||\n                false"
         }
       ]
     },
@@ -215,9 +215,9 @@
       "mutants": [
         {
           "id": "open-stack-tail-insertion",
-          "description": "Send insertion after current through the linear middle-insertion relabel path.",
-          "search": "if (referenceIndex === this.#entries.length - 1) {",
-          "replace": "if (false && referenceIndex === this.#entries.length - 1) {"
+          "description": "Insert a middle element before its reference instead of after it.",
+          "search": "const insertionIndex = referenceIndex + 1;",
+          "replace": "const insertionIndex = referenceIndex;"
         }
       ]
     },
@@ -240,7 +240,7 @@
         {
           "id": "tree-depth-boundary",
           "description": "Skip subtree depth accounting before insertion.",
-          "search": "this.#resources.observeDepth(parentDepth + depthAssignments.maxRelativeDepth);",
+          "search": "this.#resources.observeDepth(parentDepth + prepared.maxRelativeDepth);",
           "replace": "this.#resources.checkpoint();"
         },
         {
@@ -510,7 +510,7 @@
       ]
     },
     {
-      "targetFile": "dist/public/mod.js",
+      "targetFile": "dist/public/text-extraction.js",
       "testCommand": ["node", "--test", "test/behavior/independent-product-adapter.test.js"],
       "mutants": [
         {
@@ -542,6 +542,18 @@
           "description": "Drop processing-instruction token data during public conversion.",
           "search": "return Object.freeze({ kind: \"processingInstruction\", target: token.target, data: token.data });",
           "replace": "return Object.freeze({ kind: \"processingInstruction\", target: token.target, data: \"\" });"
+        },
+        {
+          "id": "product-public-span-end",
+          "description": "Collapse every captured public source span to its start offset.",
+          "search": "return Object.freeze({ start: span.startUtf16Offset, end: span.endUtf16Offset });",
+          "replace": "return Object.freeze({ start: span.startUtf16Offset, end: span.startUtf16Offset });"
+        },
+        {
+          "id": "product-trace-byte-accounting",
+          "description": "Discard retained trace byte accounting from public resource observations.",
+          "search": "traceUtf8Bytes: trace.eventUtf8Bytes",
+          "replace": "traceUtf8Bytes: 0"
         }
       ]
     }

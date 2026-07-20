@@ -41,6 +41,7 @@ import type {
   HtmlToken,
   HtmlTreeDoctypeExternalId,
   HtmlTreeElement,
+  HtmlTreeModel,
   HtmlTreeNode,
   HtmlTreeParent,
   HtmlTreeRoot,
@@ -91,6 +92,10 @@ interface ParseInputContext {
 
 class NodeIdAssigner {
   #next: NodeId = 1;
+
+  get assigned(): number {
+    return this.#next - 1;
+  }
 
   next(): NodeId {
     const id = this.#next;
@@ -147,27 +152,26 @@ function spanProvenance(span: SourceSpan | null, captureSpans: boolean): SpanPro
 
 function children(
   parent: HtmlTreeParent,
+  model: HtmlTreeModel,
   operation: OperationContext
 ): readonly HtmlTreeNode[] {
   const result: HtmlTreeNode[] = [];
-  for (let index = 0; index < parent.childCount; index += 1) {
+  for (const child of model.childrenOf(parent)) {
     operation.checkpoint();
-    const child = parent.childAt(index);
-    if (child !== null) result.push(child);
+    result.push(child);
   }
   return result;
 }
 
 function attributes(
   element: HtmlTreeElement,
+  model: HtmlTreeModel,
   captureSpans: boolean,
   operation: OperationContext
 ): readonly Attribute[] {
   const result: Attribute[] = [];
-  for (let index = 0; index < element.attributeCount; index += 1) {
+  for (const attribute of model.attributesOf(element)) {
     operation.checkpoint();
-    const attribute = element.attributeAt(index);
-    if (attribute === null) continue;
     const span = publicSpan(attribute.sourceSpan, captureSpans);
     result.push(Object.freeze({
       namespaceUri: attribute.namespaceUri,
@@ -198,119 +202,222 @@ function externalId(value: HtmlTreeDoctypeExternalId) {
 }
 
 type ConversionSource = HtmlTreeNode | HtmlTemplateContents;
+const EMPTY_HTML_NODES: readonly HtmlNode[] = Object.freeze([]);
 
-function sourceChildren(
+function pushConversionChildren(
   source: ConversionSource,
+  model: HtmlTreeModel,
+  sources: ConversionSource[],
+  expanded: boolean[],
   operation: OperationContext
-): readonly ConversionSource[] {
-  if (source.kind === "template-contents") return children(source, operation);
-  if (source.kind !== "element") return [];
-  return source.templateContents === null
-    ? children(source, operation)
-    : [source.templateContents];
+): void {
+  if (source.kind === "element" && source.templateContents !== null) {
+    sources.push(source.templateContents);
+    expanded.push(false);
+    return;
+  }
+  if (source.kind !== "element" && source.kind !== "template-contents") return;
+  const sourceChildren = model.childrenOf(source);
+  for (let index = sourceChildren.length - 1; index >= 0; index -= 1) {
+    operation.checkpoint();
+    const child = sourceChildren[index];
+    if (child !== undefined) {
+      sources.push(child);
+      expanded.push(false);
+    }
+  }
+}
+
+function convertedChildren(
+  parent: HtmlTreeParent,
+  model: HtmlTreeModel,
+  converted: readonly (HtmlNode | undefined)[],
+  operation: OperationContext
+): readonly HtmlNode[] {
+  const result: HtmlNode[] = [];
+  for (const child of model.childrenOf(parent)) {
+    operation.checkpoint();
+    result.push(requireInternalValue(
+      converted[child.identity.serial],
+      "PRODUCT_ADAPTER_CHILD_CONVERSION_MISSING"
+    ));
+  }
+  return Object.freeze(result);
+}
+
+function createPublicNode(
+  source: ConversionSource,
+  model: HtmlTreeModel,
+  assigner: NodeIdAssigner,
+  captureSpans: boolean,
+  directChildren: readonly HtmlNode[],
+  templateContent: HtmlNode | undefined,
+  operation: OperationContext
+): HtmlNode {
+  if (source.kind === "template-contents") {
+    return Object.freeze({
+      id: assigner.next(),
+      kind: "templateContent",
+      children: directChildren,
+      spanProvenance: "inferred"
+    } satisfies TemplateContentNode);
+  }
+  const span = publicSpan(source.sourceSpan, captureSpans);
+  const provenance = spanProvenance(source.sourceSpan, captureSpans);
+  if (source.kind === "text") {
+    return Object.freeze({
+      id: assigner.next(), kind: "text", value: source.data, spanProvenance: provenance,
+      ...(span === undefined ? {} : { span })
+    });
+  }
+  if (source.kind === "comment") {
+    return Object.freeze({
+      id: assigner.next(), kind: "comment", value: source.data, spanProvenance: provenance,
+      ...(span === undefined ? {} : { span })
+    });
+  }
+  if (source.kind === "processing-instruction") {
+    return Object.freeze({
+      id: assigner.next(), kind: "processingInstruction",
+      target: source.target, data: source.data, spanProvenance: provenance,
+      ...(span === undefined ? {} : { span })
+    });
+  }
+  if (source.kind === "doctype") {
+    return Object.freeze({
+      id: assigner.next(), kind: "doctype", name: source.name,
+      externalId: externalId(source.externalId), spanProvenance: provenance,
+      ...(span === undefined ? {} : { span })
+    });
+  }
+  if (templateContent !== undefined && templateContent.kind !== "templateContent") {
+    failInternalState("PRODUCT_ADAPTER_TEMPLATE_CONTENT_KIND_MISMATCH");
+  }
+  return Object.freeze({
+    id: assigner.next(), kind: "element",
+    namespaceUri: source.namespaceUri, prefix: source.prefix,
+    localName: source.localName, tagName: source.qualifiedName,
+    attributes: attributes(source, model, captureSpans, operation), children: directChildren,
+    ...(templateContent === undefined ? {} : { templateContent }),
+    spanProvenance: provenance,
+    ...(span === undefined ? {} : { span })
+  });
+}
+
+function convertReadySource(
+  source: ConversionSource,
+  model: HtmlTreeModel,
+  converted: readonly (HtmlNode | undefined)[],
+  assigner: NodeIdAssigner,
+  captureSpans: boolean,
+  operation: OperationContext
+): HtmlNode {
+  const directChildren = source.kind === "template-contents" ||
+      (source.kind === "element" && source.templateContents === null)
+    ? convertedChildren(source, model, converted, operation)
+    : EMPTY_HTML_NODES;
+  const templateContent = source.kind === "element" && source.templateContents !== null
+    ? converted[source.templateContents.identity.serial]
+    : undefined;
+  return createPublicNode(
+    source,
+    model,
+    assigner,
+    captureSpans,
+    directChildren,
+    templateContent,
+    operation
+  );
+}
+
+function convertRecursively(
+  source: ConversionSource,
+  model: HtmlTreeModel,
+  assigner: NodeIdAssigner,
+  captureSpans: boolean,
+  operation: OperationContext
+): HtmlNode {
+  operation.checkpoint();
+  let directChildren = EMPTY_HTML_NODES;
+  let templateContent: HtmlNode | undefined;
+  if (source.kind === "element" && source.templateContents !== null) {
+    templateContent = convertRecursively(
+      source.templateContents,
+      model,
+      assigner,
+      captureSpans,
+      operation
+    );
+  } else if (source.kind === "element" || source.kind === "template-contents") {
+    const convertedChildren: HtmlNode[] = [];
+    for (const child of model.childrenOf(source)) {
+      convertedChildren.push(
+        convertRecursively(child, model, assigner, captureSpans, operation)
+      );
+    }
+    directChildren = Object.freeze(convertedChildren);
+  }
+  return createPublicNode(
+    source,
+    model,
+    assigner,
+    captureSpans,
+    directChildren,
+    templateContent,
+    operation
+  );
 }
 
 function convertNodes(
   root: HtmlTreeRoot,
+  model: HtmlTreeModel,
   assigner: NodeIdAssigner,
   captureSpans: boolean,
+  maxDepth: number,
   operation: OperationContext
 ): readonly HtmlNode[] {
-  const converted = new WeakMap<object, HtmlNode>();
-  const stack: Array<{ readonly source: ConversionSource; readonly exiting: boolean }> = [];
-  const roots = children(root, operation);
-  for (let index = roots.length - 1; index >= 0; index -= 1) {
-    const source = roots[index];
-    if (source !== undefined) stack.push({ source, exiting: false });
-  }
-
-  while (stack.length > 0) {
-    operation.checkpoint();
-    const frame = stack.pop();
-    if (frame === undefined) break;
-    const descendants = sourceChildren(frame.source, operation);
-    if (descendants.length > 0 && !frame.exiting) {
-      stack.push({ source: frame.source, exiting: true });
-      for (let index = descendants.length - 1; index >= 0; index -= 1) {
-        const child = descendants[index];
-        if (child !== undefined) stack.push({ source: child, exiting: false });
+  const converted: Array<HtmlNode | undefined> = [];
+  const roots = children(root, model, operation);
+  if (maxDepth <= 128) {
+    return Object.freeze(roots.map((source) =>
+      convertRecursively(source, model, assigner, captureSpans, operation)
+    ));
+  } else {
+    const sources: ConversionSource[] = [];
+    const expanded: boolean[] = [];
+    for (let index = roots.length - 1; index >= 0; index -= 1) {
+      const source = roots[index];
+      if (source !== undefined) {
+        sources.push(source);
+        expanded.push(false);
       }
-      continue;
     }
-
-    const source = frame.source;
-    let node: HtmlNode;
-    if (source.kind === "template-contents") {
-      const templateChildren = Object.freeze(children(source, operation).map((child) => {
-        operation.checkpoint();
-        return requireInternalValue(
-          converted.get(child),
-          "PRODUCT_ADAPTER_CHILD_CONVERSION_MISSING"
-        );
-      }));
-      node = Object.freeze({
-        id: assigner.next(),
-        kind: "templateContent",
-        children: templateChildren,
-        spanProvenance: "inferred"
-      } satisfies TemplateContentNode);
-    } else {
-      const span = publicSpan(source.sourceSpan, captureSpans);
-      const provenance = spanProvenance(source.sourceSpan, captureSpans);
-      if (source.kind === "text") {
-        node = Object.freeze({
-          id: assigner.next(), kind: "text", value: source.data, spanProvenance: provenance,
-          ...(span === undefined ? {} : { span })
-        });
-      } else if (source.kind === "comment") {
-        node = Object.freeze({
-          id: assigner.next(), kind: "comment", value: source.data, spanProvenance: provenance,
-          ...(span === undefined ? {} : { span })
-        });
-      } else if (source.kind === "processing-instruction") {
-        node = Object.freeze({
-          id: assigner.next(), kind: "processingInstruction",
-          target: source.target, data: source.data, spanProvenance: provenance,
-          ...(span === undefined ? {} : { span })
-        });
-      } else if (source.kind === "doctype") {
-        node = Object.freeze({
-          id: assigner.next(), kind: "doctype", name: source.name,
-          externalId: externalId(source.externalId), spanProvenance: provenance,
-          ...(span === undefined ? {} : { span })
-        });
+    while (sources.length > 0) {
+      operation.checkpoint();
+      const source = sources.pop();
+      const isExpanded = expanded.pop();
+      if (source === undefined || isExpanded === undefined) break;
+      if (!isExpanded) {
+        sources.push(source);
+        expanded.push(true);
+        pushConversionChildren(source, model, sources, expanded, operation);
       } else {
-        const directChildren = Object.freeze(children(source, operation).map((child) => {
-          operation.checkpoint();
-          return requireInternalValue(
-            converted.get(child),
-            "PRODUCT_ADAPTER_CHILD_CONVERSION_MISSING"
-          );
-        }));
-        const templateContent = source.templateContents === null
-          ? undefined
-          : converted.get(source.templateContents);
-        if (templateContent !== undefined && templateContent.kind !== "templateContent") {
-          failInternalState("PRODUCT_ADAPTER_TEMPLATE_CONTENT_KIND_MISMATCH");
-        }
-        node = Object.freeze({
-          id: assigner.next(), kind: "element",
-          namespaceUri: source.namespaceUri, prefix: source.prefix,
-          localName: source.localName, tagName: source.qualifiedName,
-          attributes: attributes(source, captureSpans, operation), children: directChildren,
-          ...(templateContent === undefined ? {} : { templateContent }),
-          spanProvenance: provenance,
-          ...(span === undefined ? {} : { span })
-        });
+        converted[source.identity.serial] = convertReadySource(
+          source,
+          model,
+          converted,
+          assigner,
+          captureSpans,
+          operation
+        );
       }
     }
-    converted.set(source, node);
   }
 
   return Object.freeze(roots.map((source) => {
     operation.checkpoint();
     return requireInternalValue(
-      converted.get(source),
+      converted[source.identity.serial],
       "PRODUCT_ADAPTER_ROOT_CONVERSION_MISSING"
     );
   }));
@@ -385,6 +492,7 @@ function parseDocumentOperation(
   try {
     result = runHtmlEngine({
       inputChunks: [html],
+      retainNodeSpans: captureSpans,
       parser: { kind: "document", scriptingMode: "inert" },
       limits: engineLimits(budgets),
       ...(options.signal === undefined ? {} : { signal: options.signal }),
@@ -428,20 +536,27 @@ function parseDocumentOperation(
   trace.emit({ kind: "token", count: tokenCount });
   const assigner = new NodeIdAssigner();
   const documentId = assigner.next();
-  const publicChildren = convertNodes(result.model.root, assigner, captureSpans, operation);
-  const validation = result.model.validate();
+  const publicChildren = convertNodes(
+    result.model.root,
+    result.model,
+    assigner,
+    captureSpans,
+    result.resources.maxDepth,
+    operation
+  );
+  const attachedNodes = assigner.assigned;
   const errors = parseErrors(result.parseErrors, operation);
   trace.emit({
     kind: "tree-mutation",
-    nodeCount: validation.attachedNodes,
+    nodeCount: attachedNodes,
     errorCount: errors.length
   });
   trace.emitBudget("maxNodes", budgets?.maxNodes, result.resources.nodes);
   trace.emitBudget("maxDepth", budgets?.maxDepth, result.resources.maxDepth);
   const traceResult = trace.finish({
     tokenCount,
-    nodeCount: validation.attachedNodes,
-    maxDepth: validation.maxDepth,
+    nodeCount: attachedNodes,
+    maxDepth: result.resources.maxDepth,
     parseErrorCount: errors.length,
     encoding: { name: input.decode.encoding, source: input.decode.sniffSource },
     inputBytes: input.byteLength,
@@ -560,6 +675,7 @@ export function parseFragmentWithIndependentEngine(
   try {
     result = runHtmlEngine({
       inputChunks: [html],
+      retainNodeSpans: normalized.captureSpans ?? false,
       parser: {
         kind: "fragment",
         scriptingMode: "inert",
@@ -606,16 +722,23 @@ export function parseFragmentWithIndependentEngine(
   trace.emit({ kind: "token", count: tokenCount });
   const assigner = new NodeIdAssigner();
   const fragmentId = assigner.next();
-  const publicChildren = convertNodes(result.model.root, assigner, normalized.captureSpans ?? false, operation);
-  const validation = result.model.validate();
+  const publicChildren = convertNodes(
+    result.model.root,
+    result.model,
+    assigner,
+    normalized.captureSpans ?? false,
+    result.resources.maxDepth,
+    operation
+  );
+  const attachedNodes = assigner.assigned;
   const errors = parseErrors(result.parseErrors, operation);
-  trace.emit({ kind: "tree-mutation", nodeCount: validation.attachedNodes, errorCount: errors.length });
+  trace.emit({ kind: "tree-mutation", nodeCount: attachedNodes, errorCount: errors.length });
   trace.emitBudget("maxNodes", normalized.budgets?.maxNodes, result.resources.nodes);
   trace.emitBudget("maxDepth", normalized.budgets?.maxDepth, result.resources.maxDepth);
   const traceResult = trace.finish({
     tokenCount,
-    nodeCount: validation.attachedNodes,
-    maxDepth: validation.maxDepth,
+    nodeCount: attachedNodes,
+    maxDepth: result.resources.maxDepth,
     parseErrorCount: errors.length,
     encoding: { name: "utf-8", source: "input" },
     inputBytes,
@@ -709,7 +832,7 @@ export async function tokenizeByteStreamEagerWithIndependentEngine(
     accept(token) {
       operation.checkpoint();
       tokens.push(publicToken(token, operation));
-      return Object.freeze({ selfClosingAcknowledged: token.kind !== "start-tag" || token.selfClosing });
+      return token.kind !== "start-tag" || token.selfClosing;
     }
   });
   try {

@@ -3,10 +3,8 @@ import type { InsertionMode, TokenizerMode } from "./parser-state.js";
 import type { SourceSpan } from "./positions.js";
 import type { HtmlToken } from "./tokens.js";
 
-/** Result of immediate tree-builder handling for one emitted token. */
-export interface TokenAcceptance {
-  readonly selfClosingAcknowledged: boolean;
-}
+/** Whether immediate tree-builder handling acknowledged a self-closing start tag. */
+export type TokenAcceptance = boolean;
 
 /** Synchronous tokenizer-to-tree-builder delivery boundary. */
 export interface TokenSink {

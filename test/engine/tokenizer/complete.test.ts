@@ -28,7 +28,7 @@ function tokenizeChunks(
     {
       accept(token) {
         tokens.push(token);
-        return { selfClosingAcknowledged: true };
+        return true;
       }
     },
     {
@@ -230,7 +230,7 @@ void test("CDATA bracket runs, EOF, and immediate foreign-context feedback are e
   const tokenizer = new HtmlTokenizer(createEngineResourceGuard(), {
     accept(token) {
       tokens.push(token);
-      return { selfClosingAcknowledged: true };
+      return true;
     }
   });
   tokenizer.write("<![CD");

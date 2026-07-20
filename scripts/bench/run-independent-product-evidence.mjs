@@ -6,6 +6,7 @@ import {
   parseWithIndependentEngine
 } from "../../dist/integration/html-product-adapter.js";
 import { serialize, walk } from "../../dist/mod.js";
+import { writeJson } from "../eval/eval-primitives.mjs";
 
 if (typeof globalThis.gc !== "function") {
   throw new Error("Run the independent product evidence script with --expose-gc");
@@ -91,8 +92,10 @@ if (fragment.walked !== fragmentDepth + 1) {
   throw new Error("deep fragment conversion omitted nodes");
 }
 
-process.stdout.write(`${JSON.stringify({
+const report = {
   schema: "independent-product-evidence/v1",
   runtime: process.version,
   cases: [repeated, templates, fragment]
-}, null, 2)}\n`);
+};
+await writeJson("reports/engine-resource-evidence.json", report);
+process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

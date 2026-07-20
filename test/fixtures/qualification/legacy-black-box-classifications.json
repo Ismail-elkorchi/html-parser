@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "fixture": "test/fixtures/legacy-runtime/requests.json",
+  "baseline": "test/fixtures/legacy-runtime/expected.json",
+  "entries": [
+    {
+      "id": "document-output-errors-resources-trace",
+      "expectedSha256": "c3f84a720b74e686b20340b12374ed109c4731dce6329ff3270e4bfa77e6b4ba",
+      "candidateSha256": "c016720e6404b419c59707ad0c46d00e675b9dba51e98aac298af478ec539670",
+      "classification": "intentional-observability-change",
+      "reason": "Tree, source, encoding, and non-observability resource fields are exact; the independent engine reports contextual unnamed tree-builder diagnostics and its own lowercase state/token trace vocabulary."
+    },
+    {
+      "id": "fragment-context-trace",
+      "expectedSha256": "97bbda10733ddc1dc8bdb0acacdd384d30a14ecde0018f1b1ea12c1ec1e467eb",
+      "candidateSha256": "62ff7e3aa9604797f0a86006aa334ae13579fe7e7ed3ab75e27abdcd10349711",
+      "classification": "intentional-observability-change",
+      "reason": "Fragment tree and diagnostics are exact; the independent engine emits its own trace sequence without a synthetic initial-mode transition."
+    },
+    {
+      "id": "windows-1252-byte-input",
+      "expectedSha256": "276394b60e0aa2185355e7e8c7d3fa90b58e051592e03348ce5b70fd8c0a88f7",
+      "candidateSha256": "052b69bb4a7494bd8ac680acffa6f216b084b4bd1073cea11822ffcd30292fa6",
+      "classification": "intentional-diagnostic-change",
+      "reason": "Decoded source, tree, encoding, and non-observability resources are exact; the Standard leaves this tree-construction error unnamed, so the independent engine preserves contextual unexpected-token evidence."
+    },
+    {
+      "id": "chunked-stream-input",
+      "expectedSha256": "0704f57329d4c3f56ab315533d49909f2b686e097cc8b9d8ac011bae3433650b",
+      "candidateSha256": "8741b5983f6cd0157e7b016114475dadaf3225b66baefb1d7aaac825bdb0bf20",
+      "classification": "intentional-diagnostic-change",
+      "reason": "Decoded source, tree, encoding, and non-observability resources are exact; the independent engine retains contextual unnamed tree-builder diagnostics and lowercase trace state names."
+    }
+  ]
+}

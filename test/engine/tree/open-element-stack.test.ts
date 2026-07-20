@@ -90,6 +90,7 @@ void test("random-access replacement and insertion preserve identity scope and o
   const block = element(model, "div");
   const replacement = element(model, "b");
   const inserted = element(model, "i");
+  const middleInserted = element(model, "em");
   const boundaries = new Set(["html"]);
 
   stack.push(html);
@@ -102,6 +103,11 @@ void test("random-access replacement and insertion preserve identity scope and o
   stack.insertAfter(block, inserted);
   assert.equal(resources.snapshot().steps - beforeTailInsertion, 1);
   assert.equal(stack.at(3), inserted);
+  stack.insertAfter(replacement, middleInserted);
+  assert.equal(stack.at(1), replacement);
+  assert.equal(stack.at(2), middleInserted);
+  assert.equal(stack.at(3), block);
+  assert.equal(stack.at(4), inserted);
   assert.equal(stack.hasElementInScope(replacement, boundaries), true);
   assert.equal(stack.hasInScope(HTML_NAMESPACE, "i", boundaries), true);
 });

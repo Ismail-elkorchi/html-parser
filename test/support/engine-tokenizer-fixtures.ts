@@ -217,7 +217,7 @@ export function runEngineTokenizerFixture(
     {
       accept(token) {
         tokens.push(token);
-        return { selfClosingAcknowledged: true };
+        return true;
       }
     },
     {

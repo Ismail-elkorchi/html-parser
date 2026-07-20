@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { chromium, firefox, webkit } from "playwright";
 
-import { parse } from "../../dist/mod.js";
+import { parseWithIndependentEngine } from "../../dist/integration/html-product-adapter.js";
 import { readJson, safeDiv, writeJson } from "../eval/eval-primitives.mjs";
 
 const SEED = 0x5f3759df;
@@ -49,12 +49,11 @@ function randomCorpus(seed, size) {
 
 function normalizeAttributes(attributes) {
   return [...attributes]
-    .map((attribute) => [attribute.name, attribute.value])
-    .sort(([leftName, leftValue], [rightName, rightValue]) => {
-      if (leftName !== rightName) {
-        return leftName.localeCompare(rightName);
-      }
-      return leftValue.localeCompare(rightValue);
+    .map((attribute) => [attribute.namespaceUri, attribute.localName, attribute.value])
+    .sort((left, right) => {
+      const leftKey = JSON.stringify(left);
+      const rightKey = JSON.stringify(right);
+      return leftKey.localeCompare(rightKey);
     });
 }
 
@@ -68,16 +67,29 @@ function normalizeLibraryNode(node) {
   }
 
   if (node.kind === "doctype") {
-    return ["doctype", node.name, node.publicId ?? "", node.systemId ?? ""];
+    if (node.externalId.kind === "none") return ["doctype", node.name, "", ""];
+    if (node.externalId.kind === "system") {
+      return ["doctype", node.name, "", node.externalId.systemId];
+    }
+    return ["doctype", node.name, node.externalId.publicId, node.externalId.systemId ?? ""];
   }
 
-  const children = node.children.map((child) => normalizeLibraryNode(child));
+  if (node.kind === "processingInstruction") {
+    return ["processing-instruction", node.target, node.data];
+  }
+
+  if (node.kind === "templateContent") {
+    return node.children.map((child) => normalizeLibraryNode(child));
+  }
+
+  const sourceChildren = node.templateContent?.children ?? node.children;
+  const children = sourceChildren.map((child) => normalizeLibraryNode(child));
   const attributes = normalizeAttributes(node.attributes);
-  return ["element", node.tagName.toLowerCase(), attributes, children];
+  return ["element", node.namespaceUri, node.localName, attributes, children];
 }
 
 function normalizeLibrary(html) {
-  const { tree } = parse(html);
+  const { tree } = parseWithIndependentEngine(html);
   return tree.children.map((child) => normalizeLibraryNode(child));
 }
 
@@ -192,12 +204,11 @@ async function normalizeInBrowser(page, htmlInput) {
 
     const normalizeAttributesInPage = (element) =>
       Array.from(element.attributes)
-        .map((attribute) => [attribute.name, attribute.value])
-        .sort(([leftName, leftValue], [rightName, rightValue]) => {
-          if (leftName !== rightName) {
-            return leftName.localeCompare(rightName);
-          }
-          return leftValue.localeCompare(rightValue);
+        .map((attribute) => [attribute.namespaceURI, attribute.localName, attribute.value])
+        .sort((left, right) => {
+          const leftKey = JSON.stringify(left);
+          const rightKey = JSON.stringify(right);
+          return leftKey.localeCompare(rightKey);
         });
 
     const normalizeNode = (node) => {
@@ -218,11 +229,16 @@ async function normalizeInBrowser(page, htmlInput) {
         ];
       }
 
+      if (node.nodeType === nodeTypes.PROCESSING_INSTRUCTION_NODE) {
+        return ["processing-instruction", node.nodeName, node.nodeValue ?? ""];
+      }
+
       if (node.nodeType === nodeTypes.ELEMENT_NODE) {
-        const tag = (node.localName ?? node.nodeName ?? "").toLowerCase();
+        const localName = node.localName ?? node.nodeName ?? "";
         const attributes = normalizeAttributesInPage(node);
-        const children = Array.from(node.childNodes).map((child) => normalizeNode(child));
-        return ["element", tag, attributes, children];
+        const parent = localName === "template" ? node.content : node;
+        const children = Array.from(parent.childNodes).map((child) => normalizeNode(child));
+        return ["element", node.namespaceURI, localName, attributes, children];
       }
 
       return ["other", node.nodeType];
