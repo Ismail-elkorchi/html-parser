@@ -99,6 +99,9 @@ an oracle's behavior blindly.
   browser differences are likewise accepted only by exact fingerprints backed
   by the pinned WPT result.
 - `npm run mutation:pilot` writes a disposable report under `reports/`.
+- `npm run test:bench:engine-tree-builder` includes repeated selectedcontent
+  replacement so detached clone generations and parser-pop work remain visible
+  in the same resource/heap evidence as the other tree-construction paths.
 
 Do not commit generated benchmark or mutation JSON as documentation. Record a
 stable regression threshold in its test or benchmark configuration; keep

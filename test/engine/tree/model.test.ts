@@ -243,6 +243,95 @@ void test("bulk child moves preserve order, parents, depths, and linear observat
   assert.deepEqual(model.validate(), { allocatedNodes: 5, attachedNodes: 5, maxDepth: 4 });
 });
 
+void test("deep clone replacement is spanless, exact, and commits only after resource preflight", () => {
+  function scenario(maxNodes?: number) {
+    const resources = createEngineResourceGuard(
+      maxNodes === undefined ? {} : { limits: { maxNodes } }
+    );
+    const model = new HtmlTreeModel({ rootKind: "fragment", resources });
+    const source = element(model, "option");
+    const destination = element(model, "selectedcontent");
+    const previous = model.createText("old", sourceSpan(0, 3));
+    const nested = element(model, "b", [{
+      namespaceUri: null,
+      prefix: null,
+      localName: "class",
+      qualifiedName: "class",
+      value: "label",
+      sourceSpan: sourceSpan(4, 9)
+    }]);
+    const text = model.createText("new", sourceSpan(10, 13));
+    model.append(model.root, source);
+    model.append(model.root, destination);
+    model.append(destination, previous);
+    model.append(source, nested);
+    model.append(nested, text);
+    return { model, source, destination, previous, nested, text };
+  }
+
+  const successful = scenario();
+  assert.equal(successful.model.replaceChildrenWithClones(
+    successful.source,
+    successful.destination
+  ), 1);
+  const clone = successful.destination.childAt(0);
+  assert.equal(clone?.kind, "element");
+  assert.notEqual(clone, successful.nested);
+  assert.equal(clone.sourceSpan, null);
+  assert.equal(clone.attributeAt(0)?.sourceSpan, null);
+  const clonedText = clone.childAt(0);
+  assert.equal(clonedText?.kind, "text");
+  assert.notEqual(clonedText, successful.text);
+  assert.equal(clonedText.data, "new");
+  assert.equal(clonedText.sourceSpan, null);
+  assert.equal(successful.previous.parent, null);
+
+  const constrained = scenario(7);
+  assert.throws(
+    () => constrained.model.replaceChildrenWithClones(
+      constrained.source,
+      constrained.destination
+    ),
+    (error) => error instanceof EngineResourceLimitError &&
+      error.resource === "maxNodes" && error.actual === 8
+  );
+  assert.equal(constrained.destination.childAt(0), constrained.previous);
+  assert.equal(constrained.previous.parent, constrained.destination);
+  assert.equal(constrained.source.childAt(0), constrained.nested);
+});
+
+void test("clone replacement is structurally complete before observer delivery", () => {
+  const callbackFailure = new RangeError("replacement observer stopped");
+  let armed = false;
+  const model = new HtmlTreeModel({
+    rootKind: "fragment",
+    resources: createEngineResourceGuard(),
+    observer: {
+      onTreeMutation(event) {
+        if (armed && event.kind === "node-detached") throw callbackFailure;
+      }
+    }
+  });
+  const source = element(model, "option");
+  const destination = element(model, "selectedcontent");
+  const sourceText = model.createText("new");
+  const previous = model.createText("old");
+  model.append(model.root, source);
+  model.append(model.root, destination);
+  model.append(source, sourceText);
+  model.append(destination, previous);
+
+  armed = true;
+  assert.throws(
+    () => model.replaceChildrenWithClones(source, destination),
+    (error) => error === callbackFailure
+  );
+  assert.equal(previous.parent, null);
+  const clone = destination.childAt(0);
+  assert.equal(clone?.kind === "text" ? clone.data : null, "new");
+  assert.equal(clone?.parent, destination);
+});
+
 void test("ownership and reference checks reject cross-model mutations before tree changes", () => {
   const first = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });
   const second = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });

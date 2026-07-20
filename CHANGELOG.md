@@ -3,6 +3,9 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Implement parser-owned option selectedness and direct selectedcontent cloning
+  at every option-pop boundary, add atomic spanless subtree replacement, and
+  stop retaining detached historical allocations in the tree model.
 - Implement standards-derived foreign-content dispatch and fragment parsing in
   the independent engine, including HTML/SVG/MathML integration points, exact
   SVG/MathML/foreign attribute adjustment, CDATA feedback, context-sensitive

@@ -261,6 +261,18 @@
           "description": "Allow an empty processing-instruction target into the direct model.",
           "search": "if (target.length === 0)\n            fail(\"TREE_MODEL_EMPTY_PROCESSING_INSTRUCTION_TARGET\");",
           "replace": "if (false && target.length === 0)\n            fail(\"TREE_MODEL_EMPTY_PROCESSING_INSTRUCTION_TARGET\");"
+        },
+        {
+          "id": "tree-clone-child-copy",
+          "description": "Replace selectedcontent with an empty clone list.",
+          "search": "const sourceChildren = [...this.#semanticChildren(source)];",
+          "replace": "const sourceChildren = [];"
+        },
+        {
+          "id": "tree-allocation-counter",
+          "description": "Report the next unused identity as an allocated node.",
+          "search": "allocatedNodes: this.#nextSerial - 1,",
+          "replace": "allocatedNodes: this.#nextSerial,"
         }
       ]
     },
@@ -357,6 +369,24 @@
           "description": "Allow duplicate expanded names on an external fragment context.",
           "search": "if (expandedNames.has(expandedName)) {",
           "replace": "if (false && expandedNames.has(expandedName)) {"
+        }
+      ]
+    },
+    {
+      "targetFile": "tmp/test-runtime/src/internal/html-engine/select-element-state.js",
+      "testCommand": ["node", "--test", "tmp/test-runtime/test/engine/tree/builder.test.js"],
+      "mutants": [
+        {
+          "id": "select-parser-pop-clone",
+          "description": "Disable selected option cloning at the parser-pop boundary.",
+          "search": "if (selectedContent !== null &&\n            this.#enabledSelectedContentSelect(selectedContent) === select) {",
+          "replace": "if (false && selectedContent !== null &&\n            this.#enabledSelectedContentSelect(selectedContent) === select) {"
+        },
+        {
+          "id": "select-first-enabled-option",
+          "description": "Disable default selection of the first enabled option in a drop-down.",
+          "search": "if (state.selectedOption === null &&\n            this.#displaySize(select) === 1 &&",
+          "replace": "if (false && state.selectedOption === null &&\n            this.#displaySize(select) === 1 &&"
         }
       ]
     },
