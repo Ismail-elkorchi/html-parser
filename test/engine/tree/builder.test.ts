@@ -258,23 +258,179 @@ void test("leading ASCII whitespace is ignored without absorbing following body 
   assert.deepEqual(texts[0]?.sourceSpan, { startUtf16Offset: 2, endUtf16Offset: 3 });
 });
 
-void test("later insertion-mode families fail explicitly instead of constructing a known-wrong tree", () => {
-  for (const [html, feature] of [
-    ["<table>", "table"],
-    ["<select>", "select"],
-    ["<template>", "template"],
-    ["<frameset>", "frameset"],
-    ["<svg>", "foreign-content"]
-  ] as const) {
-    assert.throws(
-      () => runHtmlEngine({
-        inputChunks: [html],
-        parser: { kind: "document", scriptingMode: "disabled" }
-      }),
-      (error) =>
-        error instanceof HtmlTreeBuilderPendingFeatureError && error.feature === feature
+void test("the remaining foreign-content boundary fails before constructing a known-wrong tree", () => {
+  assert.throws(
+    () => runHtmlEngine({
+      inputChunks: ["<svg>"],
+      parser: { kind: "document", scriptingMode: "disabled" }
+    }),
+    (error) => error instanceof HtmlTreeBuilderPendingFeatureError
+  );
+});
+
+void test("table construction synthesizes containers and foster-parents text during token handling", () => {
+  const result = runHtmlEngine({
+    inputChunks: ["<!doctype html><p>lead<table>x<tr><td><b>cell</table>tail"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  const elements = [...result.model.walk()]
+    .map(({ node }) => node)
+    .filter((node): node is HtmlTreeElement => node.kind === "element");
+  const body = elements.find((element) => element.localName === "body");
+  const table = elements.find((element) => element.localName === "table");
+  const cell = elements.find((element) => element.localName === "td");
+  assert.ok(body && table && cell);
+  assert.deepEqual(children(body).map((node) =>
+    node.kind === "element" ? node.localName : node.kind === "text" ? node.data : node.kind
+  ), ["p", "x", "table", "tail"]);
+  assert.equal(table.parent, body);
+  assert.equal(cell.parent?.kind === "element" ? cell.parent.localName : null, "tr");
+  const cellChild = cell.childAt(0);
+  assert.equal(cellChild?.kind === "element" ? cellChild.localName : null, "b");
+  assert.ok(result.parseErrors.some((error) =>
+    error.phase === "tree-builder" && error.insertionMode === "in-table-text"
+  ));
+});
+
+void test("templates own their contents and clean up every parser stack on close", () => {
+  const result = runHtmlEngine({
+    inputChunks: ["<!doctype html><body data=kept><template><body data=ignored><table><tr><td>x</template><p>y"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  const elements = [...result.model.walk()]
+    .map(({ node }) => node)
+    .filter((node): node is HtmlTreeElement => node.kind === "element");
+  const body = elements.find((element) => element.localName === "body");
+  const template = elements.find((element) => element.localName === "template");
+  assert.ok(body && template?.templateContents);
+  assert.equal(body.attributeAt(0)?.qualifiedName, "data");
+  assert.equal(body.attributeAt(0)?.value, "kept");
+  const templateChild = template.templateContents.childAt(0);
+  const bodyChild = children(body).at(-1);
+  assert.equal(templateChild?.kind === "element" ? templateChild.localName : null, "table");
+  assert.equal(bodyChild?.kind === "element" ? bodyChild.localName : null, "p");
+  assert.deepEqual(result.state.templateInsertionModes, []);
+  assert.equal(result.state.insertionMode, "in-body");
+
+  const thorough = runHtmlEngine({
+    inputChunks: ["<!doctype html><template><td>x</template>"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  assert.equal(thorough.parseErrors.length, 0);
+
+  const ignoredColumnText = runHtmlEngine({
+    inputChunks: ["<!doctype html><template><col>Hello</template>"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  assert.equal(ignoredColumnText.parseErrors.length, 5);
+  assert.equal([...ignoredColumnText.model.walk()].some(({ node }) =>
+    node.kind === "text" && node.data.includes("Hello")
+  ), false);
+});
+
+void test("relaxed select parsing uses in-body rules without resurrecting removed insertion modes", () => {
+  const transitions: InsertionModeTransition[] = [];
+  const result = runHtmlEngine({
+    inputChunks: ["<!doctype html><select><div>x<option>a<select><option>b"],
+    parser: { kind: "document", scriptingMode: "disabled" },
+    observer: { onInsertionModeTransition(transition) { transitions.push(transition); } }
+  });
+  const elements = [...result.model.walk()]
+    .map(({ node }) => node)
+    .filter((node): node is HtmlTreeElement => node.kind === "element");
+  const select = elements.find((element) => element.localName === "select");
+  const options = elements.filter((element) => element.localName === "option");
+  assert.ok(select);
+  const selectChild = select.childAt(0);
+  assert.equal(selectChild?.kind === "element" ? selectChild.localName : null, "div");
+  assert.equal(options.length, 2);
+  assert.equal(options[0]?.parent?.kind === "element" ? options[0].parent.localName : null, "div");
+  assert.equal(options[1]?.parent?.kind === "element" ? options[1].parent.localName : null, "body");
+  assert.equal(transitions.some(({ to }) => to.includes("select")), false);
+});
+
+void test("frameset construction reaches its trailing document mode without an implied body", () => {
+  const result = runHtmlEngine({
+    inputChunks: ["<!doctype html><frameset cols=*><frame src=x></frameset></html>"],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  const elements = [...result.model.walk()]
+    .map(({ node }) => node)
+    .filter((node): node is HtmlTreeElement => node.kind === "element");
+  const frameset = elements.find((element) => element.localName === "frameset");
+  assert.ok(frameset);
+  const frame = frameset.childAt(0);
+  assert.equal(frame?.kind === "element" ? frame.localName : null, "frame");
+  assert.equal(elements.some((element) => element.localName === "body"), false);
+  assert.equal(result.state.insertionMode, "after-after-frameset");
+});
+
+void test("contextual tree construction is invariant across adversarial chunk boundaries", () => {
+  for (const input of [
+    "<!doctype html><table>alpha<tr><td><b>cell</table>omega",
+    "<!doctype html><template><table><tr><td>x</template><p>y",
+    "<!doctype html><select><div>x<option>a<select><option>b",
+    "<!doctype html><frameset><frame></frameset></html>"
+  ]) {
+    const run = (inputChunks: readonly string[]) => {
+      const mutations: TreeMutationObservation[] = [];
+      const transitions: InsertionModeTransition[] = [];
+      const result = runHtmlEngine({
+        inputChunks,
+        parser: { kind: "document", scriptingMode: "disabled" },
+        observer: {
+          onInsertionModeTransition(transition) { transitions.push(transition); },
+          onTreeMutation(mutation) { mutations.push(mutation); }
+        }
+      });
+      return { result, mutations, transitions };
+    };
+    const whole = run([input]);
+    const chunked = run(input.split(""));
+    assert.deepEqual(treeShape(chunked.result.model), treeShape(whole.result.model));
+    assert.deepEqual(chunked.result.parseErrors, whole.result.parseErrors);
+    assert.deepEqual(
+      { ...chunked.result.resources, steps: 0 },
+      { ...whole.result.resources, steps: 0 }
     );
+    assert.deepEqual(chunked.mutations, whole.mutations);
+    assert.deepEqual(chunked.transitions, whole.transitions);
   }
+});
+
+void test("contextual tree construction fails on the first unavailable resource unit", () => {
+  const input = `<!doctype html><template><table>${"x".repeat(200)}<tr><td>y</template>`;
+  const baseline = runHtmlEngine({
+    inputChunks: [input],
+    parser: { kind: "document", scriptingMode: "disabled" }
+  });
+  const exact = runHtmlEngine({
+    inputChunks: [input],
+    parser: { kind: "document", scriptingMode: "disabled" },
+    limits: {
+      maxSteps: baseline.resources.steps,
+      maxParseErrors: baseline.resources.parseErrors
+    }
+  });
+  assert.deepEqual(treeShape(exact.model), treeShape(baseline.model));
+  assert.throws(
+    () => runHtmlEngine({
+      inputChunks: [input],
+      parser: { kind: "document", scriptingMode: "disabled" },
+      limits: { maxSteps: baseline.resources.steps - 1 }
+    }),
+    (error) => error instanceof EngineResourceLimitError &&
+      error.resource === "maxSteps" && error.actual === baseline.resources.steps
+  );
+  assert.throws(
+    () => runHtmlEngine({
+      inputChunks: [input],
+      parser: { kind: "document", scriptingMode: "disabled" },
+      limits: { maxParseErrors: baseline.resources.parseErrors - 1 }
+    }),
+    (error) => error instanceof EngineResourceLimitError &&
+      error.resource === "maxParseErrors" && error.actual === baseline.resources.parseErrors
+  );
 });
 
 void test("active formatting is reconstructed before text is inserted after a block boundary", () => {

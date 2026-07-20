@@ -3,6 +3,10 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Add direct table, foster-parenting, template, relaxed-select, frameset, and
+  trailing-document tree construction to the independent engine, with exact
+  contextual diagnostics, deterministic mutation traces, and WPT/browser/
+  resource qualification.
 - Implement independent active-formatting reconstruction, Noah-family limits,
   bounded adoption recovery, and related in-body form/list/button/ruby rules on
   direct typed tree mutations, with indexed state and browser/WPT evidence.

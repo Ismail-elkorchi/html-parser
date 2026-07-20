@@ -295,8 +295,8 @@
         {
           "id": "tree-builder-eof-open-element-error",
           "description": "Suppress the required EOF error for unexpected open elements.",
-          "search": "if (this.#templateInsertionModes.length > 0) {\n                throw new HtmlTreeBuilderPendingFeatureError(\"template\", \"in-body\");\n            }\n            if (this.#hasUnexpectedOpenElementAtBodyEnd())",
-          "replace": "if (this.#templateInsertionModes.length > 0) {\n                throw new HtmlTreeBuilderPendingFeatureError(\"template\", \"in-body\");\n            }\n            if (false && this.#hasUnexpectedOpenElementAtBodyEnd())"
+          "search": "if (token.kind === \"eof\") {\n            if (this.#hasOpenHtmlElement(\"template\")) {\n                return \"in-template\";\n            }\n            if (this.#hasUnexpectedOpenElementAtBodyEnd())",
+          "replace": "if (token.kind === \"eof\") {\n            if (this.#hasOpenHtmlElement(\"template\")) {\n                return \"in-template\";\n            }\n            if (false && this.#hasUnexpectedOpenElementAtBodyEnd())"
         },
         {
           "id": "tree-builder-doctype-mode",
@@ -325,8 +325,8 @@
         {
           "id": "tree-builder-null-character",
           "description": "Insert Data-state NUL character tokens into the tree.",
-          "search": "if (token.data === \"\\u0000\") {",
-          "replace": "if (false && token.data === \"\\u0000\") {"
+          "search": "if (token.data === \"\\u0000\") {\n                this.#parseError(token, \"in-body\");",
+          "replace": "if (false && token.data === \"\\u0000\") {\n                this.#parseError(token, \"in-body\");"
         },
         {
           "id": "tree-builder-text-leading-line-feed",
@@ -339,6 +339,36 @@
           "description": "Suppress the early form end-tag current-node diagnostic.",
           "search": "if (this.#currentNode() !== form)\n                this.#parseError(token, \"in-body\");",
           "replace": "if (false && this.#currentNode() !== form)\n                this.#parseError(token, \"in-body\");"
+        },
+        {
+          "id": "tree-builder-table-quirks-paragraph",
+          "description": "Reverse the table-start paragraph-closing quirk.",
+          "search": "if (this.#documentMode !== \"quirks\")\n                this.#closeParagraphIfInButtonScope(token);",
+          "replace": "if (this.#documentMode === \"quirks\")\n                this.#closeParagraphIfInButtonScope(token);"
+        },
+        {
+          "id": "tree-builder-relaxed-nested-select",
+          "description": "Allow a nested select to remain on the open-element stack.",
+          "search": "if (name === \"select\") {\n            if (this.#hasInScope(\"select\", \"default\")) {",
+          "replace": "if (name === \"select\") {\n            if (false && this.#hasInScope(\"select\", \"default\")) {"
+        },
+        {
+          "id": "tree-builder-foster-parenting",
+          "description": "Disable the foster-parent insertion-location branch.",
+          "search": "if (!this.#fosterParenting ||\n            target.namespaceUri !== HTML_NAMESPACE ||",
+          "replace": "if (true || !this.#fosterParenting ||\n            target.namespaceUri !== HTML_NAMESPACE ||"
+        },
+        {
+          "id": "tree-builder-thorough-template-close",
+          "description": "Use ordinary implied-end cleanup when closing a template.",
+          "search": "this.#generateAllImpliedEndTagsThoroughly();",
+          "replace": "this.#generateImpliedEndTags();"
+        },
+        {
+          "id": "tree-builder-frameset-trailing-mode",
+          "description": "Keep the parser in frameset mode after the outer frameset closes.",
+          "search": "if (this.#currentNode().localName !== \"frameset\")\n                this.#setInsertionMode(\"after-frameset\", token);",
+          "replace": "if (false && this.#currentNode().localName !== \"frameset\")\n                this.#setInsertionMode(\"after-frameset\", token);"
         }
       ]
     }
