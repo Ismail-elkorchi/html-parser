@@ -84,7 +84,8 @@ an oracle's behavior blindly.
 ## Resource and performance checks
 
 - `npm run qualification:performance` is the single release performance
-  report and gate. It compares parsing with the accepted independent-parser
+  report and gate, and release evaluation invokes it directly. It compares
+  parsing with the accepted independent-parser
   revision, serialization with the first corrected public serializer revision,
   and retains tagged `v0.1.1` parsing as report-only recovery evidence. Samples
   are fresh-process and balanced across revisions; throughput and retained

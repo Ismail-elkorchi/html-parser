@@ -201,7 +201,7 @@ const report = {
   sampleOrder,
   percentileMethod: "linear interpolation between closest ranks",
   memoryMetric:
-    "post-GC retained parsed-result heap slope from a post-warmup fixed-size cohort",
+    "post-GC heap delta per retained public result from an isolated post-warmup fixed-size cohort",
   runtimeHeapConfiguration: Object.freeze({
     maxOldSpaceSizeMb: 256,
     maxSemiSpaceSizeMb: 8
