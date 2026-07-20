@@ -24,7 +24,6 @@ Use narrower commands while iterating:
 | Do character references match pinned data and fixtures? | `npm run test:engine:character-references` |
 | Does the tokenizer match the complete pinned corpus? | `npm run test:engine:tokenizer` |
 | Do direct tree-model mutations and resource boundaries pass? | `npm run test:engine:tree` |
-| Do assigned document cases and every fragment case match WPT trees and diagnostic views? | `npm run test:engine:tree-builder:conformance` |
 | Do all compiled TypeScript runtime tests pass? | `npm run test:runtime` |
 | Do compile-only API contracts pass? | `npm run test:types` |
 | Do production behavior and regression tests pass? | `npm run test:behavior` |
@@ -32,13 +31,14 @@ Use narrower commands while iterating:
 | Does the normal local test set pass? | `npm test` |
 | Does the complete maintained WPT tree snapshot pass its exact classifications? | `npm run qualification:wpt` |
 | Does public serialization match pinned expectations and classified round trips? | `npm run qualification:serialization` |
-| Does public serialization agree with Chromium, Firefox, and WebKit? | `npm run test:browser-diff:serialization` |
+| Does public document parsing agree with Chromium, Firefox, and WebKit? | `npm run oracle:documents` |
+| Does public serialization agree with Chromium, Firefox, and WebKit? | `npm run oracle:serialization` |
 | Does the public fragment API match every pinned WPT fragment? | `npm run qualification:fragments` |
-| Do public fragment contexts agree with Chromium, Firefox, and WebKit? | `npm run test:browser-diff:fragments` |
+| Do public fragment contexts agree with Chromium, Firefox, and WebKit? | `npm run oracle:fragments` |
 | Do documentation links and API names stay valid? | `npm run docs:check` |
 | Do documented TypeScript examples compile strictly? | `npm run docs:snippets` |
 | Do repository examples execute? | `npm run examples:run` |
-| Is the packed npm artifact correct? | `npm run pack:check` |
+| Is the packed npm artifact complete, self-contained, and type-safe? | `npm run qualification:package` |
 
 All tests live under one `test` root. `test/behavior` owns public and current
 production regressions, `test/engine` owns parser-engine units,
@@ -87,50 +87,25 @@ HTML, SVG, MathML, integration-point, scripting, document-mode, and form-chain
 contexts in native documents; accepted browser differences require exact tree
 fingerprints and a standards-based reason.
 
-Use `npm run test:fuzz` for generated parser inputs and
-`npm run test:browser-diff` for browser comparisons. A difference is evidence
+Use `npm run qualification:fuzz` for generated parser inputs and the
+`oracle:*` commands for browser comparisons. A difference is evidence
 to investigate against the pinned standard and tests, not permission to copy
 an oracle's behavior blindly.
 
 ## Resource and performance checks
 
 - `npm run qualification:performance` is the single release performance
-  report and gate, and release evaluation invokes it directly. It compares
+  report and gate, and release qualification invokes it directly. It compares
   parsing with the accepted independent-parser
   revision, serialization with the first corrected public serializer revision,
   and retains tagged `v0.1.1` parsing as report-only recovery evidence. Samples
   are fresh-process and balanced across revisions; throughput and retained
   result memory use the same metric for every horizon.
-- `npm run test:bench:hard-budgets` exercises first-failure resource behavior.
-- `npm run test:bench:text-extraction` exercises bounded extraction.
-- `npm run test:bench:character-references` records generated-table lookup,
-  import-heap, and million-digit numeric-reference evidence.
-- `npm run test:bench:engine-tokenizer` records isolated tokenizer throughput,
-  heap delta, token fingerprints, and deterministic resource counters across
-  character references, markup, text end tags, and processing instructions.
-- `npm run test:bench:engine-tree` records isolated deep and wide direct-tree
-  construction, traversal, validation, heap, and resource evidence.
-- `npm run test:bench:engine-tree-builder` records immediate parsing for deep,
-  whitespace-boundary-heavy, error-heavy, table, foster-parent, template,
-  foreign-content, and fragment inputs, including exact contextual step and
-  fragment node-budget failures.
-- `npm run test:bench:engine-formatting` records indexed Noah-family handling,
-  full reconstruction, repeated adoption, and first-unavailable-step evidence.
-- `npm run test:bench:public-api` records large document, template, and deep
-  fragment behavior through the public package surface.
-- `npm run test:browser-diff:engine-formatting` compares focused independent
-  formatting/recovery trees with every locally available browser engine.
-- `npm run test:browser-diff:engine-contextual` compares focused table,
-  template, relaxed-select, and frameset trees. Accepted browser lag is tied to
-  exact normalized-tree fingerprints so a different disagreement still fails.
-- `npm run test:browser-diff:engine-foreign-fragment` compares namespace,
-  adjustment, integration-point, CDATA, and fragment-context trees. Known
-  browser differences are likewise accepted only by exact fingerprints backed
-  by the pinned WPT result.
-- `npm run mutation:pilot` writes a disposable report under `reports/`.
-- `npm run test:bench:engine-tree-builder` includes repeated selectedcontent
-  replacement so detached clone generations and parser-pop work remain visible
-  in the same resource/heap evidence as the other tree-construction paths.
+- `npm run qualification:resources` compares bounded and unbounded parser work
+  in isolated processes and requires every limit to fail at its first
+  unavailable unit while retaining less heap.
+- `npm run qualification:mutation` requires every configured mutation to be
+  killed; invalid or surviving mutations fail the command.
 
 Do not commit generated benchmark or mutation JSON as documentation. Record a
 stable regression threshold in its test or benchmark configuration; keep
@@ -138,8 +113,10 @@ one-off measurements in the pull request that used them.
 
 ## Broader gates
 
-`npm run eval:ci` and `npm run eval:release` aggregate additional quality,
-conformance, smoke, and packaging reports. Reports are diagnostic artifacts,
-not a substitute for checking whether the tests express the right contract.
-Run Deno, Bun, and browser smoke commands when changing portable entry points
-or runtime-sensitive behavior.
+`npm run qualification:ci` runs the complete local correctness, conformance,
+cross-runtime, browser-smoke, and package-artifact gates. `npm run
+qualification:release` adds public serialization and fragment qualification,
+three-browser oracles, fuzzing, resource and mutation checks, supply-chain
+evidence, and cross-revision performance. Both profiles fail at the first
+failed command and retain diagnostic reports under `reports/`; they do not
+assign an artificial quality score.

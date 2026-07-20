@@ -16,30 +16,12 @@ import {
   serialize,
   tokenizeByteStreamEager
 } from "../../dist/mod.js";
+import { parseLongOptions } from "../lib/cli.mjs";
 
 function ensure(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
-}
-
-function parseArgs(argv) {
-  const parsed = {
-    runtime: null,
-    reportPath: null
-  };
-
-  for (const argumentValue of argv) {
-    if (argumentValue.startsWith("--runtime=")) {
-      parsed.runtime = argumentValue.slice("--runtime=".length);
-      continue;
-    }
-    if (argumentValue.startsWith("--report=")) {
-      parsed.reportPath = argumentValue.slice("--report=".length);
-    }
-  }
-
-  return parsed;
 }
 
 function detectRuntime() {
@@ -280,9 +262,12 @@ async function runSmokeAssertions() {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const runtime = resolveRuntime(args.runtime);
-  const timestamp = new Date().toISOString();
+  const args = parseLongOptions(process.argv.slice(2), {
+    runtime: { type: "string" },
+    report: { type: "string" }
+  }, "runtime smoke");
+  const runtime = resolveRuntime(args.runtime ?? null);
+  const generatedAt = new Date().toISOString();
 
   let failure = null;
   let determinismHash = null;
@@ -293,11 +278,12 @@ async function main() {
     failure = error;
   }
 
-  if (args.reportPath) {
-    await writeReport(args.reportPath, {
-      suite: "smoke-runtime",
+  if (args.report !== undefined) {
+    await writeReport(args.report, {
+      schemaVersion: 2,
+      suite: "html-parser-runtime-smoke",
       runtime,
-      timestamp,
+      generatedAt,
       ok: failure === null,
       version: runtimeVersion(runtime),
       determinismHash,

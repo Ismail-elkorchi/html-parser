@@ -77,7 +77,7 @@ base cases, and 3,828 scripting variants. Of those variants:
 - four require live DOM mutation or `document.write` and are inapplicable to a
   static parser-library harness.
 
-Every classified variant appears in `reports/engine-wpt-tree.json` with its
+Every classified variant appears in `reports/wpt-tree.json` with its
 exact ID and reason. Files whose names contain `unsafe` remain applicable:
 their NUL, CR, and other raw input is preserved by the shared `.dat` reader.
 
@@ -85,7 +85,7 @@ The same snapshot independently qualifies the built public fragment API:
 
 ```bash
 npm run qualification:fragments
-npm run test:browser-diff:fragments
+npm run oracle:fragments
 ```
 
 The offline public gate executes all 196 fragment cases in both required
@@ -110,7 +110,7 @@ Run the offline public gate and three-browser oracle with:
 
 ```bash
 npm run qualification:serialization
-npm run test:browser-diff:serialization
+npm run oracle:serialization
 ```
 
 The non-browser gate uses reviewed expectations tied to their upstream file and
@@ -122,7 +122,7 @@ fingerprints because HTML serialization is not generally roundtripping.
 Refresh only from a reviewed full WPT revision:
 
 ```bash
-npm run wpt-serialization:refresh -- --commit=<40-character-wpt-commit>
+npm run fixtures:refresh:wpt-serialization -- --commit=<40-character-wpt-commit>
 ```
 
 An upstream file addition or removal makes refresh fail until its applicability
@@ -162,11 +162,13 @@ Refreshing the tokenizer and encoding snapshots is an explicit maintenance
 operation. Pass a reviewed full html5lib-tests revision:
 
 ```bash
-npm run html5lib-fixtures:refresh -- --commit=<html5lib-tests-commit>
+npm run fixtures:refresh:html5lib -- --commit=<html5lib-tests-commit>
 ```
 
 The refresh rejects an added or removed tokenizer or root encoding fixture
-until its inventory contract is deliberately reviewed. Inspect the raw data,
+until its inventory is deliberately reviewed. After that review, rerun with
+`--accept-inventory-change`; the new exact inventory is recorded only in the
+generated manifest. Inspect the raw data,
 manifests, licenses, classified tokenizer differences, and encoding outcomes
 before accepting the regenerated snapshots.
 
@@ -174,12 +176,14 @@ Refreshing the WPT snapshot is an explicit maintenance operation. Pass a full
 40-character WPT commit:
 
 ```bash
-npm run wpt-tree:refresh -- --commit=<wpt-commit>
+npm run fixtures:refresh:wpt-tree -- --commit=<wpt-commit>
 ```
 
 The command fetches only when invoked. For an already checked-out WPT tree at
-the same commit, add `--source=/absolute/path/to/wpt`. It replaces only the
-test snapshot and regenerates the provenance manifest.
+the same commit, add `--source=/absolute/path/to/wpt`. An added or removed
+fixture fails until it has been reviewed and the command is rerun with
+`--accept-inventory-change`. The refresh replaces only the test snapshot and
+regenerates the provenance manifest.
 
 After a refresh:
 
@@ -189,7 +193,7 @@ After a refresh:
 4. update exact classification IDs, reasons, and fingerprints only for reviewed
    script requirements or standards drift;
 5. run `npm run qualification:wpt` and inspect
-   `reports/engine-wpt-tree.json`; and
+   `reports/wpt-tree.json`; and
 6. rerun the full checks and confirm normal tests remain offline.
 
 Fixture decoding and expected-output formatting belong in test support, never

@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 import { buildReleaseNotes, parseReleaseCliArgs } from "./notes-lib.mjs";
 
@@ -9,7 +10,7 @@ function replaceRange(content, startIndex, endIndex, replacement) {
   return `${content.slice(0, startIndex)}${replacement}${content.slice(endIndex)}`;
 }
 
-function updateUnreleasedSection(changelogContent, notesBlock) {
+export function updateUnreleasedSection(changelogContent, notesBlock) {
   const unreleasedHeading = "## Unreleased";
   const headingIndex = changelogContent.indexOf(unreleasedHeading);
   if (headingIndex === -1) {
@@ -38,13 +39,13 @@ function updateUnreleasedSection(changelogContent, notesBlock) {
   return replaceRange(changelogContent, sectionStart, sectionEnd, `\n${formattedBlock}${normalizedSection}`);
 }
 
-function main() {
+export function main() {
   const options = parseReleaseCliArgs(process.argv.slice(2));
   const notes = buildReleaseNotes(options);
   const changelogPath = options.changelogPath ?? "CHANGELOG.md";
   const changelog = readFileSync(changelogPath, "utf8");
 
-  const notesBlock = [`### Candidate Notes (${notes.fromTag}...${notes.toRef})`, notes.bulletList].join("\n");
+  const notesBlock = [`### Changes (${notes.fromTag}...${notes.toRef})`, notes.bulletList].join("\n");
   const updatedChangelog = updateUnreleasedSection(changelog, notesBlock);
 
   if (options.dryRun) {
@@ -57,4 +58,6 @@ function main() {
   process.stdout.write(`Updated ${changelogPath} with release notes for ${notes.fromTag}...${notes.toRef}\n`);
 }
 
-main();
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

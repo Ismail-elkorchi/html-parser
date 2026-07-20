@@ -1,10 +1,9 @@
 import { spawn } from "node:child_process";
 import { stat } from "node:fs/promises";
 
-import { verifyHtml5libCorpora } from "../../test/support/html5lib-corpora.mjs";
-import { nowIso, readJson, writeJson } from "../eval/eval-primitives.mjs";
+import { nowIso, readJson, writeJson } from "../lib/report.mjs";
 
-function actRunNodeScript(scriptPath, args = []) {
+function runNodeScript(scriptPath, args = []) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [scriptPath, ...args], {
       stdio: "inherit"
@@ -21,7 +20,7 @@ function actRunNodeScript(scriptPath, args = []) {
   });
 }
 
-async function evalReportHasFailures(reportPath) {
+async function reportHasFailures(reportPath) {
   await stat(reportPath);
   const report = await readJson(reportPath);
   const failed = Number(report?.cases?.failed || 0);
@@ -37,9 +36,8 @@ const conformanceSuites = [
   },
   {
     id: "tree",
-    script: "scripts/conformance/run-engine-tree-builder-fixtures.mjs",
-    args: ["--qualification"],
-    report: "reports/engine-wpt-tree.json"
+    script: "scripts/conformance/run-wpt-tree.mjs",
+    report: "reports/wpt-tree.json"
   },
   {
     id: "encoding",
@@ -54,7 +52,6 @@ const conformanceSuites = [
 ];
 
 async function main() {
-  await verifyHtml5libCorpora();
   const suiteResults = [];
   let hasSuiteFailures = false;
 
@@ -62,14 +59,14 @@ async function main() {
   for (const conformanceSuite of conformanceSuites) {
     const startedAt = Date.now();
     try {
-      await actRunNodeScript(conformanceSuite.script, conformanceSuite.args);
-      const reportHasFailures = await evalReportHasFailures(conformanceSuite.report);
-      if (reportHasFailures) {
+      await runNodeScript(conformanceSuite.script, conformanceSuite.args);
+      const hasFailures = await reportHasFailures(conformanceSuite.report);
+      if (hasFailures) {
         hasSuiteFailures = true;
       }
       suiteResults.push({
         id: conformanceSuite.id,
-        ok: !reportHasFailures,
+        ok: !hasFailures,
         report: conformanceSuite.report,
         durationMs: Date.now() - startedAt
       });
@@ -86,8 +83,9 @@ async function main() {
   }
 
   await writeJson("reports/conformance-summary.json", {
-    suite: "conformance-summary",
-    timestamp: nowIso(),
+    schemaVersion: 2,
+    suite: "html-parser-conformance",
+    generatedAt: nowIso(),
     ok: !hasSuiteFailures,
     suites: suiteResults
   });

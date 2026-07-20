@@ -18,8 +18,8 @@ npm run check:fast
 ```
 
 For parser or serializer semantics, also run `npm run test:conformance`. For
-portable entry points or runtime-sensitive code, run `npm run eval:ci`.
-`npm run eval:release` is reserved for release qualification.
+portable entry points or runtime-sensitive code, run `npm run qualification:ci`.
+`npm run qualification:release` is reserved for release qualification.
 
 The [maintainer guide](./docs/maintainers/index.md) maps specialized testing,
 corpus, architecture, and implementation-source concerns.

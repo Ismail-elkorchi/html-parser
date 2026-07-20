@@ -44,6 +44,26 @@ test("source graph analysis reports unresolved, reversed, and extra engine ingre
   }]);
 });
 
+test("source graph rejects external and CommonJS runtime references", () => {
+  const result = analyzeSourceGraph([
+    {
+      filePath: "src/mod.ts",
+      source: 'import "node:fs"; const value = require("./public/value.js"); void value;'
+    },
+    { filePath: "src/public/value.ts", source: "export const value = 1;" }
+  ]);
+
+  assert.deepEqual(result.externalReferences, [{
+    filePath: "src/mod.ts",
+    kind: "import",
+    specifier: "node:fs"
+  }]);
+  assert.deepEqual(result.commonJsReferences, [{
+    filePath: "src/mod.ts",
+    specifier: "./public/value.js"
+  }]);
+});
+
 test("source graph analysis finds modules outside the package entrypoint graph", () => {
   const result = analyzeSourceGraph([
     { filePath: "src/mod.ts", source: 'export * from "./public/reachable.ts";' },

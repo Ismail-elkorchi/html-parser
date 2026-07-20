@@ -5,7 +5,12 @@ import {
   PUBLIC_SERIALIZATION_QUALIFICATION_CASES,
   createPublicSerializationNode
 } from "../../test/support/public-serialization-qualification-cases.mjs";
-import { writeJson } from "../eval/eval-primitives.mjs";
+import { writeJson } from "../lib/report.mjs";
+import { parseLongOptions } from "../lib/cli.mjs";
+
+const { report: reportPath } = parseLongOptions(process.argv.slice(2), {
+  report: { type: "string", default: "reports/public-serialization-roundtrip.json" }
+}, "public serialization round-trip qualification");
 
 const POSITIVE_CASES = Object.freeze([
   { id: "ordinary", html: "<p data-x='<>&quot;'>&amp;&nbsp;&lt;&gt;</p>" },
@@ -42,12 +47,6 @@ const HTML_DIV_CONTEXT = Object.freeze({ namespaceUri: HTML_NAMESPACE_URI, local
 
 function sha256(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
-}
-
-function reportPath() {
-  const prefix = "--report=";
-  return process.argv.slice(2).find((argument) => argument.startsWith(prefix))?.slice(prefix.length) ??
-    "reports/public-serialization-roundtrip.json";
 }
 
 function normalizeNode(node) {
@@ -129,13 +128,14 @@ if (classificationsSha256 !== EXPECTED_CLASSIFICATIONS_SHA256) {
 }
 
 const report = {
-  schema: "public-serialization-roundtrip/v1",
+  schemaVersion: 1,
+  suite: "html-parser-public-serialization-roundtrip",
   generatedAt: new Date().toISOString(),
   positive,
   classified,
   classificationsSha256,
   failures
 };
-await writeJson(reportPath(), report);
+await writeJson(reportPath, report);
 console.log(JSON.stringify(report));
 if (failures.length > 0) process.exitCode = 1;

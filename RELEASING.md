@@ -13,7 +13,7 @@ Use `.github/workflows/publish.yml` for release-driven publish and `.github/work
 ```bash
 npm ci
 npm run check:fast
-npm run eval:release
+npm run qualification:release
 npm run docs:lint:jsr
 npm run docs:test:jsr
 ```
@@ -21,8 +21,8 @@ npm run docs:test:jsr
 ## Release notes and changelog
 
 ```bash
-node scripts/release/render-notes.mjs --dry-run
-node scripts/release/update-changelog.mjs --dry-run
+npm run release:notes:dry-run
+npm run changelog:update:dry-run
 ```
 
 For test scope and corpus constraints, see `docs/maintainers/testing.md`.

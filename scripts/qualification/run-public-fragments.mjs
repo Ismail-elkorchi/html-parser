@@ -6,16 +6,10 @@ import { parseFragment } from "../../dist/mod.js";
 import { normalizePublicTree } from "../../test/support/public-tree-fixture-adapter.mjs";
 import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
 import { verifyWptTreeCorpus } from "../../test/support/wpt-tree-corpus.mjs";
-import { writeJson } from "../eval/eval-primitives.mjs";
+import { writeJson } from "../lib/report.mjs";
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
-}
-
-function reportPath() {
-  const prefix = "--report=";
-  return process.argv.slice(2).find((argument) => argument.startsWith(prefix))?.slice(prefix.length) ??
-    "reports/public-fragments.json";
 }
 
 const corpus = await verifyWptTreeCorpus();
@@ -50,23 +44,16 @@ for (const relativePath of corpus.fixtureFiles) {
     const actualUnnamedParseErrorCount = fragment.errors.length;
     const actualNamedParseErrorCount = fragment.errors
       .filter((error) => error.parseErrorId !== "unexpected-token").length;
-    const unnamedParseErrorCountMatches =
-      !fixtureCase.sawUnnamedErrors ||
+    const unnamedMatches = !fixtureCase.sawUnnamedErrors ||
       actualUnnamedParseErrorCount === fixtureCase.unnamedErrors.length;
-    const namedParseErrorCountMatches =
-      !fixtureCase.sawNamedErrors ||
+    const namedMatches = !fixtureCase.sawNamedErrors ||
       actualNamedParseErrorCount === fixtureCase.namedErrors.length;
-    const outcome = {
+    outcomes.push({
       id: fixtureCase.id,
       treeSha256: sha256(actual),
       parseErrors: fragment.errors.map((error) => error.parseErrorId)
-    };
-    outcomes.push(outcome);
-    if (
-      actual !== fixtureCase.expected ||
-      !unnamedParseErrorCountMatches ||
-      !namedParseErrorCountMatches
-    ) {
+    });
+    if (actual !== fixtureCase.expected || !unnamedMatches || !namedMatches) {
       failures.push({
         id: fixtureCase.id,
         expected: fixtureCase.expected,
@@ -85,7 +72,8 @@ for (const relativePath of corpus.fixtureFiles) {
 }
 
 const report = {
-  schema: "public-fragment-wpt/v1",
+  schemaVersion: 2,
+  suite: "html-parser-public-fragments",
   generatedAt: new Date().toISOString(),
   implementation: "dist/mod.js#parseFragment",
   corpusCommit: corpus.manifest.commit,
@@ -96,6 +84,6 @@ const report = {
   failures,
   outcomesSha256: sha256(JSON.stringify(outcomes))
 };
-await writeJson(reportPath(), report);
+await writeJson("reports/public-fragments.json", report);
 console.log(JSON.stringify(report));
 if (failures.length > 0) process.exitCode = 1;

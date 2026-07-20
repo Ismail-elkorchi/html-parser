@@ -6,15 +6,11 @@ import {
   renderGeneratedTable,
   sha256
 } from "./named-character-reference-data.mjs";
+import { parseLongOptions } from "../lib/cli.mjs";
 
-const allowedArguments = new Set(["--check"]);
-for (const argument of process.argv.slice(2)) {
-  if (!allowedArguments.has(argument)) {
-    throw new Error(`generate named character references: unsupported argument ${argument}`);
-  }
-}
-
-const checkOnly = process.argv.includes("--check");
+const { check: checkOnly } = parseLongOptions(process.argv.slice(2), {
+  check: { type: "boolean", default: false }
+}, "generate named character references");
 const { entitiesBytes, inspection } = await readAndVerifySnapshot();
 const generated = renderGeneratedTable(inspection, sha256(entitiesBytes));
 

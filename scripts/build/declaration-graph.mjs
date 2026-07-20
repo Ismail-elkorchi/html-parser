@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { collectModuleSpecifiers } from "../eval/module-specifiers.mjs";
+import { collectModuleSpecifiers } from "../lib/module-specifiers.mjs";
 
 function declarationDependency(fromPath, specifier) {
   const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(fromPath), specifier));

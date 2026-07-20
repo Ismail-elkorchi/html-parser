@@ -8,7 +8,7 @@ import {
   SVG_NAMESPACE_URI,
   parseFragment
 } from "../../dist/mod.js";
-import { writeJson } from "../eval/eval-primitives.mjs";
+import { writeJson } from "../lib/report.mjs";
 
 const context = (namespaceUri, localName, attributes = []) => Object.freeze({
   namespaceUri,
@@ -224,13 +224,6 @@ async function normalizeBrowser(page, testCase) {
   }, testCase);
 }
 
-if (
-  process.platform === "linux" &&
-  process.env["PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS"] === undefined
-) {
-  process.env["PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS"] = "1";
-}
-
 const engines = Object.freeze([
   ["chromium", chromium],
   ["firefox", firefox],
@@ -300,7 +293,8 @@ for (const [name, launcher] of engines) {
 }
 
 const report = {
-  schema: "public-fragment-browser-diff/v1",
+  schemaVersion: 1,
+  suite: "html-parser-public-fragment-browser-differential",
   generatedAt: new Date().toISOString(),
   cases: CASES.length,
   results

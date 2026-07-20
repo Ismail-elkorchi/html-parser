@@ -1,15 +1,6 @@
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 
 import { analyzeSourceGraph } from "./source-graph.mjs";
-
-async function exists(filePath) {
-  try {
-    await stat(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function sourceFiles(directoryPath) {
   const files = [];
@@ -21,10 +12,6 @@ async function sourceFiles(directoryPath) {
   return files;
 }
 
-if (await exists("tests")) {
-  throw new Error("architecture: obsolete tests root still exists");
-}
-
 const files = (await sourceFiles("src")).sort();
 const sources = await Promise.all(files.map(async (filePath) => ({
   filePath,
@@ -34,6 +21,12 @@ const result = analyzeSourceGraph(sources);
 
 if (result.unresolved.length > 0) {
   throw new Error(`architecture: unresolved source imports ${JSON.stringify(result.unresolved)}`);
+}
+if (result.externalReferences.length > 0) {
+  throw new Error(`architecture: external runtime imports ${JSON.stringify(result.externalReferences)}`);
+}
+if (result.commonJsReferences.length > 0) {
+  throw new Error(`architecture: CommonJS imports ${JSON.stringify(result.commonJsReferences)}`);
 }
 if (result.cycles.length > 0) {
   throw new Error(`architecture: source cycles ${JSON.stringify(result.cycles)}`);
