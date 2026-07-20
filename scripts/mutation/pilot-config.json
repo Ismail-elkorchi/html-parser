@@ -2,7 +2,7 @@
   "targets": [
     {
       "targetFile": "scripts/qualification/run-public-serialization-roundtrip.mjs",
-      "testCommand": ["node", "scripts/qualification/run-public-serialization-roundtrip.mjs"],
+      "testCommand": ["node", "scripts/qualification/run-public-serialization-roundtrip.mjs", "--report=tmp/mutation-public-serialization-roundtrip.json"],
       "mutants": [
         {
           "id": "serializer-roundtrip-classification-ledger",
@@ -14,7 +14,7 @@
     },
     {
       "targetFile": "test/support/public-serialization-qualification-cases.mjs",
-      "testCommand": ["node", "scripts/qualification/run-public-serialization.mjs"],
+      "testCommand": ["node", "scripts/qualification/run-public-serialization.mjs", "--report=tmp/mutation-public-serialization.json"],
       "mutants": [
         {
           "id": "serializer-qualified-rcdata-expectation",

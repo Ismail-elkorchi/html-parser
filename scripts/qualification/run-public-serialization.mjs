@@ -19,6 +19,12 @@ function sha256(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+function reportPath() {
+  const prefix = "--report=";
+  return process.argv.slice(2).find((argument) => argument.startsWith(prefix))?.slice(prefix.length) ??
+    "reports/public-serialization.json";
+}
+
 function readStaticStringArray(sourceText, declarationName) {
   const match = new RegExp(`(?:const|var) ${declarationName} = \\[([\\s\\S]*?)\\];`).exec(sourceText);
   if (match === null) throw new Error(`cannot find ${declarationName} in pinned WPT dependency`);
@@ -118,6 +124,6 @@ const report = {
   outcomesSha256: sha256({ direct: outcomes, parsedWptOutcomes }),
   failures
 };
-await writeJson("reports/public-serialization.json", report);
+await writeJson(reportPath(), report);
 console.log(JSON.stringify(report));
 if (failures.length > 0) process.exitCode = 1;
