@@ -1,51 +1,30 @@
 import { HtmlConfigurationError } from "./errors.ts";
-import { HTML_NAMESPACE_URI, asciiLowercase } from "./model.ts";
+import {
+  escapeHtmlAttribute,
+  escapeHtmlText,
+  serializedAttributeName,
+  serializedElementName,
+  serializesAsVoid,
+  serializesTextLiterally
+} from "./html-serialization-rules.ts";
 import {
   createOperationContext,
-  normalizeOperationOptions
+  normalizeSerializeOptions
 } from "./operation.ts";
 
 import type { OperationContext } from "./operation.ts";
 import type {
   DocumentTree,
+  ElementNode,
   FragmentTree,
   HtmlNode,
-  OperationOptions
+  HtmlScriptingMode,
+  SerializeOptions
 } from "./types.ts";
 
-const VOID_ELEMENTS = new Set([
-  "area",
-  "base",
-  "br",
-  "col",
-  "embed",
-  "hr",
-  "img",
-  "input",
-  "link",
-  "meta",
-  "param",
-  "source",
-  "track",
-  "wbr"
-]);
-
-/** HTML namespace URI assigned by the tree builder. */
-export function escapeText(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-export function escapeAttribute(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-}
-
 function quoteDoctypeIdentifier(value: string): string {
-  if (!value.includes('"')) {
-    return `"${value}"`;
-  }
-  if (!value.includes("'")) {
-    return `'${value}'`;
-  }
+  if (!value.includes('"')) return `"${value}"`;
+  if (!value.includes("'")) return `'${value}'`;
   throw new HtmlConfigurationError(
     "tree",
     "INVALID_VALUE",
@@ -54,9 +33,7 @@ function quoteDoctypeIdentifier(value: string): string {
 }
 
 function serializeDoctype(node: Extract<HtmlNode, { kind: "doctype" }>): string {
-  if (node.externalId.kind === "none") {
-    return `<!DOCTYPE ${node.name}>`;
-  }
+  if (node.externalId.kind === "none") return `<!DOCTYPE ${node.name}>`;
   if (node.externalId.kind === "system") {
     return `<!DOCTYPE ${node.name} SYSTEM ${quoteDoctypeIdentifier(node.externalId.systemId)}>`;
   }
@@ -66,73 +43,96 @@ function serializeDoctype(node: Extract<HtmlNode, { kind: "doctype" }>): string 
   return `<!DOCTYPE ${node.name} PUBLIC ${quoteDoctypeIdentifier(node.externalId.publicId)}${systemId}>`;
 }
 
-export function serializeNodes(nodes: readonly HtmlNode[], operation: OperationContext): string {
-  type Action = { readonly kind: "node"; readonly node: HtmlNode } |
-    { readonly kind: "text"; readonly value: string };
+interface NodeAction {
+  readonly kind: "node";
+  readonly node: HtmlNode;
+  readonly parent: ElementNode | null;
+}
+
+interface MarkupAction {
+  readonly kind: "markup";
+  readonly value: string;
+}
+
+type SerializationAction = NodeAction | MarkupAction;
+
+/** Serializes sibling nodes with their actual parent context. */
+export function serializeNodes(
+  nodes: readonly HtmlNode[],
+  operation: OperationContext,
+  parent: ElementNode | null = null,
+  scriptingMode: HtmlScriptingMode = "inert"
+): string {
   const parts: string[] = [];
-  const stack: Action[] = [];
+  const stack: SerializationAction[] = [];
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
     const node = nodes[index];
-    if (node !== undefined) {
-      stack.push({ kind: "node", node });
-    }
+    if (node !== undefined) stack.push({ kind: "node", node, parent });
   }
+
   while (stack.length > 0) {
     const action = stack.pop();
-    if (action === undefined) {
-      continue;
-    }
+    if (action === undefined) continue;
     operation.checkpoint();
-    if (action.kind === "text") {
+    if (action.kind === "markup") {
       parts.push(action.value);
       continue;
     }
-    const node = action.node;
+
+    const { node } = action;
     if (node.kind === "text") {
-      parts.push(escapeText(node.value));
-    } else if (node.kind === "comment") {
+      parts.push(
+        serializesTextLiterally(action.parent, scriptingMode)
+          ? node.value
+          : escapeHtmlText(node.value)
+      );
+      continue;
+    }
+    if (node.kind === "comment") {
       parts.push(`<!--${node.value}-->`);
-    } else if (node.kind === "processingInstruction") {
+      continue;
+    }
+    if (node.kind === "processingInstruction") {
       parts.push(`<?${node.target} ${node.data}?>`);
-    } else if (node.kind === "doctype") {
+      continue;
+    }
+    if (node.kind === "doctype") {
       parts.push(serializeDoctype(node));
-    } else if (node.kind === "templateContent") {
+      continue;
+    }
+    if (node.kind === "templateContent") {
       for (let index = node.children.length - 1; index >= 0; index -= 1) {
         const child = node.children[index];
-        if (child !== undefined) stack.push({ kind: "node", node: child });
+        if (child !== undefined) stack.push({ kind: "node", node: child, parent: null });
       }
-    } else {
-      const attributes = node.attributes
-        .map((entry) => `${entry.name}="${escapeAttribute(entry.value)}"`)
-        .join(" ");
-      const open = attributes.length > 0
-        ? `<${node.tagName} ${attributes}>`
-        : `<${node.tagName}>`;
-      parts.push(open);
-      const isHtmlVoid = node.namespaceUri === HTML_NAMESPACE_URI &&
-        VOID_ELEMENTS.has(asciiLowercase(node.localName));
-      if (!isHtmlVoid) {
-        stack.push({ kind: "text", value: `</${node.tagName}>` });
-        const children = node.templateContent?.children ?? node.children;
-        for (let index = children.length - 1; index >= 0; index -= 1) {
-          const child = children[index];
-          if (child !== undefined) {
-            stack.push({ kind: "node", node: child });
-          }
-        }
-      }
+      continue;
+    }
+
+    const tagName = serializedElementName(node);
+    const attributes = node.attributes
+      .map((attribute) => `${serializedAttributeName(attribute)}="${escapeHtmlAttribute(attribute.value)}"`)
+      .join(" ");
+    parts.push(attributes.length > 0 ? `<${tagName} ${attributes}>` : `<${tagName}>`);
+    if (serializesAsVoid(node)) continue;
+
+    stack.push({ kind: "markup", value: `</${tagName}>` });
+    const children = node.templateContent?.children ?? node.children;
+    const childParent = node.templateContent === undefined ? node : null;
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      const child = children[index];
+      if (child !== undefined) stack.push({ kind: "node", node: child, parent: childParent });
     }
   }
   return parts.join("");
 }
 
-/** Serializes a parsed tree or node as HTML. */
+/** Serializes a parsed tree or one complete node representation as HTML. */
 export function serialize(
   tree: DocumentTree | FragmentTree | HtmlNode,
-  options: OperationOptions = {}
+  options: SerializeOptions = {}
 ): string {
   const startedAt = performance.now();
-  const normalizedOptions = normalizeOperationOptions(options);
+  const normalizedOptions = normalizeSerializeOptions(options);
   const operation = createOperationContext(
     normalizedOptions.maxTimeMs,
     normalizedOptions.signal,
@@ -140,8 +140,7 @@ export function serialize(
   );
   operation.checkpoint();
   if (tree.kind === "document" || tree.kind === "fragment") {
-    return serializeNodes(tree.children, operation);
+    return serializeNodes(tree.children, operation, null, normalizedOptions.scriptingMode);
   }
-
-  return serializeNodes([tree], operation);
+  return serializeNodes([tree], operation, null, normalizedOptions.scriptingMode);
 }

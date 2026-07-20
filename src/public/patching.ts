@@ -1,14 +1,20 @@
 import { HtmlPatchPlanningError } from "./errors.ts";
+import {
+  containsEffectiveRawTextEndTag,
+  escapeHtmlAttribute,
+  escapeHtmlText,
+  serializesTextLiterally
+} from "./html-serialization-rules.ts";
 import { ownedChildNodes } from "./model.ts";
 import {
   parsedDocumentRegistration,
   patchPlanBelongsTo,
   registerPatchPlan
 } from "./parsed-document-registry.ts";
-import { escapeAttribute, escapeText } from "./serialization.ts";
 
 import type {
   Edit,
+  ElementNode,
   HtmlNode,
   HtmlPatchPlanningReason,
   NodeId,
@@ -48,20 +54,33 @@ function indexNodeSpans(nodes: readonly HtmlNode[], into: Map<NodeId, IndexedNod
   }
 }
 
-function indexNodes(nodes: readonly HtmlNode[], into: Map<NodeId, HtmlNode>): void {
-  const stack = [...nodes].reverse();
+function indexNodes(
+  nodes: readonly HtmlNode[],
+  into: Map<NodeId, HtmlNode>,
+  parentById: Map<NodeId, ElementNode | null>
+): void {
+  const stack: { readonly node: HtmlNode; readonly parent: ElementNode | null }[] = nodes
+    .map((node) => ({ node, parent: null }))
+    .reverse();
   while (stack.length > 0) {
-    const node = stack.pop();
-    if (node === undefined) {
+    const entry = stack.pop();
+    if (entry === undefined) {
       continue;
     }
+    const { node, parent } = entry;
     into.set(node.id, node);
+    parentById.set(node.id, parent);
     const descendants = ownedChildNodes(node);
     if (descendants.length > 0) {
       for (let index = descendants.length - 1; index >= 0; index -= 1) {
         const child = descendants[index];
         if (child !== undefined) {
-          stack.push(child);
+          stack.push({
+            node: child,
+            parent: node.kind === "element" && child.kind !== "templateContent"
+              ? node
+              : null
+          });
         }
       }
     }
@@ -225,7 +244,7 @@ function buildSetAttrReplacement(
 ): PlannedReplacement {
   const element = requireElementNode(nodeById, edit.target);
   const existing = element.attributes.find((entry) => entry.name === edit.name);
-  const rendered = `${edit.name}="${escapeAttribute(edit.value)}"`;
+  const rendered = `${edit.name}="${escapeHtmlAttribute(edit.value)}"`;
 
   if (existing) {
     if (!existing.span) {
@@ -300,6 +319,7 @@ function buildRemoveAttrReplacement(
 function buildReplacement(
   originalHtml: string,
   nodeById: Map<NodeId, HtmlNode>,
+  parentById: Map<NodeId, ElementNode | null>,
   spanByNode: Map<NodeId, IndexedNodeSpan>,
   edit: Edit,
   sourceIndex: number
@@ -321,12 +341,21 @@ function buildReplacement(
       failPatchPlanning("INVALID_EDIT_TARGET", { target: edit.target, detail: "expected text node target" });
     }
     const span = requireNodeSpan(spanByNode, edit.target);
+    const parent = parentById.get(edit.target) ?? null;
+    if (containsEffectiveRawTextEndTag(edit.value, parent, "inert")) {
+      failPatchPlanning("UNREPRESENTABLE_TEXT_VALUE", {
+        target: edit.target,
+        detail: `replacement contains an effective </${parent?.localName ?? ""}> end tag`
+      });
+    }
     return {
       sourceIndex,
       target: edit.target,
       start: span.start,
       end: span.end,
-      replacementHtml: escapeText(edit.value)
+      replacementHtml: serializesTextLiterally(parent, "inert")
+        ? edit.value
+        : escapeHtmlText(edit.value)
     };
   }
 
@@ -383,11 +412,12 @@ export function computePatch(document: ParsedDocument, edits: readonly Edit[]): 
 
   const spanByNode = new Map<NodeId, IndexedNodeSpan>();
   const nodeById = new Map<NodeId, HtmlNode>();
+  const parentById = new Map<NodeId, ElementNode | null>();
   indexNodeSpans(document.tree.children, spanByNode);
-  indexNodes(document.tree.children, nodeById);
+  indexNodes(document.tree.children, nodeById, parentById);
 
   const replacements = edits.map((edit, sourceIndex) =>
-    buildReplacement(originalHtml, nodeById, spanByNode, edit, sourceIndex)
+    buildReplacement(originalHtml, nodeById, parentById, spanByNode, edit, sourceIndex)
   );
 
   replacements.sort((left, right) => {

@@ -3,6 +3,11 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+
+- Correct HTML serialization for parent-sensitive raw text, namespace
+  boundaries, escaping, names, and extended void elements; make source patches
+  use the same rules and replace the unrelated fixture serializer gate with
+  direct built-package coverage.
 - Enforce syntax-aware source layers and declaration reachability, remove dead
   private barrels and migration-era adapter code, consolidate tokenizer corpus
   ownership, enable full library type checking, and publish only runtime code,

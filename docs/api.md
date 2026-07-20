@@ -11,7 +11,9 @@ the package remain the exact source of truth.
   `ParsedDocument`.
 - `parseStream(stream, options?)` reads, decodes, and parses a byte stream.
 - `parseFragment(input, contextTagName, options?)` returns a `FragmentTree`.
-- `serialize(input, options?)` serializes a document, fragment, or node.
+- `serialize(input, options?)` serializes a document, fragment, or complete node
+  representation. `SerializeOptions.scriptingMode` controls the conditional
+  `noscript` rule and defaults to `"inert"`.
 - `tokenizeByteStreamEager(stream, options?)` returns logical tokens after EOF.
 - `getParseErrorSpecRef(parseErrorId)` maps a diagnostic id to its HTML
   specification reference.
@@ -66,7 +68,8 @@ Key exported type groups include:
 - parsing and operations: `ParseBudgetOptions`, `ParseOptions`,
   `ParseBytesOptions`, `ParseFragmentOptions`, `ParseStreamBudgetOptions`,
   `ParseStreamOptions`, `TokenizeByteStreamEagerBudgetOptions`,
-  `TokenizeByteStreamEagerOptions`, `OperationOptions`, `SourceRetention`;
+  `TokenizeByteStreamEagerOptions`, `SerializeOptions`, `HtmlScriptingMode`,
+  `OperationOptions`, `SourceRetention`;
 - trees and metadata: `ParsedDocument`, `ParsedDocumentMetadata`,
   `ParseEncodingMetadata`, `ParseResourceUsage`, `DocumentTree`,
   `FragmentTree`, `HtmlNode`, `NodeKind`, `ElementNode`,

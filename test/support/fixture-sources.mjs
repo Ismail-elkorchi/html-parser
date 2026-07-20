@@ -31,19 +31,10 @@ export const ENCODING_FIXTURE_FILES = Object.freeze([
   "vendor/html5lib-tests/encoding/test-yahoo-jp.dat"
 ]);
 
-export const SERIALIZER_FIXTURE_FILES = Object.freeze([
-  "vendor/html5lib-tests/serializer/core.test",
-  "vendor/html5lib-tests/serializer/options.test",
-  "vendor/html5lib-tests/serializer/whitespace.test",
-  "vendor/html5lib-tests/serializer/optionaltags.test",
-  "vendor/html5lib-tests/serializer/injectmeta.test"
-]);
-
 export const ALL_HTML5LIB_FIXTURE_FILES = Object.freeze([
   ...TOKENIZER_FIXTURE_FILES,
   ...TREE_FIXTURE_FILES,
-  ...ENCODING_FIXTURE_FILES,
-  ...SERIALIZER_FIXTURE_FILES
+  ...ENCODING_FIXTURE_FILES
 ]);
 
 /** Rejects absent or non-file fixture inputs with one actionable setup error. */

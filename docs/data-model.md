@@ -80,3 +80,17 @@ adds semantic token kind and coalesced source provenance ranges.
 string. Its hidden source identity binds it to the originating parsed document.
 
 The exact interfaces and helper groups are listed in [the API guide](./api.md).
+
+## Serialization
+
+Documents and fragments serialize their top-level children. Passing one
+`HtmlNode` serializes that complete node representation. Text escaping follows
+the node's namespace-aware parent: HTML raw-text parents emit literal data,
+while ordinary, RCDATA, SVG, and MathML text is escaped. `noscript` follows the
+serialization operation's scripting mode.
+
+Serialization preserves the package's lossless public/system doctype model,
+which is an intentional extension beyond the HTML fragment algorithm's
+name-only doctype output. Serialization is deterministic, but arbitrary or
+parser-recovered trees are not guaranteed to survive a serialize/reparse cycle
+unchanged.

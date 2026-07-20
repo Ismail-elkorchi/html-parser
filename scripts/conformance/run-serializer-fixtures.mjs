@@ -1,89 +1,50 @@
-import { readFile } from "node:fs/promises";
-
 import {
-  requireFixtureFiles,
-  SERIALIZER_FIXTURE_FILES
-} from "../../test/support/fixture-sources.mjs";
-import { serializeFixtureTokenStream } from "../../tmp/test-runtime/test/support/fixture-serializer.js";
+  PUBLIC_SERIALIZER_CASES,
+  isPublicSerializerHoldout,
+  runPublicSerializerCase
+} from "../../test/support/public-serializer-cases.mjs";
 import { writeJson } from "../eval/eval-primitives.mjs";
 
-const HOLDOUT_MOD = 10;
-const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
-
-function computeHoldout(fixtureId) {
-  let hash = 0;
-  for (let charIndex = 0; charIndex < fixtureId.length; charIndex += 1) {
-    hash = (Math.imul(hash, 37) + fixtureId.charCodeAt(charIndex)) >>> 0;
-  }
-  return hash % HOLDOUT_MOD === 0;
-}
-
-const serializerCases = [];
-await requireFixtureFiles(SERIALIZER_FIXTURE_FILES);
-for (const fixturePath of SERIALIZER_FIXTURE_FILES) {
-  const fixtureFile = JSON.parse(await readFile(fixturePath, "utf8"));
-  for (let caseIndex = 0; caseIndex < (fixtureFile.tests ?? []).length; caseIndex += 1) {
-    const fixtureCase = fixtureFile.tests[caseIndex];
-    serializerCases.push({
-      id: `${fixturePath}#${caseIndex + 1}`,
-      input: fixtureCase.input ?? [],
-      expected: Array.isArray(fixtureCase.expected) ? String(fixtureCase.expected[0] ?? "") : "",
-      options: fixtureCase.options ?? {}
-    });
-  }
-}
-
+const HOLDOUT_RULE = "hash(id) % 10 === 0";
 let passed = 0;
 let failed = 0;
 let holdoutExcluded = 0;
 const failures = [];
 
-for (const fixtureCase of serializerCases) {
-  if (computeHoldout(fixtureCase.id)) {
+for (const testCase of PUBLIC_SERIALIZER_CASES) {
+  if (isPublicSerializerHoldout(testCase.id)) {
     holdoutExcluded += 1;
     continue;
   }
-
-  const actualOutput = serializeFixtureTokenStream(fixtureCase.input, fixtureCase.options);
-  if (actualOutput === fixtureCase.expected) {
+  const actual = runPublicSerializerCase(testCase);
+  if (actual === testCase.expected) {
     passed += 1;
-    continue;
+  } else {
+    failed += 1;
+    failures.push({ id: testCase.id, expected: testCase.expected, actual });
   }
-
-  failed += 1;
-  failures.push({
-    id: fixtureCase.id,
-    expected: fixtureCase.expected,
-    actual: actualOutput
-  });
 }
 
-const report = {
-  suite: "serializer",
+await writeJson("reports/serializer.json", {
+  schemaVersion: 2,
+  suite: "public-html-serializer",
+  implementation: "dist/mod.js#serialize",
   timestamp: new Date().toISOString(),
-  cases: {
-    total: serializerCases.length - holdoutExcluded,
-    passed,
-    failed,
-    skipped: 0
-  },
+  cases: { total: passed + failed, passed, failed, skipped: 0 },
   holdout: {
     excluded: holdoutExcluded,
     rule: HOLDOUT_RULE,
-    mod: HOLDOUT_MOD
+    mod: 10
   },
   holdoutExcluded,
   holdoutRule: HOLDOUT_RULE,
-  holdoutMod: HOLDOUT_MOD,
+  holdoutMod: 10,
   skips: [],
   failures
-};
+});
 
-await writeJson("reports/serializer.json", report);
-
-if (failed > 0) {
-  console.error(`Serializer fixture hard failures: ${failed}`);
-  process.exit(1);
-}
-
-console.log(`Serializer fixtures passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);
+if (failed > 0) process.exitCode = 1;
+console.log(
+  `Public serializer passed=${String(passed)}, failed=${String(failed)}, ` +
+  `holdoutExcluded=${String(holdoutExcluded)}`
+);

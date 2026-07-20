@@ -10,10 +10,13 @@ import {
   ALL_HTML5LIB_FIXTURE_FILES,
   ENCODING_FIXTURE_FILES,
   requireFixtureFiles,
-  SERIALIZER_FIXTURE_FILES,
   TREE_FIXTURE_FILES
 } from "../../test/support/fixture-sources.mjs";
-import { serializeFixtureTokenStream } from "../../tmp/test-runtime/test/support/fixture-serializer.js";
+import {
+  PUBLIC_SERIALIZER_CASES,
+  isPublicSerializerHoldout,
+  runPublicSerializerCase
+} from "../../test/support/public-serializer-cases.mjs";
 import {
   loadEngineTokenizerFixtures,
   runEngineTokenizerFixture
@@ -50,10 +53,6 @@ function isTreeHoldout(fixtureId) {
 
 function isEncodingHoldout(fixtureId) {
   return hashWithMultiplier(fixtureId, 29) % HOLDOUT_MOD === 0;
-}
-
-function isSerializerHoldout(fixtureId) {
-  return hashWithMultiplier(fixtureId, 37) % HOLDOUT_MOD === 0;
 }
 
 function fixtureTokenToComparable(token) {
@@ -335,29 +334,17 @@ async function runEncodingHoldout() {
 }
 
 async function runSerializerHoldout() {
-  const serializerCases = [];
-  for (const fixturePath of SERIALIZER_FIXTURE_FILES) {
-    const fixtureFile = JSON.parse(await readFile(fixturePath, "utf8"));
-    for (let caseIndex = 0; caseIndex < (fixtureFile.tests ?? []).length; caseIndex += 1) {
-      const fixtureCase = fixtureFile.tests[caseIndex];
-      serializerCases.push({
-        id: `${fixturePath}#${caseIndex + 1}`,
-        input: fixtureCase.input ?? [],
-        expected: Array.isArray(fixtureCase.expected) ? String(fixtureCase.expected[0] ?? "") : "",
-        options: fixtureCase.options ?? {}
-      });
-    }
-  }
-
-  const selectedCases = serializerCases.filter((fixture) => isSerializerHoldout(fixture.id));
+  const selectedCases = PUBLIC_SERIALIZER_CASES.filter((testCase) =>
+    isPublicSerializerHoldout(testCase.id)
+  );
   let passed = 0;
   let failed = 0;
   const failures = [];
 
-  for (const fixtureCase of selectedCases) {
-    const actualOutput = serializeFixtureTokenStream(fixtureCase.input, fixtureCase.options);
+  for (const testCase of selectedCases) {
+    const actualOutput = runPublicSerializerCase(testCase);
 
-    if (actualOutput === fixtureCase.expected) {
+    if (actualOutput === testCase.expected) {
       passed += 1;
       continue;
     }
@@ -365,8 +352,8 @@ async function runSerializerHoldout() {
     failed += 1;
     failures.push({
       suite: "serializer",
-      id: fixtureCase.id,
-      expected: fixtureCase.expected,
+      id: testCase.id,
+      expected: testCase.expected,
       actual: actualOutput
     });
   }
@@ -380,7 +367,7 @@ async function runSerializerHoldout() {
     },
     holdoutRule: HOLDOUT_RULE,
     holdoutMod: HOLDOUT_MOD,
-    totalSurface: serializerCases.length,
+    totalSurface: PUBLIC_SERIALIZER_CASES.length,
     failures
   };
 }

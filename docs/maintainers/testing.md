@@ -37,12 +37,11 @@ Use narrower commands while iterating:
 
 All tests live under one `test` root. `test/behavior` owns public and current
 production regressions, `test/engine` owns parser-engine units,
-`test/conformance` owns focused fixture-adapter behavior, `test/contracts`
-owns compile-only positive and deliberate negative type contracts,
-`test/support` owns fixture adapters/readers, and `test/fixtures` owns checked-in
-data. Differential, fuzz, benchmark, and corpus-scale conformance drivers stay
-in their matching `scripts` subdirectories because they are executable test
-programs rather than Node test modules.
+`test/contracts` owns compile-only positive and deliberate negative type
+contracts, `test/support` owns fixture adapters/readers, and `test/fixtures`
+owns checked-in data. Differential, fuzz, benchmark, and corpus-scale
+conformance drivers stay in their matching `scripts` subdirectories because
+they are executable test programs rather than Node test modules.
 
 TypeScript runtime tests compile with `tsconfig.test-runtime.json` into the
 disposable `tmp/test-runtime` tree before Node executes them. Type contracts use
@@ -54,11 +53,13 @@ parsing imports them and are never exported as package entrypoints.
 ## Parser semantics
 
 `npm run test:conformance` runs the pinned tokenizer, tree, encoding,
-serializer, and currently named holdout suite against the production parser.
-Individual commands are
-available as `test:tokenizer`, `test:tree`, `test:encoding`, `test:serializer`,
-and `test:holdout`. The maintained WPT tree suite is separate because it runs
-the complete snapshot, adversarial fragment chunks, and exact fingerprinted
+serializer, and currently named holdout suites. The tokenizer, tree, and
+encoding adapters exercise the production parser. The serializer suite calls
+the built package's public `serialize` export directly; it does not use a
+test-only rendering implementation. Individual commands are available as
+`test:tokenizer`, `test:tree`, `test:encoding`, `test:serializer`, and
+`test:holdout`. The maintained WPT tree suite is separate because it runs the
+complete snapshot, adversarial fragment chunks, and exact fingerprinted
 classifications.
 
 The aggregate command currently executes every partition, including holdout;
