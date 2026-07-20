@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 
-import { parseFragment, serialize } from "../../dist/mod.js";
+import { HTML_NAMESPACE_URI, parseFragment, serialize } from "../../dist/mod.js";
 
 import {
   PUBLIC_SERIALIZATION_QUALIFICATION_CASES,
@@ -32,6 +32,7 @@ function readStaticStringArray(sourceText, declarationName) {
 }
 
 const corpus = await verifyWptSerializationCorpus();
+const HTML_DIV_CONTEXT = Object.freeze({ namespaceUri: HTML_NAMESPACE_URI, localName: "div" });
 const failures = [];
 const outcomes = [];
 const observedFeatures = new Set();
@@ -80,7 +81,7 @@ for (const testCase of PUBLIC_SERIALIZATION_QUALIFICATION_CASES) {
 const parsedWptOutcomes = [];
 for (let index = 0; index < WPT_SERIALIZING_OUTER_EXPECTATIONS.length; index += 1) {
   const expected = WPT_SERIALIZING_OUTER_EXPECTATIONS[index];
-  const fragment = parseFragment(expected, "div");
+  const fragment = parseFragment(expected, HTML_DIV_CONTEXT);
   const node = fragment.children[0];
   const actual = node === undefined ? "" : serialize(node);
   const id = `serializing.html#outerHTML-${String(index)}`;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  HTML_NAMESPACE_URI,
   HtmlConfigurationError,
   HtmlPatchPlanningError,
   TEXT_CONTENT_POLICY,
@@ -97,7 +98,11 @@ test("already-decoded APIs reject transport and source-retention category errors
       error.reason === "UNKNOWN_OPTION"
   );
   assert.throws(
-    () => parseFragment("<p>x</p>", "div", { sourceRetention: "text" }),
+    () => parseFragment(
+      "<p>x</p>",
+      { namespaceUri: HTML_NAMESPACE_URI, localName: "div" },
+      { sourceRetention: "text" }
+    ),
     (error) => error instanceof HtmlConfigurationError &&
       error.option === "options.sourceRetention" &&
       error.reason === "UNKNOWN_OPTION"

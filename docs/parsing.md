@@ -40,21 +40,50 @@ For a `ReadableStream<Uint8Array>`, use `parseStream()` and read
 
 ## Fragments
 
-`parseFragment()` interprets input in the parsing context of an HTML element.
-This matters for context-sensitive markup such as table rows and raw-text
-elements. It returns a `FragmentTree`, not a `ParsedDocument`, and does not
-support source retention.
+`parseFragment()` interprets input in the parsing context of an external HTML,
+SVG, or MathML element. The context is a descriptor, not a tag-name shortcut,
+because namespace and selected attributes affect tokenization and tree
+construction. It returns a `FragmentTree`, not a `ParsedDocument`, and does
+not support source retention.
 
 ```ts
-import { parseFragment, serialize } from "@ismail-elkorchi/html-parser";
+import {
+  HTML_NAMESPACE_URI,
+  parseFragment,
+  serialize
+} from "@ismail-elkorchi/html-parser";
 
-const fragment = parseFragment("<tr><td>A<td>B", "tbody", {
+const fragment = parseFragment("<tr><td>A<td>B", {
+  namespaceUri: HTML_NAMESPACE_URI,
+  localName: "tbody"
+}, {
   budgets: { maxNodes: 32, maxDepth: 8 }
 });
 
 console.log(fragment.kind); // "fragment"
 console.log(serialize(fragment));
 ```
+
+The descriptor accepts `namespaceUri`, `localName`, and optional semantic
+attributes shaped as `{ namespaceUri, localName, value }`. Use the exported
+namespace constants. Prefixes and qualified names are derived, so conflicting
+representations cannot be supplied. HTML context names are ASCII-lowercased;
+SVG and MathML names retain case.
+
+`ParseFragmentOptions` also records the external parsing environment:
+
+- `scriptingMode` is `"inert"` by default or `"disabled"` for a document in
+  which scripting is disabled;
+- `documentMode` is `"no-quirks"` by default and may be `"limited-quirks"` or
+  `"quirks"`; and
+- `hasFormAncestor` says whether an ancestor outside the supplied context
+  descriptor is an HTML `form`. A context that is itself an HTML `form` is
+  recognized directly and does not require a redundant option.
+
+These values are retained on the returned fragment. `serialize(fragment)` and
+`chunk(fragment)` inherit its scripting mode; an explicit serialization option
+still overrides it. Supply environment values from the real context document
+when parity with browser `innerHTML` parsing matters.
 
 ## Parse diagnostics
 

@@ -50,6 +50,8 @@ function normalizeEngine(testCase) {
       : {
           kind: "fragment",
           scriptingMode: "inert",
+          documentMode: "no-quirks",
+          hasFormInContextChain: false,
           context: testCase.fragmentContext
         }
   });

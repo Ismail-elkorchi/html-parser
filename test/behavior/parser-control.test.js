@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  HTML_NAMESPACE_URI,
   HtmlBudgetExceededError,
   parse,
   parseBytes,
   parseFragment,
   serialize
 } from "../../dist/mod.js";
+
+const htmlContext = (localName) => ({ namespaceUri: HTML_NAMESPACE_URI, localName });
 
 test("deterministic node ids for identical input", () => {
   const first = parse("<p>alpha</p>");
@@ -24,14 +27,18 @@ test("parse bytes baseline", () => {
 });
 
 test("parseFragment uses explicit context", () => {
-  const fragment = parseFragment("hello", "section");
+  const fragment = parseFragment("hello", htmlContext("section"));
   assert.equal(fragment.kind, "fragment");
-  assert.equal(fragment.contextTagName, "section");
+  assert.deepEqual(fragment.context, {
+    namespaceUri: HTML_NAMESPACE_URI,
+    localName: "section",
+    attributes: []
+  });
 });
 
 test("deterministic fragment ids for identical input", () => {
-  const first = parseFragment("<em>alpha</em>", "section");
-  const second = parseFragment("<em>alpha</em>", "section");
+  const first = parseFragment("<em>alpha</em>", htmlContext("section"));
+  const second = parseFragment("<em>alpha</em>", htmlContext("section"));
   assert.deepEqual(first, second);
 });
 
@@ -55,7 +62,7 @@ test("string and fragment input budgets measure UTF-8 bytes", () => {
   const input = "é".repeat(10);
   for (const parseInput of [
     () => parse(input, { budgets: { maxInputBytes: 10 } }),
-    () => parseFragment(input, "div", { budgets: { maxInputBytes: 10 } })
+    () => parseFragment(input, htmlContext("div"), { budgets: { maxInputBytes: 10 } })
   ]) {
     assert.throws(parseInput, (error) => {
       assert.ok(error instanceof HtmlBudgetExceededError);

@@ -52,6 +52,8 @@ runHtmlEngine({
   parser: {
     kind: "fragment",
     scriptingMode: "disabled",
+    documentMode: "no-quirks",
+    hasFormInContextChain: false,
     context: {
       namespaceUri: "http://www.w3.org/1999/xhtml",
       localName: "div",

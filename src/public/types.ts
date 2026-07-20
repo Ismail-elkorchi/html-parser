@@ -102,8 +102,57 @@ export interface ParseBytesOptions extends ParseOptions {
   readonly transportEncodingLabel?: string;
 }
 
+/** Namespace identities accepted for an HTML fragment context element. */
+export type HtmlElementNamespaceUri =
+  | "http://www.w3.org/1999/xhtml"
+  | "http://www.w3.org/2000/svg"
+  | "http://www.w3.org/1998/Math/MathML";
+
+/** Namespace identities accepted for an HTML fragment context attribute. */
+export type HtmlAttributeNamespaceUri =
+  | "http://www.w3.org/1999/xlink"
+  | "http://www.w3.org/XML/1998/namespace"
+  | "http://www.w3.org/2000/xmlns/"
+  | null;
+
+/** Semantic attribute supplied on the external fragment context element. */
+export interface HtmlFragmentContextAttribute {
+  /** Attribute namespace, or null for an unnamespaced attribute. */
+  readonly namespaceUri: HtmlAttributeNamespaceUri;
+  /** Local attribute name; namespace prefixes are derived by the parser. */
+  readonly localName: string;
+  /** Attribute value visible to fragment parsing algorithms. */
+  readonly value: string;
+}
+
+/** Namespace-aware external element used to establish a fragment parsing context. */
+export interface HtmlFragmentContextInput {
+  /** HTML, SVG, or MathML namespace of the context element. */
+  readonly namespaceUri: HtmlElementNamespaceUri;
+  /** Context element local name. HTML names are normalized to ASCII lowercase. */
+  readonly localName: string;
+  /** Attributes consulted by integration-point and tree-construction rules. */
+  readonly attributes?: readonly HtmlFragmentContextAttribute[];
+}
+
+/** Normalized immutable fragment context retained on the result. */
+export interface HtmlFragmentContext extends Omit<HtmlFragmentContextInput, "attributes"> {
+  /** Frozen attributes with validated namespace/local-name identity. */
+  readonly attributes: readonly HtmlFragmentContextAttribute[];
+}
+
+/** Owner-document mode used by fragment tree construction. */
+export type HtmlDocumentMode = "no-quirks" | "limited-quirks" | "quirks";
+
 /** Options accepted by already-decoded fragment parsing. */
-export type ParseFragmentOptions = Omit<ParseOptions, "sourceRetention">;
+export interface ParseFragmentOptions extends Omit<ParseOptions, "sourceRetention"> {
+  /** Non-executing scripting environment; defaults to `"inert"`. */
+  readonly scriptingMode?: HtmlScriptingMode;
+  /** Context owner-document mode; defaults to `"no-quirks"`. */
+  readonly documentMode?: HtmlDocumentMode;
+  /** Whether an ancestor outside the supplied context descriptor is an HTML `form`. */
+  readonly hasFormAncestor?: boolean;
+}
 
 /** Parse limits for byte streams, including bounded encoding-prescan retention. */
 export interface ParseStreamBudgetOptions extends ParseBudgetOptions {
@@ -152,7 +201,7 @@ export type HtmlScriptingMode = "inert" | "disabled";
 
 /** Controls one HTML serialization operation. */
 export interface SerializeOptions extends OperationOptions {
-  /** Controls scripting-dependent `noscript` text serialization; defaults to `"inert"`. */
+  /** Controls `noscript`; fragments inherit their parse mode, while other inputs default inert. */
   readonly scriptingMode?: HtmlScriptingMode;
 }
 
@@ -613,8 +662,14 @@ export interface FragmentTree {
   readonly id: NodeId;
   /** Root discriminator. */
   readonly kind: "fragment";
-  /** Normalized HTML context element name. */
-  readonly contextTagName: string;
+  /** Normalized namespace-aware external context element. */
+  readonly context: HtmlFragmentContext;
+  /** Effective non-executing scripting environment used for this parse. */
+  readonly scriptingMode: HtmlScriptingMode;
+  /** Effective context owner-document mode used for this parse. */
+  readonly documentMode: HtmlDocumentMode;
+  /** Whether the context chain seeded the form element pointer. */
+  readonly hasFormInContextChain: boolean;
   /** Top-level fragment nodes in tree order. */
   readonly children: readonly HtmlNode[];
   /** Non-fatal parse errors in emission order. */

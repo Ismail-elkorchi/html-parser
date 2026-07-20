@@ -19,6 +19,7 @@ import { HtmlTreeBuilder, type HtmlTreeBuilderState } from "./tree-builder.ts";
 import { HtmlTreeModel } from "./tree-model.ts";
 
 import type { EngineParseError } from "./diagnostics.ts";
+import type { HtmlDocumentMode } from "./doctype-mode.ts";
 import type { HtmlFragmentContext, HtmlFragmentContextAttribute } from "./fragment-context.ts";
 import type { EngineObserver } from "./observer.ts";
 import type { NonExecutingScriptingMode } from "./parser-state.ts";
@@ -33,6 +34,8 @@ interface HtmlEngineDocumentConfiguration {
 interface HtmlEngineFragmentConfiguration {
   readonly kind: "fragment";
   readonly scriptingMode: NonExecutingScriptingMode;
+  readonly documentMode: HtmlDocumentMode;
+  readonly hasFormInContextChain: boolean;
   readonly context: HtmlFragmentContext;
 }
 
@@ -188,7 +191,9 @@ function validateParser(parser: unknown): HtmlEngineParserConfiguration {
     record,
     kind === "document"
       ? new Set(["kind", "scriptingMode"])
-      : new Set(["kind", "scriptingMode", "context"]),
+      : new Set([
+          "kind", "scriptingMode", "documentMode", "hasFormInContextChain", "context"
+        ]),
     "options.parser"
   );
   if (record["scriptingMode"] !== "disabled" && record["scriptingMode"] !== "inert") {
@@ -200,9 +205,27 @@ function validateParser(parser: unknown): HtmlEngineParserConfiguration {
   if (kind === "document") {
     return Object.freeze({ kind, scriptingMode: record["scriptingMode"] });
   }
+  if (
+    record["documentMode"] !== "no-quirks" &&
+    record["documentMode"] !== "limited-quirks" &&
+    record["documentMode"] !== "quirks"
+  ) {
+    throw new EngineConfigurationError(
+      "options.parser.documentMode",
+      'must be "no-quirks", "limited-quirks", or "quirks"'
+    );
+  }
+  if (typeof record["hasFormInContextChain"] !== "boolean") {
+    throw new EngineConfigurationError(
+      "options.parser.hasFormInContextChain",
+      "must be a boolean"
+    );
+  }
   return Object.freeze({
     kind,
     scriptingMode: record["scriptingMode"],
+    documentMode: record["documentMode"],
+    hasFormInContextChain: record["hasFormInContextChain"],
     context: validateFragmentContext(record["context"])
   });
 }
@@ -261,15 +284,22 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
     resources,
     ...(observer === undefined ? {} : { observer })
   });
-  const builder = new HtmlTreeBuilder({
+  const treeBuilderCommon = {
     model,
     resources,
     scriptingMode: parser.scriptingMode,
     retainNodeSpans: options.retainNodeSpans ?? true,
-    ...(parser.kind === "fragment" ? { fragmentContext: parser.context } : {}),
     ...(observer === undefined ? {} : { observer }),
-    onParseError(error) { parseErrors.push(error); }
-  });
+    onParseError(error: EngineParseError) { parseErrors.push(error); }
+  };
+  const builder = parser.kind === "fragment"
+    ? new HtmlTreeBuilder({
+        ...treeBuilderCommon,
+        fragmentContext: parser.context,
+        fragmentDocumentMode: parser.documentMode,
+        hasFormInContextChain: parser.hasFormInContextChain
+      })
+    : new HtmlTreeBuilder(treeBuilderCommon);
   const tokenizer = new HtmlTokenizer(resources, builder, {
     ...(parser.kind === "fragment"
       ? { initialState: fragmentTokenizerMode(parser.context, parser.scriptingMode) }

@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 import process from "node:process";
 
-import { parse, parseFragment, serialize, walk } from "../../dist/mod.js";
+import { HTML_NAMESPACE_URI, parse, parseFragment, serialize, walk } from "../../dist/mod.js";
 import { writeJson } from "../eval/eval-primitives.mjs";
 
 if (typeof globalThis.gc !== "function") {
@@ -69,7 +69,10 @@ const templates = measure("template-content-ownership", () => {
 const fragmentDepth = 5_000;
 const fragment = measure("deep-fragment-conversion", () => {
   const input = `${"<div>".repeat(fragmentDepth)}x${"</div>".repeat(fragmentDepth)}`;
-  const parsed = parseFragment(input, "section", {
+  const parsed = parseFragment(input, {
+    namespaceUri: HTML_NAMESPACE_URI,
+    localName: "section"
+  }, {
     budgets: { maxNodes: fragmentDepth + 4, maxDepth: fragmentDepth + 2 }
   });
   let walked = 0;

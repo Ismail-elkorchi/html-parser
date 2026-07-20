@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import {
+  HTML_NAMESPACE_URI,
   isHtmlBudgetExceededError,
   chunk,
   outline,
@@ -114,7 +115,11 @@ async function writeDeterminism() {
 
   const fragmentHashes = [];
   for (let sampleIndex = 0; sampleIndex < 5; sampleIndex += 1) {
-    fragmentHashes.push(sha256(JSON.stringify(parseFragment("beta", "section", { captureSpans: true, trace: "events" }))));
+    fragmentHashes.push(sha256(JSON.stringify(parseFragment(
+      "beta",
+      { namespaceUri: HTML_NAMESPACE_URI, localName: "section" },
+      { captureSpans: true, trace: "events" }
+    ))));
   }
 
   const uniqueDocumentHashes = [...new Set(documentHashes)];

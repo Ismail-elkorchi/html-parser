@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import {
+  HTML_NAMESPACE_URI,
   HtmlAbortError,
   HtmlBudgetExceededError,
   isHtmlAbortError,
@@ -216,8 +217,11 @@ async function runSmokeAssertions() {
   const second = parse("deterministic");
   ensure(JSON.stringify(first) === JSON.stringify(second), "deterministic output mismatch");
 
-  const fragment = parseFragment("child", "section");
-  ensure(fragment.contextTagName === "section", "fragment context mismatch");
+  const fragment = parseFragment("child", {
+    namespaceUri: HTML_NAMESPACE_URI,
+    localName: "section"
+  });
+  ensure(fragment.context.localName === "section", "fragment context mismatch");
 
   const sampleBytes = new Uint8Array([
     0x3c, 0x6d, 0x65, 0x74, 0x61, 0x20, 0x63, 0x68, 0x61, 0x72, 0x73, 0x65, 0x74, 0x3d, 0x77, 0x69, 0x6e, 0x64,

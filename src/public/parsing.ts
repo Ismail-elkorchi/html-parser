@@ -3,7 +3,6 @@ import {
   failInternalState,
   requireInternalValue
 } from "../internal/foundation/internal-state-error.ts";
-import { HTML_NAMESPACE } from "../internal/html-engine/namespaces.ts";
 import { runHtmlEngine } from "../internal/html-engine/parser-driver.ts";
 import {
   EngineAbortError,
@@ -13,7 +12,8 @@ import {
 import { HtmlTokenizer } from "../internal/html-engine/tokenizer/tokenizer.ts";
 
 import { enforceBudget } from "./budgets.ts";
-import { HtmlAbortError, HtmlBudgetExceededError, HtmlConfigurationError } from "./errors.ts";
+import { HtmlAbortError, HtmlBudgetExceededError } from "./errors.ts";
+import { normalizeFragmentContext, toEngineFragmentContext } from "./fragment-context.ts";
 import {
   DecodedUtf8BudgetCounter,
   decodeStreamToText,
@@ -22,6 +22,7 @@ import {
   requireString,
   utf8ByteLength
 } from "./html-input.ts";
+import { HTML_NAMESPACE_URI } from "./model.ts";
 import {
   createOperationContext,
   normalizeParseBytesOptions,
@@ -38,6 +39,7 @@ import type {
   Attribute,
   DocumentTree,
   FragmentTree,
+  HtmlFragmentContextInput,
   HtmlBudgetName,
   HtmlNode,
   NodeId,
@@ -682,29 +684,30 @@ export function parseBytes(
 }
 
 /**
- * Parses an HTML fragment using the supplied context element name.
+ * Parses an HTML fragment using the supplied namespace-aware context element.
  *
  * @example
  * ```ts
- * import { parseFragment } from "jsr:@ismail-elkorchi/html-parser";
+ * import { HTML_NAMESPACE_URI, parseFragment } from "jsr:@ismail-elkorchi/html-parser";
  *
- * const fragment = parseFragment("<td>Cell", "tr");
+ * const fragment = parseFragment("<td>Cell", {
+ *   namespaceUri: HTML_NAMESPACE_URI,
+ *   localName: "tr"
+ * });
  * console.log(fragment.children.length);
  * ```
  */
 export function parseFragment(
   html: string,
-  contextTagName: string,
+  contextInput: HtmlFragmentContextInput,
   options: ParseFragmentOptions = {}
 ): FragmentTree {
   const startedAt = performance.now();
   const normalized = normalizeParseFragmentOptions(options);
   requireString(html, "input");
-  requireString(contextTagName, "contextTagName");
-  const context = contextTagName.trim().toLowerCase();
-  if (context.length === 0) {
-    throw new HtmlConfigurationError("contextTagName", "INVALID_VALUE", "must be a non-empty tag name");
-  }
+  const context = normalizeFragmentContext(contextInput);
+  const hasFormInContextChain = (normalized.hasFormAncestor ?? false) ||
+    (context.namespaceUri === HTML_NAMESPACE_URI && context.localName === "form");
   const operation = createOperationContext(normalized.budgets?.maxTimeMs, normalized.signal, startedAt);
   const inputBytes = utf8ByteLength(html, operation);
   enforceBudget("maxInputBytes", normalized.budgets?.maxInputBytes, inputBytes);
@@ -726,8 +729,10 @@ export function parseFragment(
       retainNodeSpans: normalized.captureSpans ?? false,
       parser: {
         kind: "fragment",
-        scriptingMode: "inert",
-        context: { namespaceUri: HTML_NAMESPACE, localName: context, attributes: Object.freeze([]) }
+        scriptingMode: normalized.scriptingMode ?? "inert",
+        documentMode: normalized.documentMode ?? "no-quirks",
+        hasFormInContextChain,
+        context: toEngineFragmentContext(context)
       },
       limits: engineLimits(normalized.budgets),
       ...(normalized.signal === undefined ? {} : { signal: normalized.signal }),
@@ -798,7 +803,10 @@ export function parseFragment(
   return Object.freeze({
     id: fragmentId,
     kind: "fragment",
-    contextTagName: context,
+    context,
+    scriptingMode: normalized.scriptingMode ?? "inert",
+    documentMode: normalized.documentMode ?? "no-quirks",
+    hasFormInContextChain,
     children: publicChildren,
     errors,
     ...(traceResult === undefined ? {} : { trace: traceResult })

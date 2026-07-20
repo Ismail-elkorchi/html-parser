@@ -46,15 +46,27 @@ import type {
   HtmlTreeParent
 } from "./tree-model.ts";
 
-interface HtmlTreeBuilderOptions {
+interface HtmlTreeBuilderCommonOptions {
   readonly model: HtmlTreeModel;
   readonly resources: EngineResourceGuard;
   readonly scriptingMode: NonExecutingScriptingMode;
   readonly retainNodeSpans?: boolean;
-  readonly fragmentContext?: HtmlFragmentContext;
   readonly observer?: EngineObserver;
   readonly onParseError: (error: EngineParseError) => void;
 }
+
+type HtmlTreeBuilderOptions = HtmlTreeBuilderCommonOptions & (
+  | {
+      readonly fragmentContext?: undefined;
+      readonly fragmentDocumentMode?: never;
+      readonly hasFormInContextChain?: never;
+    }
+  | {
+      readonly fragmentContext: HtmlFragmentContext;
+      readonly fragmentDocumentMode: HtmlDocumentMode;
+      readonly hasFormInContextChain: boolean;
+    }
+);
 
 export interface HtmlTreeBuilderState {
   readonly insertionMode: InsertionMode;
@@ -276,6 +288,8 @@ export class HtmlTreeBuilder implements TokenSink {
         qualifiedName: options.fragmentContext.localName,
         attributes: fragmentContextAttributes(options.fragmentContext)
       });
+      this.#documentMode = options.fragmentDocumentMode;
+      if (options.hasFormInContextChain) this.#formElement = this.#fragmentContext;
       if (
         this.#fragmentContext.namespaceUri === HTML_NAMESPACE &&
         this.#fragmentContext.localName === "template"

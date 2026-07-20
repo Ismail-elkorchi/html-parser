@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  HTML_NAMESPACE_URI,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
   chunk,
@@ -297,7 +298,10 @@ test("outline and chunk stay deterministic", () => {
 });
 
 test("chunk enforces maxBytes when configured", () => {
-  const fragment = parseFragment("<p>a</p><p>bb</p><p>ccc</p>", "section");
+  const fragment = parseFragment(
+    "<p>a</p><p>bb</p><p>ccc</p>",
+    { namespaceUri: HTML_NAMESPACE_URI, localName: "section" }
+  );
   const chunks = chunk(fragment, { maxChars: 4096, maxNodes: 32, maxBytes: 20 });
   const encoder = new TextEncoder();
 

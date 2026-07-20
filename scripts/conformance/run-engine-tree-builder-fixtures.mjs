@@ -217,9 +217,11 @@ for (const fileName of fixtureFiles) {
                 kind: "document",
                 scriptingMode: fixtureCase.scriptingEnabled ? "inert" : "disabled"
               }
-            : {
+              : {
                 kind: "fragment",
                 scriptingMode: fixtureCase.scriptingEnabled ? "inert" : "disabled",
+                documentMode: "no-quirks",
+                hasFormInContextChain: false,
                 context: { ...fixtureCase.fragmentContext, attributes: [] }
               },
           limits: {

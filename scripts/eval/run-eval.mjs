@@ -73,6 +73,8 @@ async function main() {
   if (profile === "release") {
     steps.push(["public-serialization", "npm", ["run", "qualification:serialization"]]);
     steps.push(["public-serialization-browser", "npm", ["run", "test:browser-diff:serialization"]]);
+    steps.push(["public-fragments", "npm", ["run", "qualification:fragments"]]);
+    steps.push(["public-fragment-browser", "npm", ["run", "test:browser-diff:fragments"]]);
     steps.push(["browser-diff", "npm", ["run", "test:browser-diff"]]);
     steps.push(["fuzz", "npm", ["run", "test:fuzz"]]);
     steps.push(["performance", "npm", ["run", "qualification:performance"]]);

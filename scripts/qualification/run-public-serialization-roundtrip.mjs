@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { parseFragment, serialize } from "../../dist/mod.js";
+import { HTML_NAMESPACE_URI, parseFragment, serialize } from "../../dist/mod.js";
 import {
   PUBLIC_SERIALIZATION_QUALIFICATION_CASES,
   createPublicSerializationNode
@@ -38,6 +38,7 @@ const EXPECTED_CLASSIFICATIONS = Object.freeze({
   })
 });
 const EXPECTED_CLASSIFICATIONS_SHA256 = "86f7cb6d3f42dd40c8ce4f08e2a664fa9c230d1ad2994ed2b1862742a12648f4";
+const HTML_DIV_CONTEXT = Object.freeze({ namespaceUri: HTML_NAMESPACE_URI, localName: "div" });
 
 function sha256(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -72,9 +73,9 @@ function normalizeNodes(nodes) {
 const failures = [];
 const positive = [];
 for (const testCase of POSITIVE_CASES) {
-  const first = parseFragment(testCase.html, "div");
+  const first = parseFragment(testCase.html, HTML_DIV_CONTEXT);
   const serialized = serialize(first);
-  const second = parseFragment(serialized, "div");
+  const second = parseFragment(serialized, HTML_DIV_CONTEXT);
   const before = normalizeNodes(first.children);
   const after = normalizeNodes(second.children);
   const stable = JSON.stringify(before) === JSON.stringify(after);
@@ -87,16 +88,16 @@ for (const testCase of POSITIVE_CASES) {
   if (!stable) failures.push({ id: testCase.id, reason: "unexpected-roundtrip-difference" });
 }
 
-const plaintextFirst = parseFragment("<plaintext>a<b>", "div");
+const plaintextFirst = parseFragment("<plaintext>a<b>", HTML_DIV_CONTEXT);
 const plaintextSerialized = serialize(plaintextFirst);
-const plaintextSecond = parseFragment(plaintextSerialized, "div");
+const plaintextSecond = parseFragment(plaintextSerialized, HTML_DIV_CONTEXT);
 const rawCase = PUBLIC_SERIALIZATION_QUALIFICATION_CASES.find(
   (testCase) => testCase.id === "classified/raw-effective-end-tag"
 );
 if (rawCase === undefined) throw new Error("missing raw effective-end-tag qualification case");
 const rawNode = createPublicSerializationNode(rawCase.descriptor);
 const rawSerialized = serialize(rawNode);
-const rawSecond = parseFragment(rawSerialized, "div");
+const rawSecond = parseFragment(rawSerialized, HTML_DIV_CONTEXT);
 
 const classified = [
   {

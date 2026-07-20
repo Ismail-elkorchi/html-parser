@@ -32,6 +32,8 @@ Use narrower commands while iterating:
 | Does the complete maintained WPT tree snapshot pass its exact classifications? | `npm run qualification:wpt` |
 | Does public serialization match pinned expectations and classified round trips? | `npm run qualification:serialization` |
 | Does public serialization agree with Chromium, Firefox, and WebKit? | `npm run test:browser-diff:serialization` |
+| Does the public fragment API match every pinned WPT fragment? | `npm run qualification:fragments` |
+| Do public fragment contexts agree with Chromium, Firefox, and WebKit? | `npm run test:browser-diff:fragments` |
 | Do documentation links and API names stay valid? | `npm run docs:check` |
 | Do documented TypeScript examples compile strictly? | `npm run docs:snippets` |
 | Do repository examples execute? | `npm run examples:run` |
@@ -75,6 +77,14 @@ expectation, requires the named positive round trips to remain structurally
 stable, and checks exact fingerprints for the two intentional non-roundtrips.
 The browser differential constructs equivalent native nodes; it is an oracle,
 not an alternate serializer.
+
+`npm run qualification:fragments` runs all 392 scripting variants of the 196
+fragment cases in the pinned WPT tree snapshot through
+`dist/mod.js#parseFragment`. It compares public trees and declared diagnostic
+counts directly. The focused browser differential additionally constructs
+HTML, SVG, MathML, integration-point, scripting, document-mode, and form-chain
+contexts in native documents; accepted browser differences require exact tree
+fingerprints and a standards-based reason.
 
 Use `npm run test:fuzz` for generated parser inputs and
 `npm run test:browser-diff` for browser comparisons. A difference is evidence

@@ -55,7 +55,17 @@ ParsedDocument
 └── metadata    input, encoding, and observed resource usage
 ```
 
-`parseFragment()` returns a `FragmentTree` directly.
+`parseFragment()` returns a `FragmentTree` directly and requires an explicit
+namespace-aware context:
+
+```ts
+import { HTML_NAMESPACE_URI, parseFragment } from "@ismail-elkorchi/html-parser";
+
+const rows = parseFragment("<tr><td>A<td>B", {
+  namespaceUri: HTML_NAMESPACE_URI,
+  localName: "tbody"
+});
+```
 
 ## Find what you need
 

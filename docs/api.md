@@ -10,10 +10,12 @@ the package remain the exact source of truth.
 - `parseBytes(input, options?)` sniffs/decodes bytes and returns a
   `ParsedDocument`.
 - `parseStream(stream, options?)` reads, decodes, and parses a byte stream.
-- `parseFragment(input, contextTagName, options?)` returns a `FragmentTree`.
+- `parseFragment(input, context, options?)` parses with an explicit
+  namespace-aware `HtmlFragmentContextInput` and returns a `FragmentTree`.
 - `serialize(input, options?)` serializes a document, fragment, or complete node
   representation. `SerializeOptions.scriptingMode` controls the conditional
-  `noscript` rule and defaults to `"inert"`.
+  `noscript` rule. A fragment inherits the mode retained from parsing; other
+  inputs default to `"inert"`.
 - `tokenizeByteStreamEager(stream, options?)` returns logical tokens after EOF.
 - `getParseErrorSpecRef(parseErrorId)` maps a diagnostic id to its HTML
   specification reference.
@@ -66,7 +68,9 @@ the value can cross realms or package boundaries.
 Key exported type groups include:
 
 - parsing and operations: `ParseBudgetOptions`, `ParseOptions`,
-  `ParseBytesOptions`, `ParseFragmentOptions`, `ParseStreamBudgetOptions`,
+  `ParseBytesOptions`, `ParseFragmentOptions`, `HtmlFragmentContextInput`,
+  `HtmlFragmentContext`, `HtmlFragmentContextAttribute`, `HtmlDocumentMode`,
+  `HtmlElementNamespaceUri`, `HtmlAttributeNamespaceUri`, `ParseStreamBudgetOptions`,
   `ParseStreamOptions`, `TokenizeByteStreamEagerBudgetOptions`,
   `TokenizeByteStreamEagerOptions`, `SerializeOptions`, `HtmlScriptingMode`,
   `OperationOptions`, `SourceRetention`;
