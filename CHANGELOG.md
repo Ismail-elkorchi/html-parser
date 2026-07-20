@@ -5,10 +5,11 @@ All notable changes are documented in this file.
 ## Unreleased
 
 - Replace the tag-name-only fragment API with one normalized namespace-aware
-  context and explicit scripting, owner-document mode, and form-chain inputs;
-  retain the effective environment on fragment results, preserve it during
-  serialization/chunking, and qualify the built API against every pinned WPT
-  fragment plus focused Chromium, Firefox, and WebKit contexts.
+  context and explicit scripting, owner-document mode, and external
+  form-ancestor inputs; derive and retain the effective environment on fragment
+  results, preserve it during serialization/chunking, and qualify the built API
+  against every pinned WPT fragment plus focused Chromium, Firefox, and WebKit
+  contexts.
 
 - Consolidated release performance evidence into one balanced cross-revision
   report: accepted independent parser and corrected serializer revisions are

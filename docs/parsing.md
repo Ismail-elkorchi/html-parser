@@ -76,8 +76,9 @@ SVG and MathML names retain case.
   which scripting is disabled;
 - `documentMode` is `"no-quirks"` by default and may be `"limited-quirks"` or
   `"quirks"`; and
-- `hasFormInContextChain` says whether the context itself or one of its
-  ancestors is an HTML `form`.
+- `hasFormAncestor` says whether an ancestor outside the supplied context
+  descriptor is an HTML `form`. A context that is itself an HTML `form` is
+  recognized directly and does not require a redundant option.
 
 These values are retained on the returned fragment. `serialize(fragment)` and
 `chunk(fragment)` inherit its scripting mode; an explicit serialization option

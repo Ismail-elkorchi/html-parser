@@ -73,12 +73,18 @@ test("fragment environment controls tree construction and is retained on the res
   assert.equal(quirks.documentMode, "quirks");
 
   const withoutForm = parseFragment("<form><input>", context);
-  const withForm = parseFragment("<form><input>", context, { hasFormInContextChain: true });
+  const withForm = parseFragment("<form><input>", context, { hasFormAncestor: true });
   assert.equal(withoutForm.children[0]?.kind, "element");
   assert.equal(withoutForm.children[0]?.localName, "form");
   assert.equal(withForm.children[0]?.kind, "element");
   assert.equal(withForm.children[0]?.localName, "input");
   assert.equal(withForm.hasFormInContextChain, true);
+  assert.equal(withoutForm.hasFormInContextChain, false);
+
+  const formContext = parseFragment("<form><input>", htmlContext("form"));
+  assert.equal(formContext.children[0]?.kind, "element");
+  assert.equal(formContext.children[0]?.localName, "input");
+  assert.equal(formContext.hasFormInContextChain, true);
 });
 
 test("serialization and chunking inherit a fragment's scripting mode", () => {
@@ -121,5 +127,15 @@ test("fragment context and environment validation reject ambiguous configuration
   assert.throws(
     () => parseFragment("x", htmlContext("div"), { documentMode: "standards" }),
     (error) => error instanceof HtmlConfigurationError && error.option === "options.documentMode"
+  );
+  assert.throws(
+    () => parseFragment("x", htmlContext("div"), { hasFormAncestor: "yes" }),
+    (error) => error instanceof HtmlConfigurationError && error.option === "options.hasFormAncestor"
+  );
+  assert.throws(
+    () => parseFragment("x", htmlContext("div"), { hasFormInContextChain: true }),
+    (error) => error instanceof HtmlConfigurationError &&
+      error.option === "options.hasFormInContextChain" &&
+      error.reason === "UNKNOWN_OPTION"
   );
 });

@@ -22,6 +22,7 @@ import {
   requireString,
   utf8ByteLength
 } from "./html-input.ts";
+import { HTML_NAMESPACE_URI } from "./model.ts";
 import {
   createOperationContext,
   normalizeParseBytesOptions,
@@ -705,6 +706,8 @@ export function parseFragment(
   const normalized = normalizeParseFragmentOptions(options);
   requireString(html, "input");
   const context = normalizeFragmentContext(contextInput);
+  const hasFormInContextChain = (normalized.hasFormAncestor ?? false) ||
+    (context.namespaceUri === HTML_NAMESPACE_URI && context.localName === "form");
   const operation = createOperationContext(normalized.budgets?.maxTimeMs, normalized.signal, startedAt);
   const inputBytes = utf8ByteLength(html, operation);
   enforceBudget("maxInputBytes", normalized.budgets?.maxInputBytes, inputBytes);
@@ -728,7 +731,7 @@ export function parseFragment(
         kind: "fragment",
         scriptingMode: normalized.scriptingMode ?? "inert",
         documentMode: normalized.documentMode ?? "no-quirks",
-        hasFormInContextChain: normalized.hasFormInContextChain ?? false,
+        hasFormInContextChain,
         context: toEngineFragmentContext(context)
       },
       limits: engineLimits(normalized.budgets),
@@ -803,7 +806,7 @@ export function parseFragment(
     context,
     scriptingMode: normalized.scriptingMode ?? "inert",
     documentMode: normalized.documentMode ?? "no-quirks",
-    hasFormInContextChain: normalized.hasFormInContextChain ?? false,
+    hasFormInContextChain,
     children: publicChildren,
     errors,
     ...(traceResult === undefined ? {} : { trace: traceResult })

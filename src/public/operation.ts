@@ -66,7 +66,7 @@ const PARSE_FRAGMENT_OPTION_KEYS = new Set<PropertyKey>([
   ...PARSE_COMMON_OPTION_KEYS,
   "scriptingMode",
   "documentMode",
-  "hasFormInContextChain"
+  "hasFormAncestor"
 ]);
 const TOKENIZE_BYTE_STREAM_EAGER_OPTION_KEYS = new Set<PropertyKey>([
   "transportEncodingLabel",
@@ -367,15 +367,15 @@ export function normalizeParseFragmentOptions(options: ParseFragmentOptions): Pa
       'must be "no-quirks", "limited-quirks", or "quirks"'
     );
   }
-  const hasFormInContextChain = optionalBoolean(
-    read(record, "hasFormInContextChain", "options.hasFormInContextChain"),
-    "options.hasFormInContextChain"
+  const hasFormAncestor = optionalBoolean(
+    read(record, "hasFormAncestor", "options.hasFormAncestor"),
+    "options.hasFormAncestor"
   );
   return Object.freeze({
     ...common,
     scriptingMode: scriptingMode ?? "inert",
     documentMode: documentMode ?? "no-quirks",
-    hasFormInContextChain: hasFormInContextChain ?? false
+    hasFormAncestor: hasFormAncestor ?? false
   });
 }
 

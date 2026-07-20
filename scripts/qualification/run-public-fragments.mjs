@@ -26,7 +26,8 @@ let executions = 0;
 
 for (const relativePath of corpus.fixtureFiles) {
   const filePath = path.join(corpus.corpusRoot, relativePath);
-  const fixtureCases = parseTreeDatFixtures(await readFile(filePath, "utf8"), filePath)
+  const fixtureIdPath = path.relative(corpus.repositoryRoot, filePath).split(path.sep).join("/");
+  const fixtureCases = parseTreeDatFixtures(await readFile(filePath, "utf8"), fixtureIdPath)
     .filter((fixtureCase) => fixtureCase.fragmentContext !== null);
   baseCases += fixtureCases.length;
   for (const fixtureCase of expandTreeDatCases(fixtureCases, { includeModeInId: true })) {

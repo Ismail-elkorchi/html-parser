@@ -33,13 +33,16 @@ const mathContext: HtmlFragmentContextInput = {
 const contextualFragment = parseFragment("<p>x", mathContext, {
   scriptingMode: "disabled",
   documentMode: "limited-quirks",
-  hasFormInContextChain: true
+  hasFormAncestor: true
 });
 const normalizedContext: HtmlFragmentContext = contextualFragment.context;
 const documentMode: HtmlDocumentMode = contextualFragment.documentMode;
 const attributeNamespace: HtmlAttributeNamespaceUri = normalizedContext.attributes[0]?.namespaceUri ?? null;
 void documentMode;
 void attributeNamespace;
+
+// @ts-expect-error - callers describe only an external form ancestor; the effective chain is derived.
+parseFragment("x", mathContext, { hasFormInContextChain: true });
 
 // @ts-expect-error - a tag-name string omits required namespace identity.
 parseFragment("x", "div");

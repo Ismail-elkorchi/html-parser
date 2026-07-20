@@ -150,8 +150,8 @@ export interface ParseFragmentOptions extends Omit<ParseOptions, "sourceRetentio
   readonly scriptingMode?: HtmlScriptingMode;
   /** Context owner-document mode; defaults to `"no-quirks"`. */
   readonly documentMode?: HtmlDocumentMode;
-  /** Whether the context or one of its ancestors is an HTML `form`; defaults to false. */
-  readonly hasFormInContextChain?: boolean;
+  /** Whether an ancestor outside the supplied context descriptor is an HTML `form`. */
+  readonly hasFormAncestor?: boolean;
 }
 
 /** Parse limits for byte streams, including bounded encoding-prescan retention. */

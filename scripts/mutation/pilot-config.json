@@ -667,8 +667,19 @@
     },
     {
       "targetFile": "dist/public/parsing.js",
-      "testCommand": ["node", "--test", "test/behavior/independent-product-contract.test.js"],
+      "testCommand": [
+        "node",
+        "--test",
+        "test/behavior/independent-product-contract.test.js",
+        "test/behavior/fragment-context.test.js"
+      ],
       "mutants": [
+        {
+          "id": "product-fragment-form-context-derivation",
+          "description": "Ignore an HTML form context when deriving the effective fragment form chain.",
+          "search": "context.namespaceUri === HTML_NAMESPACE_URI && context.localName === \"form\"",
+          "replace": "false && context.namespaceUri === HTML_NAMESPACE_URI && context.localName === \"form\""
+        },
         {
           "id": "product-attribute-budget-map",
           "description": "Expose the engine attribute-byte resource name instead of the public budget name.",

@@ -101,13 +101,13 @@ const CASES = Object.freeze([
     id: "form-in-context-chain",
     html: "<form><input>",
     context: context(HTML_NAMESPACE_URI, "div"),
-    options: { hasFormInContextChain: true }
+    options: { hasFormAncestor: true }
   },
   {
     id: "form-is-context",
     html: "<form><input>",
     context: context(HTML_NAMESPACE_URI, "form"),
-    options: { hasFormInContextChain: true }
+    options: {}
   }
 ]);
 
@@ -204,7 +204,7 @@ async function normalizeBrowser(page, testCase) {
           attribute.value
         );
       }
-      if (candidate.options?.hasFormInContextChain === true && !(
+      if (candidate.options?.hasFormAncestor === true && !(
         element.namespaceURI === HTML_NAMESPACE && element.localName === "form"
       )) {
         const form = owner.createElement("form");
