@@ -27,13 +27,15 @@ const fixtures = Object.freeze([
     name: "parse-medium",
     input: "<div><h1>Title</h1><p>alpha beta gamma</p><ul><li>a</li><li>b</li><li>c</li></ul></div>".repeat(200),
     warmupIterations: 20,
-    iterations: 100
+    iterations: 100,
+    retainedResultCount: 8
   }),
   Object.freeze({
     name: "parse-large",
     input: "<section><article><h2>x</h2><p>payload</p></article></section>".repeat(1200),
     warmupIterations: 10,
-    iterations: 20
+    iterations: 20,
+    retainedResultCount: 4
   })
 ]);
 
@@ -43,19 +45,25 @@ for (const fixture of fixtures) {
     parse(fixture.input);
   }
   globalThis.gc();
-  const heapBefore = process.memoryUsage().heapUsed;
-  let peakHeap = heapBefore;
   let retained;
   const cpuBefore = process.cpuUsage();
   const started = performance.now();
   for (let iteration = 0; iteration < fixture.iterations; iteration += 1) {
     retained = parse(fixture.input);
-    peakHeap = Math.max(peakHeap, process.memoryUsage().heapUsed);
   }
   const elapsedMs = performance.now() - started;
   const cpu = process.cpuUsage(cpuBefore);
+  const throughputNodeCount = retained?.tree?.children?.length ?? null;
+  retained = undefined;
+  globalThis.gc();
+  const retainedHeapBaseline = process.memoryUsage().heapUsed;
+  const retainedResults = new Array(fixture.retainedResultCount);
+  for (let index = 0; index < retainedResults.length; index += 1) {
+    retainedResults[index] = parse(fixture.input);
+  }
   globalThis.gc();
   const retainedHeap = process.memoryUsage().heapUsed;
+  const retainedHeapDelta = Math.max(0, retainedHeap - retainedHeapBaseline);
   const totalBytes = fixture.input.length * fixture.iterations;
   results.push({
     name: fixture.name,
@@ -65,12 +73,12 @@ for (const fixture of fixtures) {
     elapsedMs,
     cpuMs: (cpu.user + cpu.system) / 1_000,
     throughputMbPerSec: totalBytes / (1024 * 1024) / (elapsedMs / 1_000),
-    heapBeforeBytes: heapBefore,
-    peakHeapBytes: peakHeap,
-    peakHeapDeltaBytes: Math.max(0, peakHeap - heapBefore),
+    retainedResultCount: retainedResults.length,
+    retainedHeapBaselineBytes: retainedHeapBaseline,
     retainedHeapBytes: retainedHeap,
-    retainedHeapDeltaBytes: Math.max(0, retainedHeap - heapBefore),
-    retainedNodeCount: retained?.tree?.children?.length ?? null
+    retainedHeapDeltaBytes: retainedHeapDelta,
+    retainedHeapBytesPerResult: retainedHeapDelta / retainedResults.length,
+    retainedNodeCount: retainedResults[0]?.tree?.children?.length ?? throughputNodeCount
   });
 }
 

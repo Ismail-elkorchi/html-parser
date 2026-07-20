@@ -72,7 +72,7 @@ export function utf8ByteLength(value: string, operation?: OperationContext): num
   let bytes = 0;
   let cursor = 0;
   while (cursor < value.length) {
-    operation?.checkpoint();
+    if (operation?.interruptible === true) operation.checkpoint();
     const codePoint = value.codePointAt(cursor);
     if (codePoint === undefined) break;
     bytes += codePointUtf8ByteLength(codePoint);

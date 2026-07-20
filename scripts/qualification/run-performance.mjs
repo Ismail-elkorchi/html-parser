@@ -5,7 +5,7 @@ import process from "node:process";
 
 import { writeJson } from "../eval/eval-primitives.mjs";
 
-const RUNS = Number(process.env["ENGINE_PERFORMANCE_RUNS"] ?? 9);
+const RUNS = Number(process.env["ENGINE_PERFORMANCE_RUNS"] ?? 12);
 if (!Number.isSafeInteger(RUNS) || RUNS < 3) {
   throw new Error("ENGINE_PERFORMANCE_RUNS must be a safe integer of at least 3");
 }
@@ -13,6 +13,11 @@ if (!Number.isSafeInteger(RUNS) || RUNS < 3) {
 const ROOT = process.cwd();
 const DRIVER = path.join(ROOT, "scripts/qualification/benchmark-engine.mjs");
 const WORKTREE_ROOT = path.join(ROOT, "tmp/qualification-performance");
+const BENCHMARK_RUNTIME_FLAGS = Object.freeze([
+  "--expose-gc",
+  "--max-old-space-size=256",
+  "--max-semi-space-size=8"
+]);
 const REFERENCES = Object.freeze([
   Object.freeze({ id: "v0.1.1", ref: "v0.1.1", engine: "public" }),
   Object.freeze({ id: "d74d661", ref: "d74d661a7a64ac6a87ee7fc558aaabc77cce0916", engine: "public" })
@@ -34,7 +39,13 @@ function run(command, args, options = {}) {
 }
 
 function percentile(sorted, fraction) {
-  return sorted[Math.floor((sorted.length - 1) * fraction)] ?? 0;
+  if (sorted.length === 0) return 0;
+  const position = (sorted.length - 1) * fraction;
+  const lowerIndex = Math.floor(position);
+  const upperIndex = Math.ceil(position);
+  const lower = sorted[lowerIndex] ?? 0;
+  const upper = sorted[upperIndex] ?? lower;
+  return lower + (upper - lower) * (position - lowerIndex);
 }
 
 function stats(values) {
@@ -66,49 +77,76 @@ function summarize(runResults) {
       throughputMbPerSec: stats(entries.map((entry) => entry?.throughputMbPerSec ?? 0)),
       cpuMs: stats(entries.map((entry) => entry?.cpuMs ?? 0)),
       retainedHeapBytes: stats(entries.map((entry) => entry?.retainedHeapBytes ?? 0)),
-      retainedHeapDeltaBytes: stats(entries.map((entry) => entry?.retainedHeapDeltaBytes ?? 0)),
-      peakHeapBytes: stats(entries.map((entry) => entry?.peakHeapBytes ?? 0)),
-      peakHeapDeltaBytes: stats(entries.map((entry) => entry?.peakHeapDeltaBytes ?? 0))
+      retainedHeapDeltaBytes: stats(
+        entries.map((entry) => entry?.retainedHeapDeltaBytes ?? 0)
+      ),
+      retainedHeapBytesPerResult: stats(
+        entries.map((entry) => entry?.retainedHeapBytesPerResult ?? 0)
+      )
     }];
   }));
 }
 
 function measure(moduleRoot, engine) {
-  const results = [];
-  for (let runIndex = 0; runIndex < RUNS; runIndex += 1) {
-    const output = run(process.execPath, [
-      "--expose-gc",
-      DRIVER,
-      `--module-root=${moduleRoot}`,
-      `--engine=${engine}`
-    ]);
-    results.push(JSON.parse(output));
-  }
-  return { runs: results, benchmarks: summarize(results) };
+  const output = run(process.execPath, [
+    ...BENCHMARK_RUNTIME_FLAGS,
+    DRIVER,
+    `--module-root=${moduleRoot}`,
+    `--engine=${engine}`
+  ]);
+  return JSON.parse(output);
 }
 
 await mkdir(WORKTREE_ROOT, { recursive: true });
 const revisions = {};
 const worktrees = [];
 try {
+  const measurementTargets = [];
   for (const reference of REFERENCES) {
     const worktree = path.join(WORKTREE_ROOT, reference.id.replaceAll(".", "-"));
     run("git", ["worktree", "add", "--detach", worktree, reference.ref]);
     worktrees.push(worktree);
     run("npm", ["ci"], { cwd: worktree });
     const commit = run("git", ["rev-parse", "HEAD"], { cwd: worktree }).trim();
-    revisions[reference.id] = {
-      commit,
+    measurementTargets.push({
+      id: reference.id,
+      moduleRoot: worktree,
       engine: reference.engine,
-      ...measure(worktree, reference.engine)
-    };
+      commit,
+      results: []
+    });
   }
 
-  revisions.candidate = {
-    commit: run("git", ["rev-parse", "HEAD"]).trim(),
+  measurementTargets.push({
+    id: "candidate",
+    moduleRoot: ROOT,
     engine: "public",
-    ...measure(ROOT, "public")
-  };
+    commit: run("git", ["rev-parse", "HEAD"]).trim(),
+    results: []
+  });
+
+  // Rotate the deterministic order on every round. Sampling each revision in a
+  // separate time block made ratios sensitive to host load and CPU-frequency
+  // drift, while still claiming to compare like-for-like measurements.
+  for (let runIndex = 0; runIndex < RUNS; runIndex += 1) {
+    const offset = runIndex % measurementTargets.length;
+    const orderedTargets = [
+      ...measurementTargets.slice(offset),
+      ...measurementTargets.slice(0, offset)
+    ];
+    for (const target of orderedTargets) {
+      target.results.push(measure(target.moduleRoot, target.engine));
+    }
+  }
+
+  for (const target of measurementTargets) {
+    revisions[target.id] = {
+      commit: target.commit,
+      engine: target.engine,
+      runs: target.results,
+      benchmarks: summarize(target.results)
+    };
+  }
 } finally {
   for (const worktree of worktrees.reverse()) {
     try {
@@ -129,9 +167,13 @@ const comparisons = Object.fromEntries(Object.keys(candidate).map((name) => {
     throughputMedianRatio:
       current.throughputMbPerSec.median / baseline.throughputMbPerSec.median,
     memoryMedianRatio:
-      current.peakHeapDeltaBytes.median / baseline.peakHeapDeltaBytes.median,
+      current.retainedHeapBytesPerResult.median / baseline.retainedHeapBytesPerResult.median,
+    baselineThroughputRobustSpreadFraction:
+      baseline.throughputMbPerSec.robustSpreadFraction,
+    baselineMemoryRobustSpreadFraction:
+      baseline.retainedHeapBytesPerResult.robustSpreadFraction,
     throughputRobustSpreadFraction: current.throughputMbPerSec.robustSpreadFraction,
-    memoryRobustSpreadFraction: current.peakHeapDeltaBytes.robustSpreadFraction
+    memoryRobustSpreadFraction: current.retainedHeapBytesPerResult.robustSpreadFraction
   }];
 }));
 const failures = [];
@@ -141,6 +183,18 @@ for (const [name, comparison] of Object.entries(comparisons)) {
   }
   if (comparison.memoryMedianRatio > THRESHOLDS.maxMemoryMedianRatio) {
     failures.push(`${name}:memory-ratio`);
+  }
+  if (
+    comparison.baselineThroughputRobustSpreadFraction >
+    THRESHOLDS.maxThroughputRobustSpreadFraction
+  ) {
+    failures.push(`${name}:baseline-throughput-spread`);
+  }
+  if (
+    comparison.baselineMemoryRobustSpreadFraction >
+    THRESHOLDS.maxMemoryRobustSpreadFraction
+  ) {
+    failures.push(`${name}:baseline-memory-spread`);
   }
   if (
     comparison.throughputRobustSpreadFraction >
@@ -154,12 +208,19 @@ for (const [name, comparison] of Object.entries(comparisons)) {
 }
 
 const report = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   suite: "independent-engine-cross-revision-performance",
   generatedAt: new Date().toISOString(),
   runs: RUNS,
   runIsolation: "fresh-process-per-sample",
-  memoryMetric: "peak heap delta after steady-state warmup",
+  samplingOrder: "deterministic-balanced-revision-interleaving",
+  percentileMethod: "linear interpolation between closest ranks",
+  memoryMetric:
+    "post-GC retained parsed-result heap slope from a post-warmup fixed-size cohort",
+  runtimeHeapConfiguration: Object.freeze({
+    maxOldSpaceSizeMb: 256,
+    maxSemiSpaceSizeMb: 8
+  }),
   primaryBaseline: "d74d661",
   historicalBaseline: "v0.1.1",
   thresholds: THRESHOLDS,

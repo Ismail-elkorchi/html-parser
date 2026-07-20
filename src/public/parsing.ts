@@ -166,11 +166,13 @@ function children(
 ): readonly HtmlTreeNode[] {
   const result: HtmlTreeNode[] = [];
   for (const child of model.childrenOf(parent)) {
-    operation.checkpoint();
+    if (operation.interruptible) operation.checkpoint();
     result.push(child);
   }
   return result;
 }
+
+const EMPTY_ATTRIBUTES: readonly Attribute[] = Object.freeze([]);
 
 function attributes(
   element: HtmlTreeElement,
@@ -178,18 +180,22 @@ function attributes(
   captureSpans: boolean,
   operation: OperationContext
 ): readonly Attribute[] {
-  const result: Attribute[] = [];
-  for (const attribute of model.attributesOf(element)) {
-    operation.checkpoint();
+  const sourceAttributes = model.attributesOf(element);
+  if (sourceAttributes.length === 0) return EMPTY_ATTRIBUTES;
+  const result = new Array<Attribute>(sourceAttributes.length);
+  let index = 0;
+  for (const attribute of sourceAttributes) {
+    if (operation.interruptible) operation.checkpoint();
     const span = publicSpan(attribute.sourceSpan, captureSpans);
-    result.push(Object.freeze({
+    result[index] = Object.freeze({
       namespaceUri: attribute.namespaceUri,
       prefix: attribute.prefix,
       localName: attribute.localName,
       name: attribute.qualifiedName,
       value: attribute.value,
       ...(span === undefined ? {} : { span })
-    }));
+    });
+    index += 1;
   }
   return Object.freeze(result);
 }
@@ -245,7 +251,7 @@ function convertedChildren(
 ): readonly HtmlNode[] {
   const result: HtmlNode[] = [];
   for (const child of model.childrenOf(parent)) {
-    operation.checkpoint();
+    if (operation.interruptible) operation.checkpoint();
     result.push(requireInternalValue(
       converted[child.identity.serial],
       "PRODUCT_ADAPTER_CHILD_CONVERSION_MISSING"
@@ -346,7 +352,7 @@ function convertRecursively(
   captureSpans: boolean,
   operation: OperationContext
 ): HtmlNode {
-  operation.checkpoint();
+  if (operation.interruptible) operation.checkpoint();
   let directChildren = EMPTY_HTML_NODES;
   let templateContent: HtmlNode | undefined;
   if (source.kind === "element" && source.templateContents !== null) {
@@ -358,13 +364,22 @@ function convertRecursively(
       operation
     );
   } else if (source.kind === "element" || source.kind === "template-contents") {
-    const convertedChildren: HtmlNode[] = [];
-    for (const child of model.childrenOf(source)) {
-      convertedChildren.push(
-        convertRecursively(child, model, assigner, captureSpans, operation)
-      );
+    const sourceChildren = model.childrenOf(source);
+    if (sourceChildren.length > 0) {
+      const convertedChildren = new Array<HtmlNode>(sourceChildren.length);
+      let index = 0;
+      for (const child of sourceChildren) {
+        convertedChildren[index] = convertRecursively(
+          child,
+          model,
+          assigner,
+          captureSpans,
+          operation
+        );
+        index += 1;
+      }
+      directChildren = Object.freeze(convertedChildren);
     }
-    directChildren = Object.freeze(convertedChildren);
   }
   return createPublicNode(
     source,
@@ -402,7 +417,7 @@ function convertNodes(
       }
     }
     while (sources.length > 0) {
-      operation.checkpoint();
+      if (operation.interruptible) operation.checkpoint();
       const source = sources.pop();
       const isExpanded = expanded.pop();
       if (source === undefined || isExpanded === undefined) break;
@@ -424,7 +439,7 @@ function convertNodes(
   }
 
   return Object.freeze(roots.map((source) => {
-    operation.checkpoint();
+    if (operation.interruptible) operation.checkpoint();
     return requireInternalValue(
       converted[source.identity.serial],
       "PRODUCT_ADAPTER_ROOT_CONVERSION_MISSING"
@@ -456,7 +471,7 @@ function parseErrors(
   operation: OperationContext
 ) {
   return Object.freeze(errors.map((error) => {
-    operation.checkpoint();
+    if (operation.interruptible) operation.checkpoint();
     return parseError(error);
   }));
 }

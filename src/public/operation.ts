@@ -466,6 +466,7 @@ export function normalizeChunkOptions(options: ChunkOptions): ChunkOptions {
 export interface OperationContext {
   readonly signal: AbortSignal | undefined;
   readonly timeLimit: number | undefined;
+  readonly interruptible: boolean;
   remainingTimeMs(): number | undefined;
   checkpoint(): void;
 }
@@ -480,6 +481,7 @@ export function createOperationContext(
   return {
     signal,
     timeLimit: maxTimeMs,
+    interruptible: signal !== undefined || maxTimeMs !== undefined,
     remainingTimeMs(): number | undefined {
       return deadline === undefined ? undefined : Math.max(0, deadline - performance.now());
     },
