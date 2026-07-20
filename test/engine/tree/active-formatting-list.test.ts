@@ -1,17 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { ActiveFormattingList } from "../../../src/internal/html-engine/active-formatting-list.js";
+import { HTML_NAMESPACE } from "../../../src/internal/html-engine/namespaces.js";
+import { sourceSpan } from "../../../src/internal/html-engine/positions.js";
 import {
-  ActiveFormattingList,
   EngineResourceLimitError,
-  HTML_NAMESPACE,
+  createEngineResourceGuard
+} from "../../../src/internal/html-engine/resource-guard.js";
+import {
   HtmlTreeModel,
-  createEngineResourceGuard,
-  sourceSpan,
-  type HtmlStartTagToken,
   type HtmlTreeAttributeInput,
   type HtmlTreeElement
-} from "../../../src/internal/html-engine/mod.js";
+} from "../../../src/internal/html-engine/tree-model.js";
+
+import type { HtmlStartTagToken } from "../../../src/internal/html-engine/tokens.js";
 
 function token(name: string, attributes: HtmlStartTagToken["attributes"] = []): HtmlStartTagToken {
   return Object.freeze({

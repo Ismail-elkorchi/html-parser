@@ -4,20 +4,25 @@ import test from "node:test";
 
 import {
   CharacterReferenceConsumer,
+  type CharacterReferenceResult
+} from "../../../src/internal/html-engine/character-reference-consumer.js";
+import { HtmlInputCursor } from "../../../src/internal/html-engine/input-cursor.js";
+import {
+  MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
+  NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
+  SEMICOLONLESS_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
+  probeNamedCharacterReference
+} from "../../../src/internal/html-engine/named-character-references.js";
+import {
   EngineAbortError,
   EngineConfigurationError,
   EngineResourceLimitError,
-  HtmlInputCursor,
-  LEGACY_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
-  MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
-  NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
   createEngineResourceGuard,
-  probeNamedCharacterReference,
-  type CharacterReferenceResult,
-  type EngineParseError
-} from "../../../src/internal/html-engine/mod.js";
+} from "../../../src/internal/html-engine/resource-guard.js";
 import { runCharacterReference } from "../../support/character-reference-driver.js";
 import { loadCharacterReferenceFixtures } from "../../support/character-reference-fixtures.js";
+
+import type { EngineParseError } from "../../../src/internal/html-engine/diagnostics.js";
 
 function semanticResult(result: CharacterReferenceResult): unknown {
   if (result.kind === "need-more-input") return result;
@@ -36,7 +41,7 @@ void test("generated table matches every pinned WHATWG input entry", () => {
   ) as Readonly<Record<string, { readonly characters: string }>>;
   assert.equal(Object.keys(raw).length, NAMED_CHARACTER_REFERENCE_ENTRY_COUNT);
   assert.equal(NAMED_CHARACTER_REFERENCE_ENTRY_COUNT, 2231);
-  assert.equal(LEGACY_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT, 106);
+  assert.equal(SEMICOLONLESS_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT, 106);
   assert.equal(MAX_NAMED_CHARACTER_REFERENCE_LENGTH, 32);
 
   let maximumComparisons = 0;

@@ -5,18 +5,25 @@ import {
   HTML_NAMESPACE,
   MATHML_NAMESPACE,
   SVG_NAMESPACE,
-  XLINK_NAMESPACE,
+  XLINK_NAMESPACE
+} from "../../../src/internal/html-engine/namespaces.js";
+import { runHtmlEngine } from "../../../src/internal/html-engine/parser-driver.js";
+import {
   EngineConfigurationError,
-  EngineResourceLimitError,
-  runHtmlEngine,
-  type EngineObserver,
-  type HtmlTreeElement,
-  type HtmlTreeNode,
-  type HtmlTreeModel,
-  type HtmlTreeParent,
-  type InsertionModeTransition,
-  type TreeMutationObservation
-} from "../../../src/internal/html-engine/mod.js";
+  EngineResourceLimitError
+} from "../../../src/internal/html-engine/resource-guard.js";
+
+import type {
+  EngineObserver,
+  InsertionModeTransition,
+  TreeMutationObservation
+} from "../../../src/internal/html-engine/observer.js";
+import type {
+  HtmlTreeElement,
+  HtmlTreeNode,
+  HtmlTreeModel,
+  HtmlTreeParent
+} from "../../../src/internal/html-engine/tree-model.js";
 
 function children(parent: HtmlTreeParent): readonly HtmlTreeNode[] {
   const result: HtmlTreeNode[] = [];

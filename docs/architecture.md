@@ -38,7 +38,8 @@ call-stack limit.
 Production uses one independent standards-based TypeScript engine. There is no
 public engine selector, fallback, hybrid parser, installed runtime dependency,
 or copied third-party parser implementation. The allowed implementation
-sources and isolation rules are in the [source policy](./maintainers/source-policy.md).
+sources and isolation rules are in the repository's
+[source policy](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/maintainers/source-policy.md).
 
 ## Module boundaries
 
@@ -59,11 +60,21 @@ owner. Platform entrypoints contain no business logic.
 
 New code must be strict TypeScript from its first change; generated standards
 data must be reproducible and separated from handwritten algorithms.
+The compiler checks library declarations instead of using `skipLibCheck`.
+Declaration output remains compiler-generated from the canonical source graph;
+`isolatedDeclarations` is intentionally not enabled because the project does
+not use an alternate or parallel declaration emitter. Its remaining required
+annotations would duplicate the inferred internal reason map and standards
+baseline without changing the declarations emitted by the current compiler.
 
 The parser engine lives under `src/internal/html-engine` and is imported only
 through the public parsing owner. It is included in npm and JSR artifacts as
 private runtime code but is not exported. Its standards baseline is pinned in
 code so maintenance cannot silently follow a moving Living Standard revision.
+Private source has no aggregate export barrel: production code, tests, and
+evidence runners import the module that owns each name. A syntax-aware graph
+gate rejects unresolved edges, cycles, reversed layers, extra engine ingress,
+dead modules, and direct access to generated data.
 
 Within that boundary, tokenization feeds tree construction synchronously. The
 document and fragment drivers build the direct internal tree without a token

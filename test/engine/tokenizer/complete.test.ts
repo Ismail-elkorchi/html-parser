@@ -3,14 +3,19 @@ import test from "node:test";
 
 import {
   EngineResourceLimitError,
-  HtmlTokenizer,
   createEngineResourceGuard,
-  type EngineParseError,
-  type EngineResourceGuard,
-  type HtmlProcessingInstructionToken,
-  type HtmlToken,
+  type EngineResourceGuard
+} from "../../../src/internal/html-engine/resource-guard.js";
+import {
+  HtmlTokenizer,
   type HtmlTokenizerInitialState
-} from "../../../src/internal/html-engine/mod.js";
+} from "../../../src/internal/html-engine/tokenizer/tokenizer.js";
+
+import type { EngineParseError } from "../../../src/internal/html-engine/diagnostics.js";
+import type {
+  HtmlProcessingInstructionToken,
+  HtmlToken
+} from "../../../src/internal/html-engine/tokens.js";
 
 function tokenizeChunks(
   chunks: readonly string[],

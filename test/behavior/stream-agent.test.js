@@ -259,7 +259,7 @@ test("tokenizeByteStreamEager returns a deterministic token sequence", async () 
   );
 });
 
-test("eager tokenization is invariant across chunk patterns and legacy encoding", async () => {
+test("eager tokenization is invariant across chunk patterns and single-byte encoding", async () => {
   const bytes = new Uint8Array([
     ...asciiBytes("<meta charset=windows-1252><p>"),
     0xe9,

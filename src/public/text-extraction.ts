@@ -1207,7 +1207,7 @@ function iterateTextUsing(
  * keeps nested `noscript` work on the same parser route as the owning tree
  * without a global selector or tree-origin registry.
  */
-export function createTextOperations(
+function createTextOperations(
   parseNestedFragment: ResolvedVisibleTextOptions["parseNestedFragment"]
 ): Readonly<{
   iterateText(

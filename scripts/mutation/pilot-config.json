@@ -107,7 +107,7 @@
         },
         {
           "id": "character-reference-attribute-ambiguity",
-          "description": "Disable the legacy-name ambiguity rule in attributes.",
+          "description": "Disable the semicolonless-name ambiguity rule in attributes.",
           "search": "if (this.#context === \"attribute\" && !endsWithSemicolon) {",
           "replace": "if (false && this.#context === \"attribute\" && !endsWithSemicolon) {"
         },

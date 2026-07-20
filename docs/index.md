@@ -15,6 +15,7 @@ Keep these pages nearby when you need exact shapes and names:
 - [API](./api.md)
 - [Architecture](./architecture.md)
 
-Project work starts at the [maintainer guide](./maintainers/index.md). Release,
-security, license, and contribution policy remain in the root files where
-GitHub and package consumers expect to find them.
+Project work starts at the repository's
+[maintainer guide](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/maintainers/index.md).
+Security, support, license, and third-party notices remain beside the package
+README.

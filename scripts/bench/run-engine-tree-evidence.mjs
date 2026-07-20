@@ -1,11 +1,9 @@
 import process from "node:process";
 import { performance } from "node:perf_hooks";
 
-import {
-  HTML_NAMESPACE,
-  HtmlTreeModel,
-  createEngineResourceGuard
-} from "../../dist/internal/html-engine/mod.js";
+import { HTML_NAMESPACE } from "../../dist/internal/html-engine/namespaces.js";
+import { createEngineResourceGuard } from "../../dist/internal/html-engine/resource-guard.js";
+import { HtmlTreeModel } from "../../dist/internal/html-engine/tree-model.js";
 
 if (typeof globalThis.gc !== "function") {
   throw new Error("Run the tree evidence script with --expose-gc");

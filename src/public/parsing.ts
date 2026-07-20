@@ -1,16 +1,16 @@
-import { decodeHtmlBytes } from "../internal/encoding/mod.ts";
+import { decodeHtmlBytes } from "../internal/encoding/sniff.ts";
 import {
   failInternalState,
   requireInternalValue
 } from "../internal/foundation/internal-state-error.ts";
+import { HTML_NAMESPACE } from "../internal/html-engine/namespaces.ts";
+import { runHtmlEngine } from "../internal/html-engine/parser-driver.ts";
 import {
-  HTML_NAMESPACE,
   EngineAbortError,
   EngineResourceLimitError,
-  HtmlTokenizer,
-  createEngineResourceGuard,
-  runHtmlEngine
-} from "../internal/html-engine/mod.ts";
+  createEngineResourceGuard
+} from "../internal/html-engine/resource-guard.ts";
+import { HtmlTokenizer } from "../internal/html-engine/tokenizer/tokenizer.ts";
 
 import { enforceBudget } from "./budgets.ts";
 import { HtmlAbortError, HtmlBudgetExceededError, HtmlConfigurationError } from "./errors.ts";
@@ -55,19 +55,23 @@ import type {
   TokenizeByteStreamEagerOptions
 } from "./types.ts";
 import type {
-  EngineParseError,
+  EngineParseError
+} from "../internal/html-engine/diagnostics.ts";
+import type { SourceSpan } from "../internal/html-engine/positions.ts";
+import type {
   EngineResourceLimitName,
-  EngineResourceLimits,
+  EngineResourceLimits
+} from "../internal/html-engine/resource-guard.ts";
+import type { HtmlToken } from "../internal/html-engine/tokens.ts";
+import type {
   HtmlTemplateContents,
-  HtmlToken,
   HtmlTreeDoctypeExternalId,
   HtmlTreeElement,
   HtmlTreeModel,
   HtmlTreeNode,
   HtmlTreeParent,
-  HtmlTreeRoot,
-  SourceSpan
-} from "../internal/html-engine/mod.ts";
+  HtmlTreeRoot
+} from "../internal/html-engine/tree-model.ts";
 
 interface ParseInputContext {
   readonly inputKind: ParsedDocumentMetadata["inputKind"];
@@ -116,7 +120,7 @@ class NodeIdAssigner {
 function publicBudgetName(resource: EngineResourceLimitName): HtmlBudgetName {
   if (resource === "maxAttributeUtf8BytesPerElement") return "maxAttributeBytes";
   if (resource === "maxSteps") {
-    return failInternalState("PRODUCT_ADAPTER_UNMAPPED_RESOURCE_LIMIT");
+    return failInternalState("PUBLIC_PARSER_UNMAPPED_RESOURCE_LIMIT");
   }
   return resource;
 }
@@ -254,7 +258,7 @@ function convertedChildren(
     if (operation.interruptible) operation.checkpoint();
     result.push(requireInternalValue(
       converted[child.identity.serial],
-      "PRODUCT_ADAPTER_CHILD_CONVERSION_MISSING"
+      "PUBLIC_PARSER_CHILD_CONVERSION_MISSING"
     ));
   }
   return Object.freeze(result);
@@ -306,7 +310,7 @@ function createPublicNode(
     });
   }
   if (templateContent !== undefined && templateContent.kind !== "templateContent") {
-    failInternalState("PRODUCT_ADAPTER_TEMPLATE_CONTENT_KIND_MISMATCH");
+    failInternalState("PUBLIC_PARSER_TEMPLATE_CONTENT_KIND_MISMATCH");
   }
   return Object.freeze({
     id: assigner.next(), kind: "element",
@@ -442,7 +446,7 @@ function convertNodes(
     if (operation.interruptible) operation.checkpoint();
     return requireInternalValue(
       converted[source.identity.serial],
-      "PRODUCT_ADAPTER_ROOT_CONVERSION_MISSING"
+      "PUBLIC_PARSER_ROOT_CONVERSION_MISSING"
     );
   }));
 }

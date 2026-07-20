@@ -232,7 +232,7 @@ const manifest = {
     bytes: entitiesBytes.length,
     sha256: actualEntitiesSha256,
     entryCount: inspection.entryCount,
-    legacyEntryCount: inspection.legacyEntryCount,
+    semicolonlessEntryCount: inspection.semicolonlessEntryCount,
     twoCodePointValueCount: inspection.twoCodePointValueCount,
     maximumNameLength: inspection.maximumNameLength,
     firstKey: inspection.firstKey,

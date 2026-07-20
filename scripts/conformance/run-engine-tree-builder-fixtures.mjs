@@ -7,9 +7,9 @@ import {
   SVG_NAMESPACE,
   XLINK_NAMESPACE,
   XML_NAMESPACE,
-  XMLNS_NAMESPACE,
-  runHtmlEngine
-} from "../../dist/internal/html-engine/mod.js";
+  XMLNS_NAMESPACE
+} from "../../dist/internal/html-engine/namespaces.js";
+import { runHtmlEngine } from "../../dist/internal/html-engine/parser-driver.js";
 import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
 
 const FIXTURE_ROOT = "test/fixtures/upstream/wpt-tree-construction/resources";
@@ -232,15 +232,16 @@ for (const fileName of fixtureFiles) {
           }
         });
         const actual = serializeModel(result.model);
-        const actualLegacyParseErrorCount = result.parseErrors.length;
+        const actualUnnamedParseErrorCount = result.parseErrors.length;
         const actualNamedParseErrorCount = result.parseErrors
           .filter((error) => error.code !== "unexpected-token").length;
-        const legacyParseErrorCountMatches =
-          !fixtureCase.sawErrors || actualLegacyParseErrorCount === fixtureCase.errors.length;
+        const unnamedParseErrorCountMatches =
+          !fixtureCase.sawUnnamedErrors ||
+          actualUnnamedParseErrorCount === fixtureCase.unnamedErrors.length;
         const namedParseErrorCountMatches =
-          !fixtureCase.sawNewErrors || actualNamedParseErrorCount === fixtureCase.newErrors.length;
+          !fixtureCase.sawNamedErrors || actualNamedParseErrorCount === fixtureCase.namedErrors.length;
         if (actual !== fixtureCase.expected ||
-          !legacyParseErrorCountMatches ||
+          !unnamedParseErrorCountMatches ||
           !namedParseErrorCountMatches) {
           fixturePassed = false;
           failures.push({
@@ -248,11 +249,11 @@ for (const fileName of fixtureFiles) {
             expected: fixtureCase.expected,
             actual,
             expectedParseErrors: {
-              legacy: fixtureCase.sawErrors ? fixtureCase.errors.length : null,
-              named: fixtureCase.sawNewErrors ? fixtureCase.newErrors.length : null
+              unnamed: fixtureCase.sawUnnamedErrors ? fixtureCase.unnamedErrors.length : null,
+              named: fixtureCase.sawNamedErrors ? fixtureCase.namedErrors.length : null
             },
             actualParseErrors: {
-              legacy: actualLegacyParseErrorCount,
+              unnamed: actualUnnamedParseErrorCount,
               named: actualNamedParseErrorCount
             }
           });

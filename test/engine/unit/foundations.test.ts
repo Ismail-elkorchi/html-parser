@@ -2,18 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  HTML_PARSE_ERROR_CODES,
-  HTML_STANDARD_REVISION,
+  createParseError,
+  type EngineParseError
+} from "../../../src/internal/html-engine/diagnostics.js";
+import { HtmlInputCursor, type InputRead } from "../../../src/internal/html-engine/input-cursor.js";
+import { runHtmlEngine } from "../../../src/internal/html-engine/parser-driver.js";
+import {
   EngineAbortError,
   EngineConfigurationError,
   EngineResourceLimitError,
-  HtmlInputCursor,
-  createEngineResourceGuard,
-  createParseError,
-  runHtmlEngine,
-  type EngineParseError,
-  type InputRead
-} from "../../../src/internal/html-engine/mod.js";
+  createEngineResourceGuard
+} from "../../../src/internal/html-engine/resource-guard.js";
+import { ENGINE_STANDARD_BASELINE } from "../../../src/internal/html-engine/standards.js";
 
 function drain(cursor: HtmlInputCursor): InputRead[] {
   const reads: InputRead[] = [];
@@ -30,11 +30,13 @@ function readEvidence(read: InputRead) {
     : read;
 }
 
-void test("foundation pins the current HTML parse-error vocabulary", () => {
-  assert.equal(HTML_STANDARD_REVISION, "56674fb3ac40279141a202e5d19b84f30d99854d");
-  assert.equal(HTML_PARSE_ERROR_CODES.length, 52);
-  assert.equal(new Set(HTML_PARSE_ERROR_CODES).size, HTML_PARSE_ERROR_CODES.length);
-  assert.ok(HTML_PARSE_ERROR_CODES.includes("eof-in-processing-instruction"));
+void test("foundation pins the complete standards baseline", () => {
+  assert.deepEqual(ENGINE_STANDARD_BASELINE, {
+    html: "56674fb3ac40279141a202e5d19b84f30d99854d",
+    encoding: "a985b62a9b45c17da3e17a9f0a0b4e30c34c4a8a",
+    infra: "3f984adcd24a6d5c53cc26b3e737701808003f3e",
+    dom: "8a5f57c61ca1de8dc21b7e114501b1b57882e935"
+  });
 });
 
 void test("input cursor normalizes newlines and retains original UTF-16 spans", () => {

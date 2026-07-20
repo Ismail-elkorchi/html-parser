@@ -24,7 +24,7 @@ export type HtmlTreeModelErrorReason = Extract<
 >;
 
 /** Stable private identity; intentionally not assignable to the public numeric NodeId. */
-export interface HtmlTreeNodeIdentity {
+interface HtmlTreeNodeIdentity {
   readonly serial: number;
 }
 
@@ -44,12 +44,12 @@ interface HtmlTreeNodeBase {
   readonly sourceSpan: SourceSpan | null;
 }
 
-export interface HtmlTreeDocument extends HtmlTreeContainer {
+interface HtmlTreeDocument extends HtmlTreeContainer {
   readonly kind: "document";
   readonly identity: HtmlTreeNodeIdentity;
 }
 
-export interface HtmlTreeFragment extends HtmlTreeContainer {
+interface HtmlTreeFragment extends HtmlTreeContainer {
   readonly kind: "fragment";
   readonly identity: HtmlTreeNodeIdentity;
 }
@@ -61,7 +61,7 @@ export interface HtmlTemplateContents extends HtmlTreeContainer {
 }
 
 /** Immutable attribute value retained in token order. */
-export interface HtmlTreeAttribute {
+interface HtmlTreeAttribute {
   readonly namespaceUri: HtmlAttributeNamespaceUri;
   readonly prefix: string | null;
   readonly localName: string;
@@ -90,17 +90,17 @@ export interface HtmlTreeElement extends HtmlTreeNodeBase, HtmlTreeContainer {
   readonly templateContents: HtmlTemplateContents | null;
 }
 
-export interface HtmlTreeText extends HtmlTreeNodeBase {
+interface HtmlTreeText extends HtmlTreeNodeBase {
   readonly kind: "text";
   readonly data: string;
 }
 
-export interface HtmlTreeComment extends HtmlTreeNodeBase {
+interface HtmlTreeComment extends HtmlTreeNodeBase {
   readonly kind: "comment";
   readonly data: string;
 }
 
-export interface HtmlTreeProcessingInstruction extends HtmlTreeNodeBase {
+interface HtmlTreeProcessingInstruction extends HtmlTreeNodeBase {
   readonly kind: "processing-instruction";
   readonly target: string;
   readonly data: string;
@@ -115,7 +115,7 @@ export type HtmlTreeDoctypeExternalId =
     }
   | { readonly kind: "system"; readonly systemIdentifier: string };
 
-export interface HtmlTreeDoctype extends HtmlTreeNodeBase {
+interface HtmlTreeDoctype extends HtmlTreeNodeBase {
   readonly kind: "doctype";
   readonly name: string;
   readonly externalId: HtmlTreeDoctypeExternalId;
@@ -130,7 +130,7 @@ export type HtmlTreeNode =
   | HtmlTreeDoctype;
 export type HtmlTreeParent = HtmlTreeRoot | HtmlTreeElement | HtmlTemplateContents;
 
-export interface HtmlTreeElementInput {
+interface HtmlTreeElementInput {
   readonly namespaceUri: HtmlElementNamespaceUri;
   readonly prefix: string | null;
   readonly localName: string;
@@ -139,24 +139,24 @@ export interface HtmlTreeElementInput {
   readonly sourceSpan?: SourceSpan | null;
 }
 
-export interface HtmlTreeDoctypeInput {
+interface HtmlTreeDoctypeInput {
   readonly name: string;
   readonly externalId: HtmlTreeDoctypeExternalId;
   readonly sourceSpan?: SourceSpan | null;
 }
 
-export interface HtmlTreeModelOptions {
+interface HtmlTreeModelOptions {
   readonly rootKind: HtmlTreeRoot["kind"];
   readonly resources: EngineResourceGuard;
   readonly observer?: EngineObserver;
 }
 
-export interface HtmlTreeWalkEntry {
+interface HtmlTreeWalkEntry {
   readonly node: HtmlTreeNode;
   readonly depth: number;
 }
 
-export interface HtmlTreeValidationResult {
+interface HtmlTreeValidationResult {
   readonly allocatedNodes: number;
   readonly attachedNodes: number;
   readonly maxDepth: number;

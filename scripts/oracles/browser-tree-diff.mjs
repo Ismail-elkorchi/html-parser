@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { chromium, firefox, webkit } from "playwright";
 
-import { runHtmlEngine } from "../../dist/internal/html-engine/mod.js";
+import { runHtmlEngine } from "../../dist/internal/html-engine/parser-driver.js";
 
 function normalizeAttributes(element) {
   const attributes = [];

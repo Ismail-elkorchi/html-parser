@@ -46,7 +46,7 @@ import type {
   HtmlTreeParent
 } from "./tree-model.ts";
 
-export interface HtmlTreeBuilderOptions {
+interface HtmlTreeBuilderOptions {
   readonly model: HtmlTreeModel;
   readonly resources: EngineResourceGuard;
   readonly scriptingMode: NonExecutingScriptingMode;

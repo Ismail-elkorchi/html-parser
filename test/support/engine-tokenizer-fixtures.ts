@@ -1,13 +1,16 @@
 import { readFileSync } from "node:fs";
 
 import {
-  HtmlTokenizer,
   createEngineResourceGuard,
-  type EngineParseError,
-  type EngineResourceUsage,
-  type HtmlToken,
+  type EngineResourceUsage
+} from "../../src/internal/html-engine/resource-guard.js";
+import {
+  HtmlTokenizer,
   type HtmlTokenizerInitialState
-} from "../../src/internal/html-engine/mod.js";
+} from "../../src/internal/html-engine/tokenizer/tokenizer.js";
+
+import type { EngineParseError } from "../../src/internal/html-engine/diagnostics.js";
+import type { HtmlToken } from "../../src/internal/html-engine/tokens.js";
 
 const TOKENIZER_FIXTURE_PATHS = Object.freeze([
   "vendor/html5lib-tests/tokenizer/test1.test",
@@ -208,8 +211,8 @@ export function runEngineTokenizerFixture(
     limits: {
       maxSteps: 1_000_000,
       maxAttributesPerElement: 10_000,
-      maxAttributeUtf8BytesPerElement: 1_000_000,
-      maxParseErrors: 10_000
+      maxAttributeUtf8BytesPerElement: 16_000,
+      maxParseErrors: 2_000
     }
   });
   const tokenizer = new HtmlTokenizer(

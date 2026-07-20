@@ -112,7 +112,7 @@ function checkEntrypointDocs(entryPath) {
     moduleResolution: ts.ModuleResolutionKind.NodeNext,
     target: ts.ScriptTarget.ES2022,
     allowJs: false,
-    skipLibCheck: true
+    skipLibCheck: false
   });
 
   const checker = program.getTypeChecker();

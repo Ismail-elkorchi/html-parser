@@ -1,11 +1,9 @@
 import { performance } from "node:perf_hooks";
 import process from "node:process";
 
-import {
-  EngineResourceLimitError,
-  SVG_NAMESPACE,
-  runHtmlEngine
-} from "../../dist/internal/html-engine/mod.js";
+import { SVG_NAMESPACE } from "../../dist/internal/html-engine/namespaces.js";
+import { runHtmlEngine } from "../../dist/internal/html-engine/parser-driver.js";
+import { EngineResourceLimitError } from "../../dist/internal/html-engine/resource-guard.js";
 
 if (typeof globalThis.gc !== "function") {
   throw new Error("Run the tree-builder evidence script with --expose-gc");

@@ -2,10 +2,8 @@ import { createHash } from "node:crypto";
 import process from "node:process";
 import { performance } from "node:perf_hooks";
 
-import {
-  HtmlTokenizer,
-  createEngineResourceGuard
-} from "../../dist/internal/html-engine/mod.js";
+import { createEngineResourceGuard } from "../../dist/internal/html-engine/resource-guard.js";
+import { HtmlTokenizer } from "../../dist/internal/html-engine/tokenizer/tokenizer.js";
 
 if (typeof globalThis.gc !== "function") {
   throw new Error("Run the tokenizer evidence script with --expose-gc");

@@ -4,13 +4,13 @@ import type { EngineResourceGuard } from "./resource-guard.ts";
 import type { HtmlStartTagToken } from "./tokens.ts";
 import type { HtmlTreeElement } from "./tree-model.ts";
 
-export interface ActiveFormattingElementEntry {
+interface ActiveFormattingElementEntry {
   readonly kind: "element";
   readonly element: HtmlTreeElement;
   readonly token: HtmlStartTagToken;
 }
 
-export interface ActiveFormattingMarker {
+interface ActiveFormattingMarker {
   readonly kind: "marker";
 }
 

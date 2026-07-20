@@ -1,10 +1,9 @@
-import {
-  runHtmlEngine,
-  type HtmlToken,
-  type InsertionMode,
-  type TokenizerMode
-} from "../../../src/internal/html-engine/mod.js";
+import { runHtmlEngine } from "../../../src/internal/html-engine/parser-driver.js";
 import * as PublicApi from "../../../src/mod.js";
+
+import type { HtmlParseErrorCode } from "../../../src/internal/html-engine/diagnostics.js";
+import type { InsertionMode, TokenizerMode } from "../../../src/internal/html-engine/parser-state.js";
+import type { HtmlToken } from "../../../src/internal/html-engine/tokens.js";
 
 const token: HtmlToken = {
   kind: "doctype",
@@ -38,8 +37,10 @@ tokenKind(token);
 
 const tokenizerMode: TokenizerMode = "script-data";
 const insertionMode: InsertionMode = "in-table-text";
+const parseErrorCode: HtmlParseErrorCode = "eof-in-processing-instruction";
 void tokenizerMode;
 void insertionMode;
+void parseErrorCode;
 
 runHtmlEngine({
   inputChunks: ["<p>x"],
@@ -66,6 +67,10 @@ void invalidTokenizerMode;
 // @ts-expect-error - the insertion mode vocabulary is closed.
 const invalidInsertionMode: InsertionMode = "body";
 void invalidInsertionMode;
+
+// @ts-expect-error - parse-error names retain exact standard spelling.
+const invalidParseErrorCode: HtmlParseErrorCode = "eof-processing-instruction";
+void invalidParseErrorCode;
 
 // @ts-expect-error - the non-executing driver cannot select a script-executing mode.
 runHtmlEngine({ inputChunks: [], parser: { kind: "document", scriptingMode: "normal" } });

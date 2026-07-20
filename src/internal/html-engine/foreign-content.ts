@@ -9,7 +9,7 @@ import {
 import type { HtmlStartTagToken, HtmlTokenAttribute } from "./tokens.ts";
 import type { HtmlTreeAttributeInput, HtmlTreeElement } from "./tree-model.ts";
 
-export type ForeignElementNamespaceUri = typeof MATHML_NAMESPACE | typeof SVG_NAMESPACE;
+type ForeignElementNamespaceUri = typeof MATHML_NAMESPACE | typeof SVG_NAMESPACE;
 
 const MATHML_TEXT_INTEGRATION_POINTS = new Set(["mi", "mo", "mn", "ms", "mtext"]);
 const SVG_HTML_INTEGRATION_POINTS = new Set(["foreignObject", "desc", "title"]);

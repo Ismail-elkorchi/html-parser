@@ -3,6 +3,10 @@
 All notable changes are documented in this file.
 
 ## Unreleased
+- Enforce syntax-aware source layers and declaration reachability, remove dead
+  private barrels and migration-era adapter code, consolidate tokenizer corpus
+  ownership, enable full library type checking, and publish only runtime code,
+  reachable public declarations, user documentation, and required legal files.
 - Route every public parsing entrypoint through the independent TypeScript
   engine; delete the embedded parse5/entities runtime, compatibility facade,
   copy/seal/differential infrastructure, stale notices, and copied-source
@@ -114,7 +118,7 @@ All notable changes are documented in this file.
   accounting across decoding and parsing.
 - Remove the `includeSpans` compatibility alias and impossible parse-diagnostic
   variants from the public type surface.
-- Support current and legacy Deno documentation shapes, and add actionable
+- Support both structured and flat Deno documentation output, and add actionable
   conformance-submodule setup guidance.
 
 ## [0.1.1] - 2026-03-04

@@ -1,22 +1,27 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { InternalStateError } from "../../../src/internal/foundation/internal-state-error.js";
 import {
   HTML_NAMESPACE,
   MATHML_NAMESPACE,
   SVG_NAMESPACE,
-  XML_NAMESPACE,
+  XML_NAMESPACE
+} from "../../../src/internal/html-engine/namespaces.js";
+import { sourceSpan } from "../../../src/internal/html-engine/positions.js";
+import {
   EngineResourceLimitError,
+  createEngineResourceGuard
+} from "../../../src/internal/html-engine/resource-guard.js";
+import {
   HtmlTreeModel,
-  createEngineResourceGuard,
-  sourceSpan,
   type HtmlTreeAttributeInput,
   type HtmlTreeElement,
   type HtmlTreeModelErrorReason,
-  type HtmlTreeParent,
-  type TreeMutationObservation
-} from "../../../src/internal/html-engine/mod.js";
+  type HtmlTreeParent
+} from "../../../src/internal/html-engine/tree-model.js";
+import { isInternalStateError } from "../../support/internal-state-error.js";
+
+import type { TreeMutationObservation } from "../../../src/internal/html-engine/observer.js";
 
 function element(
   model: HtmlTreeModel,
@@ -35,7 +40,7 @@ function element(
 function assertModelError(action: () => unknown, reason: HtmlTreeModelErrorReason): void {
   assert.throws(
     action,
-    (error) => error instanceof InternalStateError && error.reason === reason
+    (error) => isInternalStateError(error, reason)
   );
 }
 

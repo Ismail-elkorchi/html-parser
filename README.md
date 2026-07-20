@@ -91,13 +91,15 @@ empty and JSR imports only repository-owned modules. The parser is an
 independent standards-based TypeScript implementation; generated character
 reference data is reproducible from the pinned WHATWG snapshot. Provenance and
 implementation-source rules are recorded in the
-[source policy](./docs/maintainers/source-policy.md) and
+[source policy](https://github.com/Ismail-elkorchi/html-parser/blob/main/docs/maintainers/source-policy.md) and
 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
 ## Support and contributing
 
 Use [SUPPORT.md](./SUPPORT.md) for usage questions and bug reports. Start code
-contributions with [CONTRIBUTING.md](./CONTRIBUTING.md). Report vulnerabilities
+contributions with the repository's
+[contribution guide](https://github.com/Ismail-elkorchi/html-parser/blob/main/CONTRIBUTING.md).
+Report vulnerabilities
 through the private channel in [SECURITY.md](./SECURITY.md).
 
 ## License

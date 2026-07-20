@@ -43,7 +43,7 @@ export function inspectEntities(bytes) {
   }
 
   const entries = [];
-  let legacyEntryCount = 0;
+  let semicolonlessEntryCount = 0;
   let twoCodePointValueCount = 0;
   let maximumNameLength = 0;
 
@@ -76,7 +76,7 @@ export function inspectEntities(bytes) {
     }
 
     const name = key.slice(1);
-    if (!name.endsWith(";")) legacyEntryCount += 1;
+    if (!name.endsWith(";")) semicolonlessEntryCount += 1;
     if (codepoints.length === 2) twoCodePointValueCount += 1;
     maximumNameLength = Math.max(maximumNameLength, name.length);
     entries.push(Object.freeze({ name, characters }));
@@ -85,7 +85,7 @@ export function inspectEntities(bytes) {
   return Object.freeze({
     entries: Object.freeze(entries),
     entryCount: entries.length,
-    legacyEntryCount,
+    semicolonlessEntryCount,
     twoCodePointValueCount,
     maximumNameLength,
     firstKey: sourceKeys[0] ?? null,
@@ -175,7 +175,7 @@ export function renderGeneratedTable(inspection, entitiesSha256) {
     `/* WHATWG named-character data input SHA-256: ${entitiesSha256} */`,
     "",
     `export const NAMED_CHARACTER_REFERENCE_ENTRY_COUNT = ${String(inspection.entryCount)};`,
-    `export const LEGACY_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT = ${String(inspection.legacyEntryCount)};`,
+    `export const SEMICOLONLESS_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT = ${String(inspection.semicolonlessEntryCount)};`,
     `export const MAX_NAMED_CHARACTER_REFERENCE_LENGTH = ${String(inspection.maximumNameLength)};`,
     "",
     "export const NAMED_CHARACTER_REFERENCE_DATA: readonly string[] = Object.freeze(["
@@ -218,7 +218,11 @@ export async function readAndVerifySnapshot() {
   assertEqual("entities bytes", entitiesBytes.length, manifest.entities.bytes);
   assertEqual("entities SHA-256", sha256(entitiesBytes), manifest.entities.sha256);
   assertEqual("entity count", inspection.entryCount, manifest.entities.entryCount);
-  assertEqual("legacy entity count", inspection.legacyEntryCount, manifest.entities.legacyEntryCount);
+  assertEqual(
+    "semicolonless entity count",
+    inspection.semicolonlessEntryCount,
+    manifest.entities.semicolonlessEntryCount
+  );
   assertEqual(
     "two-code-point entity count",
     inspection.twoCodePointValueCount,

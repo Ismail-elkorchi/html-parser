@@ -2,24 +2,31 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  adjustedForeignAttributes,
+  adjustedForeignTagName,
+  hasForeignBreakoutFontAttribute,
+  isForeignBreakoutStartTag,
+  isHtmlIntegrationPoint,
+  isMathMLTextIntegrationPoint
+} from "../../../src/internal/html-engine/foreign-content.js";
+import {
+  fragmentContextAttributes,
+  fragmentTokenizerMode,
+  type HtmlFragmentContext
+} from "../../../src/internal/html-engine/fragment-context.js";
+import {
   HTML_NAMESPACE,
   MATHML_NAMESPACE,
   SVG_NAMESPACE,
-  XLINK_NAMESPACE,
-  adjustedForeignAttributes,
-  adjustedForeignTagName,
-  createEngineResourceGuard,
-  fragmentContextAttributes,
-  fragmentTokenizerMode,
-  hasForeignBreakoutFontAttribute,
+  XLINK_NAMESPACE
+} from "../../../src/internal/html-engine/namespaces.js";
+import { createEngineResourceGuard } from "../../../src/internal/html-engine/resource-guard.js";
+import {
   HtmlTreeModel,
-  isForeignBreakoutStartTag,
-  isHtmlIntegrationPoint,
-  isMathMLTextIntegrationPoint,
-  type HtmlFragmentContext,
-  type HtmlStartTagToken,
   type HtmlTreeAttributeInput
-} from "../../../src/internal/html-engine/mod.js";
+} from "../../../src/internal/html-engine/tree-model.js";
+
+import type { HtmlStartTagToken } from "../../../src/internal/html-engine/tokens.js";
 
 const SPAN = Object.freeze({ startUtf16Offset: 0, endUtf16Offset: 1 });
 
