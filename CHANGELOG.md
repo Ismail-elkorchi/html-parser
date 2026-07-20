@@ -4,6 +4,10 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Consolidated release performance evidence into one balanced cross-revision
+  report: accepted independent parser and corrected serializer revisions are
+  enforced while tagged `v0.1.1` remains a report-only recovery horizon.
+
 - Pin the maintained WPT serialization directory and qualify the built public
   serializer against explicit expectations, structural round trips, exact
   non-roundtrip classifications, and Chromium, Firefox, and WebKit.

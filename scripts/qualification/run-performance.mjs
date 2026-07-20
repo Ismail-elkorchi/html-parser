@@ -4,6 +4,12 @@ import path from "node:path";
 import process from "node:process";
 
 import { writeJson } from "../eval/eval-primitives.mjs";
+import {
+  evaluatePerformance,
+  PERFORMANCE_BENCHMARK_NAMES,
+  PERFORMANCE_BASELINES,
+  PERFORMANCE_THRESHOLDS
+} from "./performance-policy.mjs";
 
 const RUNS = Number(process.env["ENGINE_PERFORMANCE_RUNS"] ?? 12);
 if (!Number.isSafeInteger(RUNS) || RUNS < 3) {
@@ -19,15 +25,24 @@ const BENCHMARK_RUNTIME_FLAGS = Object.freeze([
   "--max-semi-space-size=8"
 ]);
 const REFERENCES = Object.freeze([
-  Object.freeze({ id: "v0.1.1", ref: "v0.1.1", engine: "public" }),
-  Object.freeze({ id: "d74d661", ref: "d74d661a7a64ac6a87ee7fc558aaabc77cce0916", engine: "public" })
+  PERFORMANCE_BASELINES.historical,
+  PERFORMANCE_BASELINES.parser,
+  PERFORMANCE_BASELINES.serializer
 ]);
-const THRESHOLDS = Object.freeze({
-  minThroughputMedianRatio: 0.9,
-  maxMemoryMedianRatio: 1.1,
-  maxThroughputRobustSpreadFraction: 0.2,
-  maxMemoryRobustSpreadFraction: 0.15
-});
+
+const candidateStatus = run("git", ["status", "--porcelain", "--untracked-files=no"]).trim();
+if (candidateStatus.length > 0) {
+  throw new Error("Performance qualification requires a clean tracked candidate revision");
+}
+const historicalTagCommit = run("git", [
+  "rev-parse",
+  `${PERFORMANCE_BASELINES.historical.tag}^{commit}`
+]).trim();
+if (historicalTagCommit !== PERFORMANCE_BASELINES.historical.ref) {
+  throw new Error(
+    `${PERFORMANCE_BASELINES.historical.tag} resolves to ${historicalTagCommit}, expected ${PERFORMANCE_BASELINES.historical.ref}`
+  );
+}
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -87,12 +102,13 @@ function summarize(runResults) {
   }));
 }
 
-function measure(moduleRoot, engine) {
+function measure(moduleRoot, engine, benchmark) {
   const output = run(process.execPath, [
     ...BENCHMARK_RUNTIME_FLAGS,
     DRIVER,
     `--module-root=${moduleRoot}`,
-    `--engine=${engine}`
+    `--engine=${engine}`,
+    `--benchmark=${benchmark}`
   ]);
   return JSON.parse(output);
 }
@@ -100,6 +116,7 @@ function measure(moduleRoot, engine) {
 await mkdir(WORKTREE_ROOT, { recursive: true });
 const revisions = {};
 const worktrees = [];
+const sampleOrder = [];
 try {
   const measurementTargets = [];
   for (const reference of REFERENCES) {
@@ -111,9 +128,10 @@ try {
     measurementTargets.push({
       id: reference.id,
       moduleRoot: worktree,
-      engine: reference.engine,
+      engine: "public",
       commit,
-      results: []
+      benchmarks: reference.benchmarks,
+      results: Array.from({ length: RUNS }, () => ({ results: [] }))
     });
   }
 
@@ -122,27 +140,40 @@ try {
     moduleRoot: ROOT,
     engine: "public",
     commit: run("git", ["rev-parse", "HEAD"]).trim(),
-    results: []
+    benchmarks: PERFORMANCE_BENCHMARK_NAMES,
+    results: Array.from({ length: RUNS }, () => ({ results: [] }))
   });
 
-  // Rotate the deterministic order on every round. Sampling each revision in a
-  // separate time block made ratios sensitive to host load and CPU-frequency
-  // drift, while still claiming to compare like-for-like measurements.
+  // Interleave revisions independently for every benchmark and rotate the
+  // starting revision on every round. This prevents a faster benchmark or a
+  // revision with fewer applicable benchmarks from receiving a systematic
+  // host-load or CPU-frequency advantage.
   for (let runIndex = 0; runIndex < RUNS; runIndex += 1) {
-    const offset = runIndex % measurementTargets.length;
-    const orderedTargets = [
-      ...measurementTargets.slice(offset),
-      ...measurementTargets.slice(0, offset)
-    ];
-    for (const target of orderedTargets) {
-      target.results.push(measure(target.moduleRoot, target.engine));
+    const benchmarkOrder = [];
+    for (const [benchmarkIndex, benchmark] of PERFORMANCE_BENCHMARK_NAMES.entries()) {
+      const applicableTargets = measurementTargets.filter((target) =>
+        target.benchmarks.includes(benchmark)
+      );
+      const offset = (runIndex + benchmarkIndex) % applicableTargets.length;
+      const orderedTargets = [
+        ...applicableTargets.slice(offset),
+        ...applicableTargets.slice(0, offset)
+      ];
+      benchmarkOrder.push({ benchmark, revisions: orderedTargets.map((target) => target.id) });
+      for (const target of orderedTargets) {
+        const measurement = measure(target.moduleRoot, target.engine, benchmark);
+        target.results[runIndex]?.results.push(...measurement.results);
+        target.runtime = measurement.runtime;
+      }
     }
+    sampleOrder.push({ round: runIndex + 1, benchmarks: benchmarkOrder });
   }
 
   for (const target of measurementTargets) {
     revisions[target.id] = {
       commit: target.commit,
       engine: target.engine,
+      runtime: target.runtime,
       runs: target.results,
       benchmarks: summarize(target.results)
     };
@@ -158,62 +189,16 @@ try {
   await rm(WORKTREE_ROOT, { recursive: true, force: true });
 }
 
-const primary = revisions.d74d661.benchmarks;
-const candidate = revisions.candidate.benchmarks;
-const comparisons = Object.fromEntries(Object.keys(candidate).map((name) => {
-  const baseline = primary[name];
-  const current = candidate[name];
-  return [name, {
-    throughputMedianRatio:
-      current.throughputMbPerSec.median / baseline.throughputMbPerSec.median,
-    memoryMedianRatio:
-      current.retainedHeapBytesPerResult.median / baseline.retainedHeapBytesPerResult.median,
-    baselineThroughputRobustSpreadFraction:
-      baseline.throughputMbPerSec.robustSpreadFraction,
-    baselineMemoryRobustSpreadFraction:
-      baseline.retainedHeapBytesPerResult.robustSpreadFraction,
-    throughputRobustSpreadFraction: current.throughputMbPerSec.robustSpreadFraction,
-    memoryRobustSpreadFraction: current.retainedHeapBytesPerResult.robustSpreadFraction
-  }];
-}));
-const failures = [];
-for (const [name, comparison] of Object.entries(comparisons)) {
-  if (comparison.throughputMedianRatio < THRESHOLDS.minThroughputMedianRatio) {
-    failures.push(`${name}:throughput-ratio`);
-  }
-  if (comparison.memoryMedianRatio > THRESHOLDS.maxMemoryMedianRatio) {
-    failures.push(`${name}:memory-ratio`);
-  }
-  if (
-    comparison.baselineThroughputRobustSpreadFraction >
-    THRESHOLDS.maxThroughputRobustSpreadFraction
-  ) {
-    failures.push(`${name}:baseline-throughput-spread`);
-  }
-  if (
-    comparison.baselineMemoryRobustSpreadFraction >
-    THRESHOLDS.maxMemoryRobustSpreadFraction
-  ) {
-    failures.push(`${name}:baseline-memory-spread`);
-  }
-  if (
-    comparison.throughputRobustSpreadFraction >
-    THRESHOLDS.maxThroughputRobustSpreadFraction
-  ) {
-    failures.push(`${name}:throughput-spread`);
-  }
-  if (comparison.memoryRobustSpreadFraction > THRESHOLDS.maxMemoryRobustSpreadFraction) {
-    failures.push(`${name}:memory-spread`);
-  }
-}
+const evaluation = evaluatePerformance(revisions);
 
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   suite: "independent-engine-cross-revision-performance",
   generatedAt: new Date().toISOString(),
   runs: RUNS,
   runIsolation: "fresh-process-per-sample",
   samplingOrder: "deterministic-balanced-revision-interleaving",
+  sampleOrder,
   percentileMethod: "linear interpolation between closest ranks",
   memoryMetric:
     "post-GC retained parsed-result heap slope from a post-warmup fixed-size cohort",
@@ -221,14 +206,11 @@ const report = {
     maxOldSpaceSizeMb: 256,
     maxSemiSpaceSizeMb: 8
   }),
-  primaryBaseline: "d74d661",
-  historicalBaseline: "v0.1.1",
-  thresholds: THRESHOLDS,
+  baselinePolicy: PERFORMANCE_BASELINES,
+  thresholds: PERFORMANCE_THRESHOLDS,
   revisions,
-  comparisons,
-  failures,
-  ok: failures.length === 0
+  ...evaluation
 };
 await writeJson("reports/engine-performance.json", report);
-console.log(JSON.stringify({ comparisons, failures, ok: report.ok }, null, 2));
+console.log(JSON.stringify(evaluation, null, 2));
 if (!report.ok) process.exitCode = 1;

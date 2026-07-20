@@ -1,6 +1,30 @@
 {
   "targets": [
     {
+      "targetFile": "scripts/qualification/performance-policy.mjs",
+      "testCommand": ["node", "--test", "test/behavior/performance-policy.test.js"],
+      "mutants": [
+        {
+          "id": "performance-throughput-threshold",
+          "description": "Allow an immediate throughput regression below the accepted threshold.",
+          "search": "minThroughputMedianRatio: 0.9",
+          "replace": "minThroughputMedianRatio: 0.8"
+        },
+        {
+          "id": "performance-memory-threshold",
+          "description": "Allow an immediate retained-memory regression above the accepted threshold.",
+          "search": "maxMemoryMedianRatio: 1.1",
+          "replace": "maxMemoryMedianRatio: 1.2"
+        },
+        {
+          "id": "performance-historical-enforcement",
+          "description": "Apply the hard threshold policy to the report-only historical horizon.",
+          "search": "for (const [name, reason] of Object.entries(PERFORMANCE_BASELINES.historical.excludedBenchmarks)) {",
+          "replace": "failures.push(...thresholdFailures(\"historical-parse-medium\", historical[\"parse-medium\"], thresholds));\n  for (const [name, reason] of Object.entries(PERFORMANCE_BASELINES.historical.excludedBenchmarks)) {"
+        }
+      ]
+    },
+    {
       "targetFile": "scripts/qualification/run-public-serialization-roundtrip.mjs",
       "testCommand": ["node", "scripts/qualification/run-public-serialization-roundtrip.mjs", "--report=tmp/mutation-public-serialization-roundtrip.json"],
       "mutants": [

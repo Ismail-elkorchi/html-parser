@@ -83,8 +83,12 @@ an oracle's behavior blindly.
 
 ## Resource and performance checks
 
-- `npm run test:bench` runs the normal benchmark set.
-- `npm run test:bench:stability` checks benchmark variation.
+- `npm run qualification:performance` is the single release performance
+  report and gate. It compares parsing with the accepted independent-parser
+  revision, serialization with the first corrected public serializer revision,
+  and retains tagged `v0.1.1` parsing as report-only recovery evidence. Samples
+  are fresh-process and balanced across revisions; throughput and retained
+  result memory use the same metric for every horizon.
 - `npm run test:bench:hard-budgets` exercises first-failure resource behavior.
 - `npm run test:bench:text-extraction` exercises bounded extraction.
 - `npm run test:bench:character-references` records generated-table lookup,

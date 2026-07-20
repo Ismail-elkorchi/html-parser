@@ -14,8 +14,7 @@
       "requirePackReport": true,
       "requireDocsReport": true,
       "requireBudgetsReport": true,
-      "requireBenchReport": false,
-      "requireBenchStability": false,
+      "requirePerformanceQualification": false,
       "robustnessUsesFuzz": false,
       "weights": {
         "correctness": 70,
@@ -39,9 +38,7 @@
       "requirePackReport": true,
       "requireDocsReport": true,
       "requireBudgetsReport": true,
-      "requireBenchReport": true,
-      "requireBenchStability": true,
-      "benchStabilityRuns": 9,
+      "requirePerformanceQualification": true,
       "robustnessUsesFuzz": true,
       "weights": {
         "correctness": 40,
@@ -111,12 +108,6 @@
         "codex-prompts/",
         "scripts/"
       ]
-    },
-    "performanceStability": {
-      "maxThroughputRobustSpreadFraction": 0.2,
-      "maxMemoryRobustSpreadFraction": 0.01,
-      "minThroughputMedianRatio": 0.9,
-      "maxMemoryMedianRatio": 1.1
     }
   },
   "weights": {
@@ -126,19 +117,6 @@
     "robustness": 10,
     "agentFirst": 10,
     "packagingTrust": 5
-  },
-  "performanceBaseline": {
-    "notes": "Calibrated from bench-stability medians using postGcHeapUsed measurements (`node --expose-gc`).",
-    "benchmarks": {
-      "parse-medium": {
-        "mbPerSec": 3.395,
-        "memoryMB": 6.938
-      },
-      "parse-large": {
-        "mbPerSec": 3.974,
-        "memoryMB": 6.987
-      }
-    }
   },
   "scoring": {
     "passRateScoreShape": "fromThresholdToPerfect",
