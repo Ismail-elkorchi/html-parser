@@ -510,8 +510,8 @@ async function main() {
     if (!performanceReport) {
       performanceFailures.push("Missing reports/engine-performance.json");
     } else {
-      if (performanceReport.schemaVersion !== 3) {
-        performanceFailures.push("Performance report schemaVersion must be 3");
+      if (performanceReport.schemaVersion !== 4) {
+        performanceFailures.push("Performance report schemaVersion must be 4");
       }
       if (performanceReport.suite !== "independent-engine-cross-revision-performance") {
         performanceFailures.push("Performance report suite is invalid");

@@ -44,6 +44,18 @@ if (historicalTagCommit !== PERFORMANCE_BASELINES.historical.ref) {
   );
 }
 
+function candidateIdentity() {
+  const checkoutCommit = run("git", ["rev-parse", "HEAD"]).trim();
+  if (process.env["GITHUB_EVENT_NAME"] !== "pull_request") {
+    return { commit: checkoutCommit, checkoutCommit };
+  }
+  const parents = run("git", ["show", "-s", "--format=%P", "HEAD"]).trim().split(/\s+/u);
+  if (parents.length !== 2 || parents[1] === undefined) {
+    throw new Error("Pull-request performance checkout must have exact base and head parents");
+  }
+  return { commit: parents[1], checkoutCommit };
+}
+
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
     cwd: options.cwd ?? ROOT,
@@ -130,16 +142,18 @@ try {
       moduleRoot: worktree,
       engine: "public",
       commit,
+      checkoutCommit: commit,
       benchmarks: reference.benchmarks,
       results: Array.from({ length: RUNS }, () => ({ results: [] }))
     });
   }
 
+  const candidate = candidateIdentity();
   measurementTargets.push({
     id: "candidate",
     moduleRoot: ROOT,
     engine: "public",
-    commit: run("git", ["rev-parse", "HEAD"]).trim(),
+    ...candidate,
     benchmarks: PERFORMANCE_BENCHMARK_NAMES,
     results: Array.from({ length: RUNS }, () => ({ results: [] }))
   });
@@ -172,6 +186,7 @@ try {
   for (const target of measurementTargets) {
     revisions[target.id] = {
       commit: target.commit,
+      checkoutCommit: target.checkoutCommit,
       engine: target.engine,
       runtime: target.runtime,
       runs: target.results,
@@ -192,7 +207,7 @@ try {
 const evaluation = evaluatePerformance(revisions);
 
 const report = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   suite: "independent-engine-cross-revision-performance",
   generatedAt: new Date().toISOString(),
   runs: RUNS,
