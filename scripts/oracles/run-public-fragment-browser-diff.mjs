@@ -241,6 +241,15 @@ for (const [name, launcher] of engines) {
   let browser;
   try {
     browser = await launcher.launch({ headless: true });
+  } catch (error) {
+    results.push({
+      name,
+      status: "unavailable",
+      reason: error instanceof Error ? error.message : String(error)
+    });
+    continue;
+  }
+  try {
     const page = await browser.newPage();
     const failures = [];
     const acceptedDifferences = [];
@@ -277,11 +286,16 @@ for (const [name, launcher] of engines) {
   } catch (error) {
     results.push({
       name,
-      status: "unavailable",
-      reason: error instanceof Error ? error.message : String(error)
+      version: browser.version(),
+      status: "fail",
+      cases: CASES.length,
+      failures: [{
+        id: "browser-harness",
+        reason: error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      }]
     });
   } finally {
-    await browser?.close();
+    await browser.close();
   }
 }
 
