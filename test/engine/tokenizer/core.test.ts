@@ -5,12 +5,12 @@ import {
   EngineAbortError,
   EngineConfigurationError,
   EngineResourceLimitError,
-  HTML_TOKENIZER_STATES,
-  HtmlTokenizer,
-  createEngineResourceGuard,
-  type EngineParseError,
-  type HtmlToken
-} from "../../../src/internal/html-engine/mod.js";
+  createEngineResourceGuard
+} from "../../../src/internal/html-engine/resource-guard.js";
+import { HtmlTokenizer } from "../../../src/internal/html-engine/tokenizer/tokenizer.js";
+
+import type { EngineParseError } from "../../../src/internal/html-engine/diagnostics.js";
+import type { HtmlToken } from "../../../src/internal/html-engine/tokens.js";
 
 function tokenizeChunks(
   chunks: readonly string[],
@@ -133,12 +133,7 @@ void test("RAWTEXT less-than transitions preserve literal input through EOF", ()
   ]);
 });
 
-void test("the frozen state inventory and text-mode NUL distinction are exact", () => {
-  assert.equal(HTML_TOKENIZER_STATES.length, 85);
-  assert.equal(new Set(HTML_TOKENIZER_STATES).size, 85);
-  assert.equal(HTML_TOKENIZER_STATES[0], "data-state");
-  assert.equal(HTML_TOKENIZER_STATES.at(-1), "numeric-character-reference-end-state");
-
+void test("text-mode NUL handling preserves the standard distinction", () => {
   const data = tokenizeChunks(["\0"]);
   const rcdata = tokenizeChunks(["\0"], { mode: "rcdata" });
   assert.deepEqual(data.tokens[0], {

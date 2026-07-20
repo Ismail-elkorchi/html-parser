@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { InternalStateError } from "../../../src/internal/foundation/internal-state-error.js";
+import { HTML_NAMESPACE, MATHML_NAMESPACE } from "../../../src/internal/html-engine/namespaces.js";
+import { OpenElementStack } from "../../../src/internal/html-engine/open-element-stack.js";
+import { createEngineResourceGuard } from "../../../src/internal/html-engine/resource-guard.js";
 import {
-  HTML_NAMESPACE,
-  MATHML_NAMESPACE,
   HtmlTreeModel,
-  OpenElementStack,
-  createEngineResourceGuard,
   type HtmlTreeElement
-} from "../../../src/internal/html-engine/mod.js";
+} from "../../../src/internal/html-engine/tree-model.js";
+import { isInternalStateError } from "../../support/internal-state-error.js";
 
 function element(
   model: HtmlTreeModel,
@@ -70,14 +69,12 @@ void test("indexed stack rejects duplicate and absent element mutations", () => 
   stack.push(html);
   assert.throws(
     () => { stack.push(html); },
-    (error) => error instanceof InternalStateError &&
-      error.reason === "TREE_BUILDER_OPEN_ELEMENT_ALREADY_PRESENT"
+    (error) => isInternalStateError(error, "TREE_BUILDER_OPEN_ELEMENT_ALREADY_PRESENT")
   );
   stack.pop();
   assert.throws(
     () => { stack.remove(html); },
-    (error) => error instanceof InternalStateError &&
-      error.reason === "TREE_BUILDER_OPEN_ELEMENT_NOT_PRESENT"
+    (error) => isInternalStateError(error, "TREE_BUILDER_OPEN_ELEMENT_NOT_PRESENT")
   );
 });
 

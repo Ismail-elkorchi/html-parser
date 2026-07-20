@@ -2,7 +2,7 @@ import {
   HTML_NAMESPACE,
   MATHML_NAMESPACE,
   SVG_NAMESPACE
-} from "../../dist/internal/html-engine/mod.js";
+} from "../../dist/internal/html-engine/namespaces.js";
 import { runBrowserTreeDifferential } from "./browser-tree-diff.mjs";
 
 const fragment = (namespaceUri, localName, attributes = []) => Object.freeze({

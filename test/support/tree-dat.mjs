@@ -56,11 +56,11 @@ function finishCase(current, fixtureCases, filePath) {
     file: filePath,
     caseNumber,
     data: current.dataLines.join("\n"),
-    errors: Object.freeze([...current.errors]),
-    newErrors: Object.freeze([...current.newErrors]),
-    sawErrors: current.sawErrors,
-    sawNewErrors: current.sawNewErrors,
-    errorsDeclared: current.sawErrors || current.sawNewErrors,
+    unnamedErrors: Object.freeze([...current.unnamedErrors]),
+    namedErrors: Object.freeze([...current.namedErrors]),
+    sawUnnamedErrors: current.sawUnnamedErrors,
+    sawNamedErrors: current.sawNamedErrors,
+    errorsDeclared: current.sawUnnamedErrors || current.sawNamedErrors,
     expected: current.documentLines.join("\n"),
     fragmentContext: current.fragmentContext,
     scripting: current.scripting
@@ -85,14 +85,14 @@ export function parseTreeDatFixtures(content, filePath) {
       finishCase(current, fixtureCases, filePath);
       current = {
         dataLines: [],
-        errors: [],
-        newErrors: [],
+        unnamedErrors: [],
+        namedErrors: [],
         documentLines: [],
         fragmentContext: null,
         expectsFragmentContext: false,
         scripting: "both",
-        sawErrors: false,
-        sawNewErrors: false,
+        sawUnnamedErrors: false,
+        sawNamedErrors: false,
         sawDocument: false
       };
       section = "data";
@@ -107,13 +107,13 @@ export function parseTreeDatFixtures(content, filePath) {
     }
 
     if (line === "#errors") {
-      current.sawErrors = true;
-      section = "errors";
+      current.sawUnnamedErrors = true;
+      section = "unnamed-errors";
       continue;
     }
     if (line === "#new-errors" || line === "#errors-new") {
-      current.sawNewErrors = true;
-      section = "new-errors";
+      current.sawNamedErrors = true;
+      section = "named-errors";
       continue;
     }
     if (line === "#document-fragment") {
@@ -139,10 +139,10 @@ export function parseTreeDatFixtures(content, filePath) {
 
     if (section === "data") {
       current.dataLines.push(line);
-    } else if (section === "errors") {
-      current.errors.push(line);
-    } else if (section === "new-errors") {
-      current.newErrors.push(line);
+    } else if (section === "unnamed-errors") {
+      current.unnamedErrors.push(line);
+    } else if (section === "named-errors") {
+      current.namedErrors.push(line);
     } else if (section === "fragment") {
       const caseNumber = fixtureCases.length + 1;
       if (current.fragmentContext !== null) {

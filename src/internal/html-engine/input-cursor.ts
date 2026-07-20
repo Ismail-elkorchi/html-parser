@@ -29,16 +29,16 @@ export interface InputEof {
 export type InputRead = InputCharacter | InputNeedMore | InputEof;
 
 /** One original decoded UTF-16 code unit observed without advancing the cursor. */
-export interface InputCodeUnit {
+interface InputCodeUnit {
   readonly kind: "code-unit";
   readonly value: number;
   readonly position: SourcePosition;
 }
 
 /** Result of guarded, non-consuming UTF-16 lookahead. */
-export type InputCodeUnitRead = InputCodeUnit | InputNeedMore | InputEof;
+type InputCodeUnitRead = InputCodeUnit | InputNeedMore | InputEof;
 
-export type InputParseErrorObserver = (error: EngineParseError) => void;
+type InputParseErrorObserver = (error: EngineParseError) => void;
 
 class CursorInputCharacter implements InputCharacter {
   readonly kind = "character";

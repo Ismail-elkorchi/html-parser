@@ -24,30 +24,30 @@ import type { EngineObserver } from "./observer.ts";
 import type { NonExecutingScriptingMode } from "./parser-state.ts";
 
 /** Document parser configuration supported by the independent engine. */
-export interface HtmlEngineDocumentConfiguration {
+interface HtmlEngineDocumentConfiguration {
   readonly kind: "document";
   readonly scriptingMode: NonExecutingScriptingMode;
 }
 
 /** Fragment parser configuration supported by the independent engine. */
-export interface HtmlEngineFragmentConfiguration {
+interface HtmlEngineFragmentConfiguration {
   readonly kind: "fragment";
   readonly scriptingMode: NonExecutingScriptingMode;
   readonly context: HtmlFragmentContext;
 }
 
-export type HtmlEngineParserConfiguration =
+type HtmlEngineParserConfiguration =
   | HtmlEngineDocumentConfiguration
   | HtmlEngineFragmentConfiguration;
 
-export interface HtmlEngineOptions extends EngineResourceGuardOptions {
+interface HtmlEngineOptions extends EngineResourceGuardOptions {
   readonly inputChunks: readonly string[];
   readonly parser: HtmlEngineParserConfiguration;
   readonly observer?: EngineObserver;
   readonly retainNodeSpans?: boolean;
 }
 
-export interface HtmlEngineResult {
+interface HtmlEngineResult {
   readonly standardBaseline: typeof ENGINE_STANDARD_BASELINE;
   readonly parser: HtmlEngineParserConfiguration;
   readonly model: HtmlTreeModel;

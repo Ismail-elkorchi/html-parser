@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { sniffHtmlEncoding } from "../../dist/internal/encoding/mod.js";
+import { sniffHtmlEncoding } from "../../dist/internal/encoding/sniff.js";
 
 function bytesFromText(text) {
   return new TextEncoder().encode(text);

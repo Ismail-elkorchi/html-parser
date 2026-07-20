@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile, unlink } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
 
+import { analyzeDeclarationGraph } from "../build/declaration-graph.mjs";
 import { nowIso, writeJson, fileExists, readJson } from "./eval-primitives.mjs";
 
 const REMOVED_RUNTIME_HASHES = new Set([
@@ -168,6 +169,37 @@ async function main() {
     .map((entry) => entry.path);
   const jsrEngineExcluded = Array.isArray(jsrManifest.exclude) &&
     jsrManifest.exclude.includes("src/internal/html-engine/**");
+  const expectedJsrPublishIncludes = [
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    "THIRD_PARTY_NOTICES.md",
+    "docs/*.md",
+    "jsr/mod.ts",
+    "src/**/*.ts"
+  ];
+  const jsrPublishIncludes = Array.isArray(jsrManifest.publish?.include)
+    ? [...jsrManifest.publish.include].sort()
+    : [];
+  const jsrPublishExcludes = Array.isArray(jsrManifest.publish?.exclude)
+    ? [...jsrManifest.publish.exclude].sort()
+    : [];
+  const expectedJsrWorkspaceExcludes = [
+    "dist/**",
+    "html-parser-*.tgz",
+    "node_modules/**",
+    "reports/**",
+    "tmp/**",
+    "vendor/**"
+  ];
+  const jsrWorkspaceExcludes = Array.isArray(jsrManifest.exclude)
+    ? [...jsrManifest.exclude].sort()
+    : [];
+  const jsrPublicationBoundaryValid =
+    JSON.stringify(jsrPublishIncludes) === JSON.stringify(expectedJsrPublishIncludes) &&
+    jsrPublishExcludes.length === 0 &&
+    JSON.stringify(jsrWorkspaceExcludes) === JSON.stringify(expectedJsrWorkspaceExcludes);
 
   const forbiddenIncluded = normalizedPaths.filter((tarPath) =>
     forbiddenPrefixes.some((forbiddenPrefix) => tarPath.startsWith(forbiddenPrefix))
@@ -175,13 +207,18 @@ async function main() {
   const thirdPartyNoticesIncluded = normalizedPaths.includes("THIRD_PARTY_NOTICES.md");
   const requiredDocumentation = [
     "README.md",
-    "CONTRIBUTING.md",
-    "RELEASING.md",
     "SECURITY.md",
     "SUPPORT.md",
     "docs/index.md",
     "docs/getting-started.md",
-    "docs/api.md"
+    "docs/api.md",
+    "docs/architecture.md",
+    "docs/data-model.md",
+    "docs/limits-errors-and-safety.md",
+    "docs/modifying-html.md",
+    "docs/parsing.md",
+    "docs/querying-and-text.md",
+    "docs/streams-and-encoding.md"
   ];
   const missingDocumentation = requiredDocumentation.filter(
     (documentationPath) => !normalizedPaths.includes(documentationPath)
@@ -194,6 +231,34 @@ async function main() {
     files: firstPartyDistEntries.length,
     bytes: firstPartyDistEntries.reduce((total, entry) => total + entry.size, 0)
   };
+  function inventory(entries) {
+    return {
+      files: entries.length,
+      bytes: entries.reduce((total, entry) => total + entry.size, 0)
+    };
+  }
+  const embeddedImplementationEntries = firstPartyDistEntries.filter((entry) =>
+    entry.path.startsWith("dist/internal/") && entry.path.endsWith(".js")
+  );
+  const publicRuntimeEntries = firstPartyDistEntries.filter((entry) =>
+    entry.path.endsWith(".js") && !entry.path.startsWith("dist/internal/")
+  );
+  const declarationEntries = firstPartyDistEntries.filter((entry) =>
+    entry.path.endsWith(".d.ts")
+  );
+  const declarationGraph = analyzeDeclarationGraph(new Map(declarationEntries.map((entry) => [
+    entry.path,
+    entry.content.toString("utf8")
+  ])), "dist/mod.d.ts");
+  const privateDeclarationPaths = normalizedPaths.filter((tarPath) =>
+    tarPath.startsWith("dist/internal/") && tarPath.endsWith(".d.ts")
+  );
+  const maintainerDocumentationPaths = normalizedPaths.filter((tarPath) =>
+    tarPath.startsWith("docs/maintainers/")
+  );
+  const repositoryWorkflowDocumentationPaths = normalizedPaths.filter((tarPath) =>
+    tarPath === "CONTRIBUTING.md" || tarPath === "RELEASING.md"
+  );
 
   const isPackagingCheckPass =
     dependenciesEmpty &&
@@ -204,6 +269,13 @@ async function main() {
     removedRuntimePaths.length === 0 &&
     removedRuntimeFingerprints.length === 0 &&
     !jsrEngineExcluded &&
+    jsrPublicationBoundaryValid &&
+    privateDeclarationPaths.length === 0 &&
+    maintainerDocumentationPaths.length === 0 &&
+    repositoryWorkflowDocumentationPaths.length === 0 &&
+    declarationGraph.rootFound &&
+    declarationGraph.unresolved.length === 0 &&
+    declarationGraph.unreachable.length === 0 &&
     missingDocumentation.length === 0;
 
   const report = {
@@ -216,15 +288,26 @@ async function main() {
     dependenciesEmpty,
     runtimeComposition: {
       installedDependencies,
-      firstPartyDist
+      firstPartyDist,
+      embeddedImplementation: inventory(embeddedImplementationEntries),
+      publicRuntime: inventory(publicRuntimeEntries),
+      publicDeclarations: inventory(declarationEntries)
     },
     esmOnly,
     exportsOk,
     removedRuntimePaths,
     removedRuntimeFingerprints,
     jsrEngineExcluded,
+    jsrPublicationBoundaryValid,
+    jsrPublishIncludes,
+    jsrPublishExcludes,
+    jsrWorkspaceExcludes,
     forbiddenIncluded,
     thirdPartyNoticesIncluded,
+    privateDeclarationPaths,
+    maintainerDocumentationPaths,
+    repositoryWorkflowDocumentationPaths,
+    declarationGraph,
     missingDocumentation
   };
 

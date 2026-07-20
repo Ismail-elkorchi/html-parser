@@ -3,9 +3,9 @@ import test from "node:test";
 
 import { collectDocSymbols } from "../../scripts/quality/doc-jsr-shape.mjs";
 
-test("collectDocSymbols reads legacy flat Deno documentation output", () => {
-  const legacy = { nodes: [{ name: "parse", functionDef: { returnType: "tree" } }] };
-  assert.deepEqual(collectDocSymbols(legacy), legacy.nodes);
+test("collectDocSymbols reads flat Deno documentation output", () => {
+  const flatOutput = { nodes: [{ name: "parse", functionDef: { returnType: "tree" } }] };
+  assert.deepEqual(collectDocSymbols(flatOutput), flatOutput.nodes);
 });
 
 test("collectDocSymbols normalizes module-scoped Deno documentation output", () => {

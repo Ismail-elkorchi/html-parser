@@ -1,9 +1,9 @@
 import {
   CharacterReferenceConsumer,
-  HtmlInputCursor,
-  createEngineResourceGuard,
   type CharacterReferenceResult
-} from "../../../src/internal/html-engine/mod.js";
+} from "../../../src/internal/html-engine/character-reference-consumer.js";
+import { HtmlInputCursor } from "../../../src/internal/html-engine/input-cursor.js";
+import { createEngineResourceGuard } from "../../../src/internal/html-engine/resource-guard.js";
 
 const guard = createEngineResourceGuard();
 const cursor = new HtmlInputCursor(guard);

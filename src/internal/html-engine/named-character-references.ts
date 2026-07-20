@@ -3,11 +3,12 @@ import { failInternalState, requireInternalValue } from "../foundation/internal-
 import {
   MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
   NAMED_CHARACTER_REFERENCE_DATA,
-  NAMED_CHARACTER_REFERENCE_ENTRY_COUNT
+  NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
+  SEMICOLONLESS_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT
 } from "./generated/named-character-references.ts";
 
 /** One bounded binary-search observation over the generated reference table. */
-export interface NamedCharacterReferenceProbe {
+interface NamedCharacterReferenceProbe {
   readonly value: string | null;
   readonly hasPrefix: boolean;
   readonly comparisons: number;
@@ -54,7 +55,7 @@ export function probeNamedCharacterReference(name: string): NamedCharacterRefere
 }
 
 export {
-  LEGACY_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
   MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
-  NAMED_CHARACTER_REFERENCE_ENTRY_COUNT
-} from "./generated/named-character-references.ts";
+  NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
+  SEMICOLONLESS_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT
+};

@@ -11,12 +11,14 @@ import {
   ENCODING_FIXTURE_FILES,
   requireFixtureFiles,
   SERIALIZER_FIXTURE_FILES,
-  TOKENIZER_FIXTURE_FILES,
   TREE_FIXTURE_FILES
 } from "../../test/support/fixture-sources.mjs";
 import { serializeFixtureTokenStream } from "../../tmp/test-runtime/test/support/fixture-serializer.js";
+import {
+  loadEngineTokenizerFixtures,
+  runEngineTokenizerFixture
+} from "../../tmp/test-runtime/test/support/engine-tokenizer-fixtures.js";
 import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
-import { tokenizeFixtureCase } from "../../test/support/tokenizer-fixture-adapter.mjs";
 import {
   isStaleTokenizerProcessingInstructionExpectation,
   isStaleTreeProcessingInstructionExpectation
@@ -42,10 +44,6 @@ function hashWithMultiplier(fixtureId, multiplier) {
   return hash;
 }
 
-function isTokenizerHoldout(fixtureId) {
-  return hashWithMultiplier(fixtureId, 33) % HOLDOUT_MOD === 0;
-}
-
 function isTreeHoldout(fixtureId) {
   return hashWithMultiplier(fixtureId, 31) % HOLDOUT_MOD === 0;
 }
@@ -60,37 +58,6 @@ function isSerializerHoldout(fixtureId) {
 
 function fixtureTokenToComparable(token) {
   return JSON.stringify(token);
-}
-
-function tokenizerTokenToFixture(token) {
-  if (token.type === "StartTag") {
-    return token.selfClosing
-      ? ["StartTag", token.name, token.attributes, true]
-      : ["StartTag", token.name, token.attributes];
-  }
-
-  if (token.type === "EndTag") {
-    return ["EndTag", token.name];
-  }
-
-  if (token.type === "Comment") {
-    return ["Comment", token.data];
-  }
-
-  if (token.type === "Doctype") {
-    const name = token.name === "" ? null : token.name;
-    return ["DOCTYPE", name, token.publicId, token.systemId, !token.forceQuirks];
-  }
-
-  if (token.type === "Character") {
-    return ["Character", token.data];
-  }
-
-  if (token.type === "ProcessingInstruction") {
-    return ["ProcessingInstruction", token.target, token.data];
-  }
-
-  return null;
 }
 
 function parseEncodingDatFixtures(text, fixtureFilePath) {
@@ -166,58 +133,18 @@ function sumCases(records) {
 }
 
 async function runTokenizerHoldout() {
-  const parsedCases = [];
-  for (const fixturePath of TOKENIZER_FIXTURE_FILES) {
-    const fixtureFile = JSON.parse(await readFile(fixturePath, "utf8"));
-    const tests = fixtureFile.tests ?? fixtureFile.xmlViolationTests ?? [];
-
-    for (let index = 0; index < tests.length; index += 1) {
-      const fixture = tests[index];
-      const fixtureId = `${fixturePath}#${index + 1}`;
-      const initialStates = fixture.initialStates ?? ["Data state"];
-
-      for (const initialState of initialStates) {
-        parsedCases.push({
-          id: `${fixtureId}@${initialState}`,
-          fixtureId,
-          file: fixturePath,
-          input: fixture.input ?? "",
-          output: fixture.output ?? [],
-          initialState,
-          lastStartTag: fixture.lastStartTag,
-          doubleEscaped: fixture.doubleEscaped ?? false,
-          xmlViolationMode: fixturePath.endsWith("xmlViolation.test")
-        });
-      }
-    }
-  }
-
-  const selectedCases = parsedCases.filter((fixture) => isTokenizerHoldout(fixture.fixtureId));
+  const fixtures = loadEngineTokenizerFixtures();
+  const selectedCases = fixtures.filter((fixture) => fixture.holdout);
 
   let passed = 0;
   let failed = 0;
   const failures = [];
   const classified = [];
 
-  for (const fixtureCase of selectedCases) {
-    const tokenizeResult = tokenizeFixtureCase(fixtureCase.input, {
-      initialState: fixtureCase.initialState,
-      lastStartTag: fixtureCase.lastStartTag,
-      doubleEscaped: fixtureCase.doubleEscaped,
-      xmlViolationMode: fixtureCase.xmlViolationMode,
-      budgets: {
-        maxTextBytes: 200000,
-        maxTokenBytes: 16000,
-        maxParseErrors: 2000,
-        maxTimeMs: 50
-      }
-    });
-
-    const expectedTokens = fixtureCase.output.map((token) => fixtureTokenToComparable(token));
-    const actualFixtureTokens = tokenizeResult.tokens
-      .map((token) => tokenizerTokenToFixture(token))
-      .filter((token) => token !== null);
-    const actualTokens = actualFixtureTokens.map((token) => fixtureTokenToComparable(token));
+  for (const fixture of selectedCases) {
+    const outcome = runEngineTokenizerFixture(fixture, [fixture.input]);
+    const expectedTokens = fixture.expectedTokens.map((token) => fixtureTokenToComparable(token));
+    const actualTokens = outcome.fixtureTokens.map((token) => fixtureTokenToComparable(token));
     const isTokenSequenceMatch = JSON.stringify(expectedTokens) === JSON.stringify(actualTokens);
 
     if (isTokenSequenceMatch) {
@@ -226,17 +153,17 @@ async function runTokenizerHoldout() {
     }
 
     if (isStaleTokenizerProcessingInstructionExpectation(
-      fixtureCase.input,
-      fixtureCase.output,
-      actualFixtureTokens,
-      tokenizeResult.errors
+      fixture.input,
+      fixture.expectedTokens,
+      outcome.fixtureTokens,
+      outcome.errors
     )) {
       classified.push({
-        id: fixtureCase.id,
+        id: fixture.id,
         classification: "stale-processing-instruction-expectation",
-        expected: fixtureCase.output,
-        actual: actualFixtureTokens,
-        errors: tokenizeResult.errors.map((error) => error.code)
+        expected: fixture.expectedTokens,
+        actual: outcome.fixtureTokens,
+        errors: outcome.errors.map((error) => error.code)
       });
       continue;
     }
@@ -244,7 +171,7 @@ async function runTokenizerHoldout() {
     failed += 1;
     failures.push({
       suite: "tokenizer",
-      id: fixtureCase.id,
+      id: fixture.id,
       expectedPreview: expectedTokens.slice(0, 8),
       actualPreview: actualTokens.slice(0, 8)
     });
@@ -262,7 +189,7 @@ async function runTokenizerHoldout() {
     },
     holdoutRule: HOLDOUT_RULE,
     holdoutMod: HOLDOUT_MOD,
-    totalSurface: parsedCases.length,
+    totalSurface: fixtures.length,
     classifiedDifferences: classified.length,
     classificationSha256,
     classificationsMatch:

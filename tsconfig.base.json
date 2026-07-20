@@ -20,7 +20,6 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noErrorTruncation": true,
-    "skipLibCheck": true,
     "allowJs": false,
     "resolveJsonModule": false,
     "newLine": "lf",

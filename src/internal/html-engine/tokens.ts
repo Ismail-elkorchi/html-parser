@@ -59,7 +59,7 @@ export interface HtmlCharacterToken {
 }
 
 /** Conceptual end-of-file token. */
-export interface HtmlEofToken {
+interface HtmlEofToken {
   readonly kind: "eof";
   readonly span: SourceSpan;
 }

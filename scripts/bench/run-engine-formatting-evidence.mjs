@@ -1,9 +1,7 @@
 import { performance } from "node:perf_hooks";
 
-import {
-  EngineResourceLimitError,
-  runHtmlEngine
-} from "../../dist/internal/html-engine/mod.js";
+import { runHtmlEngine } from "../../dist/internal/html-engine/parser-driver.js";
+import { EngineResourceLimitError } from "../../dist/internal/html-engine/resource-guard.js";
 
 function measure(name, html, thresholds) {
   globalThis.gc?.();

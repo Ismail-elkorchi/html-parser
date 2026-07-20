@@ -19,7 +19,7 @@ export interface TokenizerControl {
 }
 
 /** Token context attached to an insertion-mode transition. */
-export interface InsertionModeTokenContext {
+interface InsertionModeTokenContext {
   readonly kind: HtmlToken["kind"];
   readonly tagName: string | null;
   readonly span: SourceSpan;

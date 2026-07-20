@@ -4,9 +4,9 @@ import {
   SVG_NAMESPACE,
   XLINK_NAMESPACE,
   XML_NAMESPACE,
-  XMLNS_NAMESPACE,
-  runHtmlEngine
-} from "../../dist/internal/html-engine/mod.js";
+  XMLNS_NAMESPACE
+} from "../../dist/internal/html-engine/namespaces.js";
+import { runHtmlEngine } from "../../dist/internal/html-engine/parser-driver.js";
 
 function fixtureElementName(node) {
   if (node.namespaceUri === SVG_NAMESPACE) return `svg ${node.localName}`;

@@ -1,14 +1,16 @@
+import { ActiveFormattingList } from "../../../src/internal/html-engine/active-formatting-list.js";
 import {
   HTML_NAMESPACE,
   XML_NAMESPACE,
-  ActiveFormattingList,
+  type HtmlAttributeNamespaceUri
+} from "../../../src/internal/html-engine/namespaces.js";
+import { createEngineResourceGuard } from "../../../src/internal/html-engine/resource-guard.js";
+import {
   HtmlTreeModel,
-  createEngineResourceGuard,
-  type HtmlAttributeNamespaceUri,
   type HtmlTreeDoctypeExternalId,
   type HtmlTreeNode,
   type HtmlTreeParent
-} from "../../../src/internal/html-engine/mod.js";
+} from "../../../src/internal/html-engine/tree-model.js";
 
 import type { NodeId } from "../../../src/mod.js";
 

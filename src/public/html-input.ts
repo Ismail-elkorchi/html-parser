@@ -1,4 +1,4 @@
-import { sniffHtmlEncoding } from "../internal/encoding/mod.ts";
+import { sniffHtmlEncoding } from "../internal/encoding/sniff.ts";
 
 import { enforceBudget } from "./budgets.ts";
 import {
@@ -13,12 +13,12 @@ import type { ParseStreamBudgetOptions, TokenizeByteStreamEagerOptions } from ".
 
 const DEFAULT_STREAM_ENCODING_PRESCAN_BYTES = 16_384;
 
-export interface StreamEncodingSniff {
+interface StreamEncodingSniff {
   readonly encoding: string;
   readonly source: "bom" | "transport" | "meta" | "default";
 }
 
-export interface StreamDecodeResult {
+interface StreamDecodeResult {
   readonly text: string;
   readonly sniff: StreamEncodingSniff;
   readonly totalBytes: number;

@@ -33,8 +33,8 @@ test("tree .dat reader preserves raw input and fragment namespace identity", () 
   });
   assert.equal(cases[0].scripting, "disabled");
   assert.equal(cases[0].errorsDeclared, true);
-  assert.equal(cases[0].sawErrors, true);
-  assert.equal(cases[0].sawNewErrors, false);
+  assert.equal(cases[0].sawUnnamedErrors, true);
+  assert.equal(cases[0].sawNamedErrors, false);
 
   const executions = expandTreeDatCases(cases);
   assert.deepEqual(executions.map((fixtureCase) => fixtureCase.id), [
@@ -42,12 +42,12 @@ test("tree .dat reader preserves raw input and fragment namespace identity", () 
   ]);
 });
 
-test("tree .dat reader retains separate legacy and named diagnostic sections", () => {
+test("tree .dat reader retains separate unnamed and named diagnostic sections", () => {
   const content = [
     "#data",
     "<?target?>",
     "#errors",
-    "legacy error",
+    "unnamed error",
     "#new-errors",
     "named-error",
     "#document",
@@ -57,10 +57,10 @@ test("tree .dat reader retains separate legacy and named diagnostic sections", (
   ].join("\n");
   const [fixtureCase] = parseTreeDatFixtures(content, "resources/errors.dat");
 
-  assert.deepEqual(fixtureCase.errors, ["legacy error"]);
-  assert.deepEqual(fixtureCase.newErrors, ["named-error"]);
-  assert.equal(fixtureCase.sawErrors, true);
-  assert.equal(fixtureCase.sawNewErrors, true);
+  assert.deepEqual(fixtureCase.unnamedErrors, ["unnamed error"]);
+  assert.deepEqual(fixtureCase.namedErrors, ["named-error"]);
+  assert.equal(fixtureCase.sawUnnamedErrors, true);
+  assert.equal(fixtureCase.sawNamedErrors, true);
   assert.equal(fixtureCase.expected, "| <?target ?>");
 });
 

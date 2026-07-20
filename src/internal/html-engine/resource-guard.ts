@@ -72,7 +72,7 @@ export interface StartTagResourceGuard {
 }
 
 /** Minimal final-tree attribute shape needed by element resource checks. */
-export interface ElementResourceAttribute {
+interface ElementResourceAttribute {
   readonly qualifiedName: string;
   readonly value: string;
 }

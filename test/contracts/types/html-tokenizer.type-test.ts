@@ -1,11 +1,13 @@
+import { createEngineResourceGuard } from "../../../src/internal/html-engine/resource-guard.js";
 import {
-  HtmlTokenizer,
   type HtmlTokenizerDelegatedCharacterReferenceState,
   type HtmlTokenizerExecutionState,
-  createEngineResourceGuard,
-  type HtmlTokenizerRunResult,
   type HtmlTokenizerState
-} from "../../../src/internal/html-engine/mod.js";
+} from "../../../src/internal/html-engine/tokenizer/state.js";
+import {
+  HtmlTokenizer,
+  type HtmlTokenizerRunResult
+} from "../../../src/internal/html-engine/tokenizer/tokenizer.js";
 import * as PublicApi from "../../../src/mod.js";
 
 const tokenizer = new HtmlTokenizer(
@@ -46,7 +48,7 @@ new HtmlTokenizer(
   createEngineResourceGuard(),
   { accept: () => true },
   {
-    // @ts-expect-error the constructor uses the exact initial-state option, not a legacy mode alias
+    // @ts-expect-error the constructor uses the exact initial-state option, not a broad mode alias
     mode: "data"
   }
 );

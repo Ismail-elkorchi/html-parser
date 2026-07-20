@@ -10,7 +10,9 @@ function collectHeap() {
 }
 
 const heapBeforeImport = collectHeap();
-const engine = await import("../../tmp/test-runtime/src/internal/html-engine/mod.js");
+const engine = await import(
+  "../../tmp/test-runtime/src/internal/html-engine/named-character-references.js"
+);
 const driver = await import("../../tmp/test-runtime/test/support/character-reference-driver.js");
 const heapAfterImport = collectHeap();
 const raw = JSON.parse(await readFile(rawPath, "utf8"));
@@ -49,7 +51,7 @@ const report = {
   generatedAt: new Date().toISOString(),
   data: {
     entries: engine.NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
-    legacyEntries: engine.LEGACY_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
+    semicolonlessEntries: engine.SEMICOLONLESS_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
     maximumNameCodeUnits: engine.MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
     rawBytes: rawStats.size,
     generatedBytes: generatedStats.size,

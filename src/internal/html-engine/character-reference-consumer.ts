@@ -15,14 +15,14 @@ import {
 /** Tokenizer return-state information that changes character-reference behavior. */
 export type CharacterReferenceContext = "text" | "attribute";
 
-export interface CharacterReferenceConsumerOptions {
+interface CharacterReferenceConsumerOptions {
   readonly context: CharacterReferenceContext;
   readonly ampersandSpan: SourceSpan;
   readonly additionalAllowedCharacter?: string | null;
   readonly onParseError?: (error: EngineParseError) => void;
 }
 
-export interface CharacterReferenceNeedMore {
+interface CharacterReferenceNeedMore {
   readonly kind: "need-more-input";
   readonly consumedUtf16: number;
   readonly position: SourcePosition;

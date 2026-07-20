@@ -66,7 +66,7 @@ test("string and fragment input budgets measure UTF-8 bytes", () => {
   }
 });
 
-test("byte input budget remains based on transport bytes after legacy decoding", () => {
+test("byte input budget remains based on transport bytes after single-byte decoding", () => {
   const { tree } = parseBytes(new Uint8Array([0xe9]), {
     transportEncodingLabel: "windows-1252",
     budgets: { maxInputBytes: 1 }

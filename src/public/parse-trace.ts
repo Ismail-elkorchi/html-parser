@@ -17,7 +17,7 @@ type TraceEventInput = TraceEvent extends infer Event
     : never
   : never;
 
-export interface TraceFinalMetrics {
+interface TraceFinalMetrics {
   readonly tokenCount: number;
   readonly nodeCount: number;
   readonly maxDepth: number;

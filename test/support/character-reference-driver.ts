@@ -1,15 +1,18 @@
 import {
   CharacterReferenceConsumer,
-  HtmlInputCursor,
-  createEngineResourceGuard,
   type CharacterReferenceConsumerMetrics,
   type CharacterReferenceContext,
   type CharacterReferenceLiteral,
-  type CharacterReferenceResolved,
-  type EngineParseError,
+  type CharacterReferenceResolved
+} from "../../src/internal/html-engine/character-reference-consumer.js";
+import { HtmlInputCursor } from "../../src/internal/html-engine/input-cursor.js";
+import {
+  createEngineResourceGuard,
   type EngineResourceGuardOptions,
   type EngineResourceUsage
-} from "../../src/internal/html-engine/mod.js";
+} from "../../src/internal/html-engine/resource-guard.js";
+
+import type { EngineParseError } from "../../src/internal/html-engine/diagnostics.js";
 
 export interface CharacterReferenceDriverOptions {
   readonly context?: CharacterReferenceContext;

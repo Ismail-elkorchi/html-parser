@@ -60,6 +60,7 @@ export default [
       "boundaries/elements": [
         { "type": "public", "pattern": "src/public/**" },
         { "type": "internal-foundation", "pattern": "src/internal/foundation/**" },
+        { "type": "encoding", "pattern": "src/internal/encoding/**" },
         { "type": "engine", "pattern": "src/internal/html-engine/**" },
         { "type": "internal", "pattern": "src/internal/**" },
         { "type": "tests", "pattern": "test/**" }
@@ -96,7 +97,7 @@ export default [
               "allow": {
                 "to": {
                   "element": {
-                    "types": { "anyOf": ["public", "engine", "internal", "internal-foundation"] }
+                    "types": { "anyOf": ["public", "engine", "encoding", "internal-foundation"] }
                   }
                 }
               }
@@ -106,6 +107,16 @@ export default [
               "allow": {
                 "to": { "element": { "types": { "anyOf": ["engine", "internal-foundation"] } } }
               }
+            },
+            {
+              "from": { "element": { "types": "encoding" } },
+              "allow": {
+                "to": { "element": { "types": { "anyOf": ["encoding", "internal-foundation"] } } }
+              }
+            },
+            {
+              "from": { "element": { "types": "internal-foundation" } },
+              "allow": { "to": { "element": { "types": "internal-foundation" } } }
             },
             {
               "from": { "element": { "types": "internal" } },
@@ -119,7 +130,14 @@ export default [
                   "to": {
                     "element": {
                       "types": {
-                        "anyOf": ["public", "engine", "internal", "internal-foundation", "tests"]
+                        "anyOf": [
+                          "public",
+                          "engine",
+                          "encoding",
+                          "internal",
+                          "internal-foundation",
+                          "tests"
+                        ]
                       }
                     }
                   }
@@ -178,8 +196,8 @@ export default [
         {
           "patterns": [
             {
-              "group": ["./internal/html-engine", "./internal/html-engine/*"],
-              "message": "The private HTML engine must not be exported from the public package root."
+              "group": ["./internal", "./internal/*", "./internal/**"],
+              "message": "The package root may export only modules owned by src/public."
             }
           ]
         }

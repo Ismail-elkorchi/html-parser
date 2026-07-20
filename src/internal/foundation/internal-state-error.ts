@@ -4,12 +4,10 @@ const INTERNAL_STATE_COMPONENT_BY_REASON = Object.freeze({
   GENERATED_CHARACTER_REFERENCE_ENTRY_MISSING: "named-character-references",
   GENERATED_CHARACTER_REFERENCE_LENGTH_MISMATCH: "named-character-references",
   INPUT_CURSOR_BUFFER_UNDERRUN: "input-cursor",
-  PRODUCT_ADAPTER_CHILD_CONVERSION_MISSING: "product-adapter",
-  PRODUCT_ADAPTER_ROOT_CONVERSION_MISSING: "product-adapter",
-  PRODUCT_ADAPTER_TEMPLATE_CONTENT_KIND_MISMATCH: "product-adapter",
-  PRODUCT_ADAPTER_UNMAPPED_RESOURCE_LIMIT: "product-adapter",
-  PUBLIC_TREE_CHILD_CONVERSION_MISSING: "public-tree-conversion",
-  PUBLIC_TREE_ROOT_CONVERSION_MISSING: "public-tree-conversion",
+  PUBLIC_PARSER_CHILD_CONVERSION_MISSING: "public-parser",
+  PUBLIC_PARSER_ROOT_CONVERSION_MISSING: "public-parser",
+  PUBLIC_PARSER_TEMPLATE_CONTENT_KIND_MISMATCH: "public-parser",
+  PUBLIC_PARSER_UNMAPPED_RESOURCE_LIMIT: "public-parser",
   TOKENIZER_BUFFERED_CHARACTER_MISSING: "tokenizer",
   TOKENIZER_CDATA_BRACKET_POSITION_MISSING: "tokenizer",
   TOKENIZER_CHARACTER_REFERENCE_MISSING: "tokenizer",
@@ -57,11 +55,7 @@ const INTERNAL_STATE_COMPONENT_BY_REASON = Object.freeze({
   TREE_MODEL_REFERENCE_NOT_CHILD: "tree-model",
   TREE_MODEL_TEXT_UNDER_DOCUMENT: "tree-model",
   TREE_MODEL_UNKNOWN_NODE: "tree-model",
-  TREE_MODEL_UNKNOWN_PARENT: "tree-model",
-  TREE_ADAPTER_CHILD_CONVERSION_MISSING: "tree-adapter",
-  TREE_ADAPTER_LEAF_KIND_UNREACHABLE: "tree-adapter",
-  TREE_ADAPTER_ROOT_CONVERSION_MISSING: "tree-adapter",
-  TREE_SERIALIZER_DOCTYPE_IDENTIFIER_UNREPRESENTABLE: "tree-serializer"
+  TREE_MODEL_UNKNOWN_PARENT: "tree-model"
 } as const);
 
 /** Machine-readable causes of contradictions in private parser state. */
@@ -72,7 +66,7 @@ export type InternalStateComponent =
   (typeof INTERNAL_STATE_COMPONENT_BY_REASON)[InternalStateErrorReason];
 
 /** A library defect or corrupted private state, never a recoverable input error. */
-export class InternalStateError extends Error {
+class InternalStateError extends Error {
   readonly code = "HTML_INTERNAL_STATE_ERROR";
   readonly component: InternalStateComponent;
   readonly reason: InternalStateErrorReason;

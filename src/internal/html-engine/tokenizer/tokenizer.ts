@@ -29,14 +29,14 @@ import {
 } from "./state.ts";
 
 /** Tokenization stopped at an open decoded-input boundary. */
-export interface HtmlTokenizerNeedMore {
+interface HtmlTokenizerNeedMore {
   readonly status: "need-more-input";
   readonly position: SourcePosition;
   readonly state: HtmlTokenizerExecutionState;
 }
 
 /** Tokenization emitted its sole end-of-file token. */
-export interface HtmlTokenizerDone {
+interface HtmlTokenizerDone {
   readonly status: "done";
   readonly position: SourcePosition;
 }
@@ -46,7 +46,7 @@ export type HtmlTokenizerRunResult = HtmlTokenizerNeedMore | HtmlTokenizerDone;
 /** States that a test or future parser driver may select before input begins. */
 export type HtmlTokenizerInitialState = TokenizerMode | "cdata-section";
 
-export interface HtmlTokenizerOptions {
+interface HtmlTokenizerOptions {
   readonly initialState?: HtmlTokenizerInitialState;
   readonly lastStartTagName?: string | null;
   readonly foreignContent?: boolean;

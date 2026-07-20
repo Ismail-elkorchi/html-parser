@@ -1,15 +1,15 @@
-export interface EncodingSniffOptions {
+interface EncodingSniffOptions {
   readonly transportEncodingLabel?: string;
   readonly maxPrescanBytes?: number;
   readonly defaultEncoding?: string;
 }
 
-export interface EncodingSniffResult {
+interface EncodingSniffResult {
   readonly encoding: string;
   readonly source: "bom" | "transport" | "meta" | "default";
 }
 
-export interface HtmlByteDecodeOptions extends EncodingSniffOptions {
+interface HtmlByteDecodeOptions extends EncodingSniffOptions {
   readonly onDecodedChunk?: (chunk: string) => void;
 }
 
