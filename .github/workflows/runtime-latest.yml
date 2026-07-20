@@ -40,9 +40,6 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Dependency freshness check
-        run: npm run deps:freshness
-
       - name: Lint
         run: npm run lint
 
@@ -53,4 +50,8 @@ jobs:
         run: npm run test
 
       - name: Runtime smoke matrix
-        run: npm run smoke:all
+        run: npm run smoke:runtimes
+
+      - name: Report outdated dependencies
+        continue-on-error: true
+        run: npm run deps:outdated

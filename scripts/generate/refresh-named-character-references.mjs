@@ -1,5 +1,5 @@
-import { mkdir, open, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, mkdtemp, open, rm, writeFile } from "node:fs/promises";
+import path, { dirname } from "node:path";
 
 import {
   ENTITIES_PATH,
@@ -15,49 +15,10 @@ import {
   renderGeneratedTable,
   sha256
 } from "./named-character-reference-data.mjs";
+import { parseLongOptions } from "../lib/cli.mjs";
+import { replacePathsAtomically } from "../lib/upstream-snapshot.mjs";
 
 const ENTITIES_URL = "https://html.spec.whatwg.org/entities.json";
-
-function parseArguments(arguments_) {
-  const values = new Map();
-  for (const argument of arguments_) {
-    const match = /^--([a-z0-9-]+)=(.+)$/.exec(argument);
-    if (match === null) throw new Error(`refresh named character references: invalid argument ${argument}`);
-    const [, name, value] = match;
-    if (name === undefined || value === undefined || values.has(name)) {
-      throw new Error(`refresh named character references: invalid or duplicate argument ${argument}`);
-    }
-    values.set(name, value);
-  }
-  const required = [
-    "entities-file",
-    "entities-bytes",
-    "entities-sha256",
-    "license-file",
-    "license-bytes",
-    "license-revision",
-    "license-sha256",
-    "retrieved-at",
-    "standard-file",
-    "standard-bytes",
-    "standard-revision",
-    "standard-sha256"
-  ];
-  for (const name of required) {
-    if (!values.has(name)) throw new Error(`refresh named character references: missing --${name}`);
-  }
-  const allowed = new Set(required);
-  for (const name of values.keys()) {
-    if (!allowed.has(name)) throw new Error(`refresh named character references: unsupported --${name}`);
-  }
-  return values;
-}
-
-function requiredValue(values, name) {
-  const value = values.get(name);
-  if (value === undefined) throw new Error(`refresh named character references: missing --${name}`);
-  return value;
-}
 
 function validateSha256(name, value) {
   if (!/^[0-9a-f]{64}$/.test(value)) {
@@ -125,28 +86,42 @@ async function fetchBytes(url, expectedBytes) {
   return Buffer.concat(chunks, receivedBytes);
 }
 
-const values = parseArguments(process.argv.slice(2));
-const entitiesFile = requiredValue(values, "entities-file");
+const requiredString = Object.freeze({ type: "string", required: true });
+const values = parseLongOptions(process.argv.slice(2), {
+  "entities-file": requiredString,
+  "entities-bytes": requiredString,
+  "entities-sha256": requiredString,
+  "license-file": requiredString,
+  "license-bytes": requiredString,
+  "license-revision": requiredString,
+  "license-sha256": requiredString,
+  "retrieved-at": requiredString,
+  "standard-file": requiredString,
+  "standard-bytes": requiredString,
+  "standard-revision": requiredString,
+  "standard-sha256": requiredString
+}, "refresh named character references");
+const entitiesFile = values["entities-file"];
 const entitiesBytesExpected = validateByteCount(
   "entities-bytes",
-  requiredValue(values, "entities-bytes")
+  values["entities-bytes"]
 );
-const entitiesSha256 = requiredValue(values, "entities-sha256");
-const licenseFile = requiredValue(values, "license-file");
+const entitiesSha256 = values["entities-sha256"];
+const licenseFile = values["license-file"];
 const licenseBytesExpected = validateByteCount(
   "license-bytes",
-  requiredValue(values, "license-bytes")
+  values["license-bytes"]
 );
-const licenseRevision = requiredValue(values, "license-revision");
-const licenseSha256 = requiredValue(values, "license-sha256");
-const retrievedAt = requiredValue(values, "retrieved-at");
-const standardFile = requiredValue(values, "standard-file");
+const licenseRevision = values["license-revision"];
+const licenseSha256 = values["license-sha256"];
+const retrievedAt = values["retrieved-at"];
+const standardFile = values["standard-file"];
 const standardBytesExpected = validateByteCount(
   "standard-bytes",
-  requiredValue(values, "standard-bytes")
+  values["standard-bytes"]
 );
-const standardRevision = requiredValue(values, "standard-revision");
-const standardSha256 = requiredValue(values, "standard-sha256");
+const standardRevision = values["standard-revision"];
+const standardSha256 = values["standard-sha256"];
 validateSha256("entities-sha256", entitiesSha256);
 validateSha256("license-sha256", licenseSha256);
 validateSha256("standard-sha256", standardSha256);
@@ -259,16 +234,32 @@ const manifest = {
   }
 };
 
-await mkdir(SNAPSHOT_DIRECTORY, { recursive: true });
-await mkdir(dirname(GENERATED_PATH), { recursive: true });
-await writeFile(ENTITIES_PATH, entitiesBytes);
-await writeFile(LICENSE_PATH, licenseBytes);
-await writeFile(MANIFEST_PATH, canonicalJson(manifest), "utf8");
-await writeFile(
-  GENERATED_PATH,
-  renderGeneratedTable(inspection, actualEntitiesSha256),
-  "utf8"
-);
+await mkdir("tmp", { recursive: true });
+const stagingRoot = await mkdtemp(path.join("tmp", "character-reference-refresh-"));
+try {
+  const snapshotStaging = path.join(stagingRoot, "snapshot");
+  const generatedStaging = path.join(stagingRoot, "named-character-references.ts");
+  await mkdir(snapshotStaging, { recursive: true });
+  await mkdir(dirname(GENERATED_PATH), { recursive: true });
+  await writeFile(path.join(snapshotStaging, path.basename(ENTITIES_PATH)), entitiesBytes);
+  await writeFile(path.join(snapshotStaging, path.basename(LICENSE_PATH)), licenseBytes);
+  await writeFile(
+    path.join(snapshotStaging, path.basename(MANIFEST_PATH)),
+    canonicalJson(manifest),
+    "utf8"
+  );
+  await writeFile(
+    generatedStaging,
+    renderGeneratedTable(inspection, actualEntitiesSha256),
+    "utf8"
+  );
+  await replacePathsAtomically([
+    { source: snapshotStaging, destination: SNAPSHOT_DIRECTORY },
+    { source: generatedStaging, destination: GENERATED_PATH }
+  ]);
+} finally {
+  await rm(stagingRoot, { recursive: true, force: true });
+}
 process.stdout.write(
   `named character references: refreshed ${String(inspection.entryCount)} entries with verified provenance\n`
 );

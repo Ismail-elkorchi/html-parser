@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
 
+import { parseLongOptions } from "../lib/cli.mjs";
+
 function runCommand(command, args) {
   return execFileSync(command, args, {
     encoding: "utf8",
@@ -7,7 +9,7 @@ function runCommand(command, args) {
   }).trim();
 }
 
-function parseRepoFromRemote(remoteUrl) {
+export function parseRepoFromRemote(remoteUrl) {
   const scpStyle = remoteUrl.match(/github\.com:([^/]+)\/(.+?)(?:\.git)?$/);
   if (scpStyle) {
     return { owner: scpStyle[1], repo: scpStyle[2] };
@@ -76,17 +78,14 @@ export function resolveReleaseRange({ fromTag, toRef } = {}) {
 }
 
 export function listMergedPullRequests({ owner, repo, fromTag, toRef }) {
-  const compareEndpoint = `repos/${owner}/${repo}/compare/${encodeURIComponent(fromTag)}...${encodeURIComponent(toRef)}`;
-  const compare = ghApiJson(compareEndpoint);
-  const commits = Array.isArray(compare.commits) ? compare.commits : [];
+  runCommand("git", ["merge-base", "--is-ancestor", fromTag, toRef]);
+  const commits = runCommand("git", ["rev-list", "--reverse", `${fromTag}..${toRef}`])
+    .split("\n")
+    .filter(Boolean);
   const pullRequestByNumber = new Map();
 
   for (const commit of commits) {
-    if (!commit?.sha) {
-      continue;
-    }
-
-    const pulls = ghApiJson(`repos/${owner}/${repo}/commits/${commit.sha}/pulls`);
+    const pulls = ghApiJson(`repos/${owner}/${repo}/commits/${commit}/pulls`);
     for (const pull of pulls) {
       if (!pull?.number || !pull?.merged_at) {
         continue;
@@ -138,36 +137,16 @@ export function buildReleaseNotes(options = {}) {
 }
 
 export function parseReleaseCliArgs(argv) {
-  const options = {
-    dryRun: false
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const argument = argv[index];
-
-    if (argument === "--dry-run") {
-      options.dryRun = true;
-      continue;
-    }
-
-    if (argument === "--from-tag" || argument === "--from_tag") {
-      options.fromTag = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (argument === "--to-ref" || argument === "--to_ref") {
-      options.toRef = argv[index + 1];
-      index += 1;
-      continue;
-    }
-
-    if (argument === "--changelog" || argument === "--changelog-file") {
-      options.changelogPath = argv[index + 1];
-      index += 1;
-      continue;
-    }
-  }
-
-  return options;
+  const parsed = parseLongOptions(argv, {
+    "dry-run": { type: "boolean", default: false },
+    "from-tag": { type: "string" },
+    "to-ref": { type: "string" },
+    changelog: { type: "string" }
+  }, "release notes");
+  return Object.freeze({
+    dryRun: parsed["dry-run"],
+    ...(parsed["from-tag"] === undefined ? {} : { fromTag: parsed["from-tag"] }),
+    ...(parsed["to-ref"] === undefined ? {} : { toRef: parsed["to-ref"] }),
+    ...(parsed.changelog === undefined ? {} : { changelogPath: parsed.changelog })
+  });
 }

@@ -5,7 +5,7 @@ import {
   ENCODING_FIXTURES,
   verifyHtml5libCorpora
 } from "../../test/support/html5lib-corpora.mjs";
-import { writeJson } from "../eval/eval-primitives.mjs";
+import { writeJson } from "../lib/report.mjs";
 
 function parseDatFixtures(text, fixtureFilePath) {
   const lines = text.split(/\r?\n/);
@@ -105,8 +105,9 @@ for (const fixtureCase of allCases) {
 }
 
 const report = {
-  suite: "encoding",
-  timestamp: new Date().toISOString(),
+  schemaVersion: 2,
+  suite: "html-parser-encoding-conformance",
+  generatedAt: new Date().toISOString(),
   cases: {
     total: allCases.length,
     passed,

@@ -2,7 +2,7 @@ import {
   PUBLIC_SERIALIZER_CASES,
   runPublicSerializerCase
 } from "../../test/support/public-serializer-cases.mjs";
-import { writeJson } from "../eval/eval-primitives.mjs";
+import { writeJson } from "../lib/report.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -20,9 +20,9 @@ for (const testCase of PUBLIC_SERIALIZER_CASES) {
 
 await writeJson("reports/serializer.json", {
   schemaVersion: 2,
-  suite: "public-html-serializer",
+  suite: "html-parser-public-serializer",
   implementation: "dist/mod.js#serialize",
-  timestamp: new Date().toISOString(),
+  generatedAt: new Date().toISOString(),
   cases: { total: passed + failed, passed, failed, skipped: 0 },
   skips: [],
   failures

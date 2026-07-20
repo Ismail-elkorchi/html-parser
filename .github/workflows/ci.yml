@@ -30,12 +30,10 @@ jobs:
           cache: npm
 
       - name: Setup Deno
+        if: matrix.node-version == 20
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: v2.x
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Install
         run: npm ci
@@ -56,27 +54,8 @@ jobs:
         if: matrix.node-version == 20
         run: npm run test:public-surface
 
-      - name: Packed type consumers
-        if: matrix.node-version == 20
-        run: npm run test:packed-types
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-
       - name: Test
         run: npm test
-
-      - name: Evaluate CI profile
-        if: github.event_name != 'pull_request'
-        run: npm run eval:ci
-
-      - name: Upload eval reports
-        if: github.event_name != 'pull_request' && always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: eval-reports-node
-          if-no-files-found: warn
-          path: reports/**
 
   deno:
     runs-on: ubuntu-latest

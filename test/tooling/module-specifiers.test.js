@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { collectModuleSpecifiers } from "../../scripts/eval/module-specifiers.mjs";
+import { collectModuleSpecifiers } from "../../scripts/lib/module-specifiers.mjs";
 
 test("module reference scanning reads syntax without matching documentation text", () => {
   const source = `

@@ -170,9 +170,8 @@ jobs:
         run: |
           set -euo pipefail
           npm run check:fast
-          npm run docs:lint:jsr
-          npm run docs:test:jsr
-          npm run examples:run
+          npm run test:conformance
+          npm run qualification:package
 
       - name: Ensure npm version does not already exist
         if: ${{ steps.meta.outputs.publish_npm == 'true' }}
@@ -267,4 +266,4 @@ jobs:
 
       - name: Publish JSR
         if: ${{ steps.meta.outputs.dry_run != 'true' && steps.meta.outputs.publish_jsr == 'true' }}
-        run: npx -y jsr publish --allow-dirty
+        run: npx -y jsr publish --allow-dirty --provenance

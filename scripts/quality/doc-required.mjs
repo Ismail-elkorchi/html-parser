@@ -1,20 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import ts from "typescript";
 
-const ENTRYPOINT_CANDIDATES = ["src/mod.ts", "src/public/mod.ts"];
-
-function resolveEntrypointPath() {
-  for (const candidate of ENTRYPOINT_CANDIDATES) {
-    const absolutePath = resolve(process.cwd(), candidate);
-    if (existsSync(absolutePath)) {
-      return absolutePath;
-    }
-  }
-
-  throw new Error(`Expected package entrypoint at one of: ${ENTRYPOINT_CANDIDATES.join(", ")}`);
-}
+const ENTRYPOINT = "src/mod.ts";
 
 function normalizePath(filePath) {
   return filePath.replaceAll("\\", "/");
@@ -186,7 +175,7 @@ function checkEntrypointDocs(entryPath) {
 }
 
 function main() {
-  const entryPath = resolveEntrypointPath();
+  const entryPath = resolve(process.cwd(), ENTRYPOINT);
   const missing = checkEntrypointDocs(entryPath);
 
   if (missing.length === 0) {

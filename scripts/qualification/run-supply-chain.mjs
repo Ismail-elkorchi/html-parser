@@ -2,8 +2,8 @@ import { spawnSync } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
-import { writeJson } from "../eval/eval-primitives.mjs";
-import { collectModuleSpecifiers } from "../eval/module-specifiers.mjs";
+import { collectModuleSpecifiers } from "../lib/module-specifiers.mjs";
+import { writeJson } from "../lib/report.mjs";
 
 function run(command, args) {
   const result = spawnSync(command, args, { encoding: "utf8" });
@@ -77,7 +77,8 @@ const manualPublishWorkflow = await readFile(".github/workflows/publish-manual.y
 const provenance = {
   npm: publishWorkflow.includes("npm publish --provenance") &&
     manualPublishWorkflow.includes("npm publish --provenance"),
-  jsr: manualPublishWorkflow.includes("jsr publish --allow-dirty --provenance")
+  jsr: publishWorkflow.includes("jsr publish --allow-dirty --provenance") &&
+    manualPublishWorkflow.includes("jsr publish --allow-dirty --provenance")
 };
 const noticeCoverage = {
   wpt: notices.includes("web-platform-tests") || notices.includes("WPT"),
@@ -85,7 +86,7 @@ const noticeCoverage = {
 };
 
 const report = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   suite: "html-parser-supply-chain",
   generatedAt: new Date().toISOString(),
   manifests: {
@@ -119,6 +120,6 @@ const ok = runtimeDependencies.length === 0 && lockedRuntimeDependencies.length 
   auditClean && sbomValid && bareImports.length === 0 &&
   report.characterReferences.exactGeneratedData &&
   Object.values(provenance).every(Boolean) && Object.values(noticeCoverage).every(Boolean);
-await writeJson("reports/engine-supply-chain.json", { ...report, ok });
+await writeJson("reports/supply-chain.json", { ...report, ok });
 console.log(JSON.stringify({ ...report, ok }, null, 2));
 if (!ok) process.exitCode = 1;

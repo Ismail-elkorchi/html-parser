@@ -6,7 +6,7 @@ import {
   PUBLIC_SERIALIZATION_QUALIFICATION_CASES,
   runPublicSerializationQualificationCase
 } from "../../test/support/public-serialization-qualification-cases.mjs";
-import { writeJson } from "../eval/eval-primitives.mjs";
+import { writeJson } from "../lib/report.mjs";
 
 const ENGINES = Object.freeze([
   ["chromium", chromium],
@@ -44,13 +44,6 @@ async function nativeSerialization(page, testCase) {
     container.appendChild(node);
     return container.innerHTML;
   }, testCase);
-}
-
-if (
-  process.platform === "linux" &&
-  process.env["PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS"] === undefined
-) {
-  process.env["PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS"] = "1";
 }
 
 const cases = PUBLIC_SERIALIZATION_QUALIFICATION_CASES.filter((testCase) => testCase.browserApplicable);
@@ -118,7 +111,8 @@ for (const [name, launcher] of ENGINES) {
 }
 
 const report = {
-  schema: "public-serialization-browser-diff/v1",
+  schemaVersion: 1,
+  suite: "html-parser-public-serialization-browser-differential",
   generatedAt: new Date().toISOString(),
   cases: cases.length,
   results

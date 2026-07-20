@@ -6,7 +6,7 @@ import {
   runEngineTokenizerFixture
 } from "../../tmp/test-runtime/test/support/engine-tokenizer-fixtures.js";
 import { verifyHtml5libCorpora } from "../../test/support/html5lib-corpora.mjs";
-import { writeJson } from "../eval/eval-primitives.mjs";
+import { writeJson } from "../lib/report.mjs";
 
 const EXPECTED_CLASSIFIED_DIFFERENCES = 38;
 const EXPECTED_CLASSIFICATION_SHA256 =
@@ -68,14 +68,16 @@ const classificationSha256 = createHash("sha256")
 const classificationsMatch = classified.length === EXPECTED_CLASSIFIED_DIFFERENCES &&
   classificationSha256 === EXPECTED_CLASSIFICATION_SHA256;
 const report = {
-  suite: "tokenizer",
-  timestamp: new Date().toISOString(),
+  schemaVersion: 2,
+  suite: "html-parser-tokenizer-conformance",
+  generatedAt: new Date().toISOString(),
   cases: {
-    total: passed + failed,
-    passed,
+    total: fixtures.length,
+    passed: passed + classified.length,
     failed,
     skipped: 0
   },
+  exactPasses: passed,
   skips: [],
   classifiedDifferences: classified.length,
   classificationSha256,

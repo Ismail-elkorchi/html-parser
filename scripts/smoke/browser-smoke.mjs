@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, normalize, resolve } from "node:path";
 
 import { chromium } from "playwright";
+import { parseLongOptions } from "../lib/cli.mjs";
 
 const DEFAULT_REPORT_PATH = "reports/smoke-browser.json";
 const MIME_TYPES = {
@@ -12,16 +13,6 @@ const MIME_TYPES = {
   ".txt": "text/plain; charset=utf-8",
   ".map": "application/json; charset=utf-8"
 };
-
-function parseArgs(argv) {
-  let reportPath = DEFAULT_REPORT_PATH;
-  for (const arg of argv) {
-    if (arg.startsWith("--report=")) {
-      reportPath = arg.slice("--report=".length);
-    }
-  }
-  return { reportPath };
-}
 
 function encodeHex(bytes) {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
@@ -186,7 +177,9 @@ async function runBrowserSmoke(baseUrl) {
 }
 
 async function main() {
-  const { reportPath } = parseArgs(process.argv.slice(2));
+  const { report: reportPath } = parseLongOptions(process.argv.slice(2), {
+    report: { type: "string", default: DEFAULT_REPORT_PATH }
+  }, "browser smoke");
   const rootDir = resolve(".");
   const server = createStaticServer(rootDir);
   await new Promise((resolvePromise) => {
@@ -201,9 +194,10 @@ async function main() {
     const baseUrl = `http://127.0.0.1:${String(address.port)}`;
     const smoke = await runBrowserSmoke(baseUrl);
     const report = {
-      suite: "smoke-runtime",
+      schemaVersion: 2,
+      suite: "html-parser-browser-smoke",
       runtime: "browser",
-      timestamp: new Date().toISOString(),
+      generatedAt: new Date().toISOString(),
       ok: smoke.ok,
       version: smoke.version,
       userAgent: smoke.userAgent,

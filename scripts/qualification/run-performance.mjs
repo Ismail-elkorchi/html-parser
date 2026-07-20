@@ -3,7 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
-import { writeJson } from "../eval/eval-primitives.mjs";
+import { writeJson } from "../lib/report.mjs";
 import {
   evaluatePerformance,
   PERFORMANCE_BENCHMARK_NAMES,
@@ -11,13 +11,13 @@ import {
   PERFORMANCE_THRESHOLDS
 } from "./performance-policy.mjs";
 
-const RUNS = Number(process.env["ENGINE_PERFORMANCE_RUNS"] ?? 12);
+const RUNS = Number(process.env["HTML_PARSER_PERFORMANCE_RUNS"] ?? 12);
 if (!Number.isSafeInteger(RUNS) || RUNS < 3) {
-  throw new Error("ENGINE_PERFORMANCE_RUNS must be a safe integer of at least 3");
+  throw new Error("HTML_PARSER_PERFORMANCE_RUNS must be a safe integer of at least 3");
 }
 
 const ROOT = process.cwd();
-const DRIVER = path.join(ROOT, "scripts/qualification/benchmark-engine.mjs");
+const DRIVER = path.join(ROOT, "scripts/qualification/benchmark-parser.mjs");
 const WORKTREE_ROOT = path.join(ROOT, "tmp/qualification-performance");
 const BENCHMARK_RUNTIME_FLAGS = Object.freeze([
   "--expose-gc",
@@ -30,9 +30,9 @@ const REFERENCES = Object.freeze([
   PERFORMANCE_BASELINES.serializer
 ]);
 
-const candidateStatus = run("git", ["status", "--porcelain", "--untracked-files=no"]).trim();
+const candidateStatus = run("git", ["status", "--porcelain"]).trim();
 if (candidateStatus.length > 0) {
-  throw new Error("Performance qualification requires a clean tracked candidate revision");
+  throw new Error("Performance qualification requires a clean candidate revision");
 }
 const historicalTagCommit = run("git", [
   "rev-parse",
@@ -114,12 +114,11 @@ function summarize(runResults) {
   }));
 }
 
-function measure(moduleRoot, engine, benchmark) {
+function measure(moduleRoot, benchmark) {
   const output = run(process.execPath, [
     ...BENCHMARK_RUNTIME_FLAGS,
     DRIVER,
     `--module-root=${moduleRoot}`,
-    `--engine=${engine}`,
     `--benchmark=${benchmark}`
   ]);
   return JSON.parse(output);
@@ -140,7 +139,6 @@ try {
     measurementTargets.push({
       id: reference.id,
       moduleRoot: worktree,
-      engine: "public",
       commit,
       checkoutCommit: commit,
       benchmarks: reference.benchmarks,
@@ -152,7 +150,6 @@ try {
   measurementTargets.push({
     id: "candidate",
     moduleRoot: ROOT,
-    engine: "public",
     ...candidate,
     benchmarks: PERFORMANCE_BENCHMARK_NAMES,
     results: Array.from({ length: RUNS }, () => ({ results: [] }))
@@ -175,7 +172,7 @@ try {
       ];
       benchmarkOrder.push({ benchmark, revisions: orderedTargets.map((target) => target.id) });
       for (const target of orderedTargets) {
-        const measurement = measure(target.moduleRoot, target.engine, benchmark);
+        const measurement = measure(target.moduleRoot, benchmark);
         target.results[runIndex]?.results.push(...measurement.results);
         target.runtime = measurement.runtime;
       }
@@ -187,7 +184,7 @@ try {
     revisions[target.id] = {
       commit: target.commit,
       checkoutCommit: target.checkoutCommit,
-      engine: target.engine,
+      implementation: "public",
       runtime: target.runtime,
       runs: target.results,
       benchmarks: summarize(target.results)
@@ -226,6 +223,6 @@ const report = {
   revisions,
   ...evaluation
 };
-await writeJson("reports/engine-performance.json", report);
+await writeJson("reports/performance.json", report);
 console.log(JSON.stringify(evaluation, null, 2));
 if (!report.ok) process.exitCode = 1;

@@ -4,6 +4,10 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Replace staged parser evidence and score-based evaluation wrappers with one
+  direct test/qualification command surface; make fixture refreshes
+  transactional, package checks exercise the installed tarball, mutation run
+  in an isolated workspace, and release/publish validation fail closed.
 - Make WPT the sole tree-construction corpus, remove the html5lib-tests
   submodule and duplicate legacy tree runner, and retain only manifest-verified
   tokenizer and encoding snapshots with stable upstream fixture identities.

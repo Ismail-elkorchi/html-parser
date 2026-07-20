@@ -3,15 +3,24 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
 import { HtmlBudgetExceededError, parse } from "../../dist/mod.js";
-import { writeJson } from "../eval/eval-primitives.mjs";
+import { parseLongOptions } from "../lib/cli.mjs";
+import { writeJson } from "../lib/report.mjs";
 
 const RUNS = 600;
 const SEED = 0x9e3779b9;
 const SLOW_OBSERVATION_MS = 25;
-const CASE_WATCHDOG_MS = Number(process.env["ENGINE_FUZZ_WATCHDOG_MS"] ?? 2_000);
+const CASE_WATCHDOG_MS = Number(process.env["HTML_PARSER_FUZZ_WATCHDOG_MS"] ?? 2_000);
 if (!Number.isSafeInteger(CASE_WATCHDOG_MS) || CASE_WATCHDOG_MS < 10) {
-  throw new Error("ENGINE_FUZZ_WATCHDOG_MS must be a safe integer of at least 10");
+  throw new Error("HTML_PARSER_FUZZ_WATCHDOG_MS must be a safe integer of at least 10");
 }
+const options = parseLongOptions(process.argv.slice(2), {
+  worker: { type: "boolean", default: false },
+  "stall-worker": { type: "boolean", default: false },
+  "probe-watchdog": { type: "boolean", default: false }
+}, "fuzz qualification");
+const selectedModes = [options.worker, options["stall-worker"], options["probe-watchdog"]]
+  .filter(Boolean).length;
+if (selectedModes > 1) throw new Error("fuzz qualification: worker modes are mutually exclusive");
 const PROTOCOL_WATCHDOG_MS = Math.max(5_000, CASE_WATCHDOG_MS);
 const TOP_SLOWEST = 12;
 
@@ -293,7 +302,7 @@ function runCampaign() {
   return {
     schemaVersion: 2,
     suite: "html-parser-fuzz",
-    timestamp: new Date().toISOString(),
+    generatedAt: new Date().toISOString(),
     runs: RUNS,
     seed: `0x${SEED.toString(16)}`,
     crashes,
@@ -331,7 +340,7 @@ function runCampaignWithWatchdog(workerArguments = ["--worker"]) {
         resolve({
           schemaVersion: 2,
           suite: "html-parser-fuzz",
-          timestamp: new Date().toISOString(),
+          generatedAt: new Date().toISOString(),
           runs: RUNS,
           completedRuns,
           seed: `0x${SEED.toString(16)}`,
@@ -374,7 +383,7 @@ function runCampaignWithWatchdog(workerArguments = ["--worker"]) {
       resolve({
         schemaVersion: 2,
         suite: "html-parser-fuzz",
-        timestamp: new Date().toISOString(),
+        generatedAt: new Date().toISOString(),
         runs: RUNS,
         completedRuns,
         seed: `0x${SEED.toString(16)}`,
@@ -392,12 +401,12 @@ function runCampaignWithWatchdog(workerArguments = ["--worker"]) {
   });
 }
 
-if (process.argv.includes("--worker")) {
+if (options.worker) {
   process.send?.({ kind: "report", report: runCampaign() });
-} else if (process.argv.includes("--stall-worker")) {
+} else if (options["stall-worker"]) {
   process.send?.({ kind: "case-start", id: "watchdog-probe", run: 0, seed: "probe" });
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
-} else if (process.argv.includes("--probe-watchdog")) {
+} else if (options["probe-watchdog"]) {
   const report = await runCampaignWithWatchdog(["--stall-worker"]);
   const passed = report.hangs === 1 && report.crashes === 0 &&
     report.findings?.[0]?.type === "watchdog-timeout" &&

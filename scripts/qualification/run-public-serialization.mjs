@@ -13,16 +13,15 @@ import {
   runPublicSerializationQualificationCase
 } from "../../test/support/public-serialization-qualification-cases.mjs";
 import { verifyWptSerializationCorpus } from "../../test/support/wpt-serialization-corpus.mjs";
-import { writeJson } from "../eval/eval-primitives.mjs";
+import { writeJson } from "../lib/report.mjs";
+import { parseLongOptions } from "../lib/cli.mjs";
+
+const { report: reportPath } = parseLongOptions(process.argv.slice(2), {
+  report: { type: "string", default: "reports/public-serialization.json" }
+}, "public serialization qualification");
 
 function sha256(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
-}
-
-function reportPath() {
-  const prefix = "--report=";
-  return process.argv.slice(2).find((argument) => argument.startsWith(prefix))?.slice(prefix.length) ??
-    "reports/public-serialization.json";
 }
 
 function readStaticStringArray(sourceText, declarationName) {
@@ -100,7 +99,8 @@ for (const file of requiredWptFiles) {
 }
 
 const report = {
-  schema: "public-serialization-qualification/v1",
+  schemaVersion: 1,
+  suite: "html-parser-public-serialization",
   generatedAt: new Date().toISOString(),
   implementation: "dist/mod.js#serialize",
   standardRevision: "56674fb3ac40279141a202e5d19b84f30d99854d",
@@ -125,6 +125,6 @@ const report = {
   outcomesSha256: sha256({ direct: outcomes, parsedWptOutcomes }),
   failures
 };
-await writeJson(reportPath(), report);
+await writeJson(reportPath, report);
 console.log(JSON.stringify(report));
 if (failures.length > 0) process.exitCode = 1;

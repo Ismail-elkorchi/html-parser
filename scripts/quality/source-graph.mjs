@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { collectModuleSpecifiers } from "../eval/module-specifiers.mjs";
+import { collectModuleSpecifiers } from "../lib/module-specifiers.mjs";
 
 function sourceLayer(filePath) {
   if (filePath === "src/mod.ts") return "entrypoint";
@@ -98,13 +98,25 @@ export function analyzeSourceGraph(sources) {
   const sourceByPath = new Map(sources.map(({ filePath, source }) => [filePath, source]));
   const graph = new Map([...sourceByPath.keys()].map((filePath) => [filePath, []]));
   const unresolved = [];
+  const externalReferences = [];
+  const commonJsReferences = [];
   const layerViolations = [];
   const engineIngress = [];
   const generatedIngress = [];
 
   for (const [filePath, source] of sourceByPath) {
     for (const reference of collectModuleSpecifiers(source, filePath)) {
-      if (!reference.specifier.startsWith(".")) continue;
+      if (reference.kind === "require") {
+        commonJsReferences.push(Object.freeze({ filePath, specifier: reference.specifier }));
+      }
+      if (!reference.specifier.startsWith(".")) {
+        externalReferences.push(Object.freeze({
+          filePath,
+          kind: reference.kind,
+          specifier: reference.specifier
+        }));
+        continue;
+      }
       const dependency = resolveRelativeSpecifier(filePath, reference.specifier);
       if (!sourceByPath.has(dependency)) {
         unresolved.push(Object.freeze({ filePath, specifier: reference.specifier, dependency }));
@@ -129,6 +141,8 @@ export function analyzeSourceGraph(sources) {
     files: sourceByPath.size,
     edges: [...graph.values()].reduce((total, dependencies) => total + dependencies.length, 0),
     unresolved: Object.freeze(unresolved),
+    externalReferences: Object.freeze(externalReferences),
+    commonJsReferences: Object.freeze(commonJsReferences),
     cycles: findCycles(graph),
     entrypointFound: graph.has("src/mod.ts"),
     unreachableFromEntrypoint: unreachableFrom(graph, "src/mod.ts"),
