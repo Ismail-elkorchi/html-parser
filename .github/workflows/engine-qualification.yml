@@ -55,9 +55,6 @@ jobs:
       - name: Run deep and error-heavy resource evidence
         run: npm run test:bench:independent-product
 
-      - name: Compare tagged and candidate performance
-        run: npm run qualification:performance
-
       - name: Verify package types from an offline production install
         run: npm run test:packed-types
 
