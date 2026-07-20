@@ -5,7 +5,7 @@ fixtures from the network.
 
 ## Named character reference data
 
-The independent engine's generated reference table comes from the pinned
+The parser engine's generated reference table comes from the pinned
 WHATWG snapshot under
 `test/fixtures/upstream/whatwg-named-character-references`. Its manifest keeps
 the floating `entities.json` retrieval artifact, the rendered HTML Standard
@@ -130,36 +130,45 @@ is reviewed in the refresh contract. Inspect the source changes, manifest,
 licenses, explicit expectations, round-trip classifications, and all three
 browser results together before accepting a new snapshot.
 
-## html5lib corpus
+## html5lib tokenizer and encoding corpora
 
-`vendor/html5lib-tests` remains a Git submodule at
-`8f43b7ec8c9d02179f5f38e0ea08cb5000fb9c9e`. It supplies tokenizer,
-encoding, and six-file tree conformance. Initialize it
-when running those suites:
+The checked-in snapshots under `test/fixtures/upstream/html5lib-tokenizer` and
+`test/fixtures/upstream/html5lib-encoding` are pinned to
+`224991ec10db04f056a89eed8b0bd8695fd2950e`. Their manifests record the official
+repository, upstream paths, Git blob IDs, SHA-256 values, licenses, byte counts,
+and complete consumed inventories. The tokenizer snapshot contains all 14
+upstream `.test` files. The encoding snapshot contains the three applicable
+root `.dat` files; nested scripted and character-detection inputs are outside
+the encoding-sniffing fixture contract.
 
-```bash
-git submodule update --init --recursive
-```
+WPT is the sole tree-construction corpus. No html5lib tree or serializer
+fixtures are retained, and normal tests require neither a Git submodule nor a
+network fetch.
 
-All 277 tree cases were proven represented in the maintained WPT snapshot when
-that snapshot was pinned. Do not update, remove, or narrow the html5lib
-submodule until its tokenizer, encoding, and tree consumers have an
-authoritative replacement. Public serialization has an owned direct gate and
-does not depend on an html5lib rendering adapter.
-
-The tokenizer runner expands the 14 tokenizer files to 7,036 entry-mode cases
-and applies the same visible primary/holdout partition. It matches 6,297
-primary and 701 holdout
-cases. The other 38 cases exercise processing instructions and retain stale
-comment-token expectations from before the pinned HTML Standard added its five
-processing-instruction states. They are classified by the observed standard
-behavior, not fixture IDs; direct tests cover the typed token, recovery, and
-diagnostics. `npm run test:engine:tokenizer` also requires every token, source
-span, and diagnostic to agree under whole-input, one-UTF-16-unit,
+The tokenizer runner expands the 14 tokenizer files to 7,036 entry-mode cases.
+It matches 6,998 exactly. The remaining 38 exercise processing instructions
+and retain comment-token or diagnostic expectations from before the pinned
+HTML Standard added its five processing-instruction states. Their complete
+observed differences are fingerprinted; a new or changed difference fails.
+Direct tests cover the typed token, recovery, and diagnostics. `npm run
+test:engine:tokenizer` also requires every token, source span, and diagnostic to
+agree under whole-input, one-UTF-16-unit,
 Unicode-scalar, delimiter, empty-interleaved, and deterministic chunk schedules,
 plus every code-unit partition of focused transition probes.
 
 ## Refresh procedure
+
+Refreshing the tokenizer and encoding snapshots is an explicit maintenance
+operation. Pass a reviewed full html5lib-tests revision:
+
+```bash
+npm run html5lib-fixtures:refresh -- --commit=<html5lib-tests-commit>
+```
+
+The refresh rejects an added or removed tokenizer or root encoding fixture
+until its inventory contract is deliberately reviewed. Inspect the raw data,
+manifests, licenses, classified tokenizer differences, and encoding outcomes
+before accepting the regenerated snapshots.
 
 Refreshing the WPT snapshot is an explicit maintenance operation. Pass a full
 40-character WPT commit:
@@ -194,6 +203,5 @@ Product regressions cover html-parser-specific budgets, errors, spans, traces,
 immutability, and public API behavior.
 
 Store licenses and corpus provenance with test fixtures and summarize them in
-[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md). A test partition is not
-private merely because it is called holdout; all repository partitions are
-visible and runnable.
+[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md). Every applicable pinned
+case is executed; conformance is not split into artificial visible partitions.

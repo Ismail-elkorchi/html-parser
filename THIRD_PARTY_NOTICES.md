@@ -6,9 +6,12 @@ Scope:
 
 ## html5lib-tests
 - Source: https://github.com/html5lib/html5lib-tests
-- Location in repository: `vendor/html5lib-tests`
+- Locations in repository: `test/fixtures/upstream/html5lib-tokenizer` and
+  `test/fixtures/upstream/html5lib-encoding`
 - License: MIT
-- Notice: Fixture data is used for conformance evaluation.
+- Notice: Test-only tokenizer and applicable encoding snapshots are used for
+  conformance evaluation. Their exact commit, upstream paths, Git blob IDs,
+  SHA-256 values, and byte counts are recorded in colocated manifests.
 
 ## Web Platform Tests tree-construction fixtures
 - Source: https://github.com/web-platform-tests/wpt

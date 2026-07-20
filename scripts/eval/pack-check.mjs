@@ -190,8 +190,7 @@ async function main() {
     "html-parser-*.tgz",
     "node_modules/**",
     "reports/**",
-    "tmp/**",
-    "vendor/**"
+    "tmp/**"
   ];
   const jsrWorkspaceExcludes = Array.isArray(jsrManifest.exclude)
     ? [...jsrManifest.exclude].sort()

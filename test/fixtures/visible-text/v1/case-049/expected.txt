@@ -1,5 +1,0 @@
-Command:
-
-npm run build
-npm test
-Done

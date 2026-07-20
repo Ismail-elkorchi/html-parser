@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -14,9 +12,8 @@ import {
   iterateText,
   parse
 } from "../../dist/mod.js";
+import { loadVisibleTextFixtures } from "../support/visible-text-fixtures.mjs";
 
-const FIXTURE_ROOT = "test/fixtures/visible-text/v1";
-const FALLBACK_FIXTURE_ROOT = "test/fixtures/visible-text-fallback/v1";
 const encoder = new TextEncoder();
 
 function visibleOptions(overrides = {}) {
@@ -50,73 +47,47 @@ function drain(iterator) {
   }
 }
 
-async function loadFixtureIds(root) {
-  const entries = await readdir(root, { withFileTypes: true });
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort((left, right) => left.localeCompare(right));
-}
-
-test("visible-text fixture corpus has required minimum size", async () => {
-  const fixtureIds = await loadFixtureIds(FIXTURE_ROOT);
-  assert.ok(fixtureIds.length >= 30);
-});
-
 test("visible policy results and iterator tokens match every fixture snapshot", async () => {
-  const fixtureIds = await loadFixtureIds(FIXTURE_ROOT);
-  for (const fixtureId of fixtureIds) {
-    const fixtureDir = join(FIXTURE_ROOT, fixtureId);
-    const [inputHtml, expectedText, expectedTokensText] = await Promise.all([
-      readFile(join(fixtureDir, "input.html"), "utf8"),
-      readFile(join(fixtureDir, "expected.txt"), "utf8"),
-      readFile(join(fixtureDir, "expected.tokens.json"), "utf8")
-    ]);
-    const { tree } = parse(inputHtml, { captureSpans: true });
-    const expected = expectedText.replace(/\n$/, "");
+  const { visibleText } = await loadVisibleTextFixtures();
+  for (const fixture of visibleText) {
+    const { tree } = parse(fixture.input, { captureSpans: true });
     const first = extractText(tree, visibleOptions());
     const second = extractText(tree, visibleOptions());
     const iterated = drain(iterateText(tree, visibleOptions()));
     const tokenSnapshot = iterated.tokens.map(({ kind, value }) => ({ kind, value }));
 
-    assert.deepEqual(first, second, `result determinism: ${fixtureId}`);
-    assert.equal(first.text, expected, `text mismatch: ${fixtureId}`);
-    assert.equal(first.totalBytes, encoder.encode(expected).byteLength, `byte total: ${fixtureId}`);
-    assert.equal(first.truncated, false, `unexpected truncation: ${fixtureId}`);
-    assert.equal(first.policy, VISIBLE_TEXT_HTML_POLICY, `policy: ${fixtureId}`);
-    assert.deepEqual(tokenSnapshot, JSON.parse(expectedTokensText), `tokens: ${fixtureId}`);
-    assert.deepEqual(iterated.result, first, `iterator result: ${fixtureId}`);
+    assert.deepEqual(first, second, `result determinism: ${fixture.id}`);
+    assert.equal(first.text, fixture.expectedText, `text mismatch: ${fixture.id}`);
+    assert.equal(
+      first.totalBytes,
+      encoder.encode(fixture.expectedText).byteLength,
+      `byte total: ${fixture.id}`
+    );
+    assert.equal(first.truncated, false, `unexpected truncation: ${fixture.id}`);
+    assert.equal(first.policy, VISIBLE_TEXT_HTML_POLICY, `policy: ${fixture.id}`);
+    assert.deepEqual(tokenSnapshot, fixture.expectedTokens, `tokens: ${fixture.id}`);
+    assert.deepEqual(iterated.result, first, `iterator result: ${fixture.id}`);
     assert.equal(iterated.tokens.map((entry) => entry.value).join(""), first.text);
   }
 });
 
-test("visible fallback variants preserve their versioned snapshots", async () => {
-  const fixtureIds = await loadFixtureIds(FALLBACK_FIXTURE_ROOT);
-  assert.ok(fixtureIds.length >= 12);
-  for (const fixtureId of fixtureIds) {
-    const fixtureDir = join(FALLBACK_FIXTURE_ROOT, fixtureId);
-    const [inputHtml, expectedDefaultText, expectedFallbackText, expectedTokensText] = await Promise.all([
-      readFile(join(fixtureDir, "input.html"), "utf8"),
-      readFile(join(fixtureDir, "expected.default.txt"), "utf8"),
-      readFile(join(fixtureDir, "expected.fallback.txt"), "utf8"),
-      readFile(join(fixtureDir, "expected.fallback.tokens.json"), "utf8")
-    ]);
-    const { tree } = parse(inputHtml, { captureSpans: true });
-    const expectedDefault = expectedDefaultText.replace(/\n$/, "");
-    const expectedFallback = expectedFallbackText.replace(/\n$/, "");
+test("accessible-name fallback variants match their explicit snapshots", async () => {
+  const { accessibleNameFallback } = await loadVisibleTextFixtures();
+  for (const fixture of accessibleNameFallback) {
+    const { tree } = parse(fixture.input, { captureSpans: true });
     const baseline = extractText(tree, visibleOptions());
     const options = visibleOptions({ includeAccessibleNameFallback: true });
     const fallback = extractText(tree, options);
     const iterated = drain(iterateText(tree, options));
 
-    assert.equal(baseline.text, expectedDefault, `fallback default: ${fixtureId}`);
-    assert.equal(fallback.text, expectedFallback, `fallback variant: ${fixtureId}`);
+    assert.equal(baseline.text, fixture.expectedDefaultText, `fallback default: ${fixture.id}`);
+    assert.equal(fallback.text, fixture.expectedFallbackText, `fallback variant: ${fixture.id}`);
     assert.deepEqual(
       iterated.tokens.map(({ kind, value }) => ({ kind, value })),
-      JSON.parse(expectedTokensText),
-      `fallback tokens: ${fixtureId}`
+      fixture.expectedFallbackTokens,
+      `fallback tokens: ${fixture.id}`
     );
-    assert.deepEqual(iterated.result, fallback, `fallback iterator result: ${fixtureId}`);
+    assert.deepEqual(iterated.result, fallback, `fallback iterator result: ${fixture.id}`);
   }
 });
 

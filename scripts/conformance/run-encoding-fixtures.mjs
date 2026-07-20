@@ -2,20 +2,10 @@ import { readFile } from "node:fs/promises";
 
 import { sniffHtmlEncoding } from "../../dist/internal/encoding/sniff.js";
 import {
-  ENCODING_FIXTURE_FILES,
-  requireFixtureFiles
-} from "../../test/support/fixture-sources.mjs";
+  ENCODING_FIXTURES,
+  verifyHtml5libCorpora
+} from "../../test/support/html5lib-corpora.mjs";
 import { writeJson } from "../eval/eval-primitives.mjs";
-const HOLDOUT_MOD = 10;
-const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
-
-function computeHoldout(fixtureId) {
-  let hash = 0;
-  for (let charIndex = 0; charIndex < fixtureId.length; charIndex += 1) {
-    hash = (Math.imul(hash, 29) + fixtureId.charCodeAt(charIndex)) >>> 0;
-  }
-  return hash % HOLDOUT_MOD === 0;
-}
 
 function parseDatFixtures(text, fixtureFilePath) {
   const lines = text.split(/\r?\n/);
@@ -82,24 +72,18 @@ function normalizeExpected(label) {
 }
 
 const allCases = [];
-await requireFixtureFiles(ENCODING_FIXTURE_FILES);
-for (const fixturePath of ENCODING_FIXTURE_FILES) {
-  const content = await readFile(fixturePath, "utf8");
-  allCases.push(...parseDatFixtures(content, fixturePath));
+await verifyHtml5libCorpora();
+for (const fixture of ENCODING_FIXTURES) {
+  const content = await readFile(fixture.path, "utf8");
+  allCases.push(...parseDatFixtures(content, fixture.upstreamPath));
 }
 
 const encoder = new TextEncoder();
 const failures = [];
 let passed = 0;
 let failed = 0;
-let holdoutExcluded = 0;
 
 for (const fixtureCase of allCases) {
-  if (computeHoldout(fixtureCase.id)) {
-    holdoutExcluded += 1;
-    continue;
-  }
-
   const encodedBytes = encoder.encode(fixtureCase.data);
   const sniffResult = sniffHtmlEncoding(encodedBytes, { defaultEncoding: "windows-1252" });
 
@@ -124,19 +108,11 @@ const report = {
   suite: "encoding",
   timestamp: new Date().toISOString(),
   cases: {
-    total: allCases.length - holdoutExcluded,
+    total: allCases.length,
     passed,
     failed,
     skipped: 0
   },
-  holdout: {
-    excluded: holdoutExcluded,
-    rule: HOLDOUT_RULE,
-    mod: HOLDOUT_MOD
-  },
-  holdoutExcluded,
-  holdoutRule: HOLDOUT_RULE,
-  holdoutMod: HOLDOUT_MOD,
   skips: [],
   failures
 };
@@ -144,8 +120,8 @@ const report = {
 await writeJson("reports/encoding.json", report);
 
 if (failed > 0) {
-  console.error(`Encoding fixture failures: ${failed}/${allCases.length - holdoutExcluded}`);
+  console.error(`Encoding fixture failures: ${String(failed)}/${String(allCases.length)}`);
   process.exit(1);
 }
 
-console.log(`Encoding fixtures passed=${passed}/${allCases.length - holdoutExcluded}`);
+console.log(`Encoding fixtures passed=${String(passed)}/${String(allCases.length)}`);

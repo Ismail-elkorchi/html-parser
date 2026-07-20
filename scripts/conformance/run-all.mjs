@@ -1,15 +1,12 @@
 import { spawn } from "node:child_process";
 import { stat } from "node:fs/promises";
 
-import {
-  ALL_HTML5LIB_FIXTURE_FILES,
-  requireFixtureFiles
-} from "../../test/support/fixture-sources.mjs";
+import { verifyHtml5libCorpora } from "../../test/support/html5lib-corpora.mjs";
 import { nowIso, readJson, writeJson } from "../eval/eval-primitives.mjs";
 
-function actRunNodeScript(scriptPath) {
+function actRunNodeScript(scriptPath, args = []) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [scriptPath], {
+    const child = spawn(process.execPath, [scriptPath, ...args], {
       stdio: "inherit"
     });
 
@@ -40,8 +37,9 @@ const conformanceSuites = [
   },
   {
     id: "tree",
-    script: "scripts/conformance/run-tree-fixtures.mjs",
-    report: "reports/tree.json"
+    script: "scripts/conformance/run-engine-tree-builder-fixtures.mjs",
+    args: ["--qualification"],
+    report: "reports/engine-wpt-tree.json"
   },
   {
     id: "encoding",
@@ -52,16 +50,11 @@ const conformanceSuites = [
     id: "serializer",
     script: "scripts/conformance/run-serializer-fixtures.mjs",
     report: "reports/serializer.json"
-  },
-  {
-    id: "holdout",
-    script: "scripts/conformance/run-holdout-fixtures.mjs",
-    report: "reports/holdout.json"
   }
 ];
 
 async function main() {
-  await requireFixtureFiles(ALL_HTML5LIB_FIXTURE_FILES);
+  await verifyHtml5libCorpora();
   const suiteResults = [];
   let hasSuiteFailures = false;
 
@@ -69,7 +62,7 @@ async function main() {
   for (const conformanceSuite of conformanceSuites) {
     const startedAt = Date.now();
     try {
-      await actRunNodeScript(conformanceSuite.script);
+      await actRunNodeScript(conformanceSuite.script, conformanceSuite.args);
       const reportHasFailures = await evalReportHasFailures(conformanceSuite.report);
       if (reportHasFailures) {
         hasSuiteFailures = true;

@@ -67,7 +67,7 @@ function finishCase(current, fixtureCases, filePath) {
   }));
 }
 
-/** Parses the WPT/html5lib tree-construction .dat format without normalizing input text. */
+/** Parses the maintained WPT tree-construction .dat format without normalizing input text. */
 export function parseTreeDatFixtures(content, filePath) {
   if (typeof content !== "string") {
     throw new TypeError("content must be a string");

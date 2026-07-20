@@ -38,7 +38,7 @@ const available = results.filter((result) => result.available);
 const outputHashes = new Set(available.map((result) => result.outputSha256));
 const report = {
   schemaVersion: 1,
-  suite: "independent-engine-cross-runtime",
+  suite: "html-parser-cross-runtime",
   generatedAt: new Date().toISOString(),
   expectedRuntimes: runtimes.map((runtime) => runtime.id),
   results,

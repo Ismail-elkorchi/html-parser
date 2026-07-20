@@ -1,35 +1,29 @@
 import { createHash } from "node:crypto";
 
 import {
+  compareEngineTokenizerFixture,
   loadEngineTokenizerFixtures,
   runEngineTokenizerFixture
 } from "../../tmp/test-runtime/test/support/engine-tokenizer-fixtures.js";
-import { isStaleTokenizerProcessingInstructionExpectation } from "../../test/support/stale-fixture-classification.mjs";
+import { verifyHtml5libCorpora } from "../../test/support/html5lib-corpora.mjs";
 import { writeJson } from "../eval/eval-primitives.mjs";
 
-const HOLDOUT_MOD = 10;
-const HOLDOUT_RULE = `hash(id) % ${HOLDOUT_MOD} === 0`;
-const EXPECTED_CLASSIFIED_DIFFERENCES = 10;
+const EXPECTED_CLASSIFIED_DIFFERENCES = 38;
 const EXPECTED_CLASSIFICATION_SHA256 =
-  "889a2c31c2b3fbe94223a50a9601c5f98fe2851628f2dfa0f99985c8c5333632";
+  "3b931b821b41febec2667908f130d602699921a0f208c1d39bde0b99aa579a7c";
 
 function comparableTokens(tokens) {
   return tokens.map((token) => JSON.stringify(token));
 }
 
+await verifyHtml5libCorpora();
 const fixtures = loadEngineTokenizerFixtures();
 let passed = 0;
 let failed = 0;
-let holdoutExcluded = 0;
 const failures = [];
 const classified = [];
 
 for (const fixture of fixtures) {
-  if (fixture.holdout) {
-    holdoutExcluded += 1;
-    continue;
-  }
-
   let outcome;
   try {
     outcome = runEngineTokenizerFixture(fixture, [fixture.input]);
@@ -44,37 +38,30 @@ for (const fixture of fixtures) {
     continue;
   }
 
-  const expectedTokens = comparableTokens(fixture.expectedTokens);
-  const actualTokens = comparableTokens(outcome.fixtureTokens);
-  if (JSON.stringify(expectedTokens) === JSON.stringify(actualTokens)) {
+  const comparison = compareEngineTokenizerFixture(fixture, outcome);
+  if (comparison.matches) {
     passed += 1;
     continue;
   }
 
-  if (isStaleTokenizerProcessingInstructionExpectation(
-    fixture.input,
-    fixture.expectedTokens,
-    outcome.fixtureTokens,
-    outcome.errors
-  )) {
-    classified.push({
-      id: fixture.id,
-      classification: "stale-processing-instruction-expectation",
-      expected: fixture.expectedTokens,
-      actual: outcome.fixtureTokens,
-      errors: outcome.errors.map((error) => error.code)
-    });
+  if (comparison.recognizedStandardsDifference && comparison.difference !== null) {
+    classified.push(comparison.difference);
     continue;
   }
 
   failed += 1;
+  const expectedTokens = comparableTokens(fixture.expectedTokens);
+  const actualTokens = comparableTokens(outcome.fixtureTokens);
   failures.push({
     id: fixture.id,
     expectedPreview: expectedTokens.slice(0, 8),
-    actualPreview: actualTokens.slice(0, 8)
+    actualPreview: actualTokens.slice(0, 8),
+    expectedErrors: fixture.expectedErrorCodes,
+    actualErrors: outcome.errors.map((error) => error.code)
   });
 }
 
+classified.sort((left, right) => left.id.localeCompare(right.id));
 const classificationSha256 = createHash("sha256")
   .update(JSON.stringify(classified))
   .digest("hex");
@@ -89,14 +76,6 @@ const report = {
     failed,
     skipped: 0
   },
-  holdout: {
-    excluded: holdoutExcluded,
-    rule: HOLDOUT_RULE,
-    mod: HOLDOUT_MOD
-  },
-  holdoutExcluded,
-  holdoutRule: HOLDOUT_RULE,
-  holdoutMod: HOLDOUT_MOD,
   skips: [],
   classifiedDifferences: classified.length,
   classificationSha256,
@@ -112,4 +91,7 @@ if (failed > 0 || !classificationsMatch) {
   process.exit(1);
 }
 
-console.log(`Tokenizer fixtures passed=${passed}, failed=${failed}, holdoutExcluded=${holdoutExcluded}`);
+console.log(
+  `Tokenizer fixtures passed=${String(passed)}, classified=${String(classified.length)}, ` +
+    `failed=${String(failed)}`
+);

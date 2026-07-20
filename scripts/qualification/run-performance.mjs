@@ -208,7 +208,7 @@ const evaluation = evaluatePerformance(revisions);
 
 const report = {
   schemaVersion: 4,
-  suite: "independent-engine-cross-revision-performance",
+  suite: "html-parser-cross-revision-performance",
   generatedAt: new Date().toISOString(),
   runs: RUNS,
   runIsolation: "fresh-process-per-sample",

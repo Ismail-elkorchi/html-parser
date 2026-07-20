@@ -66,7 +66,7 @@ function serializeNode(node, level, lines) {
   }
 }
 
-/** Normalizes a public document or fragment into the pinned html5lib fixture representation. */
+/** Normalizes a public document or fragment into the pinned WPT tree-fixture representation. */
 export function normalizePublicTree(tree) {
   const lines = [];
   const stack = [...tree.children].reverse().map((node) => ({ node, level: 0 }));

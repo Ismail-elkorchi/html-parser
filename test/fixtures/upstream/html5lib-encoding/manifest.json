@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "corpus": "encoding",
+  "repository": "https://github.com/html5lib/html5lib-tests.git",
+  "commit": "224991ec10db04f056a89eed8b0bd8695fd2950e",
+  "sourceRoot": "encoding",
+  "license": "MIT",
+  "statistics": {
+    "fixtureFiles": 3,
+    "fixtureBytes": 48995
+  },
+  "files": [
+    {
+      "kind": "license",
+      "path": "LICENSE",
+      "upstreamPath": "LICENSE",
+      "bytes": 1103,
+      "sha256": "ff512aac9ef231d504be5afaf4429005024e4b2aaf257be39524f37b8402aaf2",
+      "gitBlob": "8812371b41cfc6d2de3eac8c0b2a7a90f9b03428"
+    },
+    {
+      "kind": "fixture",
+      "path": "test-yahoo-jp.dat",
+      "upstreamPath": "encoding/test-yahoo-jp.dat",
+      "bytes": 502,
+      "sha256": "dc353a7ceaa9428a668e7846e78efd18f7e0a09e768d6be61166c12fc223a432",
+      "gitBlob": "3629278931ce0842fb15ff6b1123a8b0b521410b"
+    },
+    {
+      "kind": "fixture",
+      "path": "tests1.dat",
+      "upstreamPath": "encoding/tests1.dat",
+      "bytes": 45380,
+      "sha256": "ef54dd3d9c256a6830c266808c0277545a156a241b350c613c996a4cea52e5f7",
+      "gitBlob": "7aa9586ddc8e3f3d8dc0de09da3703ee7ed035ac"
+    },
+    {
+      "kind": "fixture",
+      "path": "tests2.dat",
+      "upstreamPath": "encoding/tests2.dat",
+      "bytes": 3113,
+      "sha256": "5e00d81e6207307f1186ea85f85b5f58003af94f5a7c6a3e06ca19c17567f51b",
+      "gitBlob": "d31b387fb5dd19ef65d3994ff449fdd33847d269"
+    }
+  ],
+  "compositeSha256": "e12d0fad9bfd524a9d58b927835145d1992bb12dd2f300d0a89aa56edd5805af"
+}

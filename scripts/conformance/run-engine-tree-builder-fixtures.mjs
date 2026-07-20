@@ -330,10 +330,16 @@ if (qualificationRun) {
   );
   const report = {
     schemaVersion: 1,
-    suite: "independent-engine-wpt-tree",
+    suite: "html-parser-wpt-tree",
     generatedAt: new Date().toISOString(),
     corpusCommit: corpusManifest.commit,
     corpusCompositeSha256: corpusManifest.compositeSha256,
+    cases: {
+      total: executed,
+      passed: passed + classified.length,
+      failed: unexpected.length,
+      skipped: 0
+    },
     executed,
     chunkExecutions,
     exactPasses: passed,

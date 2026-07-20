@@ -9,6 +9,7 @@ if (roots.length === 0) {
 }
 
 const files = [];
+const unexpectedFiles = [];
 
 for (const root of roots) {
   walk(resolve(process.cwd(), root));
@@ -16,6 +17,12 @@ for (const root of roots) {
 
 if (files.length === 0) {
   throw new Error(`run-node-tests: no test files found under ${roots.join(", ")}`);
+}
+if (unexpectedFiles.length > 0) {
+  throw new Error(
+    `run-node-tests: test directories contain files without the .test.js suffix: ` +
+      unexpectedFiles.sort().join(", ")
+  );
 }
 
 files.sort();
@@ -36,8 +43,9 @@ function walk(directoryPath) {
       walk(absolutePath);
       continue;
     }
-    if (entry.isFile() && entry.name.endsWith(".test.js")) {
-      files.push(absolutePath);
+    if (entry.isFile()) {
+      if (entry.name.endsWith(".test.js")) files.push(absolutePath);
+      else unexpectedFiles.push(absolutePath);
     }
   }
 }

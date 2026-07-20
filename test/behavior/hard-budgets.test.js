@@ -167,6 +167,24 @@ test("zero stream prescan retention is valid", async () => {
   assert.equal((await parseStream(stream, { budgets: { maxEncodingPrescanBytes: 0 } })).tree.kind, "document");
 });
 
+test("input byte budgets distinguish decoded text from transport bytes", () => {
+  const decodedInput = "é".repeat(10);
+  for (const parseInput of [
+    () => parse(decodedInput, { budgets: { maxInputBytes: 10 } }),
+    () => parseFragment(decodedInput, HTML_DIV_CONTEXT, { budgets: { maxInputBytes: 10 } })
+  ]) {
+    assert.throws(
+      parseInput,
+      (error) => assertBudget(error, "maxInputBytes", 10, 11)
+    );
+  }
+
+  assert.equal(parseBytes(new Uint8Array([0xe9]), {
+    transportEncodingLabel: "windows-1252",
+    budgets: { maxInputBytes: 1 }
+  }).tree.kind, "document");
+});
+
 test("trace retention stops during parser work instead of retaining an error storm", () => {
   const errorStorm = "\0".repeat(10_000);
   assert.throws(

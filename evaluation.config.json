@@ -2,7 +2,6 @@
   "version": 1,
   "profiles": {
     "ci": {
-      "requireHoldouts": false,
       "requireBrowserDiff": false,
       "requireDeno": true,
       "requireBun": true,
@@ -26,7 +25,6 @@
       }
     },
     "release": {
-      "requireHoldouts": true,
       "requireBrowserDiff": true,
       "requireDeno": true,
       "requireBun": true,
@@ -65,10 +63,6 @@
         "maxSkips": 0
       },
       "serializer": {
-        "minPassRate": 1,
-        "maxSkips": 0
-      },
-      "holdout": {
         "minPassRate": 1,
         "maxSkips": 0
       }

@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
 
-const FIXTURE_ROOT = "vendor/html5lib-tests/tokenizer";
-const FIXTURE_FILES = Object.freeze([
-  "entities.test",
-  "namedEntities.test",
-  "numericEntities.test"
+import { loadHtml5libTokenizerInventory } from "./html5lib-fixture-inventory.js";
+
+const CHARACTER_REFERENCE_SOURCES = new Set([
+  "tokenizer/entities.test",
+  "tokenizer/namedEntities.test",
+  "tokenizer/numericEntities.test"
 ]);
 
 interface JsonRecord {
@@ -25,15 +26,21 @@ function isRecord(value: unknown): value is JsonRecord {
 /** Loads every standalone character-reference case from the pinned html5lib corpus. */
 export function loadCharacterReferenceFixtures(): readonly CharacterReferenceFixture[] {
   const fixtures: CharacterReferenceFixture[] = [];
-  for (const fileName of FIXTURE_FILES) {
-    const parsed: unknown = JSON.parse(
-      readFileSync(`${FIXTURE_ROOT}/${fileName}`, "utf8")
-    );
+  const fixtureSources = loadHtml5libTokenizerInventory().filter((source) =>
+    CHARACTER_REFERENCE_SOURCES.has(source.upstreamPath)
+  );
+  if (fixtureSources.length !== CHARACTER_REFERENCE_SOURCES.size) {
+    throw new Error("character reference fixture inventory is incomplete");
+  }
+  for (const fixtureSource of fixtureSources) {
+    const parsed: unknown = JSON.parse(readFileSync(fixtureSource.path, "utf8"));
     if (!isRecord(parsed) || !Array.isArray(parsed["tests"])) {
-      throw new Error(`character reference fixtures: ${fileName} has an invalid root`);
+      throw new Error(`character reference fixtures: ${fixtureSource.upstreamPath} has an invalid root`);
     }
     for (const [index, rawTest] of parsed["tests"].entries()) {
-      if (!isRecord(rawTest)) throw new Error(`character reference fixtures: invalid ${fileName} test`);
+      if (!isRecord(rawTest)) {
+        throw new Error(`character reference fixtures: invalid ${fixtureSource.upstreamPath} test`);
+      }
       const input = rawTest["input"];
       if (typeof input !== "string" || !input.startsWith("&")) continue;
       const output = rawTest["output"];
@@ -44,20 +51,26 @@ export function loadCharacterReferenceFixtures(): readonly CharacterReferenceFix
         output[0][0] !== "Character" ||
         typeof output[0][1] !== "string"
       ) {
-        throw new Error(`character reference fixtures: ${fileName}#${String(index)} is not standalone`);
+        throw new Error(
+          `character reference fixtures: ${fixtureSource.upstreamPath}#${String(index)} is not standalone`
+        );
       }
       const rawErrors = rawTest["errors"] ?? [];
       if (!Array.isArray(rawErrors)) {
-        throw new Error(`character reference fixtures: ${fileName}#${String(index)} errors invalid`);
+        throw new Error(
+          `character reference fixtures: ${fixtureSource.upstreamPath}#${String(index)} errors invalid`
+        );
       }
       const errors = rawErrors.map((rawError) => {
         if (!isRecord(rawError) || typeof rawError["code"] !== "string") {
-          throw new Error(`character reference fixtures: ${fileName}#${String(index)} error invalid`);
+          throw new Error(
+            `character reference fixtures: ${fixtureSource.upstreamPath}#${String(index)} error invalid`
+          );
         }
         return rawError["code"];
       });
       fixtures.push(Object.freeze({
-        id: `${fileName}#${String(index)}`,
+        id: `${fixtureSource.upstreamPath}#${String(index)}`,
         input,
         expected: output[0][1],
         errors: Object.freeze(errors)

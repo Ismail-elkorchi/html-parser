@@ -99,6 +99,11 @@ test("serialization and chunking inherit a fragment's scripting mode", () => {
   assert.equal(chunk(fragment)[0]?.content, "<noscript>&lt;b&gt;</noscript>");
 });
 
+test("frameset fragments serialize frame as an HTML void element", () => {
+  const fragment = parseFragment("</frameset><frame>", htmlContext("frameset"));
+  assert.equal(serialize(fragment), "<frame>");
+});
+
 test("fragment context and environment validation reject ambiguous configuration", () => {
   const parseUnknown = parseFragment;
   assert.throws(

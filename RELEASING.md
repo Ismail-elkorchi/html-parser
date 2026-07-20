@@ -12,7 +12,6 @@ Use `.github/workflows/publish.yml` for release-driven publish and `.github/work
 
 ```bash
 npm ci
-git submodule update --init --recursive
 npm run check:fast
 npm run eval:release
 npm run docs:lint:jsr
