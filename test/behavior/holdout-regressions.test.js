@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { parseFragment, serialize } from "../../dist/mod.js";
 
-test("frameset fragment context keeps frame node after unmatched close tag", () => {
+test("frameset fragment context serializes frame as a void element", () => {
   const fragment = parseFragment("</frameset><frame>", "frameset");
-  assert.equal(serialize(fragment), "<frame></frame>");
+  assert.equal(serialize(fragment), "<frame>");
 });

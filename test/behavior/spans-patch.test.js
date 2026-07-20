@@ -92,6 +92,51 @@ test("computePatch supports deterministic structural edit plans", () => {
   assert.equal(serialize(patchedTree.tree), serialize(expectedTree.tree));
 });
 
+test("computePatch applies HTML escaping rules to text and attributes", () => {
+  const original = "<p data-x=old>old</p>";
+  const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
+  const paragraph = findNode(
+    parsed.tree.children,
+    (node) => node.kind === "element" && node.localName === "p"
+  );
+  const paragraphText = findNode(
+    parsed.tree.children,
+    (node) => node.kind === "text" && node.value === "old"
+  );
+  assert.ok(paragraph);
+  assert.ok(paragraphText);
+
+  const plan = computePatch(parsed, [
+    { kind: "setAttr", target: paragraph.id, name: "data-x", value: "<>&\u00a0\"" },
+    { kind: "replaceText", target: paragraphText.id, value: "<>&\u00a0" }
+  ]);
+  assert.equal(plan.result, "<p data-x=\"&lt;&gt;&amp;&nbsp;&quot;\">&lt;&gt;&amp;&nbsp;</p>");
+});
+
+test("computePatch preserves representable raw text and rejects effective end tags", () => {
+  const original = "<script>old</script>";
+  const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
+  const scriptText = findNode(
+    parsed.tree.children,
+    (node) => node.kind === "text" && node.value === "old"
+  );
+  assert.ok(scriptText);
+
+  assert.equal(
+    computePatch(parsed, [{ kind: "replaceText", target: scriptText.id, value: "a < b && c > d" }]).result,
+    "<script>a < b && c > d</script>"
+  );
+  assert.throws(
+    () => computePatch(parsed, [{
+      kind: "replaceText",
+      target: scriptText.id,
+      value: "before</ScRiPt >after"
+    }]),
+    (error) => error instanceof HtmlPatchPlanningError &&
+      error.reason === "UNREPRESENTABLE_TEXT_VALUE" && error.target === scriptText.id
+  );
+});
+
 test("computePatch edits attributes without rewriting full nodes", () => {
   const original = "<div><p class=\"x\" data-k=\"v\">one</p></div>";
   const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });

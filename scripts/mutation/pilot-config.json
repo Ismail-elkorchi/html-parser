@@ -1,6 +1,42 @@
 {
   "targets": [
     {
+      "targetFile": "dist/public/html-serialization-rules.js",
+      "testCommand": ["node", "--test", "test/behavior/serialization.test.js", "test/behavior/spans-patch.test.js"],
+      "mutants": [
+        {
+          "id": "serializer-parent-context",
+          "description": "Disable literal text serialization for every HTML parent context.",
+          "search": "if (parent?.namespaceUri !== HTML_NAMESPACE_URI)\n        return false;",
+          "replace": "if (true || parent?.namespaceUri !== HTML_NAMESPACE_URI)\n        return false;"
+        },
+        {
+          "id": "serializer-nonbreaking-space",
+          "description": "Stop escaping non-breaking spaces in text and attribute values.",
+          "search": ".replace(/\\u00a0/g, \"&nbsp;\")",
+          "replace": ".replace(/\\u00a0/g, \"\\u00a0\")"
+        },
+        {
+          "id": "serializer-namespaced-attribute",
+          "description": "Drop the required xlink prefix from serialized XLink attributes.",
+          "search": "if (attribute.namespaceUri === XLINK_NAMESPACE_URI)\n        return `xlink:${attribute.localName}`;",
+          "replace": "if (attribute.namespaceUri === XLINK_NAMESPACE_URI)\n        return attribute.localName;"
+        },
+        {
+          "id": "serializer-legacy-void-elements",
+          "description": "Treat frame as a normal element with an end tag.",
+          "search": "    \"frame\",\n",
+          "replace": ""
+        },
+        {
+          "id": "patch-raw-text-boundary",
+          "description": "Allow replacement text to terminate its owning raw-text element.",
+          "search": "if (!serializesTextLiterally(parent, scriptingMode) || parent === null)\n        return false;",
+          "replace": "if (true || !serializesTextLiterally(parent, scriptingMode) || parent === null)\n        return false;"
+        }
+      ]
+    },
+    {
       "targetFile": "dist/internal/encoding/sniff.js",
       "testCommand": ["node", "--test", "test/behavior/encoding-sniff.test.js"],
       "mutants": [

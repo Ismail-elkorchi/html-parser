@@ -92,10 +92,11 @@ errors. Production TypeScript may not throw unclassified generic `Error`
 instances. Configuration, resource, cancellation, callback, and parse failures
 retain their separate contracts.
 
-Test-only fixture conventions, serializers, corpus readers, and integrity
+Test-only fixture conventions, corpus readers, oracle adapters, and integrity
 checks live under `test/support`. Production source must not export helpers for
 adapting third-party fixture formats; conformance runners adapt those formats at
-the test boundary.
+the test boundary. Public serialization tests invoke the built public export,
+so no parallel test renderer can mask a production defect.
 
 ## Design rules
 

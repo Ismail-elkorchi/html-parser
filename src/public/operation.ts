@@ -13,6 +13,7 @@ import type {
   ParseOptions,
   ParseStreamBudgetOptions,
   ParseStreamOptions,
+  SerializeOptions,
   TextContentExtractionOptions,
   TextExtractionOptions,
   TokenizeByteStreamEagerBudgetOptions,
@@ -68,6 +69,10 @@ const TOKENIZE_BYTE_STREAM_EAGER_OPTION_KEYS = new Set<PropertyKey>([
   "signal"
 ]);
 const OPERATION_OPTION_KEYS = new Set<PropertyKey>(["maxTimeMs", "signal"]);
+const SERIALIZE_OPTION_KEYS = new Set<PropertyKey>([
+  ...OPERATION_OPTION_KEYS,
+  "scriptingMode"
+]);
 const TEXT_EXTRACTION_OPTION_KEYS = [
   "policy",
   "maxOutputBytes",
@@ -374,6 +379,23 @@ export function normalizeTokenizeByteStreamEagerOptions(
 /** Validates and snapshots deadline/cancellation operation options. */
 export function normalizeOperationOptions(options: OperationOptions): OperationOptions {
   return normalizeCommonOperationOptions(options, OPERATION_OPTION_KEYS, "options").normalized;
+}
+
+/** Validates and snapshots HTML serialization controls. */
+export function normalizeSerializeOptions(options: SerializeOptions): Required<Pick<SerializeOptions, "scriptingMode">> & OperationOptions {
+  const { record, normalized } = normalizeCommonOperationOptions(
+    options,
+    SERIALIZE_OPTION_KEYS,
+    "options"
+  );
+  const scriptingMode = read(record, "scriptingMode", "options.scriptingMode");
+  if (scriptingMode !== undefined && scriptingMode !== "inert" && scriptingMode !== "disabled") {
+    invalidConfiguration("options.scriptingMode", 'must be "inert" or "disabled"');
+  }
+  return Object.freeze({
+    ...normalized,
+    scriptingMode: scriptingMode ?? "inert"
+  });
 }
 
 /** Validates and snapshots one versioned bounded text-extraction policy. */

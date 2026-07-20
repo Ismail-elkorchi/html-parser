@@ -45,3 +45,9 @@ requires one.
 Patch insertion strings are source text, not automatically parsed or
 sanitized. Validate or sanitize them according to the eventual rendering
 context.
+
+Text replacements preserve parsed text semantics. Ordinary text and attribute
+values use the HTML serialization escaping rules; representable raw-text
+values are inserted literally. A raw-text replacement containing an effective
+closing tag is rejected because no character-reference spelling can preserve
+that text when the result is reparsed.

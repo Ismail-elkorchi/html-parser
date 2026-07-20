@@ -85,7 +85,7 @@ their NUL, CR, and other raw input is preserved by the shared `.dat` reader.
 
 `vendor/html5lib-tests` remains a Git submodule at
 `8f43b7ec8c9d02179f5f38e0ea08cb5000fb9c9e`. It supplies tokenizer,
-encoding, serializer, and six-file tree conformance. Initialize it
+encoding, and six-file tree conformance. Initialize it
 when running those suites:
 
 ```bash
@@ -94,8 +94,9 @@ git submodule update --init --recursive
 
 All 277 tree cases were proven represented in the maintained WPT snapshot when
 that snapshot was pinned. Do not update, remove, or narrow the html5lib
-submodule until its tokenizer, encoding, serializer, and tree consumers have an
-authoritative replacement.
+submodule until its tokenizer, encoding, and tree consumers have an
+authoritative replacement. Public serialization has an owned direct gate and
+does not depend on an html5lib rendering adapter.
 
 The tokenizer runner expands the 14 tokenizer files to 7,036 entry-mode cases
 and applies the same visible primary/holdout partition. It matches 6,297

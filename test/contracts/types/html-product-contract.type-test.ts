@@ -7,8 +7,10 @@ import {
 } from "../../../src/mod.js";
 
 import type {
+  HtmlScriptingMode,
   ProcessingInstructionNode,
   ProcessingInstructionToken,
+  SerializeOptions,
   TemplateContentNode
 } from "../../../src/public/types.js";
 
@@ -27,6 +29,9 @@ void fragment;
 void templateContent;
 void instruction;
 void tokenPromise;
+const scriptingMode: HtmlScriptingMode = "inert";
+const serializeOptions: SerializeOptions = { scriptingMode, maxTimeMs: 10 };
+void serializeOptions;
 const visibleOptions = {
   policy: "visible-text-html-v1",
   maxOutputBytes: 128,

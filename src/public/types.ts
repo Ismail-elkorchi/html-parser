@@ -147,6 +147,15 @@ export interface OperationOptions {
   readonly signal?: AbortSignal;
 }
 
+/** Non-executing scripting environment used by parsing and HTML serialization. */
+export type HtmlScriptingMode = "inert" | "disabled";
+
+/** Controls one HTML serialization operation. */
+export interface SerializeOptions extends OperationOptions {
+  /** Controls scripting-dependent `noscript` text serialization; defaults to `"inert"`. */
+  readonly scriptingMode?: HtmlScriptingMode;
+}
+
 /** Name and decoded value retained on a public start-tag token. */
 export interface TokenAttribute {
   /** Attribute name as emitted by the tokenizer. */
@@ -839,6 +848,7 @@ export type HtmlPatchPlanningReason =
   | "MISSING_NODE_SPAN"
   | "NON_INPUT_SPAN_PROVENANCE"
   | "INVALID_EDIT_TARGET"
+  | "UNREPRESENTABLE_TEXT_VALUE"
   | "ATTRIBUTE_NOT_FOUND"
   | "ATTRIBUTE_SPAN_MISSING"
   | "ELEMENT_START_TAG_NOT_FOUND"
