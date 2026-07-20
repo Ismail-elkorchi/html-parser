@@ -86,5 +86,5 @@ for (const filePath of await listFiles("src")) {
 }
 
 process.stdout.write(
-  "test architecture: one root, production/test-support boundaries, and engine isolation verified\n"
+  "test architecture: one root, production/test-support boundaries, and private engine boundary verified\n"
 );

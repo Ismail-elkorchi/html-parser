@@ -76,5 +76,5 @@ runHtmlEngine({ inputChunks: [], parser: { kind: "fragment", scriptingMode: "ine
 // @ts-expect-error - tokens are immutable once emitted.
 token.name = "svg";
 
-// @ts-expect-error - the incomplete driver is not part of the public package surface.
+// @ts-expect-error - the private engine driver is not part of the public package surface.
 void PublicApi.runHtmlEngine;
