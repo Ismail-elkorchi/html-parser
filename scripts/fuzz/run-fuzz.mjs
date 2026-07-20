@@ -300,7 +300,7 @@ function runCampaign() {
 
   slowCases.sort((left, right) => right.elapsedMs - left.elapsedMs || left.id.localeCompare(right.id));
   return {
-    schemaVersion: 2,
+    schemaVersion: 1,
     suite: "html-parser-fuzz",
     generatedAt: new Date().toISOString(),
     runs: RUNS,
@@ -338,7 +338,7 @@ function runCampaignWithWatchdog(workerArguments = ["--worker"]) {
         settled = true;
         child.kill("SIGKILL");
         resolve({
-          schemaVersion: 2,
+          schemaVersion: 1,
           suite: "html-parser-fuzz",
           generatedAt: new Date().toISOString(),
           runs: RUNS,
@@ -381,7 +381,7 @@ function runCampaignWithWatchdog(workerArguments = ["--worker"]) {
       settled = true;
       globalThis.clearTimeout(timer);
       resolve({
-        schemaVersion: 2,
+        schemaVersion: 1,
         suite: "html-parser-fuzz",
         generatedAt: new Date().toISOString(),
         runs: RUNS,

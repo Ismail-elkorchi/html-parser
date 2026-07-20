@@ -204,7 +204,7 @@ try {
 const evaluation = evaluatePerformance(revisions);
 
 const report = {
-  schemaVersion: 4,
+  schemaVersion: 1,
   suite: "html-parser-cross-revision-performance",
   generatedAt: new Date().toISOString(),
   runs: RUNS,

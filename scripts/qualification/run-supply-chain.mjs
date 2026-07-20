@@ -86,7 +86,7 @@ const noticeCoverage = {
 };
 
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 1,
   suite: "html-parser-supply-chain",
   generatedAt: new Date().toISOString(),
   manifests: {

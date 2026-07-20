@@ -135,7 +135,7 @@ async function main() {
   }
 
   const report = {
-    schemaVersion: 2,
+    schemaVersion: 1,
     suite: "html-parser-text-safety",
     generatedAt: nowIso(),
     ok: violations.length === 0,

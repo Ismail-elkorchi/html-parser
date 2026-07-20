@@ -68,7 +68,7 @@ const classificationSha256 = createHash("sha256")
 const classificationsMatch = classified.length === EXPECTED_CLASSIFIED_DIFFERENCES &&
   classificationSha256 === EXPECTED_CLASSIFICATION_SHA256;
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 1,
   suite: "html-parser-tokenizer-conformance",
   generatedAt: new Date().toISOString(),
   cases: {

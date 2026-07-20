@@ -36,6 +36,10 @@ export {
   findAllByTagName,
   findAllByTagNameNS,
   findById,
+  getAttributeValue,
+  getAttributeValueNS,
+  hasAttribute,
+  hasAttributeNS,
   walk,
   walkElements
 } from "./public/querying.ts";
@@ -44,10 +48,6 @@ export {
   TEXT_CONTENT_POLICY,
   VISIBLE_TEXT_HTML_POLICY,
   extractText,
-  getAttributeValue,
-  getAttributeValueNS,
-  hasAttribute,
-  hasAttributeNS,
   iterateText
 } from "./public/text-extraction.ts";
 

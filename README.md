@@ -77,6 +77,7 @@ const rows = parseFragment("<tr><td>A<td>B", {
 - [Set limits and handle errors](./docs/limits-errors-and-safety.md)
 - [Understand the data model](./docs/data-model.md)
 - [Browse API groups](./docs/api.md)
+- [Run complete examples](./examples)
 
 The [documentation index](./docs/index.md) also points maintainers to the
 architecture, testing, corpus, and source-policy notes.

@@ -83,7 +83,7 @@ async function main() {
   }
 
   await writeJson("reports/conformance-summary.json", {
-    schemaVersion: 2,
+    schemaVersion: 1,
     suite: "html-parser-conformance",
     generatedAt: nowIso(),
     ok: !hasSuiteFailures,

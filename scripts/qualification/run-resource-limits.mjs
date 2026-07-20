@@ -170,7 +170,7 @@ for (const name of fixtureNames) {
 }
 
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 1,
   suite: "html-parser-resource-limits",
   generatedAt: new Date().toISOString(),
   runtime: {

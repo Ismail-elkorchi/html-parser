@@ -19,7 +19,7 @@ for (const testCase of PUBLIC_SERIALIZER_CASES) {
 }
 
 await writeJson("reports/serializer.json", {
-  schemaVersion: 2,
+  schemaVersion: 1,
   suite: "html-parser-public-serializer",
   implementation: "dist/mod.js#serialize",
   generatedAt: new Date().toISOString(),

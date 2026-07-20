@@ -65,7 +65,7 @@ for (const markdownFile of markdownFiles) {
 }
 
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 1,
   suite: "html-parser-documentation",
   generatedAt: nowIso(),
   ok: missingRoots.length === 0 && brokenLinks.length === 0,

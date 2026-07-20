@@ -105,7 +105,7 @@ for (const fixtureCase of allCases) {
 }
 
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 1,
   suite: "html-parser-encoding-conformance",
   generatedAt: new Date().toISOString(),
   cases: {
