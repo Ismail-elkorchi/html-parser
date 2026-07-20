@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/web-platform-tests/wpt.git",
+  "commit": "e4ea1706fa708c3ac4523c534a65160d1ab20db8",
+  "sourceRoot": "html/syntax/serializing-html-fragments",
+  "license": "BSD-3-Clause",
+  "statistics": {
+    "fixtureFiles": 9,
+    "fixtureBytes": 21642,
+    "applicableFiles": 7,
+    "partialFiles": 1,
+    "inapplicableFiles": 1
+  },
+  "files": [
+    {
+      "kind": "license",
+      "path": "LICENSE.md",
+      "upstreamPath": "LICENSE.md",
+      "bytes": 1500,
+      "sha256": "5fac07febb0e2a97fb0d7b0def149ec08b642e1ba4b9c345283ab1cbd2af6570",
+      "gitBlob": "39c46d03ac2988226f949ee7ab3c7347d5481bd8"
+    },
+    {
+      "kind": "dependency",
+      "path": "dependencies/html-common.js",
+      "upstreamPath": "html/resources/common.js",
+      "bytes": 7223,
+      "sha256": "5099709377292cd60778f3db339a22487c83da37be78d20b0985435ec139047f",
+      "gitBlob": "a1822115fe5fda22c6165cf0e467d12abf71ae76"
+    },
+    {
+      "kind": "fixture",
+      "path": "files/escaping.html",
+      "upstreamPath": "html/syntax/serializing-html-fragments/escaping.html",
+      "bytes": 3204,
+      "sha256": "ff2b0cf9e496d74720e04c7ba46f9fd358fee4d7e69b4514cce5f721141a0376",
+      "gitBlob": "7bbc5566fc67964c0b07d24869ab7166ec611ebf",
+      "applicability": {
+        "status": "partial",
+        "reason": "static noscript serialization expectations apply; document.write, XHR, and execution setup do not"
+      }
+    },
+    {
+      "kind": "fixture",
+      "path": "files/initial-linefeed-pre.html",
+      "upstreamPath": "html/syntax/serializing-html-fragments/initial-linefeed-pre.html",
+      "bytes": 1319,
+      "sha256": "8bd5df9ba619c6d408c1da7ffc266746cec24c415b8b37ab78de7e4fad890fab",
+      "gitBlob": "d4e30bb60d3e0a9ac7c0f954c3e9d7441b9457b9",
+      "applicability": {
+        "status": "applicable"
+      }
+    },
+    {
+      "kind": "fixture",
+      "path": "files/outerHTML.html",
+      "upstreamPath": "html/syntax/serializing-html-fragments/outerHTML.html",
+      "bytes": 1340,
+      "sha256": "f6bf3200bf2bb854082563a87c86d80229c7614ceff96188d384b92612dc6f25",
+      "gitBlob": "491bf9e900e03f11ac1058e3412afbe1569b92ae",
+      "applicability": {
+        "status": "applicable"
+      }
+    },
+    {
+      "kind": "fixture",
+      "path": "files/processing-instructions.html",
+      "upstreamPath": "html/syntax/serializing-html-fragments/processing-instructions.html",
+      "bytes": 1074,
+      "sha256": "7db81658f9358fb8b9ee912ba137cc961cf74dfa0a4c68b3f9c577cbcce09066",
+      "gitBlob": "953d77c18c930730289aa229df56a084436e887b",
+      "applicability": {
+        "status": "applicable"
+      }
+    },
+    {
+      "kind": "fixture",
+      "path": "files/range-on-pi-contextual-fragment-crash.html",
+      "upstreamPath": "html/syntax/serializing-html-fragments/range-on-pi-contextual-fragment-crash.html",
+      "bytes": 669,
+      "sha256": "3ce71fdf7a4593c1f1ceb71288b27a6fbd45b1201cd78f676f3d7b2a7d028545",
+      "gitBlob": "37e6d7535eabbee1367987dc99cb335261126c6d",
+      "applicability": {
+        "status": "inapplicable",
+        "reason": "the package does not expose DOM Range or createContextualFragment"
+      }
+    },
+    {
+      "kind": "fixture",
+      "path": "files/serializing-cdata-in-html-document.html",
+      "upstreamPath": "html/syntax/serializing-html-fragments/serializing-cdata-in-html-document.html",
+      "bytes": 593,
+      "sha256": "25601f51c5d02331690deab66d077dad22becf6233418ba3da028e7ef4977dd0",
+      "gitBlob": "b2366285a41d946324981e771bfbfe2b157606f5",
+      "applicability": {
+        "status": "applicable"
+      }
+    },
+    {
+      "kind": "fixture",
+      "path": "files/serializing-lt-gt.html",
+      "upstreamPath": "html/syntax/serializing-html-fragments/serializing-lt-gt.html",
+      "bytes": 536,
+      "sha256": "d5de2ff2f3c815f97b4049627092bd6ec93a5ca8e7dc0134907676058b7d633f",
+      "gitBlob": "6c74b443a838267be7f0d2ad8a8a80964c57209f",
+      "applicability": {
+        "status": "applicable"
+      }
+    },
+    {
+      "kind": "fixture",
+      "path": "files/serializing.html",
+      "upstreamPath": "html/syntax/serializing-html-fragments/serializing.html",
+      "bytes": 11863,
+      "sha256": "358124cd9b8029138d1f19de7d3eb2cfed7d2155b67295df4891816411bc1f69",
+      "gitBlob": "e0473f968017eb536f3e2bb62ccd34dd0cdaeeb8",
+      "applicability": {
+        "status": "applicable"
+      }
+    },
+    {
+      "kind": "fixture",
+      "path": "files/template.html",
+      "upstreamPath": "html/syntax/serializing-html-fragments/template.html",
+      "bytes": 1044,
+      "sha256": "660d68e76470ec6f5ca2d31acc44104598e03373bc914b0a0a6f89d211e6c77d",
+      "gitBlob": "ea050384f27af4ba6bd25c691c728b23269d3dad",
+      "applicability": {
+        "status": "applicable"
+      }
+    }
+  ],
+  "compositeSha256": "2d6598ba727a8af2b0b1d500aa089096cc878db88a97172e96d45a88540dea57",
+  "applicabilitySha256": "2bd9fb64278e59092b38de3d6ebca4b245fdb38b55ae39907dd1e53fef57925a"
+}

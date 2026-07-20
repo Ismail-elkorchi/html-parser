@@ -76,6 +76,8 @@ async function main() {
   ];
 
   if (profile === "release") {
+    steps.push(["public-serialization", "npm", ["run", "qualification:serialization"]]);
+    steps.push(["public-serialization-browser", "npm", ["run", "test:browser-diff:serialization"]]);
     steps.push(["browser-diff", "npm", ["run", "test:browser-diff"]]);
     steps.push(["fuzz", "npm", ["run", "test:fuzz"]]);
     if (profilePolicy.requireBenchStability) {

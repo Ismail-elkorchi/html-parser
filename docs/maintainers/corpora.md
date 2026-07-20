@@ -81,6 +81,43 @@ Every classified variant appears in `reports/engine-wpt-tree.json` with its
 exact ID and reason. Files whose names contain `unsafe` remain applicable:
 their NUL, CR, and other raw input is preserved by the shared `.dat` reader.
 
+## Maintained serialization corpus
+
+The complete nine-file WPT directory under
+`html/syntax/serializing-html-fragments` is pinned at the same commit under
+`test/fixtures/upstream/wpt-serialization`. Its manifest records every source
+path, Git blob, byte count, SHA-256 value, applicability decision, and the WPT
+root license. The snapshot has 21,642 fixture bytes: seven files are wholly
+applicable, `escaping.html` is partially applicable because it also exercises
+browser transports and execution setup, and the Range crash case is outside
+this package's API. The manifest also pins the 7,223-byte
+`html/resources/common.js` dependency used to define the complete
+`outerHTML.html` element and void-element inventories.
+
+Run the offline public gate and three-browser oracle with:
+
+```bash
+npm run qualification:serialization
+npm run test:browser-diff:serialization
+```
+
+The non-browser gate uses reviewed expectations tied to their upstream file and
+test identity and invokes the built public serializer. It does not execute or
+reimplement WPT's browser harness. Round trips have a named positive subset;
+`plaintext` and an effective raw-text closing tag retain exact classified tree
+fingerprints because HTML serialization is not generally roundtripping.
+
+Refresh only from a reviewed full WPT revision:
+
+```bash
+npm run wpt-serialization:refresh -- --commit=<40-character-wpt-commit>
+```
+
+An upstream file addition or removal makes refresh fail until its applicability
+is reviewed in the refresh contract. Inspect the source changes, manifest,
+licenses, explicit expectations, round-trip classifications, and all three
+browser results together before accepting a new snapshot.
+
 ## html5lib corpus
 
 `vendor/html5lib-tests` remains a Git submodule at
