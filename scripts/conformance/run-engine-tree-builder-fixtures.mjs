@@ -7,11 +7,17 @@ import {
   XLINK_NAMESPACE,
   XML_NAMESPACE,
   XMLNS_NAMESPACE,
+  HtmlTreeBuilderPendingFeatureError,
   runHtmlEngine
 } from "../../dist/internal/html-engine/mod.js";
 import { expandTreeDatCases, parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
 
 const FIXTURE_ROOT = "test/fixtures/upstream/wpt-tree-construction/resources";
+
+function inclusiveRange(first, last) {
+  return Array.from({ length: last - first + 1 }, (_, index) => first + index);
+}
+
 const ASSIGNMENTS = Object.freeze({
   "adoption01.dat": Object.freeze({ cases: Object.freeze([1, 2, 3, 4, 5, 7, 8, 9, 10, 14, 15, 16, 17]) }),
   "adoption02.dat": Object.freeze({ cases: Object.freeze([1, 2]) }),
@@ -25,6 +31,18 @@ const ASSIGNMENTS = Object.freeze({
   "plain-text-unsafe.dat": Object.freeze({ cases: Object.freeze([8, 9]) }),
   "scriptdata01.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
   "search-element.dat": Object.freeze({ first: 1, last: 2 }),
+  "tables01.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "template.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "tests8.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "tests9.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "tests10.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "tests11.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "tests12.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "tests20.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "tests21.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "tests22.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "tests23.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
+  "tests24.dat": Object.freeze({ first: 1, last: Number.POSITIVE_INFINITY }),
   "ruby.dat": Object.freeze({ first: 1, last: 21 }),
   "tests2.dat": Object.freeze({ cases: Object.freeze([5]) }),
   "tests3.dat": Object.freeze({ cases: Object.freeze([17, 18, 19, 20, 21, 22]) }),
@@ -42,11 +60,26 @@ const ASSIGNMENTS = Object.freeze({
   "tricky01.dat": Object.freeze({ cases: Object.freeze([1]) }),
   "void-in-phrasing.dat": Object.freeze({ first: 1, last: 13 })
 });
+const FOREIGN_CONTENT_CASES = Object.freeze({
+  "tables01.dat": new Set([17, 18]),
+  "template.dat": new Set([99, 100]),
+  "tests9.dat": new Set([...inclusiveRange(1, 21), ...inclusiveRange(24, 27)]),
+  "tests10.dat": new Set([...inclusiveRange(1, 20), ...inclusiveRange(23, 54)]),
+  "tests11.dat": new Set(inclusiveRange(1, 13)),
+  "tests12.dat": new Set([1, 2]),
+  "tests20.dat": new Set([43, 49, 50, ...inclusiveRange(53, 64)]),
+  "tests21.dat": new Set([1, 2, ...inclusiveRange(4, 23)])
+});
+const requestedCase = process.env["ENGINE_FIXTURE_CASE"];
 
 function isAssigned(caseNumber, assignment) {
   return "cases" in assignment
     ? assignment.cases.includes(caseNumber)
     : caseNumber >= assignment.first && caseNumber <= assignment.last;
+}
+
+function isDeferredForeignContent(fileName, caseNumber) {
+  return FOREIGN_CONTENT_CASES[fileName]?.has(caseNumber) ?? false;
 }
 
 function quote(value) {
@@ -121,11 +154,16 @@ function serializeModel(model) {
     if (entry === undefined) break;
     serializeNode(entry.node, entry.level, lines);
     if (entry.node.kind === "element") {
-      const parent = entry.node.templateContents ?? entry.node;
+      const templateContents = entry.node.templateContents;
+      const parent = templateContents ?? entry.node;
+      const childLevel = templateContents === null ? entry.level + 1 : entry.level + 2;
+      if (templateContents !== null) {
+        lines.push(`| ${"  ".repeat(entry.level + 1)}content`);
+      }
       const children = childArray(parent);
       for (let index = children.length - 1; index >= 0; index -= 1) {
         const child = children[index];
-        if (child !== undefined) stack.push({ node: child, level: entry.level + 1 });
+        if (child !== undefined) stack.push({ node: child, level: childLevel });
       }
     }
   }
@@ -134,16 +172,20 @@ function serializeModel(model) {
 
 const failures = [];
 let executed = 0;
+let passed = 0;
+let deferred = 0;
 for (const [fileName, assignment] of Object.entries(ASSIGNMENTS)) {
   const filePath = path.join(FIXTURE_ROOT, fileName);
   const content = await readFile(filePath, "utf8");
   const cases = parseTreeDatFixtures(content, filePath)
     .filter((fixtureCase) =>
       fixtureCase.fragmentContext === null &&
-      isAssigned(fixtureCase.caseNumber, assignment)
+      isAssigned(fixtureCase.caseNumber, assignment) &&
+      (requestedCase === undefined || requestedCase === `${fileName}#${String(fixtureCase.caseNumber)}`)
     );
   for (const fixtureCase of expandTreeDatCases(cases, { includeModeInId: true })) {
     executed += 1;
+    const expectsForeignContent = isDeferredForeignContent(fileName, fixtureCase.caseNumber);
     try {
       const result = runHtmlEngine({
         inputChunks: [fixtureCase.data],
@@ -160,6 +202,13 @@ for (const [fileName, assignment] of Object.entries(ASSIGNMENTS)) {
           maxAttributeUtf8BytesPerElement: 10_000_000
         }
       });
+      if (expectsForeignContent) {
+        failures.push({
+          id: fixtureCase.id,
+          error: "Expected the staged foreign-content boundary, but parsing completed"
+        });
+        continue;
+      }
       const actual = serializeModel(result.model);
       const parseErrorCountMatches =
         !fixtureCase.errorsDeclared || result.parseErrors.length === fixtureCase.errors.length;
@@ -171,8 +220,18 @@ for (const [fileName, assignment] of Object.entries(ASSIGNMENTS)) {
           expectedParseErrors: fixtureCase.errorsDeclared ? fixtureCase.errors.length : null,
           actualParseErrors: result.parseErrors.length
         });
+      } else {
+        passed += 1;
       }
     } catch (error) {
+      if (
+        expectsForeignContent &&
+        error instanceof HtmlTreeBuilderPendingFeatureError &&
+        error.feature === "foreign-content"
+      ) {
+        deferred += 1;
+        continue;
+      }
       failures.push({
         id: fixtureCase.id,
         error: error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -182,8 +241,43 @@ for (const [fileName, assignment] of Object.entries(ASSIGNMENTS)) {
 }
 
 if (failures.length > 0) {
-  console.error(JSON.stringify({ executed, failed: failures.length, failures: failures.slice(0, 20) }, null, 2));
+  const treeOrRuntimeFailures = failures.filter((failure) =>
+    "error" in failure || failure.expected !== failure.actual
+  ).length;
+  const failureGroups = {};
+  for (const failure of failures) {
+    const match = /resources\/(.+\.dat)#(\d+)@/.exec(failure.id);
+    const fileName = match?.[1] ?? "unknown";
+    const caseNumber = Number(match?.[2] ?? 0);
+    const kind = "error" in failure
+      ? "runtime"
+      : failure.expected === failure.actual ? "diagnostic" : "tree";
+    const key = `${fileName}:${kind}`;
+    const group = failureGroups[key] ?? { executions: 0, cases: new Set() };
+    group.executions += 1;
+    group.cases.add(caseNumber);
+    failureGroups[key] = group;
+  }
+  const summarizedGroups = Object.fromEntries(Object.entries(failureGroups).map(([key, group]) => [
+    key,
+    { executions: group.executions, cases: [...group.cases].sort((left, right) => left - right) }
+  ]));
+  console.error(JSON.stringify({
+    executed,
+    passed,
+    deferred: { feature: "foreign-content", executions: deferred },
+    failed: failures.length,
+    treeOrRuntimeFailures,
+    diagnosticCountOnlyFailures: failures.length - treeOrRuntimeFailures,
+    failureGroups: summarizedGroups,
+    failures: failures.slice(0, 20)
+  }, null, 2));
   process.exitCode = 1;
 } else {
-  console.log(JSON.stringify({ executed, passed: executed, failed: 0 }));
+  console.log(JSON.stringify({
+    executed,
+    passed,
+    failed: 0,
+    deferred: { feature: "foreign-content", executions: deferred }
+  }));
 }

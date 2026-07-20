@@ -33,12 +33,7 @@ import type {
   HtmlTreeParent
 } from "./tree-model.js";
 
-export type HtmlTreeBuilderPendingFeature =
-  | "foreign-content"
-  | "frameset"
-  | "select"
-  | "table"
-  | "template";
+export type HtmlTreeBuilderPendingFeature = "foreign-content";
 
 /** Honest staged-engine boundary for algorithms owned by later implementation rows. */
 export class HtmlTreeBuilderPendingFeatureError extends Error {
@@ -77,6 +72,11 @@ export interface HtmlTreeBuilderState {
   readonly finished: boolean;
 }
 
+interface InsertionLocation {
+  readonly parent: HtmlTreeParent;
+  readonly before: HtmlTreeNode | null;
+}
+
 const ASCII_WHITESPACE = /^[\t\n\f\r ]+$/u;
 
 const BLOCK_START_TAGS = new Set([
@@ -107,6 +107,10 @@ const IN_BODY_IGNORED_START_TAGS = new Set([
   "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr"
 ]);
 const IMPLIED_END_TAGS = new Set(["dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt", "rtc"]);
+const THOROUGH_IMPLIED_END_TAGS = new Set([
+  ...IMPLIED_END_TAGS,
+  "caption", "colgroup", "tbody", "td", "tfoot", "th", "thead", "tr"
+]);
 const BODY_END_ALLOWED_OPEN_ELEMENTS = new Set([
   "dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt", "rtc", "tbody", "td",
   "tfoot", "th", "thead", "tr", "body", "html"
@@ -122,6 +126,34 @@ const LIST_ITEM_SCOPE_BOUNDARIES = new Set([
   ...DEFAULT_SCOPE_BOUNDARIES,
   ...LIST_ITEM_SCOPE_ADDITIONS
 ]);
+const TABLE_SCOPE_BOUNDARIES = new Set(["html", "table", "template"]);
+const TABLE_BODY_TAGS = new Set(["tbody", "tfoot", "thead"]);
+const TABLE_CELL_TAGS = new Set(["td", "th"]);
+const TABLE_CHARACTER_CURRENT_TAGS = new Set(["table", "tbody", "template", "tfoot", "thead", "tr"]);
+const TABLE_IGNORED_END_TAGS = new Set([
+  "body", "caption", "col", "colgroup", "html", "tbody", "td", "tfoot", "th", "thead", "tr"
+]);
+const CAPTION_BREAKOUT_START_TAGS = new Set([
+  "caption", "col", "colgroup", "tbody", "td", "tfoot", "th", "thead", "tr"
+]);
+const CAPTION_IGNORED_END_TAGS = new Set([
+  "body", "col", "colgroup", "html", "tbody", "td", "tfoot", "th", "thead", "tr"
+]);
+const TABLE_BODY_BREAKOUT_START_TAGS = new Set(["caption", "col", "colgroup", "tbody", "tfoot", "thead"]);
+const TABLE_BODY_IGNORED_END_TAGS = new Set(["body", "caption", "col", "colgroup", "html", "td", "th", "tr"]);
+const ROW_BREAKOUT_START_TAGS = new Set(["caption", "col", "colgroup", "tbody", "tfoot", "thead", "tr"]);
+const ROW_IGNORED_END_TAGS = new Set(["body", "caption", "col", "colgroup", "html", "td", "th"]);
+const CELL_BREAKOUT_START_TAGS = new Set(["caption", "col", "colgroup", "tbody", "td", "tfoot", "th", "thead", "tr"]);
+const CELL_BREAKOUT_END_TAGS = new Set(["table", "tbody", "tfoot", "thead", "tr"]);
+const CELL_IGNORED_END_TAGS = new Set(["body", "caption", "col", "colgroup", "html"]);
+const TEMPLATE_HEAD_START_TAGS = new Set([
+  "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style", "template", "title"
+]);
+const TEMPLATE_TABLE_START_TAGS = new Set(["caption", "colgroup", "tbody", "tfoot", "thead"]);
+const FOSTER_PARENTING_TARGET_TAGS = new Set(["table", "tbody", "tfoot", "thead", "tr"]);
+const TABLE_CONTEXT_CLEAR_TAGS = new Set(["html", "table", "template"]);
+const TABLE_BODY_CONTEXT_CLEAR_TAGS = new Set(["html", "tbody", "template", "tfoot", "thead"]);
+const TABLE_ROW_CONTEXT_CLEAR_TAGS = new Set(["html", "template", "tr"]);
 
 const SPECIAL_HTML_ELEMENTS = new Set([
   "address", "applet", "area", "article", "aside", "base", "basefont", "bgsound", "blockquote",
@@ -139,7 +171,7 @@ function tokenTagName(token: HtmlToken): string | null {
   return token.kind === "start-tag" || token.kind === "end-tag" ? token.name : null;
 }
 
-function isWhitespaceToken(token: HtmlToken): token is HtmlCharacterToken {
+function isWhitespaceToken(token: HtmlToken): boolean {
   return token.kind === "character" && ASCII_WHITESPACE.test(token.data);
 }
 
@@ -197,6 +229,7 @@ export class HtmlTreeBuilder implements TokenSink {
   #framesetOk = true;
   #fosterParenting = false;
   #ignoreNextLineFeed = false;
+  #pendingTableCharacters: HtmlCharacterToken[] = [];
   #finished = false;
 
   constructor(options: HtmlTreeBuilderOptions) {
@@ -262,21 +295,19 @@ export class HtmlTreeBuilder implements TokenSink {
       case "after-head": return this.#inAfterHead(token, acknowledge);
       case "in-body": return this.#inBody(token, acknowledge);
       case "text": return this.#inText(token);
+      case "in-table": return this.#inTable(token, acknowledge);
+      case "in-table-text": return this.#inTableText(token, acknowledge);
+      case "in-caption": return this.#inCaption(token, acknowledge);
+      case "in-column-group": return this.#inColumnGroup(token, acknowledge);
+      case "in-table-body": return this.#inTableBody(token, acknowledge);
+      case "in-row": return this.#inRow(token, acknowledge);
+      case "in-cell": return this.#inCell(token, acknowledge);
+      case "in-template": return this.#inTemplate(token, acknowledge);
       case "after-body": return this.#inAfterBody(token, acknowledge);
+      case "in-frameset": return this.#inFrameset(token, acknowledge);
+      case "after-frameset": return this.#inAfterFrameset(token, acknowledge);
       case "after-after-body": return this.#inAfterAfterBody(token, acknowledge);
-      case "in-table":
-      case "in-table-text":
-      case "in-caption":
-      case "in-column-group":
-      case "in-table-body":
-      case "in-row":
-      case "in-cell":
-        throw new HtmlTreeBuilderPendingFeatureError("table", mode);
-      case "in-template": throw new HtmlTreeBuilderPendingFeatureError("template", mode);
-      case "in-frameset":
-      case "after-frameset":
-      case "after-after-frameset":
-        throw new HtmlTreeBuilderPendingFeatureError("frameset", mode);
+      case "after-after-frameset": return this.#inAfterAfterFrameset(token, acknowledge);
     }
   }
 
@@ -378,7 +409,7 @@ export class HtmlTreeBuilder implements TokenSink {
   }
 
   #inHead(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
-    if (isWhitespaceToken(token)) {
+    if (token.kind === "character" && isWhitespaceToken(token)) {
       this.#insertCharacter(token);
       return null;
     }
@@ -423,7 +454,14 @@ export class HtmlTreeBuilder implements TokenSink {
         this.#insertTextElement(token, "script-data");
         return null;
       }
-      if (token.name === "template") throw new HtmlTreeBuilderPendingFeatureError("template", "in-head");
+      if (token.name === "template") {
+        this.#insertElement(token);
+        this.#activeFormatting.pushMarker();
+        this.#framesetOk = false;
+        this.#templateInsertionModes.push("in-template");
+        this.#setInsertionMode("in-template", token);
+        return null;
+      }
       if (token.name === "head") {
         this.#parseError(token, "in-head");
         return null;
@@ -435,7 +473,10 @@ export class HtmlTreeBuilder implements TokenSink {
         this.#setInsertionMode("after-head", token);
         return null;
       }
-      if (token.name === "template") throw new HtmlTreeBuilderPendingFeatureError("template", "in-head");
+      if (token.name === "template") {
+        this.#closeTemplate(token);
+        return null;
+      }
       if (!AFTER_HEAD_IMPLYING_END_TAGS.has(token.name)) {
         this.#parseError(token, "in-head");
         return null;
@@ -479,7 +520,7 @@ export class HtmlTreeBuilder implements TokenSink {
   }
 
   #inAfterHead(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
-    if (isWhitespaceToken(token)) {
+    if (token.kind === "character" && isWhitespaceToken(token)) {
       this.#insertCharacter(token);
       return null;
     }
@@ -503,9 +544,12 @@ export class HtmlTreeBuilder implements TokenSink {
         this.#setInsertionMode("in-body", token);
         return null;
       }
-      if (token.name === "frameset") throw new HtmlTreeBuilderPendingFeatureError("frameset", "after-head");
+      if (token.name === "frameset") {
+        this.#insertElement(token);
+        this.#setInsertionMode("in-frameset", token);
+        return null;
+      }
       if (HEAD_BODY_DELEGATE_TAGS.has(token.name)) {
-        if (token.name === "template") throw new HtmlTreeBuilderPendingFeatureError("template", "after-head");
         this.#parseError(token, "after-head");
         const head = requireInternalValue(this.#headElement, "TREE_BUILDER_HEAD_POINTER_MISSING");
         this.#openElements.push(head);
@@ -519,7 +563,7 @@ export class HtmlTreeBuilder implements TokenSink {
       }
     }
     if (token.kind === "end-tag") {
-      if (token.name === "template") throw new HtmlTreeBuilderPendingFeatureError("template", "after-head");
+      if (token.name === "template") return this.#inHead(token, acknowledge);
       if (!AFTER_HEAD_IMPLYING_END_TAGS.has(token.name)) {
         this.#parseError(token, "after-head");
         return null;
@@ -559,8 +603,8 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (token.kind === "eof") {
-      if (this.#templateInsertionModes.length > 0) {
-        throw new HtmlTreeBuilderPendingFeatureError("template", "in-body");
+      if (this.#hasOpenHtmlElement("template")) {
+        return "in-template";
       }
       if (this.#hasUnexpectedOpenElementAtBodyEnd()) this.#parseError(token, "in-body");
       this.#finished = true;
@@ -574,16 +618,17 @@ export class HtmlTreeBuilder implements TokenSink {
     const name = token.name;
     if (name === "html") {
       this.#parseError(token, "in-body");
+      if (this.#hasOpenHtmlElement("template")) return null;
       const html = this.#openElements.at(0);
       if (html !== null) this.#model.adoptAttributes(html, attributesFromToken(token.attributes));
       return null;
     }
     if (HEAD_BODY_DELEGATE_TAGS.has(name)) {
-      if (name === "template") throw new HtmlTreeBuilderPendingFeatureError("template", "in-body");
       return this.#inHead(token, acknowledge);
     }
     if (name === "body") {
       this.#parseError(token, "in-body");
+      if (this.#hasOpenHtmlElement("template")) return null;
       const body = this.#openElements.at(1);
       if (body?.localName === "body") {
         this.#framesetOk = false;
@@ -591,7 +636,16 @@ export class HtmlTreeBuilder implements TokenSink {
       }
       return null;
     }
-    if (name === "frameset") throw new HtmlTreeBuilderPendingFeatureError("frameset", "in-body");
+    if (name === "frameset") {
+      this.#parseError(token, "in-body");
+      const body = this.#openElements.at(1);
+      if (body?.localName !== "body" || !this.#framesetOk) return null;
+      this.#model.detach(body);
+      while (this.#openElements.length > 1) this.#popCurrent();
+      this.#insertElement(token);
+      this.#setInsertionMode("in-frameset", token);
+      return null;
+    }
     if (IN_BODY_IGNORED_START_TAGS.has(name)) {
       this.#parseError(token, "in-body");
       return null;
@@ -619,12 +673,14 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "form") {
-      if (this.#formElement !== null) {
+      const hasTemplate = this.#hasOpenHtmlElement("template");
+      if (this.#formElement !== null && !hasTemplate) {
         this.#parseError(token, "in-body");
         return null;
       }
       this.#closeParagraphIfInButtonScope(token);
-      this.#formElement = this.#insertElement(token);
+      const form = this.#insertElement(token);
+      if (!hasTemplate) this.#formElement = form;
       return null;
     }
     if (name === "li") {
@@ -697,9 +753,23 @@ export class HtmlTreeBuilder implements TokenSink {
       this.#framesetOk = false;
       return null;
     }
-    if (name === "table") throw new HtmlTreeBuilderPendingFeatureError("table", "in-body");
+    if (name === "table") {
+      if (this.#documentMode !== "quirks") this.#closeParagraphIfInButtonScope(token);
+      this.#insertElement(token);
+      this.#framesetOk = false;
+      this.#setInsertionMode("in-table", token);
+      return null;
+    }
     if (name === "select") {
-      throw new HtmlTreeBuilderPendingFeatureError("select", "in-body");
+      if (this.#hasInScope("select", "default")) {
+        this.#parseError(token, "in-body");
+        this.#popThrough("select");
+        return null;
+      }
+      this.#reconstructActiveFormatting();
+      this.#insertElement(token);
+      this.#framesetOk = false;
+      return null;
     }
     if (name === "optgroup") {
       if (this.#hasInScope("select", "default")) {
@@ -715,7 +785,12 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "option") {
-      if (this.#currentNode().localName === "option") this.#popCurrent();
+      if (this.#hasInScope("select", "default")) {
+        this.#generateImpliedEndTags("optgroup");
+        if (this.#hasInScope("option", "default")) this.#parseError(token, "in-body");
+      } else if (this.#currentNode().localName === "option") {
+        this.#popCurrent();
+      }
       this.#reconstructActiveFormatting();
       this.#insertElement(token);
       return null;
@@ -799,7 +874,7 @@ export class HtmlTreeBuilder implements TokenSink {
 
   #endTagInBody(token: HtmlEndTagToken, acknowledge: () => void): InsertionMode | null {
     const name = token.name;
-    if (name === "template") throw new HtmlTreeBuilderPendingFeatureError("template", "in-body");
+    if (name === "template") return this.#inHead(token, acknowledge);
     if (name === "body") {
       if (!this.#hasInScope("body", "default")) {
         this.#parseError(token, "in-body");
@@ -829,6 +904,16 @@ export class HtmlTreeBuilder implements TokenSink {
       return null;
     }
     if (name === "form") {
+      if (this.#hasOpenHtmlElement("template")) {
+        if (!this.#hasInScope("form", "default")) {
+          this.#parseError(token, "in-body");
+          return null;
+        }
+        this.#generateImpliedEndTags();
+        if (this.#currentNode().localName !== "form") this.#parseError(token, "in-body");
+        this.#popThrough("form");
+        return null;
+      }
       const form = this.#formElement;
       this.#formElement = null;
       if (
@@ -956,6 +1041,481 @@ export class HtmlTreeBuilder implements TokenSink {
     failInternalState("TREE_BUILDER_STACK_ENTRY_MISSING");
   }
 
+  #inTable(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (
+      token.kind === "character" &&
+      TABLE_CHARACTER_CURRENT_TAGS.has(this.#currentNode().localName)
+    ) {
+      this.#pendingTableCharacters = [];
+      this.#originalInsertionMode = this.#insertionMode;
+      this.#setInsertionMode("in-table-text", token);
+      return "in-table-text";
+    }
+    if (token.kind === "comment") {
+      this.#insertComment(token);
+      return null;
+    }
+    if (token.kind === "processing-instruction") {
+      this.#insertProcessingInstruction(token);
+      return null;
+    }
+    if (token.kind === "doctype") {
+      this.#parseError(token, "in-table");
+      return null;
+    }
+    if (token.kind === "start-tag") {
+      const name = token.name;
+      if (name === "caption") {
+        this.#clearStackToTableContext();
+        this.#activeFormatting.pushMarker();
+        this.#insertElement(token);
+        this.#setInsertionMode("in-caption", token);
+        return null;
+      }
+      if (name === "colgroup") {
+        this.#clearStackToTableContext();
+        this.#insertElement(token);
+        this.#setInsertionMode("in-column-group", token);
+        return null;
+      }
+      if (name === "col") {
+        this.#clearStackToTableContext();
+        this.#insertElement(syntheticStartTag("colgroup", token), false);
+        this.#setInsertionMode("in-column-group", token);
+        return "in-column-group";
+      }
+      if (TABLE_BODY_TAGS.has(name)) {
+        this.#clearStackToTableContext();
+        this.#insertElement(token);
+        this.#setInsertionMode("in-table-body", token);
+        return null;
+      }
+      if (name === "td" || name === "th" || name === "tr") {
+        this.#clearStackToTableContext();
+        this.#insertElement(syntheticStartTag("tbody", token), false);
+        this.#setInsertionMode("in-table-body", token);
+        return "in-table-body";
+      }
+      if (name === "table") {
+        this.#parseError(token, "in-table");
+        if (!this.#hasInTableScope("table")) return null;
+        this.#popThrough("table");
+        this.#resetInsertionMode(token);
+        return this.#insertionMode;
+      }
+      if (name === "style" || name === "script" || name === "template") {
+        return this.#inHead(token, acknowledge);
+      }
+      if (name === "input") {
+        const type = token.attributes.find((attribute) => attribute.name === "type")?.value;
+        if (type?.toLowerCase() === "hidden") {
+          this.#parseError(token, "in-table");
+          this.#insertElement(token);
+          this.#popCurrent();
+          if (token.selfClosing) acknowledge();
+          return null;
+        }
+      }
+      if (name === "form") {
+        this.#parseError(token, "in-table");
+        if (this.#hasOpenHtmlElement("template") || this.#formElement !== null) return null;
+        this.#formElement = this.#insertElement(token);
+        this.#popCurrent();
+        return null;
+      }
+    }
+    if (token.kind === "end-tag") {
+      if (token.name === "table") {
+        if (!this.#hasInTableScope("table")) {
+          this.#parseError(token, "in-table");
+          return null;
+        }
+        this.#popThrough("table");
+        this.#resetInsertionMode(token);
+        return null;
+      }
+      if (token.name === "template") return this.#inHead(token, acknowledge);
+      if (TABLE_IGNORED_END_TAGS.has(token.name)) {
+        this.#parseError(token, "in-table");
+        return null;
+      }
+    }
+    if (token.kind === "eof") return this.#inBody(token, acknowledge);
+    return this.#processTableAnythingElse(token, acknowledge);
+  }
+
+  #inTableText(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (token.kind === "character") {
+      if (token.data === "\u0000") {
+        this.#parseError(token, "in-table-text");
+        return null;
+      }
+      this.#pendingTableCharacters.push(token);
+      return null;
+    }
+
+    const original = requireInternalValue(
+      this.#originalInsertionMode,
+      "TREE_BUILDER_ORIGINAL_MODE_MISSING"
+    );
+    const pending = this.#pendingTableCharacters;
+    this.#pendingTableCharacters = [];
+    this.#setInsertionMode(original, token);
+    this.#originalInsertionMode = null;
+    if (pending.some((character) => !isWhitespaceToken(character))) {
+      for (const character of pending) this.#parseErrorForEachCharacter(character, "in-table-text");
+      for (const character of pending) this.#processWithFosterParenting(character, acknowledge);
+    } else {
+      for (const character of pending) this.#insertCharacter(character);
+    }
+    return original;
+  }
+
+  #inCaption(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (token.kind === "end-tag" && token.name === "caption") {
+      if (!this.#hasInTableScope("caption")) {
+        this.#parseError(token, "in-caption");
+        return null;
+      }
+      this.#closeCaption(token);
+      return null;
+    }
+    if (
+      (token.kind === "start-tag" && CAPTION_BREAKOUT_START_TAGS.has(token.name)) ||
+      (token.kind === "end-tag" && token.name === "table")
+    ) {
+      if (!this.#hasInTableScope("caption")) {
+        this.#parseError(token, "in-caption");
+        return null;
+      }
+      this.#closeCaption(token);
+      return "in-table";
+    }
+    if (
+      token.kind === "end-tag" &&
+      CAPTION_IGNORED_END_TAGS.has(token.name)
+    ) {
+      this.#parseError(token, "in-caption");
+      return null;
+    }
+    return this.#inBody(token, acknowledge);
+  }
+
+  #inColumnGroup(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (token.kind === "character" && isWhitespaceToken(token)) {
+      this.#insertCharacter(token);
+      return null;
+    }
+    if (token.kind === "character" && this.#currentNode().localName !== "colgroup") {
+      this.#parseErrorForEachCharacter(token, "in-column-group");
+      return null;
+    }
+    if (token.kind === "comment") {
+      this.#insertComment(token);
+      return null;
+    }
+    if (token.kind === "processing-instruction") {
+      this.#insertProcessingInstruction(token);
+      return null;
+    }
+    if (token.kind === "doctype") {
+      this.#parseError(token, "in-column-group");
+      return null;
+    }
+    if (token.kind === "start-tag") {
+      if (token.name === "html") return this.#inBody(token, acknowledge);
+      if (token.name === "col") {
+        this.#insertElement(token);
+        this.#popCurrent();
+        if (token.selfClosing) acknowledge();
+        return null;
+      }
+      if (token.name === "template") return this.#inHead(token, acknowledge);
+    }
+    if (token.kind === "end-tag") {
+      if (token.name === "colgroup") {
+        if (this.#currentNode().localName !== "colgroup") {
+          this.#parseError(token, "in-column-group");
+          return null;
+        }
+        this.#popCurrent();
+        this.#setInsertionMode("in-table", token);
+        return null;
+      }
+      if (token.name === "col") {
+        this.#parseError(token, "in-column-group");
+        return null;
+      }
+      if (token.name === "template") return this.#inHead(token, acknowledge);
+    }
+    if (token.kind === "eof") return this.#inBody(token, acknowledge);
+    if (this.#currentNode().localName !== "colgroup") {
+      this.#parseError(token, "in-column-group");
+      return null;
+    }
+    this.#popCurrent();
+    this.#setInsertionMode("in-table", token);
+    return "in-table";
+  }
+
+  #inTableBody(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (token.kind === "start-tag") {
+      if (token.name === "tr") {
+        this.#clearStackToTableBodyContext();
+        this.#insertElement(token);
+        this.#setInsertionMode("in-row", token);
+        return null;
+      }
+      if (token.name === "td" || token.name === "th") {
+        this.#parseError(token, "in-table-body");
+        this.#clearStackToTableBodyContext();
+        this.#insertElement(syntheticStartTag("tr", token), false);
+        this.#setInsertionMode("in-row", token);
+        return "in-row";
+      }
+      if (TABLE_BODY_BREAKOUT_START_TAGS.has(token.name)) {
+        return this.#closeTableBodyAndReprocess(token);
+      }
+    }
+    if (token.kind === "end-tag") {
+      if (TABLE_BODY_TAGS.has(token.name)) {
+        if (!this.#hasInTableScope(token.name)) {
+          this.#parseError(token, "in-table-body");
+          return null;
+        }
+        this.#clearStackToTableBodyContext();
+        this.#popCurrent();
+        this.#setInsertionMode("in-table", token);
+        return null;
+      }
+      if (token.name === "table") return this.#closeTableBodyAndReprocess(token);
+      if (TABLE_BODY_IGNORED_END_TAGS.has(token.name)) {
+        this.#parseError(token, "in-table-body");
+        return null;
+      }
+    }
+    return this.#inTable(token, acknowledge);
+  }
+
+  #inRow(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (token.kind === "start-tag") {
+      if (TABLE_CELL_TAGS.has(token.name)) {
+        this.#clearStackToTableRowContext();
+        this.#insertElement(token);
+        this.#activeFormatting.pushMarker();
+        this.#setInsertionMode("in-cell", token);
+        return null;
+      }
+      if (ROW_BREAKOUT_START_TAGS.has(token.name)) {
+        return this.#closeRowAndReprocess(token);
+      }
+    }
+    if (token.kind === "end-tag") {
+      if (token.name === "tr") {
+        if (!this.#hasInTableScope("tr")) {
+          this.#parseError(token, "in-row");
+          return null;
+        }
+        this.#clearStackToTableRowContext();
+        this.#popCurrent();
+        this.#setInsertionMode("in-table-body", token);
+        return null;
+      }
+      if (token.name === "table") return this.#closeRowAndReprocess(token);
+      if (TABLE_BODY_TAGS.has(token.name)) {
+        if (!this.#hasInTableScope(token.name)) {
+          this.#parseError(token, "in-row");
+          return null;
+        }
+        if (!this.#hasInTableScope("tr")) return null;
+        return this.#closeRowAndReprocess(token);
+      }
+      if (ROW_IGNORED_END_TAGS.has(token.name)) {
+        this.#parseError(token, "in-row");
+        return null;
+      }
+    }
+    return this.#inTable(token, acknowledge);
+  }
+
+  #inCell(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (token.kind === "end-tag" && TABLE_CELL_TAGS.has(token.name)) {
+      if (!this.#hasInTableScope(token.name)) {
+        this.#parseError(token, "in-cell");
+        return null;
+      }
+      this.#closeCell(token);
+      return null;
+    }
+    if (
+      (token.kind === "start-tag" && CELL_BREAKOUT_START_TAGS.has(token.name)) ||
+      (token.kind === "end-tag" && CELL_BREAKOUT_END_TAGS.has(token.name))
+    ) {
+      if (token.kind === "end-tag" && !this.#hasInTableScope(token.name)) {
+        this.#parseError(token, "in-cell");
+        return null;
+      }
+      if (!this.#hasInTableScope("td") && !this.#hasInTableScope("th")) {
+        this.#parseError(token, "in-cell");
+        return null;
+      }
+      this.#closeCell(token);
+      return this.#insertionMode;
+    }
+    if (
+      token.kind === "end-tag" &&
+      CELL_IGNORED_END_TAGS.has(token.name)
+    ) {
+      this.#parseError(token, "in-cell");
+      return null;
+    }
+    return this.#inBody(token, acknowledge);
+  }
+
+  #inTemplate(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (
+      token.kind === "character" || token.kind === "comment" ||
+      token.kind === "processing-instruction" || token.kind === "doctype"
+    ) return this.#inBody(token, acknowledge);
+    if (token.kind === "start-tag") {
+      if (TEMPLATE_HEAD_START_TAGS.has(token.name)) {
+        return this.#inHead(token, acknowledge);
+      }
+      if (TEMPLATE_TABLE_START_TAGS.has(token.name)) {
+        this.#replaceTemplateMode("in-table", token);
+        return "in-table";
+      }
+      if (token.name === "col") {
+        this.#replaceTemplateMode("in-column-group", token);
+        return "in-column-group";
+      }
+      if (token.name === "tr") {
+        this.#replaceTemplateMode("in-table-body", token);
+        return "in-table-body";
+      }
+      if (token.name === "td" || token.name === "th") {
+        this.#replaceTemplateMode("in-row", token);
+        return "in-row";
+      }
+      this.#replaceTemplateMode("in-body", token);
+      return "in-body";
+    }
+    if (token.kind === "end-tag") {
+      if (token.name === "template") return this.#inHead(token, acknowledge);
+      this.#parseError(token, "in-template");
+      return null;
+    }
+    if (!this.#hasOpenHtmlElement("template")) {
+      this.#finished = true;
+      return null;
+    }
+    this.#parseError(token, "in-template");
+    this.#popThrough("template");
+    this.#clearFormattingToMarker();
+    this.#popTemplateMode();
+    this.#resetInsertionMode(token);
+    return this.#insertionMode;
+  }
+
+  #inFrameset(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (token.kind === "character" && isWhitespaceToken(token)) {
+      this.#insertCharacter(token);
+      return null;
+    }
+    if (token.kind === "comment") {
+      this.#insertComment(token);
+      return null;
+    }
+    if (token.kind === "processing-instruction") {
+      this.#insertProcessingInstruction(token);
+      return null;
+    }
+    if (token.kind === "doctype") {
+      this.#parseError(token, "in-frameset");
+      return null;
+    }
+    if (token.kind === "start-tag") {
+      if (token.name === "html") return this.#inBody(token, acknowledge);
+      if (token.name === "frameset") {
+        this.#insertElement(token);
+        return null;
+      }
+      if (token.name === "frame") {
+        this.#insertElement(token);
+        this.#popCurrent();
+        if (token.selfClosing) acknowledge();
+        return null;
+      }
+      if (token.name === "noframes") return this.#inHead(token, acknowledge);
+    }
+    if (token.kind === "end-tag" && token.name === "frameset") {
+      if (this.#currentNode().localName === "html") {
+        this.#parseError(token, "in-frameset");
+        return null;
+      }
+      this.#popCurrent();
+      if (this.#currentNode().localName !== "frameset") this.#setInsertionMode("after-frameset", token);
+      return null;
+    }
+    if (token.kind === "eof") {
+      if (this.#currentNode().localName !== "html") this.#parseError(token, "in-frameset");
+      this.#finished = true;
+      return null;
+    }
+    this.#parseError(token, "in-frameset");
+    return null;
+  }
+
+  #inAfterFrameset(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (isWhitespaceToken(token)) return this.#inBody(token, acknowledge);
+    if (token.kind === "comment") {
+      this.#insertComment(token);
+      return null;
+    }
+    if (token.kind === "processing-instruction") {
+      this.#insertProcessingInstruction(token);
+      return null;
+    }
+    if (token.kind === "doctype") {
+      this.#parseError(token, "after-frameset");
+      return null;
+    }
+    if (token.kind === "start-tag" && token.name === "html") return this.#inBody(token, acknowledge);
+    if (token.kind === "start-tag" && token.name === "noframes") return this.#inHead(token, acknowledge);
+    if (token.kind === "end-tag" && token.name === "html") {
+      this.#setInsertionMode("after-after-frameset", token);
+      return null;
+    }
+    if (token.kind === "eof") {
+      this.#finished = true;
+      return null;
+    }
+    this.#parseError(token, "after-frameset");
+    return null;
+  }
+
+  #inAfterAfterFrameset(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    if (token.kind === "comment") {
+      this.#insertComment(token, this.#model.root);
+      return null;
+    }
+    if (token.kind === "processing-instruction") {
+      this.#insertProcessingInstruction(token, this.#model.root);
+      return null;
+    }
+    if (
+      token.kind === "doctype" || isWhitespaceToken(token) ||
+      (token.kind === "start-tag" && token.name === "html")
+    ) return this.#inBody(token, acknowledge);
+    if (token.kind === "start-tag" && token.name === "noframes") return this.#inHead(token, acknowledge);
+    if (token.kind === "eof") {
+      this.#finished = true;
+      return null;
+    }
+    this.#parseError(token, "after-after-frameset");
+    return null;
+  }
+
   #inAfterBody(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
     if (isWhitespaceToken(token)) return this.#inBody(token, acknowledge);
     if (token.kind === "comment") {
@@ -1035,34 +1595,80 @@ export class HtmlTreeBuilder implements TokenSink {
   }
 
   #insertAtAppropriateLocation(node: HtmlTreeNode, overrideTarget?: HtmlTreeElement): void {
-    const parent = overrideTarget ?? this.#appropriateParent();
-    this.#model.append(parent, node);
+    const location = this.#appropriateInsertionLocation(overrideTarget);
+    this.#model.insertBefore(location.parent, node, location.before);
   }
 
-  #appropriateParent(): HtmlTreeParent {
-    if (this.#openElements.length === 0) return this.#model.root;
-    return this.#currentNode();
+  #appropriateInsertionLocation(overrideTarget?: HtmlTreeElement): InsertionLocation {
+    if (this.#openElements.length === 0) {
+      return { parent: this.#model.root, before: null };
+    }
+    const target = overrideTarget ?? this.#currentNode();
+    if (
+      !this.#fosterParenting ||
+      target.namespaceUri !== HTML_NAMESPACE ||
+      !FOSTER_PARENTING_TARGET_TAGS.has(target.localName)
+    ) {
+      return { parent: target, before: null };
+    }
+
+    let lastTemplateIndex = -1;
+    let lastTableIndex = -1;
+    for (let index = this.#openElements.length - 1; index >= 0; index -= 1) {
+      this.#resources.checkpoint();
+      const element = this.#openElements.at(index);
+      if (element === null || element.namespaceUri !== HTML_NAMESPACE) continue;
+      if (lastTemplateIndex < 0 && element.localName === "template") lastTemplateIndex = index;
+      if (lastTableIndex < 0 && element.localName === "table") lastTableIndex = index;
+      if (lastTemplateIndex >= 0 && lastTableIndex >= 0) break;
+    }
+    if (lastTemplateIndex > lastTableIndex) {
+      const template = requireInternalValue(
+        this.#openElements.at(lastTemplateIndex),
+        "TREE_BUILDER_STACK_ENTRY_MISSING"
+      );
+      return { parent: template, before: null };
+    }
+    if (lastTableIndex < 0) {
+      const first = requireInternalValue(
+        this.#openElements.at(0),
+        "TREE_BUILDER_STACK_ENTRY_MISSING"
+      );
+      return { parent: first, before: null };
+    }
+    const table = requireInternalValue(
+      this.#openElements.at(lastTableIndex),
+      "TREE_BUILDER_STACK_ENTRY_MISSING"
+    );
+    if (table.parent !== null) return { parent: table.parent, before: table };
+    const previous = requireInternalValue(
+      this.#openElements.at(lastTableIndex - 1),
+      "TREE_BUILDER_STACK_ENTRY_MISSING"
+    );
+    return { parent: previous, before: null };
   }
 
   #insertCharacter(token: Extract<HtmlToken, { readonly kind: "character" }>): void {
-    const parent = this.#appropriateParent();
-    this.#model.insertText(parent, token.data, token.span);
+    const location = this.#appropriateInsertionLocation();
+    this.#model.insertText(location.parent, token.data, token.span, location.before);
   }
 
   #insertComment(
     token: Extract<HtmlToken, { readonly kind: "comment" }>,
-    parent: HtmlTreeParent = this.#appropriateParent()
+    parent?: HtmlTreeParent
   ): void {
     const comment = this.#model.createComment(token.data, token.span);
-    this.#model.append(parent, comment);
+    if (parent !== undefined) this.#model.append(parent, comment);
+    else this.#insertAtAppropriateLocation(comment);
   }
 
   #insertProcessingInstruction(
     token: Extract<HtmlToken, { readonly kind: "processing-instruction" }>,
-    parent: HtmlTreeParent = this.#appropriateParent()
+    parent?: HtmlTreeParent
   ): void {
     const instruction = this.#model.createProcessingInstruction(token.target, token.data, token.span);
-    this.#model.append(parent, instruction);
+    if (parent !== undefined) this.#model.append(parent, instruction);
+    else this.#insertAtAppropriateLocation(instruction);
   }
 
   #insertTextElement(token: HtmlStartTagToken, tokenizerMode: TokenizerMode): void {
@@ -1090,6 +1696,14 @@ export class HtmlTreeBuilder implements TokenSink {
     this.#onParseError(error);
     this.#observer?.onParseError?.(error);
     this.#resources.ensureActive();
+  }
+
+  #parseErrorForEachCharacter(token: HtmlCharacterToken, insertionMode: InsertionMode): void {
+    for (let offset = 0; offset < token.data.length;) {
+      const codePoint = token.data.codePointAt(offset);
+      this.#parseError(token, insertionMode);
+      offset += codePoint !== undefined && codePoint > 0xffff ? 2 : 1;
+    }
   }
 
   #tokenizerControl(): TokenizerControl {
@@ -1126,6 +1740,10 @@ export class HtmlTreeBuilder implements TokenSink {
     }
   }
 
+  #generateAllImpliedEndTagsThoroughly(): void {
+    while (THOROUGH_IMPLIED_END_TAGS.has(this.#currentNode().localName)) this.#popCurrent();
+  }
+
   #closeParagraphIfInButtonScope(token: HtmlToken): void {
     if (this.#hasInScope("p", "button")) this.#closeParagraph(token);
   }
@@ -1156,6 +1774,181 @@ export class HtmlTreeBuilder implements TokenSink {
       ? BUTTON_SCOPE_BOUNDARIES
       : scope === "list-item" ? LIST_ITEM_SCOPE_BOUNDARIES : DEFAULT_SCOPE_BOUNDARIES;
     return this.#openElements.hasInScope(HTML_NAMESPACE, name, boundaries);
+  }
+
+  #hasInTableScope(name: string): boolean {
+    return this.#openElements.hasInScope(HTML_NAMESPACE, name, TABLE_SCOPE_BOUNDARIES);
+  }
+
+  #hasOpenHtmlElement(name: string): boolean {
+    for (let index = this.#openElements.length - 1; index >= 0; index -= 1) {
+      this.#resources.checkpoint();
+      const element = this.#openElements.at(index);
+      if (element === null) continue;
+      if (element.namespaceUri === HTML_NAMESPACE && element.localName === name) return true;
+    }
+    return false;
+  }
+
+  #processTableAnythingElse(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    this.#parseError(token, "in-table");
+    return this.#processWithFosterParenting(token, acknowledge);
+  }
+
+  #processWithFosterParenting(token: HtmlToken, acknowledge: () => void): InsertionMode | null {
+    this.#fosterParenting = true;
+    try {
+      return this.#inBody(token, acknowledge);
+    } finally {
+      this.#fosterParenting = false;
+    }
+  }
+
+  #clearStackToTableContext(): void {
+    while (!TABLE_CONTEXT_CLEAR_TAGS.has(this.#currentNode().localName)) this.#popCurrent();
+  }
+
+  #clearStackToTableBodyContext(): void {
+    while (!TABLE_BODY_CONTEXT_CLEAR_TAGS.has(this.#currentNode().localName)) this.#popCurrent();
+  }
+
+  #clearStackToTableRowContext(): void {
+    while (!TABLE_ROW_CONTEXT_CLEAR_TAGS.has(this.#currentNode().localName)) this.#popCurrent();
+  }
+
+  #closeCaption(token: HtmlToken): void {
+    this.#generateImpliedEndTags();
+    if (this.#currentNode().localName !== "caption") this.#parseError(token, "in-caption");
+    this.#popThrough("caption");
+    this.#clearFormattingToMarker();
+    this.#setInsertionMode("in-table", token);
+  }
+
+  #closeTableBodyAndReprocess(token: HtmlToken): InsertionMode | null {
+    const group = this.#lastInTableScope(TABLE_BODY_TAGS);
+    if (group === null) {
+      this.#parseError(token, "in-table-body");
+      return null;
+    }
+    this.#clearStackToTableBodyContext();
+    this.#popCurrent();
+    this.#setInsertionMode("in-table", token);
+    return "in-table";
+  }
+
+  #closeRowAndReprocess(token: HtmlToken): InsertionMode | null {
+    if (!this.#hasInTableScope("tr")) {
+      this.#parseError(token, "in-row");
+      return null;
+    }
+    this.#clearStackToTableRowContext();
+    this.#popCurrent();
+    this.#setInsertionMode("in-table-body", token);
+    return "in-table-body";
+  }
+
+  #closeCell(token: HtmlToken): void {
+    const cell = this.#lastInTableScope(TABLE_CELL_TAGS);
+    if (cell === null) failInternalState("TREE_BUILDER_STACK_ENTRY_MISSING");
+    this.#generateImpliedEndTags();
+    if (this.#currentNode() !== cell) this.#parseError(token, "in-cell");
+    this.#popThroughElement(cell);
+    this.#clearFormattingToMarker();
+    this.#setInsertionMode("in-row", token);
+  }
+
+  #lastInTableScope(names: ReadonlySet<string>): HtmlTreeElement | null {
+    return this.#openElements.lastInScope(HTML_NAMESPACE, names, TABLE_SCOPE_BOUNDARIES);
+  }
+
+  #closeTemplate(token: HtmlToken): void {
+    if (!this.#hasOpenHtmlElement("template")) {
+      this.#parseError(token, "in-head");
+      return;
+    }
+    this.#generateAllImpliedEndTagsThoroughly();
+    if (this.#currentNode().localName !== "template") this.#parseError(token, "in-head");
+    this.#popThrough("template");
+    this.#clearFormattingToMarker();
+    this.#popTemplateMode();
+    this.#resetInsertionMode(token);
+  }
+
+  #replaceTemplateMode(mode: InsertionMode, token: HtmlToken): void {
+    this.#popTemplateMode();
+    this.#templateInsertionModes.push(mode);
+    this.#setInsertionMode(mode, token);
+  }
+
+  #popTemplateMode(): InsertionMode {
+    return requireInternalValue(
+      this.#templateInsertionModes.pop(),
+      "TREE_BUILDER_TEMPLATE_MODE_MISSING"
+    );
+  }
+
+  #resetInsertionMode(token: HtmlToken): void {
+    for (let index = this.#openElements.length - 1; index >= 0; index -= 1) {
+      this.#resources.checkpoint();
+      const node = requireInternalValue(
+        this.#openElements.at(index),
+        "TREE_BUILDER_STACK_ENTRY_MISSING"
+      );
+      const last = index === 0;
+      if (!last && TABLE_CELL_TAGS.has(node.localName)) {
+        this.#setInsertionMode("in-cell", token);
+        return;
+      }
+      if (node.localName === "tr") {
+        this.#setInsertionMode("in-row", token);
+        return;
+      }
+      if (TABLE_BODY_TAGS.has(node.localName)) {
+        this.#setInsertionMode("in-table-body", token);
+        return;
+      }
+      if (node.localName === "caption") {
+        this.#setInsertionMode("in-caption", token);
+        return;
+      }
+      if (node.localName === "colgroup") {
+        this.#setInsertionMode("in-column-group", token);
+        return;
+      }
+      if (node.localName === "table") {
+        this.#setInsertionMode("in-table", token);
+        return;
+      }
+      if (node.localName === "template") {
+        const mode = requireInternalValue(
+          this.#templateInsertionModes.at(-1),
+          "TREE_BUILDER_TEMPLATE_MODE_MISSING"
+        );
+        this.#setInsertionMode(mode, token);
+        return;
+      }
+      if (!last && node.localName === "head") {
+        this.#setInsertionMode("in-head", token);
+        return;
+      }
+      if (node.localName === "body") {
+        this.#setInsertionMode("in-body", token);
+        return;
+      }
+      if (node.localName === "frameset") {
+        this.#setInsertionMode("in-frameset", token);
+        return;
+      }
+      if (node.localName === "html") {
+        this.#setInsertionMode(this.#headElement === null ? "before-head" : "after-head", token);
+        return;
+      }
+      if (last) {
+        this.#setInsertionMode("in-body", token);
+        return;
+      }
+    }
+    failInternalState("TREE_BUILDER_STACK_ENTRY_MISSING");
   }
 
   #reconstructActiveFormatting(): void {
