@@ -4,6 +4,9 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Pin the maintained WPT serialization directory and qualify the built public
+  serializer against explicit expectations, structural round trips, exact
+  non-roundtrip classifications, and Chromium, Firefox, and WebKit.
 - Correct HTML serialization for parent-sensitive raw text, namespace
   boundaries, escaping, names, and extended void elements; make source patches
   use the same rules and replace the unrelated fixture serializer gate with

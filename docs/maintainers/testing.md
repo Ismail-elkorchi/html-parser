@@ -30,6 +30,8 @@ Use narrower commands while iterating:
 | Do production behavior and regression tests pass? | `npm run test:behavior` |
 | Does the normal local test set pass? | `npm test` |
 | Does the complete maintained WPT tree snapshot pass its exact classifications? | `npm run qualification:wpt` |
+| Does public serialization match pinned expectations and classified round trips? | `npm run qualification:serialization` |
+| Does public serialization agree with Chromium, Firefox, and WebKit? | `npm run test:browser-diff:serialization` |
 | Do documentation links and API names stay valid? | `npm run docs:check` |
 | Do documented TypeScript examples compile strictly? | `npm run docs:snippets` |
 | Do repository examples execute? | `npm run examples:run` |
@@ -66,6 +68,13 @@ The aggregate command currently executes every partition, including holdout;
 the label does not make those cases hidden. Treat all of its results as one
 visible conformance signal. Corpus details and refresh constraints are in
 [corpora.md](./corpora.md).
+
+`npm run qualification:serialization` verifies the exact pinned WPT
+serialization inventory, calls `dist/mod.js#serialize` for every applicable
+expectation, requires the named positive round trips to remain structurally
+stable, and checks exact fingerprints for the two intentional non-roundtrips.
+The browser differential constructs equivalent native nodes; it is an oracle,
+not an alternate serializer.
 
 Use `npm run test:fuzz` for generated parser inputs and
 `npm run test:browser-diff` for browser comparisons. A difference is evidence

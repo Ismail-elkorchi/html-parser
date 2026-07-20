@@ -18,6 +18,15 @@ Scope:
   tree-construction fixtures. Exact commit, upstream paths, Git blob IDs,
   SHA-256 values, and byte counts are recorded in the colocated `manifest.json`.
 
+## Web Platform Tests serialization fixtures
+- Source: https://github.com/web-platform-tests/wpt
+- Location in repository: `test/fixtures/upstream/wpt-serialization`
+- License: BSD-3-Clause
+- Notice: A test-only, offline snapshot of the complete HTML serialization test
+  directory and its shared element-list dependency. Exact commit, upstream
+  paths, applicability, Git blob IDs, SHA-256 values, and byte counts are
+  recorded in the colocated `manifest.json`.
+
 ## WHATWG named character references
 - Source: https://html.spec.whatwg.org/entities.json
 - Location in repository:

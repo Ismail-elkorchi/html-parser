@@ -1,6 +1,30 @@
 {
   "targets": [
     {
+      "targetFile": "scripts/qualification/run-public-serialization-roundtrip.mjs",
+      "testCommand": ["node", "scripts/qualification/run-public-serialization-roundtrip.mjs"],
+      "mutants": [
+        {
+          "id": "serializer-roundtrip-classification-ledger",
+          "description": "Change the exact non-roundtrip classification ledger fingerprint.",
+          "search": "86f7cb6d3f42dd40c8ce4f08e2a664fa9c230d1ad2994ed2b1862742a12648f4",
+          "replace": "06f7cb6d3f42dd40c8ce4f08e2a664fa9c230d1ad2994ed2b1862742a12648f4"
+        }
+      ]
+    },
+    {
+      "targetFile": "test/support/public-serialization-qualification-cases.mjs",
+      "testCommand": ["node", "scripts/qualification/run-public-serialization.mjs"],
+      "mutants": [
+        {
+          "id": "serializer-qualified-rcdata-expectation",
+          "description": "Stop requiring non-breaking-space escaping at the title boundary.",
+          "search": "<title>&lt;&amp;&gt;&nbsp;</title>",
+          "replace": "<title>&lt;&amp;&gt; </title>"
+        }
+      ]
+    },
+    {
       "targetFile": "dist/public/html-serialization-rules.js",
       "testCommand": ["node", "--test", "test/behavior/serialization.test.js", "test/behavior/spans-patch.test.js"],
       "mutants": [

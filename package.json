@@ -65,6 +65,7 @@
     "test:browser-diff:engine-formatting": "npm run build && node scripts/oracles/run-engine-formatting-browser-diff.mjs",
     "test:browser-diff:engine-contextual": "npm run build && node scripts/oracles/run-engine-contextual-browser-diff.mjs",
     "test:browser-diff:engine-foreign-fragment": "npm run build && node scripts/oracles/run-engine-foreign-fragment-browser-diff.mjs",
+    "test:browser-diff:serialization": "npm run build && node scripts/oracles/run-public-serialization-browser-diff.mjs",
     "test:fuzz": "npm run build && node scripts/fuzz/run-fuzz.mjs",
     "test:bench": "npm run build && node scripts/bench/run-bench.mjs",
     "test:bench:hard-budgets": "npm run build && node --expose-gc scripts/bench/run-hard-budget-evidence.mjs",
@@ -76,6 +77,7 @@
     "test:bench:engine-formatting": "npm run build && node --expose-gc scripts/bench/run-engine-formatting-evidence.mjs",
     "test:bench:independent-product": "npm run build && node --expose-gc scripts/bench/run-independent-product-evidence.mjs",
     "qualification:wpt": "npm run build && node scripts/conformance/run-engine-tree-builder-fixtures.mjs --qualification",
+    "qualification:serialization": "npm run build && node scripts/qualification/run-public-serialization.mjs && node scripts/qualification/run-public-serialization-roundtrip.mjs",
     "qualification:runtime": "npm run build && node scripts/qualification/run-cross-runtime.mjs",
     "qualification:performance": "npm run build && node scripts/qualification/run-performance.mjs",
     "qualification:supply-chain": "npm run build && node scripts/qualification/run-supply-chain.mjs",
@@ -103,7 +105,8 @@
     "test:packed-types": "node scripts/quality/check-packed-types.mjs",
     "release:notes:dry-run": "node scripts/release/render-notes.mjs --dry-run",
     "changelog:update:dry-run": "node scripts/release/update-changelog.mjs --dry-run",
-    "wpt-tree:refresh": "node scripts/conformance/refresh-wpt-tree-fixtures.mjs"
+    "wpt-tree:refresh": "node scripts/conformance/refresh-wpt-tree-fixtures.mjs",
+    "wpt-serialization:refresh": "node scripts/conformance/refresh-wpt-serialization-fixtures.mjs"
   },
   "dependencies": {},
   "devDependencies": {
