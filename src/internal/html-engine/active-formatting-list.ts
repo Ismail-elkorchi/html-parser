@@ -1,8 +1,8 @@
-import { failInternalState } from "../foundation/internal-state-error.js";
+import { failInternalState } from "../foundation/internal-state-error.ts";
 
-import type { EngineResourceGuard } from "./resource-guard.js";
-import type { HtmlStartTagToken } from "./tokens.js";
-import type { HtmlTreeElement } from "./tree-model.js";
+import type { EngineResourceGuard } from "./resource-guard.ts";
+import type { HtmlStartTagToken } from "./tokens.ts";
+import type { HtmlTreeElement } from "./tree-model.ts";
 
 export interface ActiveFormattingElementEntry {
   readonly kind: "element";

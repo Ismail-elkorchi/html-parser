@@ -2,15 +2,15 @@ import {
   asciiLowercase,
   isHtmlElement,
   iterateNodes
-} from "./model.js";
+} from "./model.ts";
 import {
   createOperationContext,
   normalizeOperationOptions
-} from "./operation.js";
+} from "./operation.ts";
 import {
   TEXT_CONTENT_POLICY,
   extractText
-} from "./text-extraction.js";
+} from "./text-extraction.ts";
 
 import type {
   DocumentTree,
@@ -18,7 +18,7 @@ import type {
   OperationOptions,
   Outline,
   OutlineEntry
-} from "./types.js";
+} from "./types.ts";
 
 /** Builds a heading-and-section outline with bounded text for each entry. */
 export function outline(

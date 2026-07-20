@@ -2,21 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  extractTextWithIndependentEngine,
-  iterateTextWithIndependentEngine,
-  parseBytesWithIndependentEngine,
-  parseFragmentWithIndependentEngine,
-  parseStreamWithIndependentEngine,
-  parseWithIndependentEngine,
-  tokenizeByteStreamEagerWithIndependentEngine
-} from "../../dist/integration/html-product-adapter.js";
-import {
   HtmlAbortError,
   HtmlBudgetExceededError,
   computePatch,
   extractText,
+  iterateText,
   parse,
+  parseBytes,
+  parseFragment,
+  parseStream,
   serialize,
+  tokenizeByteStreamEager,
   walk
 } from "../../dist/mod.js";
 
@@ -53,9 +49,9 @@ function byteStream(chunks) {
   });
 }
 
-test("staged document conversion is lossless for processing instructions and template content", () => {
+test("document conversion is lossless for processing instructions and template content", () => {
   const source = "<?build release?><!doctype html><template><p>inside</p></template><main>outside</main>";
-  const parsed = parseWithIndependentEngine(source, {
+  const parsed = parse(source, {
     captureSpans: true,
     sourceRetention: "text",
     trace: "events"
@@ -118,9 +114,9 @@ test("staged document conversion is lossless for processing instructions and tem
   assert.equal(plan.result, source.replace("outside", "changed"));
 });
 
-test("staged element spans cover explicit and parser-implied source extents", () => {
+test("element spans cover explicit and parser-implied source extents", () => {
   const source = "<!doctype html><html><body><p class=x>A<table><tr><td>B</table><svg><g>C</svg>";
-  const parsed = parseWithIndependentEngine(source, {
+  const parsed = parse(source, {
     captureSpans: true,
     sourceRetention: "text"
   });
@@ -141,21 +137,13 @@ test("staged element spans cover explicit and parser-implied source extents", ()
   assert.equal(source.slice(body.span.start, body.span.end), source.slice(source.indexOf("<body>")));
 });
 
-test("staging does not alter the single production route before atomic cutover", () => {
-  const source = "<?build release?><template><p>inside</p></template>";
-  const production = parse(source);
-  const staged = parseWithIndependentEngine(source);
-  assert.equal(production.tree.children[0]?.kind, "comment");
-  assert.equal(staged.tree.children[0]?.kind, "processingInstruction");
-});
-
-test("text, byte, stream, and fragment adapters preserve their input contracts", async () => {
+test("text, byte, stream, and fragment entrypoints preserve their input contracts", async () => {
   const source = "<!doctype html><p>€</p>";
   const bytes = new TextEncoder().encode(source);
-  const text = parseWithIndependentEngine(source, { sourceRetention: "text" });
+  const text = parse(source, { sourceRetention: "text" });
   const decodingOptions = { sourceRetention: "text", transportEncodingLabel: "utf-8" };
-  const fromBytes = parseBytesWithIndependentEngine(bytes, decodingOptions);
-  const fromStream = await parseStreamWithIndependentEngine(
+  const fromBytes = parseBytes(bytes, decodingOptions);
+  const fromStream = await parseStream(
     byteStream([bytes.subarray(0, 5), bytes.subarray(5)]),
     decodingOptions
   );
@@ -165,14 +153,14 @@ test("text, byte, stream, and fragment adapters preserve their input contracts",
   assert.equal(fromStream.metadata.inputKind, "stream");
   assert.equal(fromStream.metadata.resourceUsage.encodingPrescanBytes, bytes.byteLength);
 
-  const fragment = parseFragmentWithIndependentEngine("<td>x", "table", { captureSpans: true });
+  const fragment = parseFragment("<td>x", "table", { captureSpans: true });
   assert.equal(fragment.contextTagName, "table");
   assert.equal(serialize(fragment), "<tbody><tr><td>x</td></tr></tbody>");
   assert.deepEqual(fragment.children[0]?.spanProvenance, "inferred");
 });
 
-test("visible-text nested markup remains on the staged parser route", () => {
-  const parsed = parseWithIndependentEngine(
+test("visible-text nested markup remains on the production parser route", () => {
+  const parsed = parse(
     "<body><noscript><p>independent</p></noscript></body>"
   );
   let noscript;
@@ -183,19 +171,19 @@ test("visible-text nested markup remains on the staged parser route", () => {
   assert.equal(noscript.children.length, 1);
   assert.equal(noscript.children[0]?.kind, "text");
 
-  const extracted = extractTextWithIndependentEngine(parsed.tree, VISIBLE_TEXT_OPTIONS);
-  const iterated = drain(iterateTextWithIndependentEngine(parsed.tree, VISIBLE_TEXT_OPTIONS));
+  const extracted = extractText(parsed.tree, VISIBLE_TEXT_OPTIONS);
+  const iterated = drain(iterateText(parsed.tree, VISIBLE_TEXT_OPTIONS));
   assert.equal(extracted.text, "independent");
   assert.deepEqual(iterated.result, extracted);
   assert.ok(iterated.tokens.flatMap((token) => token.provenance).every((range) =>
     range.sourceNodeId === noscript.id && range.sourceRole === "noscript-fallback"
   ));
 
-  const templateMarkup = parseWithIndependentEngine(
+  const templateMarkup = parse(
     "<body><noscript><template>x</template><p>y</p></noscript></body>"
   );
   assert.throws(
-    () => extractTextWithIndependentEngine(templateMarkup.tree, {
+    () => extractText(templateMarkup.tree, {
       ...VISIBLE_TEXT_OPTIONS,
       maxFallbackNodes: 6
     }),
@@ -204,9 +192,9 @@ test("visible-text nested markup remains on the staged parser route", () => {
   );
 });
 
-test("staged tokenization retains the current-standard token vocabulary", async () => {
+test("production tokenization retains the current-standard token vocabulary", async () => {
   const source = "<?build release?><p a=1>a&amp;b</p>";
-  const tokens = await tokenizeByteStreamEagerWithIndependentEngine(
+  const tokens = await tokenizeByteStreamEager(
     byteStream([new TextEncoder().encode(source)])
   );
   assert.deepEqual(tokens, [
@@ -222,12 +210,12 @@ test("staged tokenization retains the current-standard token vocabulary", async 
 
 test("engine resource and abort failures map once to public error categories", async () => {
   assert.throws(
-    () => parseWithIndependentEngine("<template>x</template>", { budgets: { maxNodes: 5 } }),
+    () => parse("<template>x</template>", { budgets: { maxNodes: 5 } }),
     (error) => error instanceof HtmlBudgetExceededError &&
       error.budget === "maxNodes" && error.limit === 5 && error.actual === 6
   );
   assert.throws(
-    () => parseWithIndependentEngine("<p a=€>", { budgets: { maxAttributeBytes: 3 } }),
+    () => parse("<p a=€>", { budgets: { maxAttributeBytes: 3 } }),
     (error) => error instanceof HtmlBudgetExceededError &&
       error.budget === "maxAttributeBytes" && error.actual === 4
   );
@@ -236,25 +224,25 @@ test("engine resource and abort failures map once to public error categories", a
   const reason = Object.freeze({ stop: true });
   controller.abort(reason);
   assert.throws(
-    () => parseWithIndependentEngine("x", { signal: controller.signal }),
+    () => parse("x", { signal: controller.signal }),
     (error) => error instanceof HtmlAbortError && error.cause === reason
   );
   await assert.rejects(
-    parseStreamWithIndependentEngine(byteStream([]), { signal: controller.signal }),
+    parseStream(byteStream([]), { signal: controller.signal }),
     (error) => error instanceof HtmlAbortError && error.cause === reason
   );
 });
 
-test("staged trace observation is immutable, ordered, reentrant, and failure-transparent", () => {
+test("trace observation is immutable, ordered, reentrant, and failure-transparent", () => {
   const observed = [];
   let nested = false;
-  const parsed = parseWithIndependentEngine("<p>x</p>", {
+  const parsed = parse("<p>x</p>", {
     trace: "events",
     onTraceEvent(event) {
       observed.push(event);
       if (!nested) {
         nested = true;
-        assert.equal(parseWithIndependentEngine("<i>y</i>").tree.kind, "document");
+        assert.equal(parse("<i>y</i>").tree.kind, "document");
       }
     }
   });
@@ -263,7 +251,7 @@ test("staged trace observation is immutable, ordered, reentrant, and failure-tra
 
   const marker = new Error("callback failure");
   assert.throws(
-    () => parseWithIndependentEngine("x", { onTraceEvent() { throw marker; } }),
+    () => parse("x", { onTraceEvent() { throw marker; } }),
     (error) => error === marker
   );
 });

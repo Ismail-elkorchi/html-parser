@@ -20,24 +20,23 @@ Use narrower commands while iterating:
 | Do owned sources satisfy lint rules? | `npm run lint` |
 | Do production TypeScript sources compile? | `npm run typecheck` |
 | Does the package build? | `npm run build` |
-| Do independent-engine foundation units pass? | `npm run test:engine:unit` |
-| Do independent character references match pinned data and fixtures? | `npm run test:engine:character-references` |
-| Do isolated tokenizer states match their assigned primary and holdout fixtures? | `npm run test:engine:tokenizer` |
+| Do engine foundation units pass? | `npm run test:engine:unit` |
+| Do character references match pinned data and fixtures? | `npm run test:engine:character-references` |
+| Do tokenizer states match their assigned primary and holdout fixtures? | `npm run test:engine:tokenizer` |
 | Do direct tree-model mutations and resource boundaries pass? | `npm run test:engine:tree` |
 | Do assigned document cases and every fragment case match WPT trees and diagnostic views? | `npm run test:engine:tree-builder:conformance` |
 | Do all compiled TypeScript runtime tests pass? | `npm run test:runtime` |
 | Do compile-only API contracts pass? | `npm run test:types` |
 | Do production behavior and regression tests pass? | `npm run test:behavior` |
 | Does the normal local test set pass? | `npm test` |
-| Does the maintained WPT tree snapshot reproduce its frozen result? | `npm run test:wpt-tree` |
-| Does WPT retain every legacy tree case? | `npm run test:wpt-tree:coverage` |
+| Does the complete maintained WPT tree snapshot pass its exact classifications? | `npm run qualification:wpt` |
 | Do documentation links and API names stay valid? | `npm run docs:check` |
 | Do documented TypeScript examples compile strictly? | `npm run docs:snippets` |
 | Do repository examples execute? | `npm run examples:run` |
 | Is the packed npm artifact correct? | `npm run pack:check` |
 
 All tests live under one `test` root. `test/behavior` owns public and current
-production regressions, `test/engine` owns replacement-engine units,
+production regressions, `test/engine` owns parser-engine units,
 `test/conformance` owns focused fixture-adapter behavior, `test/contracts`
 owns compile-only positive and deliberate negative type contracts,
 `test/support` owns fixture adapters/readers, and `test/fixtures` owns checked-in
@@ -48,17 +47,19 @@ programs rather than Node test modules.
 TypeScript runtime tests compile with `tsconfig.test-runtime.json` into the
 disposable `tmp/test-runtime` tree before Node executes them. Type contracts use
 the separate no-emit `tsconfig.type-tests.json`; keep `@ts-expect-error` cases
-there, not in runtime tests. The incomplete engine and compiled test output are
-deliberately absent from package artifacts.
+there, not in runtime tests. Compiled test output is deliberately absent from
+package artifacts; private engine modules are shipped only because public
+parsing imports them and are never exported as package entrypoints.
 
 ## Parser semantics
 
-`npm run test:conformance` runs the legacy-pinned tokenizer, tree, encoding,
-serializer, and currently named holdout suite. Individual commands are
+`npm run test:conformance` runs the pinned tokenizer, tree, encoding,
+serializer, and currently named holdout suite against the production parser.
+Individual commands are
 available as `test:tokenizer`, `test:tree`, `test:encoding`, `test:serializer`,
-and `test:holdout`. The maintained WPT tree suite is separate because its
-frozen report intentionally exposes legacy-engine conformance gaps while
-failing only on unexplained corpus, determinism, coverage, or baseline drift.
+and `test:holdout`. The maintained WPT tree suite is separate because it runs
+the complete snapshot, adversarial fragment chunks, and exact fingerprinted
+classifications.
 
 The aggregate command currently executes every partition, including holdout;
 the label does not make those cases hidden. Treat all of its results as one

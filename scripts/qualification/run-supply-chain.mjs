@@ -2,8 +2,8 @@ import { spawnSync } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
-import { verifyLegacyRuntimeSeal } from "../legacy/verify-runtime-seal.mjs";
 import { writeJson } from "../eval/eval-primitives.mjs";
+import { collectModuleSpecifiers } from "../eval/module-specifiers.mjs";
 
 function run(command, args) {
   const result = spawnSync(command, args, { encoding: "utf8" });
@@ -27,15 +27,6 @@ async function javascriptFiles(root) {
     }
   }
   return files.sort();
-}
-
-function importSpecifiers(source) {
-  const specifiers = [];
-  const pattern = /(?:from\s+|import\s*\()(["'])([^"']+)\1/g;
-  for (const match of source.matchAll(pattern)) {
-    if (match[2] !== undefined) specifiers.push(match[2]);
-  }
-  return specifiers;
 }
 
 const packageManifest = JSON.parse(await readFile("package.json", "utf8"));
@@ -63,12 +54,12 @@ try {
 }
 const sbomValid = sbomRun.code === 0 && sbom?.bomFormat === "CycloneDX";
 
-const candidateRoots = ["dist/internal/html-engine", "dist/integration"];
+const productionRoots = ["dist"];
 const bareImports = [];
-for (const root of candidateRoots) {
+for (const root of productionRoots) {
   for (const file of await javascriptFiles(root)) {
     const source = await readFile(file, "utf8");
-    for (const specifier of importSpecifiers(source)) {
+    for (const { specifier } of collectModuleSpecifiers(source, file)) {
       if (!specifier.startsWith("./") && !specifier.startsWith("../")) {
         bareImports.push({ file, specifier });
       }
@@ -80,7 +71,6 @@ const characterReferenceCheck = run(process.execPath, [
   "scripts/generate/generate-named-character-references.mjs",
   "--check"
 ]);
-const legacySeal = await verifyLegacyRuntimeSeal();
 const notices = await readFile("THIRD_PARTY_NOTICES.md", "utf8");
 const publishWorkflow = await readFile(".github/workflows/publish.yml", "utf8");
 const manualPublishWorkflow = await readFile(".github/workflows/publish-manual.yml", "utf8");
@@ -90,7 +80,6 @@ const provenance = {
   jsr: manualPublishWorkflow.includes("jsr publish --allow-dirty --provenance")
 };
 const noticeCoverage = {
-  legacyRuntime: notices.includes("parse5") && notices.includes("entities"),
   wpt: notices.includes("web-platform-tests") || notices.includes("WPT"),
   characterReferences: notices.includes("named character") || notices.includes("entities.json")
 };
@@ -115,15 +104,14 @@ const report = {
     specVersion: sbom?.specVersion ?? null,
     components: Array.isArray(sbom?.components) ? sbom.components.length : null
   },
-  candidateImports: {
-    roots: candidateRoots,
+  productionImports: {
+    roots: productionRoots,
     bareImports
   },
   characterReferences: {
     exactGeneratedData: characterReferenceCheck.code === 0,
     output: characterReferenceCheck.stdout.trim()
   },
-  legacySeal: { verified: true, ...legacySeal },
   provenance,
   noticeCoverage
 };

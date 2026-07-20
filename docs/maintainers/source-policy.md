@@ -1,6 +1,6 @@
 # Independent parser source policy
 
-The replacement parser is an independent standards-based implementation. It
+The parser is an independent standards-based implementation. It
 must not copy, translate, import, or adapt parse5, entities, or another HTML
 parser implementation.
 
@@ -30,22 +30,19 @@ supply an implementation algorithm.
 
 ## Prohibited implementation sources
 
-When writing the replacement engine, do not inspect, search, diff, copy,
+When maintaining the parser engine, do not inspect, search, diff, copy,
 translate, or derive code from:
 
-- `src/internal/vendor/parse5`, `src/internal/vendor/entities`, or the legacy
-  `src/internal/parse5-runtime.ts` facade;
-- parse5/entities source, declarations, source maps, internal algorithm docs,
+- parser-library source formerly removed from this repository;
+- third-party parser source, declarations, source maps, internal algorithm docs,
   generated distributions, or Git history;
 - htmlparser2, jsdom, browser-engine parser source, or another parser
   implementation;
-- generated output obtained by translating/decompiling the legacy engine, or
+- generated output obtained by translating or decompiling another engine, or
   patches that expose its algorithms.
 
-Legacy code may be treated as a frozen executable black box for differential
-tests and may be inventoried only for sealing or final deletion work. New
-engine code must not import it, share tokenizer/tree-builder paths with it, or
-fall back to it.
+The production engine must not import, share tokenizer/tree-builder paths with,
+or fall back to another parser implementation.
 
 ## Resolving disagreements
 
@@ -55,7 +52,7 @@ fall back to it.
    contract.
 4. Check current WPT and multiple browser engines when the standard remains
    ambiguous.
-5. Classify and test the conclusion; do not preserve legacy behavior merely
+5. Classify and test the conclusion; do not preserve historical behavior merely
    because it is historical.
 
 If prohibited source is exposed accidentally, stop any formal clean-room claim

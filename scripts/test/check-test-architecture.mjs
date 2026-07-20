@@ -16,19 +16,19 @@ const FORBIDDEN_PRODUCTION_HELPERS = Object.freeze([
   "xmlViolationMode"
 ]);
 
-const OWNED_BOUNDARY_FILES = Object.freeze([
-  "src/internal/serializer/mod.ts",
-  "src/internal/serializer/serialize.ts",
-  "src/internal/tokenizer/tokenize.ts",
-  "src/internal/tokenizer/tokens.ts",
-  "src/internal/tree/build.ts",
-  "src/internal/tree/mod.ts"
-]);
-
 const FORBIDDEN_ENGINE_SOURCE_PATTERNS = Object.freeze([
   /src\/internal\/vendor/,
-  /parse5-runtime/,
+  new RegExp(["parse", "5-runtime"].join("")),
   /(?:from|import)\s*["'](?:parse5|entities|htmlparser2|jsdom)(?:[/'"])/
+]);
+
+const REMOVED_PRODUCTION_PATHS = Object.freeze([
+  "src/internal/vendor",
+  `src/internal/${["parse", "5-runtime.ts"].join("")}`,
+  "src/internal/tokenizer",
+  "src/internal/tree",
+  "src/internal/serializer",
+  "src/integration"
 ]);
 
 async function exists(filePath) {
@@ -65,40 +65,26 @@ if (JSON.stringify(actualDirectories) !== JSON.stringify(EXPECTED_TEST_DIRECTORI
   );
 }
 
-for (const filePath of OWNED_BOUNDARY_FILES) {
+for (const filePath of REMOVED_PRODUCTION_PATHS) {
+  if (await exists(filePath)) {
+    throw new Error(`test architecture: removed production path remains: ${filePath}`);
+  }
+}
+
+for (const filePath of await listFiles("src")) {
   const source = await readFile(filePath, "utf8");
   for (const helperName of FORBIDDEN_PRODUCTION_HELPERS) {
     if (source.includes(helperName)) {
-      throw new Error(`test architecture: ${helperName} remains in ${filePath}`);
+      throw new Error(`test architecture: test-only helper remains in ${filePath}`);
     }
   }
-}
-
-for (const filePath of await listFiles("src/internal/html-engine")) {
-  const source = await readFile(filePath, "utf8");
   for (const pattern of FORBIDDEN_ENGINE_SOURCE_PATTERNS) {
     if (pattern.test(source)) {
       throw new Error(`test architecture: prohibited implementation reference in ${filePath}`);
     }
-  }
-}
-
-for (const filePath of await listFiles("src/integration")) {
-  const source = await readFile(filePath, "utf8");
-  for (const pattern of FORBIDDEN_ENGINE_SOURCE_PATTERNS) {
-    if (pattern.test(source)) {
-      throw new Error(`test architecture: prohibited implementation reference in ${filePath}`);
-    }
-  }
-}
-
-for (const filePath of await listFiles("src/public")) {
-  const source = await readFile(filePath, "utf8");
-  if (source.includes("../integration/")) {
-    throw new Error(`test architecture: production selected staged integration in ${filePath}`);
   }
 }
 
 process.stdout.write(
-  "test architecture: one root, production/test-support boundaries, and engine isolation verified\n"
+  "test architecture: one root, production/test-support boundaries, and private engine boundary verified\n"
 );

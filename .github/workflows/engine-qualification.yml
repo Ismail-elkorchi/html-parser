@@ -46,9 +46,6 @@ jobs:
       - name: Qualify the complete WPT tree corpus
         run: npm run qualification:wpt
 
-      - name: Run the frozen product differential
-        run: npm run qualification:legacy
-
       - name: Compare Node, Deno, and Bun
         run: npm run qualification:runtime
 

@@ -1,10 +1,10 @@
-import { failInternalState, requireInternalValue } from "../foundation/internal-state-error.js";
+import { failInternalState, requireInternalValue } from "../foundation/internal-state-error.ts";
 
-import { HTML_NAMESPACE } from "./namespaces.js";
+import { HTML_NAMESPACE } from "./namespaces.ts";
 
-import type { HtmlElementNamespaceUri } from "./namespaces.js";
-import type { EngineResourceGuard } from "./resource-guard.js";
-import type { HtmlTreeElement } from "./tree-model.js";
+import type { HtmlElementNamespaceUri } from "./namespaces.ts";
+import type { EngineResourceGuard } from "./resource-guard.ts";
+import type { HtmlTreeElement } from "./tree-model.ts";
 
 export interface OpenElementName {
   readonly namespaceUri: HtmlElementNamespaceUri;

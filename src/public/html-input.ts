@@ -1,15 +1,15 @@
-import { sniffHtmlEncoding } from "../internal/encoding/mod.js";
+import { sniffHtmlEncoding } from "../internal/encoding/mod.ts";
 
-import { enforceBudget } from "./budgets.js";
+import { enforceBudget } from "./budgets.ts";
 import {
   HtmlAbortError,
   HtmlBudgetExceededError,
   HtmlConfigurationError,
   HtmlStreamReadError
-} from "./errors.js";
+} from "./errors.ts";
 
-import type { OperationContext } from "./operation.js";
-import type { ParseStreamBudgetOptions, TokenizeByteStreamEagerOptions } from "./types.js";
+import type { OperationContext } from "./operation.ts";
+import type { ParseStreamBudgetOptions, TokenizeByteStreamEagerOptions } from "./types.ts";
 
 const DEFAULT_STREAM_ENCODING_PRESCAN_BYTES = 16_384;
 
@@ -72,7 +72,7 @@ export function utf8ByteLength(value: string, operation?: OperationContext): num
   let bytes = 0;
   let cursor = 0;
   while (cursor < value.length) {
-    operation?.checkpoint();
+    if (operation?.interruptible === true) operation.checkpoint();
     const codePoint = value.codePointAt(cursor);
     if (codePoint === undefined) break;
     bytes += codePointUtf8ByteLength(codePoint);

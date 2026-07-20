@@ -1,8 +1,8 @@
-import { requireInternalValue } from "../foundation/internal-state-error.js";
+import { requireInternalValue } from "../foundation/internal-state-error.ts";
 
-import { createParseError, type EngineParseError, type HtmlParseErrorCode } from "./diagnostics.js";
-import { sourcePosition, sourceSpan, type SourcePosition, type SourceSpan } from "./positions.js";
-import { EngineConfigurationError, type EngineResourceGuard } from "./resource-guard.js";
+import { createParseError, type EngineParseError, type HtmlParseErrorCode } from "./diagnostics.ts";
+import { sourcePosition, sourceSpan, type SourcePosition, type SourceSpan } from "./positions.ts";
+import { EngineConfigurationError, type EngineResourceGuard } from "./resource-guard.ts";
 
 /** One normalized input character and its original decoded-source span. */
 export interface InputCharacter {

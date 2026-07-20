@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { nowIso, writeJson } from "./eval-primitives.mjs";
+import { collectModuleSpecifiers } from "./module-specifiers.mjs";
 
 const DIST_ROOT = "dist";
 
@@ -17,28 +18,6 @@ function isBareSpecifier(specifier) {
     return false;
   }
   return true;
-}
-
-function collectImportSpecifiers(source) {
-  const specifiers = [];
-
-  const staticImportPattern = /\b(?:import|export)\s+(?:[^"'`]*?\s+from\s+)?["']([^"']+)["']/g;
-  for (const match of source.matchAll(staticImportPattern)) {
-    const specifier = match[1];
-    if (specifier) {
-      specifiers.push(specifier);
-    }
-  }
-
-  const dynamicImportPattern = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
-  for (const match of source.matchAll(dynamicImportPattern)) {
-    const specifier = match[1];
-    if (specifier) {
-      specifiers.push(specifier);
-    }
-  }
-
-  return specifiers;
 }
 
 async function findJsFiles(rootDir) {
@@ -72,8 +51,7 @@ async function main() {
 
     for (const filePath of files) {
       const text = await readFile(filePath, "utf8");
-      const specifiers = collectImportSpecifiers(text);
-      for (const specifier of specifiers) {
+      for (const { specifier } of collectModuleSpecifiers(text, filePath)) {
         if (!isBareSpecifier(specifier)) {
           continue;
         }

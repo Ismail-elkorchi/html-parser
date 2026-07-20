@@ -1,6 +1,6 @@
-import { HtmlBudgetExceededError } from "./errors.js";
+import { HtmlBudgetExceededError } from "./errors.ts";
 
-import type { HtmlBudgetName } from "./types.js";
+import type { HtmlBudgetName } from "./types.ts";
 
 /** Enforces an inclusive public resource limit at its first unavailable unit. */
 export function enforceBudget(

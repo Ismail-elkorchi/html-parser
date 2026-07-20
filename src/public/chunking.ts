@@ -1,9 +1,9 @@
-import { countNodes } from "./model.js";
+import { countNodes } from "./model.ts";
 import {
   createOperationContext,
   normalizeChunkOptions
-} from "./operation.js";
-import { serializeNodes } from "./serialization.js";
+} from "./operation.ts";
+import { serializeNodes } from "./serialization.ts";
 
 import type {
   Chunk,
@@ -11,7 +11,7 @@ import type {
   DocumentTree,
   FragmentTree,
   NodeId
-} from "./types.js";
+} from "./types.ts";
 
 /** Groups serialized top-level nodes without splitting a node across chunks. */
 export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions = {}): Chunk[] {

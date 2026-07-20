@@ -63,5 +63,5 @@ void delegatedState;
 const invalidExecutionState: HtmlTokenizerExecutionState = "named-character-reference-state";
 void invalidExecutionState;
 
-// @ts-expect-error the incomplete tokenizer is not part of the public package surface
+// @ts-expect-error the private tokenizer is not part of the public package surface
 void PublicApi.HtmlTokenizer;

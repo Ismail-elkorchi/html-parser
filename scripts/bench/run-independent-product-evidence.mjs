@@ -1,11 +1,7 @@
 import { performance } from "node:perf_hooks";
 import process from "node:process";
 
-import {
-  parseFragmentWithIndependentEngine,
-  parseWithIndependentEngine
-} from "../../dist/integration/html-product-adapter.js";
-import { serialize, walk } from "../../dist/mod.js";
+import { parse, parseFragment, serialize, walk } from "../../dist/mod.js";
 import { writeJson } from "../eval/eval-primitives.mjs";
 
 if (typeof globalThis.gc !== "function") {
@@ -30,7 +26,7 @@ function measure(name, operation) {
 const repeatedCount = 10_000;
 const repeated = measure("document-convert-and-serialize", () => {
   const input = `<!doctype html><main>${"<p a=é>x&amp;y</p>".repeat(repeatedCount)}</main>`;
-  const parsed = parseWithIndependentEngine(input, {
+  const parsed = parse(input, {
     captureSpans: true,
     budgets: {
       maxInputBytes: 1_000_000,
@@ -55,7 +51,7 @@ const repeated = measure("document-convert-and-serialize", () => {
 const templateCount = 2_000;
 const templates = measure("template-content-ownership", () => {
   const input = `<!doctype html>${"<template><span>x</span></template>".repeat(templateCount)}`;
-  const parsed = parseWithIndependentEngine(input, {
+  const parsed = parse(input, {
     budgets: { maxNodes: 8_005, maxDepth: 7 }
   });
   let templateContents = 0;
@@ -73,7 +69,7 @@ const templates = measure("template-content-ownership", () => {
 const fragmentDepth = 5_000;
 const fragment = measure("deep-fragment-conversion", () => {
   const input = `${"<div>".repeat(fragmentDepth)}x${"</div>".repeat(fragmentDepth)}`;
-  const parsed = parseFragmentWithIndependentEngine(input, "section", {
+  const parsed = parseFragment(input, "section", {
     budgets: { maxNodes: fragmentDepth + 4, maxDepth: fragmentDepth + 2 }
   });
   let walked = 0;

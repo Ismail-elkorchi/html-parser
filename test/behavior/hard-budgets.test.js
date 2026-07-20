@@ -210,6 +210,10 @@ test("tree construction enforces node, depth, parse-error, and attribute budgets
     (error) => assertBudget(error, "maxAttributesPerElement", 1, 2)
   );
   assert.throws(
+    () => parse("<html a=x><html b=y>", { budgets: { maxAttributeBytes: 3 } }),
+    (error) => assertBudget(error, "maxAttributeBytes", 3, 4)
+  );
+  assert.throws(
     () => parse("<x a=1 a=2>", { budgets: { maxAttributesPerElement: 1 } }),
     (error) => assertBudget(error, "maxAttributesPerElement", 1, 2)
   );

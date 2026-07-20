@@ -84,14 +84,13 @@ input, set limits appropriate to the containing request, pass an `AbortSignal`,
 and classify operational failures with the exported structural error guards.
 See [limits, errors, and safety](./docs/limits-errors-and-safety.md).
 
-## Dependencies and implementation status
+## Dependencies and implementation
 
 No external runtime packages are installed: the npm `dependencies` field is
-empty and JSR imports only repository-owned modules. Current builds still
-embed modified legacy code derived from parse5 and entities; vendoring changes
-how the code is delivered, not where it came from. It is being replaced
-incrementally by an independent standards-based implementation. Provenance and
-rules for new parser work are recorded in the
+empty and JSR imports only repository-owned modules. The parser is an
+independent standards-based TypeScript implementation; generated character
+reference data is reproducible from the pinned WHATWG snapshot. Provenance and
+implementation-source rules are recorded in the
 [source policy](./docs/maintainers/source-policy.md) and
 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 

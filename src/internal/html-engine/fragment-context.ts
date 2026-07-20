@@ -1,11 +1,11 @@
-import { HTML_NAMESPACE } from "./namespaces.js";
+import { HTML_NAMESPACE } from "./namespaces.ts";
 
 import type {
   HtmlAttributeNamespaceUri,
   HtmlElementNamespaceUri
-} from "./namespaces.js";
-import type { NonExecutingScriptingMode, TokenizerMode } from "./parser-state.js";
-import type { HtmlTreeAttributeInput } from "./tree-model.js";
+} from "./namespaces.ts";
+import type { NonExecutingScriptingMode, TokenizerMode } from "./parser-state.ts";
+import type { HtmlTreeAttributeInput } from "./tree-model.ts";
 
 /** One namespace-aware attribute on the external fragment context element. */
 export interface HtmlFragmentContextAttribute {

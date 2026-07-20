@@ -1,6 +1,6 @@
-import type { InsertionMode } from "./parser-state.js";
-import type { SourceSpan } from "./positions.js";
-import type { HtmlToken } from "./tokens.js";
+import type { InsertionMode } from "./parser-state.ts";
+import type { SourceSpan } from "./positions.ts";
+import type { HtmlToken } from "./tokens.ts";
 
 /**
  * Dedicated parse-error codes in the pinned HTML Standard revision.

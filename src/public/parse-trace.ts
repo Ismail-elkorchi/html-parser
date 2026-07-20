@@ -1,6 +1,6 @@
-import { enforceBudget } from "./budgets.js";
+import { enforceBudget } from "./budgets.ts";
 
-import type { OperationContext } from "./operation.js";
+import type { OperationContext } from "./operation.ts";
 import type {
   HtmlBudgetName,
   ParseOptions,
@@ -9,7 +9,7 @@ import type {
   TraceMode,
   TraceResult,
   TraceSummary
-} from "./types.js";
+} from "./types.ts";
 
 type TraceEventInput = TraceEvent extends infer Event
   ? Event extends { readonly seq: number }

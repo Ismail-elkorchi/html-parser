@@ -1,5 +1,5 @@
-import type { OperationContext } from "./operation.js";
-import type { HtmlNode } from "./types.js";
+import type { OperationContext } from "./operation.ts";
+import type { HtmlNode } from "./types.ts";
 
 /** HTML namespace URI assigned by the tree builder. */
 export const HTML_NAMESPACE_URI = "http://www.w3.org/1999/xhtml";

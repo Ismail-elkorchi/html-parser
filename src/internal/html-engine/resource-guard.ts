@@ -71,6 +71,12 @@ export interface StartTagResourceGuard {
   appendCodePoint(value: string): void;
 }
 
+/** Minimal final-tree attribute shape needed by element resource checks. */
+export interface ElementResourceAttribute {
+  readonly qualifiedName: string;
+  readonly value: string;
+}
+
 /** Resource boundary shared by one engine operation. */
 export interface EngineResourceGuard {
   ensureActive(): void;
@@ -81,6 +87,7 @@ export interface EngineResourceGuard {
   observeDepth(depth: number): void;
   reserveParseError(): void;
   beginStartTag(): StartTagResourceGuard;
+  checkElementAttributes(attributes: readonly ElementResourceAttribute[]): void;
   snapshot(): EngineResourceUsage;
 }
 
@@ -202,6 +209,12 @@ function codePointUtf8ByteLength(value: string): number {
   return 4;
 }
 
+function stringUtf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (const codePoint of value) bytes += codePointUtf8ByteLength(codePoint);
+  return bytes;
+}
+
 /** Creates one validated resource guard before engine work begins. */
 export function createEngineResourceGuard(
   options: EngineResourceGuardOptions = {}
@@ -262,6 +275,7 @@ export function createEngineResourceGuard(
           }
         };
       },
+      checkElementAttributes(): void {},
       snapshot(): EngineResourceUsage {
         return Object.freeze({
           steps,
@@ -371,6 +385,23 @@ export function createEngineResourceGuard(
           attributeUtf8Bytes += bytes;
         }
       };
+    },
+    checkElementAttributes(elementAttributes): void {
+      guard.ensureActive();
+      const attributeLimit = limits.maxAttributesPerElement;
+      if (attributeLimit !== undefined && elementAttributes.length > attributeLimit) {
+        fail("maxAttributesPerElement", attributeLimit, attributeLimit + 1);
+      }
+      const byteLimit = limits.maxAttributeUtf8BytesPerElement;
+      if (byteLimit === undefined) return;
+      let bytes = 0;
+      for (const attribute of elementAttributes) {
+        bytes += stringUtf8ByteLength(attribute.qualifiedName);
+        bytes += stringUtf8ByteLength(attribute.value);
+        if (bytes > byteLimit) {
+          fail("maxAttributeUtf8BytesPerElement", byteLimit, byteLimit + 1);
+        }
+      }
     },
     snapshot(): EngineResourceUsage {
       return Object.freeze({

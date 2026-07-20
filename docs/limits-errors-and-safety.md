@@ -14,8 +14,8 @@ reader.
 | `maxNodes` | Public root plus input and recovery node allocations |
 | `maxDepth` | Tree depth, with the public document or fragment root at depth 1 |
 | `maxParseErrors` | Emitted non-fatal parse diagnostics |
-| `maxAttributesPerElement` | Attempted attributes on one start tag, including discarded duplicates |
-| `maxAttributeBytes` | UTF-8 bytes in attempted normalized names and decoded values on one start tag |
+| `maxAttributesPerElement` | Attempted attributes on one start tag, including discarded duplicates, and attributes retained on one tree element after recovery |
+| `maxAttributeBytes` | UTF-8 bytes in attempted normalized names and decoded values on one start tag, and in attributes retained on one tree element after recovery |
 | `maxTraceEvents` | Retained trace events; valid only with `trace: "events"` |
 | `maxTraceBytes` | Canonical UTF-8 bytes of retained events; valid only with `trace: "events"` |
 | `maxTimeMs` | Elapsed monotonic time across the operation |

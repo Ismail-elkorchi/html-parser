@@ -1,16 +1,16 @@
-import { failInternalState } from "../foundation/internal-state-error.js";
+import { failInternalState } from "../foundation/internal-state-error.ts";
 
-import { createParseError, type EngineParseError, type HtmlParseErrorCode } from "./diagnostics.js";
-import { type HtmlInputCursor } from "./input-cursor.js";
+import { createParseError, type EngineParseError, type HtmlParseErrorCode } from "./diagnostics.ts";
+import { type HtmlInputCursor } from "./input-cursor.ts";
 import {
   MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
   probeNamedCharacterReference
-} from "./named-character-references.js";
-import { sourceSpan, type SourcePosition, type SourceSpan } from "./positions.js";
+} from "./named-character-references.ts";
+import { sourceSpan, type SourcePosition, type SourceSpan } from "./positions.ts";
 import {
   EngineConfigurationError,
   type EngineResourceGuard
-} from "./resource-guard.js";
+} from "./resource-guard.ts";
 
 /** Tokenizer return-state information that changes character-reference behavior. */
 export type CharacterReferenceContext = "text" | "attribute";

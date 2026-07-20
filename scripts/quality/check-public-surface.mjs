@@ -108,7 +108,6 @@ const denoRuntime = JSON.parse(execFileSync(
   "deno",
   [
     "eval",
-    "--sloppy-imports",
     'import * as api from "./jsr/mod.ts"; console.log(JSON.stringify(Object.keys(api).sort()));'
   ],
   { encoding: "utf8" }

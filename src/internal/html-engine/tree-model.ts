@@ -1,21 +1,21 @@
-import { failInternalState } from "../foundation/internal-state-error.js";
+import { failInternalState } from "../foundation/internal-state-error.ts";
 
 import {
   HTML_NAMESPACE,
   XLINK_NAMESPACE,
   XML_NAMESPACE,
   XMLNS_NAMESPACE
-} from "./namespaces.js";
-import { sourceSpan } from "./positions.js";
+} from "./namespaces.ts";
+import { sourceSpan } from "./positions.ts";
 
 import type {
   HtmlAttributeNamespaceUri,
   HtmlElementNamespaceUri
-} from "./namespaces.js";
-import type { EngineObserver, TreeMutationKind } from "./observer.js";
-import type { SourceSpan } from "./positions.js";
-import type { EngineResourceGuard } from "./resource-guard.js";
-import type { InternalStateErrorReason } from "../foundation/internal-state-error.js";
+} from "./namespaces.ts";
+import type { EngineObserver, TreeMutationKind } from "./observer.ts";
+import type { SourceSpan } from "./positions.ts";
+import type { EngineResourceGuard } from "./resource-guard.ts";
+import type { InternalStateErrorReason } from "../foundation/internal-state-error.ts";
 
 /** Precise shared internal-state reasons owned by the direct tree model. */
 export type HtmlTreeModelErrorReason = Extract<
@@ -432,6 +432,7 @@ export class HtmlTreeModel {
     validateName(input.localName, input.prefix, input.qualifiedName);
     const attributes = input.attributes ?? [];
     validateAttributeInputs(attributes);
+    this.#resources.checkElementAttributes(attributes);
     const span = checkedSpan(input.sourceSpan);
     const ownsTemplateContents =
       input.namespaceUri === HTML_NAMESPACE && input.localName === "template";
@@ -726,16 +727,18 @@ export class HtmlTreeModel {
     const state = this.#elementState(element);
     validateAttributeInputs(attributes);
     const present = new Set(state.attributes.map(attributeKey));
-    let adopted = 0;
+    const adopted: HtmlTreeAttributeInput[] = [];
     for (const attribute of attributes) {
       this.#resources.checkpoint();
       const key = attributeKey(attribute);
       if (present.has(key)) continue;
-      state.attributes.push(copyAttribute(attribute));
+      adopted.push(attribute);
       present.add(key);
-      adopted += 1;
     }
-    if (adopted > 0) {
+    if (adopted.length === 0) return 0;
+    this.#resources.checkElementAttributes([...state.attributes, ...adopted]);
+    state.attributes.push(...adopted.map(copyAttribute));
+    if (adopted.length > 0) {
       const parent = this.#nodeState(element).parent;
       this.#emit(
         "attributes-adopted",
@@ -743,7 +746,7 @@ export class HtmlTreeModel {
         parent === null ? null : this.#observableParentSerial(parent)
       );
     }
-    return adopted;
+    return adopted.length;
   }
 
   insertText(

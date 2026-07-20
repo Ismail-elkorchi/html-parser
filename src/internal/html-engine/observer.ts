@@ -1,7 +1,7 @@
-import type { EngineParseError } from "./diagnostics.js";
-import type { InsertionMode, TokenizerMode } from "./parser-state.js";
-import type { SourceSpan } from "./positions.js";
-import type { HtmlToken } from "./tokens.js";
+import type { EngineParseError } from "./diagnostics.ts";
+import type { InsertionMode, TokenizerMode } from "./parser-state.ts";
+import type { SourceSpan } from "./positions.ts";
+import type { HtmlToken } from "./tokens.ts";
 
 /** Whether immediate tree-builder handling acknowledged a self-closing start tag. */
 export type TokenAcceptance = boolean;

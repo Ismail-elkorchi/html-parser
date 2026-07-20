@@ -2,31 +2,31 @@ import {
   failInternalState,
   requireInternalValue,
   unreachableInternalState
-} from "../../foundation/internal-state-error.js";
-import { CharacterReferenceConsumer } from "../character-reference-consumer.js";
-import { createParseError, type EngineParseError, type HtmlParseErrorCode } from "../diagnostics.js";
+} from "../../foundation/internal-state-error.ts";
+import { CharacterReferenceConsumer } from "../character-reference-consumer.ts";
+import { createParseError, type EngineParseError, type HtmlParseErrorCode } from "../diagnostics.ts";
 import {
   HtmlInputCursor,
   type InputCharacter,
   type InputEof,
   type InputNeedMore,
   type InputRead
-} from "../input-cursor.js";
-import { type EngineObserver, type TokenSink, type TokenizerControl } from "../observer.js";
-import { type TokenizerMode } from "../parser-state.js";
-import { sourceSpan, type SourcePosition, type SourceSpan } from "../positions.js";
-import { EngineConfigurationError, type EngineResourceGuard } from "../resource-guard.js";
-import { type HtmlToken } from "../tokens.js";
+} from "../input-cursor.ts";
+import { type EngineObserver, type TokenSink, type TokenizerControl } from "../observer.ts";
+import { type TokenizerMode } from "../parser-state.ts";
+import { sourceSpan, type SourcePosition, type SourceSpan } from "../positions.ts";
+import { EngineConfigurationError, type EngineResourceGuard } from "../resource-guard.ts";
+import { type HtmlToken } from "../tokens.ts";
 
 import {
   CommentTokenBuilder,
   DoctypeTokenBuilder,
   ProcessingInstructionTokenBuilder,
   TagTokenBuilder
-} from "./builders.js";
+} from "./builders.ts";
 import {
   type HtmlTokenizerExecutionState
-} from "./state.js";
+} from "./state.ts";
 
 /** Tokenization stopped at an open decoded-input boundary. */
 export interface HtmlTokenizerNeedMore {

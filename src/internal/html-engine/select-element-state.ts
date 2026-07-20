@@ -1,7 +1,7 @@
-import { HTML_NAMESPACE } from "./namespaces.js";
+import { HTML_NAMESPACE } from "./namespaces.ts";
 
-import type { EngineResourceGuard } from "./resource-guard.js";
-import type { HtmlTreeElement, HtmlTreeModel } from "./tree-model.js";
+import type { EngineResourceGuard } from "./resource-guard.ts";
+import type { HtmlTreeElement, HtmlTreeModel } from "./tree-model.ts";
 
 interface SelectState {
   selectedOption: HtmlTreeElement | null;

@@ -1,4 +1,4 @@
-import type { ParsedDocument, PatchPlan } from "./types.js";
+import type { ParsedDocument, PatchPlan } from "./types.ts";
 
 interface ParsedDocumentRegistration {
   readonly sourceText: string | null;

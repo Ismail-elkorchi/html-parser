@@ -4,4 +4,4 @@ export {
   type HtmlByteDecodeOptions,
   type EncodingSniffOptions,
   type EncodingSniffResult
-} from "./sniff.js";
+} from "./sniff.ts";

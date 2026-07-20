@@ -1,4 +1,4 @@
-export { chunk } from "./public/chunking.js";
+export { chunk } from "./public/chunking.ts";
 export {
   HtmlAbortError,
   HtmlBudgetExceededError,
@@ -11,7 +11,7 @@ export {
   isHtmlOperationalError,
   isHtmlPatchPlanningError,
   isHtmlStreamReadError
-} from "./public/errors.js";
+} from "./public/errors.ts";
 export {
   HTML_NAMESPACE_URI,
   MATHML_NAMESPACE_URI,
@@ -19,8 +19,8 @@ export {
   XLINK_NAMESPACE_URI,
   XML_NAMESPACE_URI,
   XMLNS_NAMESPACE_URI
-} from "./public/model.js";
-export { outline } from "./public/outlining.js";
+} from "./public/model.ts";
+export { outline } from "./public/outlining.ts";
 export {
   getParseErrorSpecRef,
   parse,
@@ -28,8 +28,8 @@ export {
   parseFragment,
   parseStream,
   tokenizeByteStreamEager
-} from "./public/parsing.js";
-export { applyPatchPlan, computePatch } from "./public/patching.js";
+} from "./public/parsing.ts";
+export { applyPatchPlan, computePatch } from "./public/patching.ts";
 export {
   findAllByAttr,
   findAllByAttrNS,
@@ -38,8 +38,8 @@ export {
   findById,
   walk,
   walkElements
-} from "./public/querying.js";
-export { serialize } from "./public/serialization.js";
+} from "./public/querying.ts";
+export { serialize } from "./public/serialization.ts";
 export {
   TEXT_CONTENT_POLICY,
   VISIBLE_TEXT_HTML_POLICY,
@@ -49,7 +49,7 @@ export {
   hasAttribute,
   hasAttributeNS,
   iterateText
-} from "./public/text-extraction.js";
+} from "./public/text-extraction.ts";
 
-export type { HtmlOperationalError } from "./public/errors.js";
-export type * from "./public/types.js";
+export type { HtmlOperationalError } from "./public/errors.ts";
+export type * from "./public/types.ts";

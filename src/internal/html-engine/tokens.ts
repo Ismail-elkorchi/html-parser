@@ -1,4 +1,4 @@
-import type { SourceSpan } from "./positions.js";
+import type { SourceSpan } from "./positions.ts";
 
 /** Ordered attribute data retained while a tag token is active. */
 export interface HtmlTokenAttribute {

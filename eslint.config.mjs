@@ -18,7 +18,7 @@ const strictTypeChecked = tseslint.configs.strictTypeChecked.map((config) => ({
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", "tmp/**", "src/internal/vendor/**"]
+    ignores: ["dist/**", "node_modules/**", "tmp/**"]
   },
   {
     files: ["**/*.js", "**/*.mjs", "**/*.cjs"],
@@ -30,6 +30,7 @@ export default [
         Buffer: "readonly",
         console: "readonly",
         process: "readonly",
+        ReadableStream: "readonly",
         TextEncoder: "readonly",
         URL: "readonly"
       }
@@ -58,7 +59,6 @@ export default [
       ],
       "boundaries/elements": [
         { "type": "public", "pattern": "src/public/**" },
-        { "type": "integration", "pattern": "src/integration/**" },
         { "type": "internal-foundation", "pattern": "src/internal/foundation/**" },
         { "type": "engine", "pattern": "src/internal/html-engine/**" },
         { "type": "internal", "pattern": "src/internal/**" },
@@ -95,18 +95,8 @@ export default [
               "from": { "element": { "types": "public" } },
               "allow": {
                 "to": {
-                  "element": { "types": { "anyOf": ["public", "internal", "internal-foundation"] } }
-                }
-              }
-            },
-            {
-              "from": { "element": { "types": "integration" } },
-              "allow": {
-                "to": {
                   "element": {
-                    "types": {
-                      "anyOf": ["integration", "public", "engine", "internal", "internal-foundation"]
-                    }
+                    "types": { "anyOf": ["public", "engine", "internal", "internal-foundation"] }
                   }
                 }
               }
@@ -189,7 +179,7 @@ export default [
           "patterns": [
             {
               "group": ["./internal/html-engine", "./internal/html-engine/*"],
-              "message": "The incomplete HTML engine must not be exported or used by production entrypoints."
+              "message": "The private HTML engine must not be exported from the public package root."
             }
           ]
         }

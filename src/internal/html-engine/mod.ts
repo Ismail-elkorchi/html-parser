@@ -3,7 +3,7 @@ export {
   fragmentTokenizerMode,
   type HtmlFragmentContext,
   type HtmlFragmentContextAttribute
-} from "./fragment-context.js";
+} from "./fragment-context.ts";
 export {
   adjustedForeignAttributes,
   adjustedForeignTagName,
@@ -12,7 +12,7 @@ export {
   isHtmlIntegrationPoint,
   isMathMLTextIntegrationPoint,
   type ForeignElementNamespaceUri
-} from "./foreign-content.js";
+} from "./foreign-content.ts";
 export {
   HTML_NAMESPACE,
   MATHML_NAMESPACE,
@@ -22,13 +22,13 @@ export {
   XMLNS_NAMESPACE,
   type HtmlAttributeNamespaceUri,
   type HtmlElementNamespaceUri
-} from "./namespaces.js";
+} from "./namespaces.ts";
 export {
   ActiveFormattingList,
   type ActiveFormattingElementEntry,
   type ActiveFormattingEntry,
   type ActiveFormattingMarker
-} from "./active-formatting-list.js";
+} from "./active-formatting-list.ts";
 export {
   CharacterReferenceConsumer,
   type CharacterReferenceConsumerMetrics,
@@ -38,7 +38,7 @@ export {
   type CharacterReferenceNeedMore,
   type CharacterReferenceResolved,
   type CharacterReferenceResult
-} from "./character-reference-consumer.js";
+} from "./character-reference-consumer.ts";
 export {
   HTML_PARSE_ERROR_CODES,
   createParseError,
@@ -48,8 +48,8 @@ export {
   type EngineTreeBuilderParseError,
   type HtmlParseErrorCode,
   type ParseErrorPhase
-} from "./diagnostics.js";
-export { documentModeForDoctype, type HtmlDocumentMode } from "./doctype-mode.js";
+} from "./diagnostics.ts";
+export { documentModeForDoctype, type HtmlDocumentMode } from "./doctype-mode.ts";
 export {
   HtmlInputCursor,
   type InputCodeUnit,
@@ -59,14 +59,14 @@ export {
   type InputNeedMore,
   type InputParseErrorObserver,
   type InputRead
-} from "./input-cursor.js";
+} from "./input-cursor.ts";
 export {
   LEGACY_NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
   MAX_NAMED_CHARACTER_REFERENCE_LENGTH,
   NAMED_CHARACTER_REFERENCE_ENTRY_COUNT,
   probeNamedCharacterReference,
   type NamedCharacterReferenceProbe
-} from "./named-character-references.js";
+} from "./named-character-references.ts";
 export {
   type EngineObserver,
   type InsertionModeTokenContext,
@@ -76,8 +76,8 @@ export {
   type TokenSink,
   type TreeMutationKind,
   type TreeMutationObservation
-} from "./observer.js";
-export { OpenElementStack } from "./open-element-stack.js";
+} from "./observer.ts";
+export { OpenElementStack } from "./open-element-stack.ts";
 export {
   INSERTION_MODES,
   PARSER_SCRIPTING_MODES,
@@ -86,13 +86,13 @@ export {
   type NonExecutingScriptingMode,
   type ParserScriptingMode,
   type TokenizerMode
-} from "./parser-state.js";
+} from "./parser-state.ts";
 export {
   sourcePosition,
   sourceSpan,
   type SourcePosition,
   type SourceSpan
-} from "./positions.js";
+} from "./positions.ts";
 export {
   createEngineResourceGuard,
   EngineAbortError,
@@ -104,8 +104,8 @@ export {
   type EngineResourceLimits,
   type EngineResourceUsage,
   type StartTagResourceGuard
-} from "./resource-guard.js";
-export { ENGINE_STANDARD_BASELINE, HTML_STANDARD_REVISION } from "./standards.js";
+} from "./resource-guard.ts";
+export { ENGINE_STANDARD_BASELINE, HTML_STANDARD_REVISION } from "./standards.ts";
 export {
   runHtmlEngine,
   type HtmlEngineDocumentConfiguration,
@@ -113,12 +113,12 @@ export {
   type HtmlEngineOptions,
   type HtmlEngineParserConfiguration,
   type HtmlEngineResult
-} from "./parser-driver.js";
+} from "./parser-driver.ts";
 export {
   HtmlTreeBuilder,
   type HtmlTreeBuilderOptions,
   type HtmlTreeBuilderState
-} from "./tree-builder.js";
+} from "./tree-builder.ts";
 export {
   HtmlTreeModel,
   type HtmlTemplateContents,
@@ -142,7 +142,7 @@ export {
   type HtmlTreeText,
   type HtmlTreeValidationResult,
   type HtmlTreeWalkEntry
-} from "./tree-model.js";
+} from "./tree-model.ts";
 export {
   HTML_TOKENIZER_DELEGATED_CHARACTER_REFERENCE_STATES,
   HTML_TOKENIZER_STATES,
@@ -155,7 +155,7 @@ export {
   type HtmlTokenizerOptions,
   type HtmlTokenizerRunResult,
   type HtmlTokenizerState
-} from "./tokenizer/mod.js";
+} from "./tokenizer/mod.ts";
 export {
   type HtmlCharacterToken,
   type HtmlCommentToken,
@@ -165,4 +165,4 @@ export {
   type HtmlStartTagToken,
   type HtmlToken,
   type HtmlTokenAttribute
-} from "./tokens.js";
+} from "./tokens.ts";

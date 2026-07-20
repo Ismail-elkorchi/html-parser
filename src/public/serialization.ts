@@ -1,17 +1,17 @@
-import { HtmlConfigurationError } from "./errors.js";
-import { HTML_NAMESPACE_URI, asciiLowercase } from "./model.js";
+import { HtmlConfigurationError } from "./errors.ts";
+import { HTML_NAMESPACE_URI, asciiLowercase } from "./model.ts";
 import {
   createOperationContext,
   normalizeOperationOptions
-} from "./operation.js";
+} from "./operation.ts";
 
-import type { OperationContext } from "./operation.js";
+import type { OperationContext } from "./operation.ts";
 import type {
   DocumentTree,
   FragmentTree,
   HtmlNode,
   OperationOptions
-} from "./types.js";
+} from "./types.ts";
 
 const VOID_ELEMENTS = new Set([
   "area",

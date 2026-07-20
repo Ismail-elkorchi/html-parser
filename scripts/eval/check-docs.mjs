@@ -36,7 +36,7 @@ const REQUIRED_README_PATTERNS = [
   { name: "runtime support", re: /##\s*Runtime support/i },
   { name: "security boundary", re: /parsing is not sanitization|does not[^\n]*sanitize/i },
   { name: "external dependency status", re: /no external runtime packages[\s\S]{0,100}dependencies[\s\S]{0,40}empty/i },
-  { name: "embedded legacy implementation disclosure", re: /embed[\s\S]{0,160}parse5[\s\S]{0,80}entities/i }
+  { name: "independent implementation status", re: /independent standards-based TypeScript implementation/i }
 ];
 
 const API_ENTRYPOINT_PATH = "src/mod.ts";
