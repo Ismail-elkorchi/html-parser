@@ -121,4 +121,4 @@ jobs:
           path: release-artifacts
 
       - name: Apply release notes to published release
-        run: gh release edit "${{ github.event.release.tag_name }}" --notes-file release-artifacts/release-notes.md
+        run: gh release edit "${{ github.event.release.tag_name }}" --repo "${GITHUB_REPOSITORY}" --notes-file release-artifacts/release-notes.md

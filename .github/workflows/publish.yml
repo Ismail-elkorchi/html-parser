@@ -225,16 +225,7 @@ jobs:
           deno publish 2>&1 | tee "${PUBLISH_ARTIFACTS_DIR}/jsr-publish.txt"
 
       - name: Verify JSR publication
-        run: |
-          set -euo pipefail
-          for attempt in {1..12}; do
-            if node scripts/release/check-registry-version.mjs --registry=jsr --require-present > "${PUBLISH_ARTIFACTS_DIR}/jsr-state-after.json"; then
-              exit 0
-            fi
-            if [ "${attempt}" -lt 12 ]; then sleep 5; fi
-          done
-          echo "::error::JSR publication did not become exactly verifiable"
-          exit 1
+        run: node scripts/release/check-registry-version.mjs --registry=jsr --require-present --wait-seconds=300 > "${PUBLISH_ARTIFACTS_DIR}/jsr-state-after.json"
 
       - name: Ensure tokenless npm auth
         run: |
@@ -251,16 +242,7 @@ jobs:
           npm publish "${{ steps.artifact.outputs.tarball_path }}" --provenance --access public
 
       - name: Verify npm publication
-        run: |
-          set -euo pipefail
-          for attempt in {1..12}; do
-            if node scripts/release/check-registry-version.mjs --registry=npm --require-present > "${PUBLISH_ARTIFACTS_DIR}/npm-state-after.json"; then
-              exit 0
-            fi
-            if [ "${attempt}" -lt 12 ]; then sleep 5; fi
-          done
-          echo "::error::npm publication did not become exactly verifiable"
-          exit 1
+        run: node scripts/release/check-registry-version.mjs --registry=npm --require-present --wait-seconds=300 > "${PUBLISH_ARTIFACTS_DIR}/npm-state-after.json"
 
       - name: Upload publication results
         if: ${{ always() }}

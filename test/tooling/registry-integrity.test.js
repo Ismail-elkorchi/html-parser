@@ -8,6 +8,10 @@ import {
   compareNpmProvenanceStatement,
   compareNpmVersionMetadata
 } from "../../scripts/release/registry-integrity.mjs";
+import {
+  resolveNpmVersionState,
+  waitForRegistryState
+} from "../../scripts/release/registry-state.mjs";
 
 test("JSR registry verification owns the complete qualified source surface", async () => {
   const jsrManifest = JSON.parse(await readFile("jsr.json", "utf8"));
@@ -101,4 +105,95 @@ test("npm provenance binds the artifact to the release workflow and source commi
     ok: false,
     failures: ["event", "source-commit"]
   });
+});
+
+test("npm attestation propagation is transient but immutable mismatches are final", async () => {
+  const expected = {
+    name: "@scope/package",
+    version: "1.2.3",
+    integrity: "sha512-exact",
+    sha512: "abc123",
+    repository: "https://github.com/owner/repository",
+    commit: "0123456789abcdef"
+  };
+  const metadata = {
+    name: expected.name,
+    version: expected.version,
+    dist: {
+      integrity: expected.integrity,
+      attestations: {
+        url: "https://registry.example/attestations",
+        provenance: { predicateType: "https://slsa.dev/provenance/v1" }
+      }
+    }
+  };
+  const unavailable = await resolveNpmVersionState(metadata, expected, async () => ({
+    ok: false,
+    status: 404
+  }));
+  assert.deepEqual(unavailable, {
+    state: "pending",
+    failures: ["provenance-unavailable"]
+  });
+
+  metadata.dist.integrity = "sha512-other";
+  let fetched = false;
+  const mismatch = await resolveNpmVersionState(metadata, expected, async () => {
+    fetched = true;
+    throw new Error("must not fetch provenance after an immutable mismatch");
+  });
+  assert.deepEqual(mismatch, { state: "mismatch", failures: ["integrity"] });
+  assert.equal(fetched, false);
+});
+
+test("registry polling backs off only for transient states", async () => {
+  const observations = [
+    { state: "absent", failures: [] },
+    { state: "pending", failures: ["provenance-unavailable"] },
+    { state: "identical", failures: [] }
+  ];
+  const delays = [];
+  let time = 0;
+  const result = await waitForRegistryState(
+    async () => observations.shift(),
+    {
+      waitMilliseconds: 100,
+      initialDelayMilliseconds: 10,
+      maxDelayMilliseconds: 40,
+      now: () => time,
+      sleep: async (milliseconds) => {
+        delays.push(milliseconds);
+        time += milliseconds;
+      }
+    }
+  );
+  assert.deepEqual(result, { state: "identical", failures: [] });
+  assert.deepEqual(delays, [10, 20]);
+
+  let reads = 0;
+  const mismatch = await waitForRegistryState(
+    async () => {
+      reads += 1;
+      return { state: "mismatch", failures: ["integrity"] };
+    },
+    { waitMilliseconds: 100 }
+  );
+  assert.deepEqual(mismatch, { state: "mismatch", failures: ["integrity"] });
+  assert.equal(reads, 1);
+});
+
+test("publication delegates eventual consistency to the typed registry state", async () => {
+  const workflow = await readFile(
+    new URL("../../.github/workflows/publish.yml", import.meta.url),
+    "utf8"
+  );
+  assert.match(
+    workflow,
+    /--registry=jsr --require-present --wait-seconds=300/
+  );
+  assert.match(
+    workflow,
+    /--registry=npm --require-present --wait-seconds=300/
+  );
+  assert.doesNotMatch(workflow, /for attempt in \{1\.\.12\}/);
 });
