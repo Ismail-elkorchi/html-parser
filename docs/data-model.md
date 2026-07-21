@@ -8,14 +8,15 @@
 - `tree: DocumentTree` contains children, parse diagnostics, and optional trace;
 - `sourceText: string | null` contains the exact decoded input only when
   `sourceRetention: "text"` was selected;
-- `metadata: ParsedDocumentMetadata` records input kind, transport size,
+- `metadata: ParseMetadata` records input kind, transport size,
   encoding evidence, and successful resource observations.
 
 `DocumentTree` retains the effective `scriptingMode` used for parsing.
-`parseFragment()` returns a frozen `FragmentTree` with its normalized
-namespace-aware `context`, effective `scriptingMode`, `documentMode`,
-`hasFormInContextChain` decision, children, diagnostics, and optional trace. It
-has no source-retention wrapper.
+`parseFragment()` returns a frozen `ParsedFragment`. Its `tree` is a
+`FragmentTree` with the normalized namespace-aware `context`, effective
+`scriptingMode`, `documentMode`, `hasFormInContextChain` decision, children,
+diagnostics, and optional trace; its `metadata` reports successful resource
+use. Fragments do not retain source text.
 
 Resource observations describe the exact successful parse; they are not
 limits. `steps` is the exception because counting it has a hot-path cost: it is
@@ -106,3 +107,11 @@ which is an intentional extension beyond the HTML fragment algorithm's
 name-only doctype output. Serialization is deterministic, but arbitrary or
 parser-recovered trees are not guaranteed to survive a serialize/reparse cycle
 unchanged.
+
+Caller-constructed serialization inputs are validated completely before any
+markup is emitted. Node ids and object ownership must be unique; the graph must
+be acyclic; names, namespaces, prefixes, attributes, document placement, and
+template-content ownership must satisfy the public model. Invalid graphs throw
+`HtmlConfigurationError`. Traversal, querying, outlining, text extraction, and
+chunking also reject cyclic or multiply-owned caller graphs rather than relying
+on a deadline to terminate them.

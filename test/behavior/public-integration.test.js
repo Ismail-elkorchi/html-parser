@@ -195,9 +195,9 @@ test("text, byte, stream, and fragment entrypoints preserve their input contract
   assert.deepEqual(fromStream.tree, text.tree);
   assert.equal(fromBytes.metadata.inputKind, "bytes");
   assert.equal(fromStream.metadata.inputKind, "stream");
-  assert.equal(fromStream.metadata.resourceUsage.encodingPrescanBytes, bytes.byteLength);
+  assert.equal(fromStream.metadata.resourceUsage.encodingPrescanBytes, 1);
 
-  const fragment = parseFragment(
+  const { tree: fragment } = parseFragment(
     "<td>x",
     { namespaceUri: HTML_NAMESPACE_URI, localName: "table" },
     { captureSpans: true }
@@ -242,7 +242,7 @@ test("visible-text nested markup remains on the production parser route", () => 
 
 test("production tokenization retains the current-standard token vocabulary", async () => {
   const source = "<?build release?><p a=1>a&amp;b</p>";
-  const tokens = await tokenizeByteStreamEager(
+  const { tokens } = await tokenizeByteStreamEager(
     byteStream([new TextEncoder().encode(source)])
   );
   assert.deepEqual(tokens, [

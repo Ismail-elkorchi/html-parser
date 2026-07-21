@@ -4,6 +4,23 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Validate complete caller-constructed serialization graphs before emitting
+  markup, including names, namespaces, prefixes, attributes, document
+  placement, template ownership, unique ids, unique ownership, and acyclicity;
+  apply the same ownership safety to chunking and public tree traversals.
+- Separate mandatory BOM detection from optional meta-encoding prescan,
+  initialize streaming decode as soon as encoding evidence is final, and feed
+  byte-array decoding directly into the parser without retaining decoded source
+  when source retention is disabled.
+- Return resource metadata from fragment parsing and eager stream tokenization,
+  and expose and enforce deterministic `maxSteps` for eager tokenization.
+- Validate all public query-helper arguments consistently with
+  `HtmlConfigurationError`.
+- Require scheduled registry audits to find the released version on both npm
+  and JSR, and record every accepted browser difference with its exact case id,
+  classification, explanation, and result hashes.
+- Run the blocking runtime contract on Linux, macOS, and Windows.
+
 ## [0.2.0] - 2026-07-21
 
 - Validate the complete runtime edit shape in source patching, normalize HTML

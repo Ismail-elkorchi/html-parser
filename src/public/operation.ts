@@ -41,6 +41,7 @@ const TOKENIZE_BYTE_STREAM_EAGER_BUDGET_KEYS = Object.freeze([
   "maxInputBytes",
   "maxEncodingPrescanBytes",
   "maxDecodedUtf8Bytes",
+  "maxSteps",
   "maxParseErrors",
   "maxAttributesPerElement",
   "maxAttributeBytes",

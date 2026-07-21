@@ -85,6 +85,75 @@ test("stream encoding prescan uses its documented implementation maximum", async
   }
 });
 
+test("mandatory BOM detection is independent from the optional meta-prescan cap", async () => {
+  const fixtures = [
+    {
+      bytes: new Uint8Array([0xef, 0xbb, 0xbf, 0x3c, 0x70, 0x3e, 0x78]),
+      encoding: "utf-8"
+    },
+    {
+      bytes: new Uint8Array([0xfe, 0xff, 0x00, 0x3c, 0x00, 0x70, 0x00, 0x3e, 0x00, 0x78]),
+      encoding: "utf-16be"
+    },
+    {
+      bytes: new Uint8Array([0xff, 0xfe, 0x3c, 0x00, 0x70, 0x00, 0x3e, 0x00, 0x78, 0x00]),
+      encoding: "utf-16le"
+    }
+  ];
+  for (const fixture of fixtures) {
+    for (const maxEncodingPrescanBytes of [0, 1, 2]) {
+      const result = await parseStream(createByteStream([
+        fixture.bytes.subarray(0, 1),
+        fixture.bytes.subarray(1, 2),
+        fixture.bytes.subarray(2)
+      ]), {
+        sourceRetention: "text",
+        budgets: { maxEncodingPrescanBytes }
+      });
+      assert.deepEqual(result.metadata.encoding, {
+        name: fixture.encoding,
+        source: "bom"
+      });
+      assert.equal(result.sourceText, "<p>x");
+      assert.ok(
+        result.metadata.resourceUsage.encodingPrescanBytes <= maxEncodingPrescanBytes
+      );
+    }
+  }
+});
+
+test("stream decoding commits as soon as BOM precedence and encoding evidence are final", async () => {
+  const fixtures = [
+    {
+      id: "transport",
+      bytes: new TextEncoder().encode("<p>transport tail</p>"),
+      options: { transportEncodingLabel: "utf-8" },
+      expectedDecisionBytes: 1
+    },
+    {
+      id: "meta",
+      bytes: new TextEncoder().encode("<meta charset=utf-8><p>meta tail</p>"),
+      options: {},
+      expectedDecisionBytes: new TextEncoder().encode("<meta charset=utf-8>").byteLength
+    }
+  ];
+  for (const fixture of fixtures) {
+    const pullCounter = { count: 0 };
+    let decisionPulls = null;
+    const chunks = [...fixture.bytes].map((value) => new Uint8Array([value]));
+    const result = await parseStream(createPullCountStream(chunks, pullCounter), {
+      ...fixture.options,
+      budgets: { maxEncodingPrescanBytes: 100 },
+      onTraceEvent(event) {
+        if (event.kind === "decode") decisionPulls = pullCounter.count;
+      }
+    });
+    assert.equal(decisionPulls, fixture.expectedDecisionBytes, fixture.id);
+    assert.ok(decisionPulls < fixture.bytes.byteLength, fixture.id);
+    assert.equal(result.metadata.resourceUsage.encodingPrescanBytes, decisionPulls);
+  }
+});
+
 test("parseStream budget outcome is independent of upstream chunk boundaries", async () => {
   const bytes = new TextEncoder().encode(`<p>${"x".repeat(20_000)}</p>`);
   const chunks = [];
@@ -230,7 +299,7 @@ test("parseStream and tokenizeByteStreamEager release their readers after succes
   assert.equal(parseInput.locked, false);
 
   const tokenizeInput = createByteStream([new TextEncoder().encode("<p>tokenized</p>")]);
-  const tokens = await tokenizeByteStreamEager(tokenizeInput);
+  const { tokens } = await tokenizeByteStreamEager(tokenizeInput);
   assert.ok(tokens.length > 0);
   assert.equal(tokenizeInput.locked, false);
 });
@@ -289,8 +358,28 @@ test("tokenizeByteStreamEager returns a deterministic token sequence", async () 
   const second = await collect();
   assert.deepEqual(first, second);
   assert.deepEqual(
-    first.map((entry) => entry.kind),
+    first.tokens.map((entry) => entry.kind),
     ["startTag", "chars", "endTag", "eof"]
+  );
+});
+
+test("eager tokenization exposes exact deterministic work and enforces maxSteps", async () => {
+  const input = () => createByteStream([new TextEncoder().encode("<p a=1>x&amp;y</p>")]);
+  const untracked = await tokenizeByteStreamEager(input());
+  assert.equal(untracked.metadata.resourceUsage.steps, null);
+  assert.equal(Object.isFrozen(untracked), true);
+  assert.equal(Object.isFrozen(untracked.tokens), true);
+  assert.equal(Object.isFrozen(untracked.metadata.resourceUsage), true);
+
+  const measured = await tokenizeByteStreamEager(input(), { budgets: { maxSteps: 1_000 } });
+  const steps = measured.metadata.resourceUsage.steps;
+  assert.ok(Number.isSafeInteger(steps));
+  assert.ok(steps > 0);
+  await tokenizeByteStreamEager(input(), { budgets: { maxSteps: steps } });
+  await assert.rejects(
+    tokenizeByteStreamEager(input(), { budgets: { maxSteps: steps - 1 } }),
+    (error) => error instanceof HtmlBudgetExceededError &&
+      error.budget === "maxSteps" && error.limit === steps - 1 && error.actual === steps
   );
 });
 
@@ -317,7 +406,7 @@ test("eager tokenization is invariant across chunk patterns and single-byte enco
   }
   assert.deepEqual(results[0], results[1]);
   assert.deepEqual(results[1], results[2]);
-  assert.equal(results[0].find((token) => token.kind === "chars")?.value, "é");
+  assert.equal(results[0].tokens.find((token) => token.kind === "chars")?.value, "é");
 });
 
 test("outline and chunk stay deterministic", () => {
@@ -332,7 +421,7 @@ test("outline and chunk stay deterministic", () => {
 });
 
 test("chunk enforces maxBytes when configured", () => {
-  const fragment = parseFragment(
+  const { tree: fragment } = parseFragment(
     "<p>a</p><p>bb</p><p>ccc</p>",
     { namespaceUri: HTML_NAMESPACE_URI, localName: "section" }
   );

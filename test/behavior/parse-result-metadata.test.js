@@ -150,7 +150,7 @@ test("byte and stream results own decoding evidence and exact retained source", 
   assert.equal(fromBytes.metadata.inputKind, "bytes");
   assert.equal(fromBytes.metadata.resourceUsage.encodingPrescanBytes, 0);
   assert.equal(fromStream.metadata.inputKind, "stream");
-  assert.equal(fromStream.metadata.resourceUsage.encodingPrescanBytes, bytes.byteLength);
+  assert.equal(fromStream.metadata.resourceUsage.encodingPrescanBytes, 1);
 });
 
 test("byte and stream metadata preserve BOM, meta, and default encoding evidence", async () => {
@@ -239,6 +239,37 @@ test("step observations are available exactly when deterministic counting is ena
     (event) => event.kind === "budget" && event.budget === "maxSteps"
   );
   assert.equal(stepBudget?.actual, tracked.metadata.resourceUsage.steps);
+});
+
+test("fragment results expose the same immutable resource evidence as document results", () => {
+  const source = "<b a=1>x&amp;y</b>";
+  const result = parseFragment(
+    source,
+    { namespaceUri: HTML_NAMESPACE_URI, localName: "section" },
+    { budgets: { maxSteps: 1_000 } }
+  );
+  assert.deepEqual(Object.keys(result), ["tree", "metadata"]);
+  assert.equal(result.tree.kind, "fragment");
+  assert.deepEqual(result.metadata.encoding, { name: null, source: "already-decoded" });
+  assert.equal(result.metadata.inputKind, "text");
+  assert.equal(result.metadata.transportByteLength, null);
+  assert.equal(result.metadata.resourceUsage.inputBytes, new TextEncoder().encode(source).byteLength);
+  assert.equal(result.metadata.resourceUsage.decodedUtf8Bytes, new TextEncoder().encode(source).byteLength);
+  assert.equal(result.metadata.resourceUsage.decodedCodeUnits, source.length);
+  assert.ok(result.metadata.resourceUsage.steps > 0);
+  assert.equal(result.metadata.resourceUsage.nodes, 5);
+  assert.equal(result.metadata.resourceUsage.maxDepth, 3);
+  assert.equal(result.metadata.resourceUsage.attributes, 1);
+  assert.equal(Object.isFrozen(result), true);
+  assert.equal(Object.isFrozen(result.metadata), true);
+  assert.equal(Object.isFrozen(result.metadata.resourceUsage), true);
+
+  const exactSteps = result.metadata.resourceUsage.steps;
+  assert.doesNotThrow(() => parseFragment(
+    source,
+    { namespaceUri: HTML_NAMESPACE_URI, localName: "section" },
+    { budgets: { maxSteps: exactSteps } }
+  ));
 });
 
 test("patch planning and application require exact registered parse identity", () => {

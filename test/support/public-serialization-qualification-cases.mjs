@@ -100,11 +100,12 @@ function publicNode(descriptor, ids) {
     })),
     children: descriptor.children.map((child) => publicNode(child, ids))
   };
-  if (descriptor.templateChildren !== undefined) {
+  if (descriptor.templateChildren !== undefined ||
+      (descriptor.namespaceUri === HTML_NAMESPACE_URI && descriptor.localName === "template")) {
     node.templateContent = {
       id: ids.next++,
       kind: "templateContent",
-      children: descriptor.templateChildren.map((child) => publicNode(child, ids)),
+      children: (descriptor.templateChildren ?? []).map((child) => publicNode(child, ids)),
       spanProvenance: "inferred"
     };
   }

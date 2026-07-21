@@ -60,16 +60,21 @@ ParsedDocument
 └── metadata    input, encoding, and observed resource usage
 ```
 
-`parseFragment()` returns a `FragmentTree` directly and requires an explicit
-namespace-aware context:
+`parseFragment()` returns a `ParsedFragment` with the immutable tree and the
+same successful resource evidence available for document parsing. It requires
+an explicit namespace-aware context:
 
 ```ts
 import { HTML_NAMESPACE_URI, parseFragment } from "@ismail-elkorchi/html-parser";
 
-const rows = parseFragment("<tr><td>A<td>B", {
+const { tree: rows, metadata } = parseFragment("<tr><td>A<td>B", {
   namespaceUri: HTML_NAMESPACE_URI,
   localName: "tbody"
+}, {
+  budgets: { maxSteps: 10_000 }
 });
+
+console.log(rows.kind, metadata.resourceUsage.steps);
 ```
 
 ## Find what you need
@@ -89,9 +94,10 @@ architecture, testing, corpus, and source-policy notes.
 
 ## Runtime support
 
-The npm surface supports Node.js 20, 22, and 24. Deno, Bun, and evergreen
-browsers are covered by smoke tests. npm/Node and JSR expose the same runtime
-and TypeScript API, documented in [the API guide](./docs/api.md).
+The npm surface supports Node.js 20, 22, and 24. Linux, macOS, and Windows run
+the cross-runtime contract in CI; Deno, Bun, and evergreen browsers are also
+covered by smoke tests. npm/Node and JSR expose the same runtime and TypeScript
+API, documented in [the API guide](./docs/api.md).
 
 ## Safety
 

@@ -219,4 +219,6 @@ test("published provenance is bound to the version tag rather than current HEAD"
   );
   assert.match(auditWorkflow, /fetch-depth: 0/);
   assert.match(auditWorkflow, /fetch-tags: true/);
+  assert.match(auditWorkflow, /--registry=npm --require-present/);
+  assert.match(auditWorkflow, /--registry=jsr --require-present/);
 });

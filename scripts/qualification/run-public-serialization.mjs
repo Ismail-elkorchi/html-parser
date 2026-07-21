@@ -80,7 +80,7 @@ for (const testCase of PUBLIC_SERIALIZATION_QUALIFICATION_CASES) {
 const parsedWptOutcomes = [];
 for (let index = 0; index < WPT_SERIALIZING_OUTER_EXPECTATIONS.length; index += 1) {
   const expected = WPT_SERIALIZING_OUTER_EXPECTATIONS[index];
-  const fragment = parseFragment(expected, HTML_DIV_CONTEXT);
+  const { tree: fragment } = parseFragment(expected, HTML_DIV_CONTEXT);
   const node = fragment.children[0];
   const actual = node === undefined ? "" : serialize(node);
   const id = `serializing.html#outerHTML-${String(index)}`;

@@ -8,6 +8,7 @@ import { parse } from "../../dist/mod.js";
 import { parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
 import { verifyWptTreeCorpus } from "../../test/support/wpt-tree-corpus.mjs";
 import { writeJson } from "../lib/report.mjs";
+import { expandKnownDifferenceGroups } from "./document-browser-baseline.mjs";
 
 const BASELINE_PATH = "test/fixtures/qualification/document-browser-baseline.json";
 
@@ -150,6 +151,10 @@ if (baseline.schemaVersion !== 1 ||
     typeof baseline.engines !== "object" || baseline.engines === null) {
   throw new Error("Document browser baseline does not match the pinned qualification inputs");
 }
+const knownDifferencesByEngine = expandKnownDifferenceGroups(
+  baseline.knownDifferenceGroups,
+  Object.keys(AVAILABLE_ENGINES)
+);
 
 const results = [];
 for (const [name, launcher] of engines) {
@@ -186,8 +191,11 @@ for (const [name, launcher] of engines) {
     const differenceSha256 = sha256(differenceRecords);
     const version = browser.version();
     const expected = baseline.engines[name];
+    const expectedKnownDifferences = knownDifferencesByEngine.get(name);
     const baselineMismatches = [];
-    if (expected === undefined) baselineMismatches.push("engine-not-baselined");
+    if (expected === undefined || expectedKnownDifferences === undefined) {
+      baselineMismatches.push("engine-not-baselined");
+    }
     else {
       if (expected.version !== version) baselineMismatches.push("browser-version");
       if (expected.outcomesSha256 !== outcomeSha256) baselineMismatches.push("all-outcomes");
@@ -195,8 +203,17 @@ for (const [name, launcher] of engines) {
       if (expected.differencesSha256 !== differenceSha256) {
         baselineMismatches.push("difference-inventory");
       }
+      const expectedCaseIds = [...expectedKnownDifferences.keys()].sort();
+      const actualCaseIds = differenceRecords.map(({ id }) => id).sort();
+      if (JSON.stringify(expectedCaseIds) !== JSON.stringify(actualCaseIds)) {
+        baselineMismatches.push("difference-case-identifiers");
+      }
     }
     const baselineMatches = baselineMismatches.length === 0;
+    const classifiedDifferences = differenceRecords.map((difference) => ({
+      ...difference,
+      ...expectedKnownDifferences?.get(difference.id)
+    }));
     results.push({
       name,
       version,
@@ -206,7 +223,7 @@ for (const [name, launcher] of engines) {
       knownDifferences: {
         count: failures.length,
         sha256: differenceSha256,
-        reason: baseline.reason
+        cases: classifiedDifferences
       },
       baselineMismatches,
       failures: baselineMatches ? [] : failures

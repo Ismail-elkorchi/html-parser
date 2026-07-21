@@ -7,6 +7,13 @@ const FORBIDDEN_HTML_ATTRIBUTE_SYNTAX = new Set([
   0x3e // >
 ]);
 
+const FORBIDDEN_HTML_ELEMENT_SYNTAX = new Set([
+  0x20, // ASCII space
+  0x2f, // /
+  0x3c, // <
+  0x3e // >
+]);
+
 function isControl(codePoint: number): boolean {
   return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f);
 }
@@ -61,6 +68,20 @@ export function isHtmlAttributeName(value: string): boolean {
     const codePoint = character.codePointAt(0);
     if (codePoint === undefined || isControl(codePoint) ||
         FORBIDDEN_HTML_ATTRIBUTE_SYNTAX.has(codePoint) ||
+        (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Whether a value can be emitted as one HTML tag name without changing tokenization. */
+export function isHtmlElementName(value: string): boolean {
+  if (value.length === 0) return false;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint === undefined || isControl(codePoint) ||
+        FORBIDDEN_HTML_ELEMENT_SYNTAX.has(codePoint) ||
         (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
       return false;
     }

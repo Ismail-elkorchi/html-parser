@@ -1,4 +1,8 @@
-import { sniffHtmlEncoding } from "../internal/encoding/sniff.ts";
+import {
+  decideHtmlEncoding,
+  sniffHtmlEncoding
+} from "../internal/encoding/sniff.ts";
+import { failInternalState } from "../internal/foundation/internal-state-error.ts";
 
 import { enforceBudget } from "./budgets.ts";
 import {
@@ -32,6 +36,12 @@ interface StreamDecodeResult {
 interface StreamDecoderState {
   readonly decoder: TextDecoder;
   readonly sniff: StreamEncodingSniff;
+}
+
+interface DecodeCallbacks {
+  readonly retainText: boolean;
+  readonly onEncodingSniff?: (sniff: StreamEncodingSniff) => void;
+  readonly onDecodedChunk?: (chunk: string) => void;
 }
 
 export function requireString(value: unknown, option: string): asserts value is string {
@@ -104,6 +114,96 @@ export class DecodedUtf8BudgetCounter {
   get bytes(): number {
     return this.#bytes;
   }
+}
+
+class DecodedOutputCollector {
+  readonly #operation: OperationContext;
+  readonly #budget: DecodedUtf8BudgetCounter;
+  readonly #parts: string[] | null;
+  readonly #onDecodedChunk: ((chunk: string) => void) | undefined;
+  #codeUnits = 0;
+
+  constructor(
+    limit: number | undefined,
+    callbacks: DecodeCallbacks,
+    operation: OperationContext
+  ) {
+    this.#operation = operation;
+    this.#budget = new DecodedUtf8BudgetCounter(limit, operation);
+    this.#parts = callbacks.retainText ? [] : null;
+    this.#onDecodedChunk = callbacks.onDecodedChunk;
+  }
+
+  append(value: string): void {
+    if (value.length === 0) return;
+    this.#budget.append(value);
+    const nextCodeUnits = this.#codeUnits + value.length;
+    if (!Number.isSafeInteger(nextCodeUnits)) {
+      throw new HtmlConfigurationError(
+        "input",
+        "INVALID_VALUE",
+        "decoded input must fit in a safe UTF-16 code-unit count"
+      );
+    }
+    this.#codeUnits = nextCodeUnits;
+    this.#onDecodedChunk?.(value);
+    this.#parts?.push(value);
+    this.#operation.checkpoint();
+  }
+
+  get bytes(): number {
+    return this.#budget.bytes;
+  }
+
+  get codeUnits(): number {
+    return this.#codeUnits;
+  }
+
+  text(): string | null {
+    return this.#parts?.join("") ?? null;
+  }
+}
+
+function decodeTransportBytes(
+  decoder: TextDecoder,
+  bytes: Uint8Array,
+  output: DecodedOutputCollector,
+  operation: OperationContext
+): void {
+  const decodeChunkBytes = 16_384;
+  for (let offset = 0; offset < bytes.byteLength; offset += decodeChunkBytes) {
+    operation.checkpoint();
+    output.append(decoder.decode(bytes.subarray(offset, offset + decodeChunkBytes), { stream: true }));
+  }
+}
+
+/** Decodes an in-memory byte input without retaining decoded text unless requested. */
+export function decodeByteArray(
+  bytes: Uint8Array,
+  options: DecodeCallbacks & {
+    readonly transportEncodingLabel?: string;
+    readonly maxDecodedUtf8Bytes?: number;
+  },
+  operation: OperationContext
+): StreamDecodeResult {
+  operation.checkpoint();
+  const sniff = sniffHtmlEncoding(bytes, options.transportEncodingLabel === undefined
+    ? {}
+    : { transportEncodingLabel: options.transportEncodingLabel });
+  options.onEncodingSniff?.(sniff);
+  const output = new DecodedOutputCollector(options.maxDecodedUtf8Bytes, options, operation);
+  const decoder = new TextDecoder(sniff.encoding);
+  decodeTransportBytes(decoder, bytes, output, operation);
+  output.append(decoder.decode());
+  return Object.freeze({
+    text: output.text(),
+    sniff,
+    totalBytes: bytes.byteLength,
+    decodedUtf8Bytes: output.bytes,
+    decodedCodeUnits: output.codeUnits,
+    encodingPrescanBytes: 0,
+    encodingPrescanLimitBytes: 0
+  });
 }
 
 async function readStreamChunk(
@@ -186,55 +286,32 @@ export async function decodeByteStream(
     DEFAULT_STREAM_ENCODING_PRESCAN_BYTES,
     budgets?.maxEncodingPrescanBytes ?? DEFAULT_STREAM_ENCODING_PRESCAN_BYTES
   );
-  const pendingBytesBuffer = new Uint8Array(prescanLimit);
+  const pendingBytesBuffer = new Uint8Array(Math.max(3, prescanLimit));
   let pendingBytes = 0;
   let encodingPrescanBytes = 0;
   let decoderState: StreamDecoderState | undefined;
-  const decodedParts: string[] | null = options.retainText ? [] : null;
-  let decodedCodeUnits = 0;
-  const decodedBudget = new DecodedUtf8BudgetCounter(
+  const output = new DecodedOutputCollector(
     budgets?.maxDecodedUtf8Bytes,
+    options,
     operation
   );
   const sniffOptions = options.transportEncodingLabel === undefined
     ? { maxPrescanBytes: prescanLimit }
     : { transportEncodingLabel: options.transportEncodingLabel, maxPrescanBytes: prescanLimit };
 
-  const appendDecoded = (value: string): void => {
-    if (value.length > 0) {
-      decodedBudget.append(value);
-      const nextCodeUnits = decodedCodeUnits + value.length;
-      if (!Number.isSafeInteger(nextCodeUnits)) {
-        throw new HtmlConfigurationError(
-          "input",
-          "INVALID_VALUE",
-          "decoded input must fit in a safe UTF-16 code-unit count"
-        );
-      }
-      decodedCodeUnits = nextCodeUnits;
-      options.onDecodedChunk?.(value);
-      decodedParts?.push(value);
-    }
-  };
-  const decodeBytes = (decoder: TextDecoder, bytes: Uint8Array): void => {
-    const decodeChunkBytes = 16_384;
-    for (let offset = 0; offset < bytes.byteLength; offset += decodeChunkBytes) {
-      operation.checkpoint();
-      appendDecoded(decoder.decode(bytes.subarray(offset, offset + decodeChunkBytes), { stream: true }));
-    }
-  };
-  const initializeDecoder = (): StreamDecoderState => {
+  const initializeDecoder = (endOfStream: boolean): StreamDecoderState | undefined => {
     const bufferedBytes = pendingBytesBuffer.subarray(0, pendingBytes);
-    const sniff = sniffHtmlEncoding(bufferedBytes, sniffOptions);
+    const decision = decideHtmlEncoding(bufferedBytes, { ...sniffOptions, endOfStream });
+    if (decision.status === "pending") return undefined;
+    const sniff = decision.result;
     const state = { decoder: new TextDecoder(sniff.encoding), sniff };
     decoderState = state;
     options.onEncodingSniff?.(sniff);
-    decodeBytes(state.decoder, bufferedBytes);
+    decodeTransportBytes(state.decoder, bufferedBytes, output, operation);
     return state;
   };
 
   try {
-    if (prescanLimit === 0) initializeDecoder();
     for (;;) {
       const next = await readStreamChunk(reader, operation);
       if (next.done) break;
@@ -249,31 +326,70 @@ export async function decodeByteStream(
       operation.checkpoint();
 
       if (decoderState === undefined) {
-        const bytesToBuffer = Math.min(chunkValue.byteLength, prescanLimit - pendingBytes);
-        pendingBytesBuffer.set(chunkValue.subarray(0, bytesToBuffer), pendingBytes);
-        pendingBytes += bytesToBuffer;
-        encodingPrescanBytes = Math.max(encodingPrescanBytes, pendingBytes);
-        if (pendingBytes < prescanLimit) continue;
-        const activeDecoder = initializeDecoder().decoder;
-        if (bytesToBuffer < chunkValue.byteLength) {
-          decodeBytes(activeDecoder, chunkValue.subarray(bytesToBuffer));
+        let offset = 0;
+        while (offset < chunkValue.byteLength) {
+          const capacity = pendingBytesBuffer.byteLength - pendingBytes;
+          if (capacity === 0) {
+            const initialized = initializeDecoder(false);
+            if (initialized === undefined) {
+              failInternalState("ENCODING_SNIFF_BOUNDED_PREFIX_UNDECIDED");
+            }
+            break;
+          }
+          let bytesToBuffer = Math.min(chunkValue.byteLength - offset, capacity);
+          if (pendingBytes < 3) {
+            bytesToBuffer = 1;
+          } else {
+            const nextTagEnd = chunkValue.indexOf(0x3e, offset);
+            if (nextTagEnd !== -1) {
+              bytesToBuffer = Math.min(bytesToBuffer, nextTagEnd - offset + 1);
+            }
+          }
+          pendingBytesBuffer.set(
+            chunkValue.subarray(offset, offset + bytesToBuffer),
+            pendingBytes
+          );
+          pendingBytes += bytesToBuffer;
+          offset += bytesToBuffer;
+          encodingPrescanBytes = Math.max(
+            encodingPrescanBytes,
+            Math.min(pendingBytes, prescanLimit)
+          );
+          const lastBufferedByte = pendingBytesBuffer[pendingBytes - 1];
+          const initialized = pendingBytes <= 3 || lastBufferedByte === 0x3e ||
+              pendingBytes === pendingBytesBuffer.byteLength
+            ? initializeDecoder(false)
+            : undefined;
+          if (initialized !== undefined) break;
+        }
+        const initializedDecoder = decoderState as StreamDecoderState | undefined;
+        if (initializedDecoder !== undefined && offset < chunkValue.byteLength) {
+          decodeTransportBytes(
+            initializedDecoder.decoder,
+            chunkValue.subarray(offset),
+            output,
+            operation
+          );
         }
         continue;
       }
-      decodeBytes(decoderState.decoder, chunkValue);
+      decodeTransportBytes(decoderState.decoder, chunkValue, output, operation);
     }
 
-    const finalState = decoderState ?? initializeDecoder();
-    appendDecoded(finalState.decoder.decode());
-    return {
-      text: decodedParts?.join("") ?? null,
+    const finalState = decoderState ?? initializeDecoder(true);
+    if (finalState === undefined) {
+      failInternalState("ENCODING_SNIFF_EOF_UNDECIDED");
+    }
+    output.append(finalState.decoder.decode());
+    return Object.freeze({
+      text: output.text(),
       sniff: finalState.sniff,
       totalBytes: total,
-      decodedUtf8Bytes: decodedBudget.bytes,
-      decodedCodeUnits,
+      decodedUtf8Bytes: output.bytes,
+      decodedCodeUnits: output.codeUnits,
       encodingPrescanBytes,
       encodingPrescanLimitBytes: prescanLimit
-    };
+    });
   } catch (error) {
     try {
       const cancellation = reader.cancel(error);

@@ -57,10 +57,10 @@ jobs:
         run: deno publish --dry-run
 
       - name: Inspect npm publication state
-        run: node scripts/release/check-registry-version.mjs --registry=npm
+        run: node scripts/release/check-registry-version.mjs --registry=npm --require-present
 
       - name: Inspect JSR publication state
-        run: node scripts/release/check-registry-version.mjs --registry=jsr
+        run: node scripts/release/check-registry-version.mjs --registry=jsr --require-present
 
       - name: Report outdated dependencies
         continue-on-error: true

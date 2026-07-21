@@ -210,7 +210,13 @@ test("deep parsed and caller-built trees remain stack-safe across the public sur
       children: [child]
     };
   }
-  const manual = { id: depth + 2, kind: "document", children: [child], errors: [] };
+  const manual = {
+    id: depth + 2,
+    kind: "document",
+    scriptingMode: "inert",
+    children: [child],
+    errors: []
+  };
   assert.equal(rawText(manual), "leaf");
   assert.equal(visibleTextValue(manual), "leaf");
   assert.equal(serialize(manual).includes("leaf"), true);

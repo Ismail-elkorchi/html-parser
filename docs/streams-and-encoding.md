@@ -48,8 +48,10 @@ During conversion to the immutable public result, already-converted internal
 children and attributes are released so the mutable and immutable trees are
 not both retained in full at the peak.
 
-`tokenizeByteStreamEager()` has the same eager boundary: it returns all tokens
-after EOF and does not expose tokens progressively.
+`tokenizeByteStreamEager()` has the same eager boundary: it returns a frozen
+`{ tokens, metadata }` result after EOF and does not expose tokens
+progressively. Set `budgets.maxSteps` to impose deterministic tokenizer work;
+the observed count is then returned in `metadata.resourceUsage.steps`.
 
 ## Encoding selection
 
@@ -57,11 +59,19 @@ Byte and stream entry points use the same HTML sniffing and decoding pipeline.
 `metadata.encoding.source` reports `"bom"`, `"transport"`, `"meta"`, or
 `"default"`; `metadata.encoding.name` reports the selected WHATWG encoding.
 
-`maxEncodingPrescanBytes` limits how much transport prefix is retained for
-encoding prescan. It is not a total-input budget and later bytes do not make it
-throw. The implementation never retains more than 16,384 bytes for prescan,
-even when a larger value is configured. Use `maxInputBytes` for total transport
-bytes and `maxDecodedUtf8Bytes` for decoded UTF-8 size.
+Mandatory BOM detection always examines the required prefix of up to three
+bytes and is independent of `maxEncodingPrescanBytes`. That option limits only
+the prefix retained for optional `<meta charset>` prescanning; zero disables
+meta prescanning without disabling UTF-8 or UTF-16 BOM recognition. It is not a
+total-input budget and later bytes do not make it throw. The implementation
+never retains more than 16,384 bytes for optional meta prescan, even when a
+larger value is configured.
+
+Decoding starts as soon as the higher-priority evidence is final: after a BOM,
+after BOM absence plus a recognized transport label, or after a complete early
+meta declaration. Otherwise the default is selected at the configured cap or
+EOF. Use `maxInputBytes` for total transport bytes and
+`maxDecodedUtf8Bytes` for decoded UTF-8 size.
 
 ## Cancellation and stream failures
 

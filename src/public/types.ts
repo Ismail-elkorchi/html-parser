@@ -152,15 +152,15 @@ export interface ParseFragmentOptions extends Omit<ParseOptions, "sourceRetentio
   readonly hasFormAncestor?: boolean;
 }
 
-/** Parse limits for byte streams, including bounded encoding-prescan retention. */
+/** Parse limits for byte streams, including bounded optional meta-prescan retention. */
 export interface ParseStreamBudgetOptions extends ParseBudgetOptions {
-  /** Transport bytes retained for encoding prescan; zero disables prescan retention. */
+  /** Bytes retained for optional meta-encoding prescan; mandatory BOM detection is independent. */
   readonly maxEncodingPrescanBytes?: number;
 }
 
 /** Options accepted by full-document byte-stream parsing. */
 export interface ParseStreamOptions extends Omit<ParseBytesOptions, "budgets"> {
-  /** Parse and stream-prescan resource limits. */
+  /** Parse and optional stream meta-prescan resource limits. */
   readonly budgets?: ParseStreamBudgetOptions;
 }
 
@@ -170,6 +170,7 @@ export type TokenizeByteStreamEagerBudgetOptions = Pick<
   | "maxInputBytes"
   | "maxEncodingPrescanBytes"
   | "maxDecodedUtf8Bytes"
+  | "maxSteps"
   | "maxParseErrors"
   | "maxAttributesPerElement"
   | "maxAttributeBytes"
@@ -376,7 +377,7 @@ export interface TraceBudgetEvent {
   readonly status: "ok" | "exceeded";
 }
 
-/** Byte-stream consumption and encoding-prescan retention metrics. */
+/** Byte-stream consumption and optional meta-prescan retention metrics. */
 export interface TraceStreamEvent {
   /** One-based event order within this parse. */
   readonly seq: number;
@@ -384,9 +385,9 @@ export interface TraceStreamEvent {
   readonly kind: "stream";
   /** Total transport bytes read through EOF. */
   readonly bytesRead: number;
-  /** Maximum transport bytes retained simultaneously for encoding prescan. */
+  /** Maximum transport bytes retained simultaneously for optional meta prescan. */
   readonly encodingPrescanBytes: number;
-  /** Effective prescan retention cap after the implementation maximum is applied. */
+  /** Effective optional meta-prescan cap after the implementation maximum is applied. */
   readonly encodingPrescanLimitBytes: number;
 }
 
@@ -429,9 +430,9 @@ export interface TraceSummary {
   readonly decodedUtf8Bytes: number;
   /** Total stream transport bytes, or null for non-stream input. */
   readonly bytesRead: number | null;
-  /** Stream encoding-prescan high-water bytes, or null for non-stream input. */
+  /** Optional stream meta-prescan high-water bytes, or null for non-stream input. */
   readonly encodingPrescanBytes: number | null;
-  /** Effective stream encoding-prescan cap, or null for non-stream input. */
+  /** Effective optional stream meta-prescan cap, or null for non-stream input. */
   readonly encodingPrescanLimitBytes: number | null;
   /** Total observed event count, whether or not events were retained. */
   readonly eventCount: number;
@@ -577,6 +578,9 @@ export type HtmlNode =
   | ProcessingInstructionNode
   | DoctypeNode;
 
+/** Complete node accepted as a standalone serialization input. */
+export type SerializableNode = Exclude<HtmlNode, TemplateContentNode>;
+
 /** Callback invoked for a node and its zero-based traversal depth. */
 export type NodeVisitor = (node: HtmlNode, depth: number) => void;
 /** Callback invoked for an element and its zero-based traversal depth. */
@@ -598,7 +602,7 @@ export interface DocumentTree {
   readonly trace?: TraceResult;
 }
 
-/** Successful full-document parser resource observations. */
+/** Successful document or fragment parser resource observations. */
 export interface ParseResourceUsage {
   /** UTF-8 bytes for text input; supplied transport bytes for byte/stream input. */
   readonly inputBytes: number;
@@ -618,7 +622,7 @@ export interface ParseResourceUsage {
   readonly attributes: number;
   /** UTF-8 bytes in attempted attribute names and decoded values. */
   readonly attributeUtf8Bytes: number;
-  /** Stream encoding-prescan retained-byte high-water mark; zero otherwise. */
+  /** Optional stream meta-prescan retained-byte high-water mark; zero otherwise. */
   readonly encodingPrescanBytes: number;
   /** Observable trace events emitted; zero when tracing and observation are disabled. */
   readonly traceEvents: number;
@@ -634,8 +638,8 @@ export interface ParseEncodingMetadata {
   readonly source: "already-decoded" | "bom" | "transport" | "meta" | "default";
 }
 
-/** Deterministic metadata for one full-document parse. */
-export interface ParsedDocumentMetadata {
+/** Deterministic metadata for one document or fragment parse. */
+export interface ParseMetadata {
   /** Public input variant used for this parse. */
   readonly inputKind: "text" | "bytes" | "stream";
   /** Bytes supplied to a byte/stream API, or null for already-decoded text. */
@@ -653,7 +657,7 @@ export interface ParsedDocument {
   /** Exact decoded input when `sourceRetention: "text"`; otherwise null. */
   readonly sourceText: string | null;
   /** Input, encoding, and resource evidence from this parse. */
-  readonly metadata: ParsedDocumentMetadata;
+  readonly metadata: ParseMetadata;
 }
 
 /** Immutable root returned by fragment parsing. */
@@ -676,6 +680,54 @@ export interface FragmentTree {
   readonly errors: readonly ParseError[];
   /** Retained trace when tracing was requested. */
   readonly trace?: TraceResult;
+}
+
+/** Canonical result returned by fragment parsing. */
+export interface ParsedFragment {
+  /** Parsed fragment tree. */
+  readonly tree: FragmentTree;
+  /** Input and successful resource evidence from this parse. */
+  readonly metadata: ParseMetadata;
+}
+
+/** Successful resource observations from eager byte-stream tokenization. */
+export interface TokenizationResourceUsage {
+  /** Transport bytes read through EOF. */
+  readonly inputBytes: number;
+  /** UTF-8 bytes produced by decoding. */
+  readonly decodedUtf8Bytes: number;
+  /** UTF-16 code units produced by decoding. */
+  readonly decodedCodeUnits: number;
+  /** Deterministic tokenizer checkpoints, or null when no step limit enabled counting. */
+  readonly steps: number | null;
+  /** Tokenizer diagnostics observed while producing tokens. */
+  readonly parseErrors: number;
+  /** Attempted start-tag attributes, including duplicates later discarded. */
+  readonly attributes: number;
+  /** UTF-8 bytes in attempted attribute names and decoded values. */
+  readonly attributeUtf8Bytes: number;
+  /** Optional meta-encoding prefix retained at its high-water mark. */
+  readonly encodingPrescanBytes: number;
+}
+
+/** Metadata for one eager byte-stream tokenization operation. */
+export interface TokenizeByteStreamEagerMetadata {
+  /** Public input variant used by this operation. */
+  readonly inputKind: "stream";
+  /** Transport bytes read through EOF. */
+  readonly transportByteLength: number;
+  /** Encoding decision from the owning decode pipeline. */
+  readonly encoding: ParseEncodingMetadata;
+  /** Successful deterministic resource observations. */
+  readonly resourceUsage: TokenizationResourceUsage;
+}
+
+/** Immutable eager byte-stream tokenization result. */
+export interface TokenizeByteStreamEagerResult {
+  /** Logical tokens in emission order, including EOF. */
+  readonly tokens: readonly Token[];
+  /** Decode and tokenizer resource evidence. */
+  readonly metadata: TokenizeByteStreamEagerMetadata;
 }
 
 /** One structural outline entry derived from a heading or sectioning element. */

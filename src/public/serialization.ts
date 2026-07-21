@@ -11,6 +11,7 @@ import {
   createOperationContext,
   normalizeSerializeOptions
 } from "./operation.ts";
+import { validateSerializableInput } from "./tree-validation.ts";
 
 import type { OperationContext } from "./operation.ts";
 import type {
@@ -19,6 +20,7 @@ import type {
   FragmentTree,
   HtmlNode,
   HtmlScriptingMode,
+  SerializableNode,
   SerializeOptions
 } from "./types.ts";
 
@@ -128,7 +130,7 @@ export function serializeNodes(
 
 /** Serializes a parsed tree or one complete node representation as HTML. */
 export function serialize(
-  tree: DocumentTree | FragmentTree | HtmlNode,
+  tree: DocumentTree | FragmentTree | SerializableNode,
   options: SerializeOptions = {}
 ): string {
   const startedAt = performance.now();
@@ -139,6 +141,7 @@ export function serialize(
     startedAt
   );
   operation.checkpoint();
+  validateSerializableInput(tree, operation);
   const scriptingMode = normalizedOptions.scriptingMode ??
     (tree.kind === "document" || tree.kind === "fragment" ? tree.scriptingMode : "inert");
   if (tree.kind === "document" || tree.kind === "fragment") {
