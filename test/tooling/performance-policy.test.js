@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   evaluatePerformance,
   PERFORMANCE_BASELINES,
+  PERFORMANCE_HISTORICAL_THRESHOLDS,
   PERFORMANCE_THRESHOLDS
 } from "../../scripts/qualification/performance-policy.mjs";
 
@@ -35,13 +36,13 @@ function revisions(candidateOverrides = {}, historicalOverrides = {}) {
   };
 }
 
-test("performance policy enforces only exact immediate baselines", () => {
+test("performance policy enforces immediate and historical parser horizons", () => {
   const result = evaluatePerformance(revisions());
   assert.equal(result.ok, true);
   assert.deepEqual(result.failures, []);
   assert.equal(result.comparisons.immediate["parse-medium"].enforced, true);
   assert.equal(result.comparisons.immediate["serialize-medium"].enforced, true);
-  assert.equal(result.comparisons.historical["parse-medium"].enforced, false);
+  assert.equal(result.comparisons.historical["parse-medium"].enforced, true);
   assert.deepEqual(result.comparisons.historical["serialize-medium"], {
     baseline: PERFORMANCE_BASELINES.historical.id,
     enforced: false,
@@ -50,11 +51,13 @@ test("performance policy enforces only exact immediate baselines", () => {
   });
 });
 
-test("historical recovery gaps remain report-only", () => {
+test("historical recovery gaps fail the release policy", () => {
   const result = evaluatePerformance(revisions({}, {
     "parse-medium": benchmark(1_000, 100)
   }));
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.includes("historical:parse-medium:throughput-ratio"));
+  assert.ok(result.failures.includes("historical:parse-medium:memory-ratio"));
   assert.ok(result.comparisons.historical["parse-medium"].throughputMedianRatio < 0.2);
   assert.ok(result.comparisons.historical["parse-medium"].memoryMedianRatio > 5);
 });
@@ -86,6 +89,12 @@ test("missing or invalid evidence fails closed", () => {
     minThroughputMedianRatio: 0.9,
     maxMemoryMedianRatio: 1.1,
     maxThroughputRobustSpreadFraction: 0.2,
+    maxMemoryRobustSpreadFraction: 0.15
+  });
+  assert.deepEqual(PERFORMANCE_HISTORICAL_THRESHOLDS, {
+    minThroughputMedianRatio: 0.8,
+    maxMemoryMedianRatio: 1.3,
+    maxThroughputRobustSpreadFraction: 0.25,
     maxMemoryRobustSpreadFraction: 0.15
   });
 });

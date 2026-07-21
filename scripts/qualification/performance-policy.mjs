@@ -5,6 +5,13 @@ export const PERFORMANCE_THRESHOLDS = Object.freeze({
   maxMemoryRobustSpreadFraction: 0.15
 });
 
+export const PERFORMANCE_HISTORICAL_THRESHOLDS = Object.freeze({
+  minThroughputMedianRatio: 0.8,
+  maxMemoryMedianRatio: 1.3,
+  maxThroughputRobustSpreadFraction: 0.25,
+  maxMemoryRobustSpreadFraction: 0.15
+});
+
 export const PERFORMANCE_BASELINES = Object.freeze({
   parser: Object.freeze({
     id: "independent-parser-base",
@@ -66,7 +73,7 @@ function compareBenchmark(candidate, baseline) {
   };
 }
 
-function thresholdFailures(name, comparison, thresholds) {
+function thresholdFailures(name, comparison, thresholds, prefix = "") {
   const failures = [];
   const checks = [
     ["throughput-ratio", comparison.throughputMedianRatio, (value) =>
@@ -84,13 +91,17 @@ function thresholdFailures(name, comparison, thresholds) {
   ];
   for (const [id, value, passes] of checks) {
     if (typeof value !== "number" || !Number.isFinite(value) || !passes(value)) {
-      failures.push(`${name}:${id}`);
+      failures.push(`${prefix}${name}:${id}`);
     }
   }
   return failures;
 }
 
-export function evaluatePerformance(revisions, thresholds = PERFORMANCE_THRESHOLDS) {
+export function evaluatePerformance(
+  revisions,
+  thresholds = PERFORMANCE_THRESHOLDS,
+  historicalThresholds = PERFORMANCE_HISTORICAL_THRESHOLDS
+) {
   const candidate = revisions.candidate?.benchmarks ?? {};
   const immediate = {};
   const historical = {};
@@ -107,11 +118,18 @@ export function evaluatePerformance(revisions, thresholds = PERFORMANCE_THRESHOL
 
   const historicalBenchmarks = revisions[PERFORMANCE_BASELINES.historical.id]?.benchmarks ?? {};
   for (const name of PERFORMANCE_BASELINES.historical.benchmarks) {
+    const comparison = compareBenchmark(candidate[name], historicalBenchmarks[name]);
     historical[name] = {
       baseline: PERFORMANCE_BASELINES.historical.id,
-      enforced: false,
-      ...compareBenchmark(candidate[name], historicalBenchmarks[name])
+      enforced: true,
+      ...comparison
     };
+    failures.push(...thresholdFailures(
+      name,
+      comparison,
+      historicalThresholds,
+      "historical:"
+    ));
   }
   for (const [name, reason] of Object.entries(PERFORMANCE_BASELINES.historical.excludedBenchmarks)) {
     historical[name] = {

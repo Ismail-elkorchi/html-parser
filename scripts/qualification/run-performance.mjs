@@ -8,6 +8,7 @@ import {
   evaluatePerformance,
   PERFORMANCE_BENCHMARK_NAMES,
   PERFORMANCE_BASELINES,
+  PERFORMANCE_HISTORICAL_THRESHOLDS,
   PERFORMANCE_THRESHOLDS
 } from "./performance-policy.mjs";
 
@@ -219,7 +220,10 @@ const report = {
     maxSemiSpaceSizeMb: 8
   }),
   baselinePolicy: PERFORMANCE_BASELINES,
-  thresholds: PERFORMANCE_THRESHOLDS,
+  thresholds: {
+    immediate: PERFORMANCE_THRESHOLDS,
+    historical: PERFORMANCE_HISTORICAL_THRESHOLDS
+  },
   revisions,
   ...evaluation
 };

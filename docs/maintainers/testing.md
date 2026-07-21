@@ -107,7 +107,10 @@ an oracle's behavior blindly.
   revision, serialization with the first corrected public serializer revision,
   and retains tagged `v0.1.1` parsing as an enforced recovery horizon. Samples
   are fresh-process and balanced across revisions; throughput and retained
-  result memory use the same metric for every horizon.
+  result memory use the same metric for every horizon. Current parser changes
+  must retain at least 80% of tagged throughput and no more than 130% of tagged
+  retained-result heap while also satisfying the tighter immediate-regression
+  thresholds.
 - `npm run qualification:resources` compares bounded and unbounded parser work
   in isolated processes and requires every limit to fail at its first
   unavailable unit while retaining less heap.

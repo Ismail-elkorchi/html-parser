@@ -15,7 +15,9 @@ All notable changes are documented in this file.
 - Reduce retained parse results by exposing namespace/local-name identity once,
   deriving serialized names, omitting uncaptured span markers, interning common
   strings, and removing duplicated public `prefix`, qualified-name, and outline
-  tag-name fields.
+  tag-name fields; add a direct safe-ASCII cursor path and enforce tagged
+  throughput and retained-heap recovery limits instead of merely reporting
+  them.
 - Qualify document parsing against all 1,698 applicable pinned WPT document
   cases plus 26 focused probes in all three browser engines, with exact
   per-browser outcome and known-difference fingerprints.
