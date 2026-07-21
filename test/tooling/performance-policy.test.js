@@ -7,7 +7,10 @@ import {
   PERFORMANCE_HISTORICAL_THRESHOLDS,
   PERFORMANCE_THRESHOLDS
 } from "../../scripts/qualification/performance-policy.mjs";
-import { PERFORMANCE_MEMORY_COLLECTION } from "../../scripts/qualification/performance-measurement.mjs";
+import {
+  PERFORMANCE_MEMORY_COLLECTION,
+  PERFORMANCE_RETAINED_RESULT_COUNTS
+} from "../../scripts/qualification/performance-measurement.mjs";
 
 function benchmark(throughputMedian = 100, memoryMedian = 1_000, spread = 0.05) {
   return {
@@ -40,9 +43,13 @@ function revisions(candidateOverrides = {}, historicalOverrides = {}) {
 
 test("performance policy enforces immediate and historical parser horizons", () => {
   assert.deepEqual(PERFORMANCE_MEMORY_COLLECTION, {
-    minimumFullGcPasses: 3,
-    maximumFullGcPasses: 8,
-    heapStabilityBytes: 8_192
+    fullGcPasses: 8
+  });
+  assert.deepEqual(PERFORMANCE_RETAINED_RESULT_COUNTS, {
+    "parse-medium": 32,
+    "parse-large": 8,
+    "serialize-medium": 128,
+    "serialize-large": 32
   });
   const result = evaluatePerformance(revisions());
   assert.equal(result.ok, true);

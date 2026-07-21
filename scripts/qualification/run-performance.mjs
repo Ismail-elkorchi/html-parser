@@ -11,7 +11,10 @@ import {
   PERFORMANCE_HISTORICAL_THRESHOLDS,
   PERFORMANCE_THRESHOLDS
 } from "./performance-policy.mjs";
-import { PERFORMANCE_MEMORY_COLLECTION } from "./performance-measurement.mjs";
+import {
+  PERFORMANCE_MEMORY_COLLECTION,
+  PERFORMANCE_RETAINED_RESULT_COUNTS
+} from "./performance-measurement.mjs";
 
 const RUNS = Number(process.env["HTML_PARSER_PERFORMANCE_RUNS"] ?? 12);
 if (!Number.isSafeInteger(RUNS) || RUNS < 3) {
@@ -220,8 +223,9 @@ const report = {
   throughputMetric:
     "input MiB per process CPU second; wall throughput is retained as diagnostic evidence",
   memoryMetric:
-    "fixed-point full-GC incremental heap per retained public result from an isolated post-warmup fixed-size cohort; caller-owned parse strings are materialized and serializer trees are prepared before the heap baseline",
+    "fixed-sequence full-GC incremental heap per retained public result from an isolated post-warmup cohort sized to amortize process-level parser initialization; caller-owned parse strings are materialized and serializer trees are prepared before the heap baseline",
   memoryCollection: PERFORMANCE_MEMORY_COLLECTION,
+  retainedResultCounts: PERFORMANCE_RETAINED_RESULT_COUNTS,
   runtimeHeapConfiguration: Object.freeze({
     maxOldSpaceSizeMb: 256,
     maxSemiSpaceSizeMb: 8

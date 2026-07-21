@@ -4,7 +4,10 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import { parseLongOptions } from "../lib/cli.mjs";
-import { stabilizedHeapUsed } from "./performance-measurement.mjs";
+import {
+  fullyCollectedHeapUsed,
+  PERFORMANCE_RETAINED_RESULT_COUNTS
+} from "./performance-measurement.mjs";
 
 const options = parseLongOptions(process.argv.slice(2), {
   "module-root": { type: "string", required: true },
@@ -26,7 +29,7 @@ const fixtures = Object.freeze([
     input: "<div><h1>Title</h1><p>alpha beta gamma</p><ul><li>a</li><li>b</li><li>c</li></ul></div>".repeat(200),
     warmupIterations: 20,
     iterations: 100,
-    retainedResultCount: 8
+    retainedResultCount: PERFORMANCE_RETAINED_RESULT_COUNTS["parse-medium"]
   }),
   Object.freeze({
     name: "parse-large",
@@ -34,7 +37,7 @@ const fixtures = Object.freeze([
     input: "<section><article><h2>x</h2><p>payload</p></article></section>".repeat(1200),
     warmupIterations: 10,
     iterations: 20,
-    retainedResultCount: 4
+    retainedResultCount: PERFORMANCE_RETAINED_RESULT_COUNTS["parse-large"]
   }),
   Object.freeze({
     name: "serialize-medium",
@@ -42,7 +45,7 @@ const fixtures = Object.freeze([
     input: "<main><h1>Title</h1><p data-value='a&amp;b'>alpha &lt; beta</p><svg><text>x</text></svg></main>".repeat(160),
     warmupIterations: 20,
     iterations: 720,
-    retainedResultCount: 128
+    retainedResultCount: PERFORMANCE_RETAINED_RESULT_COUNTS["serialize-medium"]
   }),
   Object.freeze({
     name: "serialize-large",
@@ -50,7 +53,7 @@ const fixtures = Object.freeze([
     input: "<section><template><article><h2>x</h2><p>payload</p></article></template></section>".repeat(900),
     warmupIterations: 10,
     iterations: 160,
-    retainedResultCount: 32
+    retainedResultCount: PERFORMANCE_RETAINED_RESULT_COUNTS["serialize-large"]
   })
 ]);
 
@@ -74,7 +77,7 @@ function measureThroughput(fixture) {
   for (let iteration = 0; iteration < fixture.warmupIterations; iteration += 1) {
     execute(fixture, prepared);
   }
-  stabilizedHeapUsed();
+  fullyCollectedHeapUsed();
   let result;
   const cpuBefore = process.cpuUsage();
   const started = performance.now();
@@ -94,7 +97,7 @@ const results = [];
 for (const fixture of fixtures) {
   if (selectedBenchmark !== undefined && fixture.name !== selectedBenchmark) continue;
   const throughput = measureThroughput(fixture);
-  stabilizedHeapUsed();
+  fullyCollectedHeapUsed();
   const retainedInputs = Array.from(
     { length: fixture.retainedResultCount },
     (_, index) => prepare(
@@ -102,12 +105,12 @@ for (const fixture of fixtures) {
       materializeOwnedInput(`${fixture.input}<!--retained-${String(index)}-->`)
     )
   );
-  const retainedHeapBaseline = stabilizedHeapUsed();
+  const retainedHeapBaseline = fullyCollectedHeapUsed();
   const retainedResults = new Array(fixture.retainedResultCount);
   for (let index = 0; index < retainedResults.length; index += 1) {
     retainedResults[index] = execute(fixture, retainedInputs[index]);
   }
-  const retainedHeap = stabilizedHeapUsed();
+  const retainedHeap = fullyCollectedHeapUsed();
   const retainedHeapDelta = Math.max(0, retainedHeap.heapUsed - retainedHeapBaseline.heapUsed);
   const totalBytes = fixture.input.length * fixture.iterations;
   const cpuMs = (throughput.cpu.user + throughput.cpu.system) / 1_000;
