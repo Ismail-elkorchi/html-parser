@@ -44,10 +44,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Public surface parity
-        if: matrix.node-version == 20
-        run: npm run test:public-surface
-
       - name: Test
         run: npm test
 
@@ -87,3 +83,7 @@ jobs:
 
       - name: Runtime agreement
         run: npm run qualification:runtime
+
+      - name: Public surface parity
+        if: matrix.name == 'linux'
+        run: npm run test:public-surface
