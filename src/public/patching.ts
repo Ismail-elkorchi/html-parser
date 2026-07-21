@@ -1,11 +1,14 @@
+import { isHtmlAttributeName } from "../internal/foundation/name-validation.ts";
+
 import { HtmlPatchPlanningError } from "./errors.ts";
 import {
   containsEffectiveRawTextEndTag,
   escapeHtmlAttribute,
   escapeHtmlText,
+  serializedAttributeName,
   serializesTextLiterally
 } from "./html-serialization-rules.ts";
-import { ownedChildNodes } from "./model.ts";
+import { asciiLowercase, ownedChildNodes } from "./model.ts";
 import {
   parsedDocumentRegistration,
   patchPlanBelongsTo,
@@ -27,8 +30,19 @@ import type {
 
 interface IndexedNodeSpan {
   readonly span?: Span;
-  readonly provenance: SpanProvenance;
+  readonly provenance: SpanProvenance | "none";
 }
+
+type UnknownRecord = Readonly<Record<PropertyKey, unknown>>;
+
+const EDIT_KEYS: Readonly<Record<Edit["kind"], ReadonlySet<PropertyKey>>> = Object.freeze({
+  removeNode: new Set(["kind", "target"]),
+  replaceText: new Set(["kind", "target", "value"]),
+  setAttr: new Set(["kind", "target", "name", "value"]),
+  removeAttr: new Set(["kind", "target", "name"]),
+  insertHtmlBefore: new Set(["kind", "target", "html"]),
+  insertHtmlAfter: new Set(["kind", "target", "html"])
+});
 
 function indexNodeSpans(nodes: readonly HtmlNode[], into: Map<NodeId, IndexedNodeSpan>): void {
   const stack = [...nodes].reverse();
@@ -38,7 +52,7 @@ function indexNodeSpans(nodes: readonly HtmlNode[], into: Map<NodeId, IndexedNod
       continue;
     }
     into.set(node.id, {
-      provenance: node.spanProvenance,
+      provenance: node.spanProvenance ?? "none",
       ...(node.kind !== "templateContent" && node.span ? { span: node.span } : {})
     });
 
@@ -235,6 +249,109 @@ function requireElementNode(nodeById: Map<NodeId, HtmlNode>, target: NodeId): Ex
   return node;
 }
 
+function invalidEdit(index: number, detail: string, target?: NodeId): never {
+  failPatchPlanning("INVALID_EDIT", {
+    ...(target === undefined ? {} : { target }),
+    detail: `edits[${String(index)}] ${detail}`
+  });
+}
+
+function editRecord(value: unknown, index: number): UnknownRecord {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return invalidEdit(index, "must be an edit object");
+  }
+  return value as UnknownRecord;
+}
+
+function editValue(record: UnknownRecord, key: PropertyKey, index: number): unknown {
+  try {
+    if (!Object.hasOwn(record, key)) {
+      return invalidEdit(index, `${String(key)} must be an own property`);
+    }
+  } catch {
+    return invalidEdit(index, `${String(key)} ownership must be inspectable`);
+  }
+  try {
+    return record[key];
+  } catch {
+    return invalidEdit(index, `${String(key)} must be readable`);
+  }
+}
+
+function editString(record: UnknownRecord, key: "name" | "value" | "html", index: number): string {
+  const value = editValue(record, key, index);
+  if (typeof value !== "string") return invalidEdit(index, `${key} must be a string`);
+  return value;
+}
+
+function normalizedAttributeName(
+  value: string,
+  index: number,
+  target: NodeId
+): string {
+  if (!isHtmlAttributeName(value)) {
+    return invalidEdit(index, "name must be a syntactically valid HTML attribute name", target);
+  }
+  // HTML tokenization ASCII-lowercases attribute syntax before namespace and
+  // SVG/MathML name adjustment, including attributes on foreign elements.
+  return asciiLowercase(value);
+}
+
+function normalizeEdit(
+  value: unknown,
+  index: number,
+  nodeById: Map<NodeId, HtmlNode>
+): Edit {
+  const record = editRecord(value, index);
+  const kind = editValue(record, "kind", index);
+  if (typeof kind !== "string" || !Object.hasOwn(EDIT_KEYS, kind)) {
+    return invalidEdit(index, "kind is not supported");
+  }
+  const typedKind = kind as Edit["kind"];
+  const allowedKeys = EDIT_KEYS[typedKind];
+  let keys: readonly PropertyKey[];
+  try {
+    keys = Reflect.ownKeys(record);
+  } catch {
+    return invalidEdit(index, "must expose readable own keys");
+  }
+  for (const key of keys) {
+    if (!allowedKeys.has(key)) return invalidEdit(index, `contains unsupported key ${String(key)}`);
+  }
+  const targetValue = editValue(record, "target", index);
+  if (!Number.isSafeInteger(targetValue) || (targetValue as number) < 1) {
+    return invalidEdit(index, "target must be a positive safe integer");
+  }
+  const target = targetValue as NodeId;
+
+  if (typedKind === "removeNode") return Object.freeze({ kind: typedKind, target });
+  if (typedKind === "replaceText") {
+    return Object.freeze({ kind: typedKind, target, value: editString(record, "value", index) });
+  }
+  if (typedKind === "insertHtmlBefore" || typedKind === "insertHtmlAfter") {
+    return Object.freeze({ kind: typedKind, target, html: editString(record, "html", index) });
+  }
+
+  requireElementNode(nodeById, target);
+  const name = normalizedAttributeName(editString(record, "name", index), index, target);
+  if (typedKind === "setAttr") {
+    return Object.freeze({
+      kind: typedKind,
+      target,
+      name,
+      value: editString(record, "value", index)
+    });
+  }
+  return Object.freeze({ kind: typedKind, target, name });
+}
+
+function matchingUnnamespacedAttribute(element: ElementNode, name: string) {
+  return element.attributes.find((attribute) =>
+    attribute.namespaceUri === null &&
+    asciiLowercase(attribute.localName) === name
+  );
+}
+
 function buildSetAttrReplacement(
   originalHtml: string,
   nodeById: Map<NodeId, HtmlNode>,
@@ -243,8 +360,9 @@ function buildSetAttrReplacement(
   sourceIndex: number
 ): PlannedReplacement {
   const element = requireElementNode(nodeById, edit.target);
-  const existing = element.attributes.find((entry) => entry.name === edit.name);
-  const rendered = `${edit.name}="${escapeHtmlAttribute(edit.value)}"`;
+  const existing = matchingUnnamespacedAttribute(element, edit.name);
+  const renderedName = existing === undefined ? edit.name : serializedAttributeName(existing);
+  const rendered = `${renderedName}="${escapeHtmlAttribute(edit.value)}"`;
 
   if (existing) {
     if (!existing.span) {
@@ -257,6 +375,17 @@ function buildSetAttrReplacement(
       end: existing.span.end,
       replacementHtml: rendered
     };
+  }
+
+  const serializedCollision = element.attributes.find((attribute) =>
+    attribute.namespaceUri !== null &&
+    asciiLowercase(serializedAttributeName(attribute)) === edit.name
+  );
+  if (serializedCollision !== undefined) {
+    failPatchPlanning("ATTRIBUTE_NAME_COLLISION", {
+      target: edit.target,
+      detail: edit.name
+    });
   }
 
   const elementSpan = requireNodeSpan(spanByNode, edit.target);
@@ -282,7 +411,7 @@ function buildRemoveAttrReplacement(
   sourceIndex: number
 ): PlannedReplacement {
   const element = requireElementNode(nodeById, edit.target);
-  const existing = element.attributes.find((entry) => entry.name === edit.name);
+  const existing = matchingUnnamespacedAttribute(element, edit.name);
   if (!existing) {
     failPatchPlanning("ATTRIBUTE_NOT_FOUND", { target: edit.target, detail: edit.name });
   }
@@ -397,6 +526,10 @@ export function computePatch(document: ParsedDocument, edits: readonly Edit[]): 
     });
   }
 
+  if (!Array.isArray(edits)) {
+    failPatchPlanning("INVALID_EDIT", { detail: "edits must be an array" });
+  }
+
   if (edits.length === 0) {
     const steps: readonly PatchStep[] = Object.freeze([
       Object.freeze({ kind: "slice", start: 0, end: originalHtml.length })
@@ -416,7 +549,22 @@ export function computePatch(document: ParsedDocument, edits: readonly Edit[]): 
   indexNodeSpans(document.tree.children, spanByNode);
   indexNodes(document.tree.children, nodeById, parentById);
 
-  const replacements = edits.map((edit, sourceIndex) =>
+  const normalizedEdits = new Array<Edit>(edits.length);
+  const attributeEdits = new Set<string>();
+  for (let index = 0; index < edits.length; index += 1) {
+    if (!Object.hasOwn(edits, index)) invalidEdit(index, "must be an edit object");
+    const edit = normalizeEdit(edits[index], index, nodeById);
+    normalizedEdits[index] = edit;
+    if (edit.kind === "setAttr" || edit.kind === "removeAttr") {
+      const key = `${String(edit.target)}\u0000${edit.name}`;
+      if (attributeEdits.has(key)) {
+        failPatchPlanning("CONFLICTING_EDITS", { target: edit.target, detail: edit.name });
+      }
+      attributeEdits.add(key);
+    }
+  }
+
+  const replacements = normalizedEdits.map((edit, sourceIndex) =>
     buildReplacement(originalHtml, nodeById, parentById, spanByNode, edit, sourceIndex)
   );
 

@@ -12,6 +12,7 @@ import type { OperationContext } from "./operation.ts";
 import type { ParseStreamBudgetOptions, TokenizeByteStreamEagerOptions } from "./types.ts";
 
 const DEFAULT_STREAM_ENCODING_PRESCAN_BYTES = 16_384;
+const ASCII_ONLY = /^[\u0000-\u007f]*$/;
 
 interface StreamEncodingSniff {
   readonly encoding: string;
@@ -69,6 +70,7 @@ function codePointUtf8ByteLength(codePoint: number): number {
 }
 
 export function utf8ByteLength(value: string, operation?: OperationContext): number {
+  if (operation?.interruptible !== true && ASCII_ONLY.test(value)) return value.length;
   let bytes = 0;
   let cursor = 0;
   while (cursor < value.length) {

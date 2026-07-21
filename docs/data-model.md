@@ -23,7 +23,7 @@ limits and do not imply that budgets were enabled.
 
 `HtmlNode` is a tagged union of:
 
-- `ElementNode`: namespace URI, prefix, local and qualified names, attributes,
+- `ElementNode`: namespace URI, local name, attributes,
   and children;
 - `TemplateContentNode`: the distinct document fragment owned by an HTML
   `template` element;
@@ -37,10 +37,12 @@ Every tree and node has a parser-assigned numeric `NodeId`. Results, nodes,
 attributes, spans, diagnostics, traces, and their arrays are frozen at runtime,
 matching their readonly TypeScript types.
 
-An element's identity is `(namespaceUri, localName)`. `tagName` is the
-qualified name. Attributes similarly retain namespace URI, prefix, local name,
-qualified name, and value. Use the exported HTML, SVG, MathML, XLink, XML, and
-XMLNS namespace constants instead of copying URI strings.
+An element's name is the exact `(namespaceUri, localName)` pair produced by
+tree construction. Attributes expose the same namespace/local-name identity;
+prefixes and qualified names are serialization details derived from the HTML
+parsing rules rather than duplicated on every retained node. Use the exported
+HTML, SVG, MathML, XLink, XML, and XMLNS namespace constants instead of copying
+URI strings.
 
 For an HTML `template`, `children` is empty and `templateContent` owns a
 `TemplateContentNode`. That fragment has its own `NodeId` and depth/resource
@@ -55,11 +57,13 @@ and system id. Empty strings are retained and differ from a missing value.
 
 With `captureSpans: true`, source-backed nodes and attributes may have a
 half-open `Span` measured in zero-based UTF-16 code units into the exact decoded
-input. `spanProvenance` is:
+input. `spanProvenance` is present only when capture was requested:
 
 - `"input"` when the span maps to source input;
-- `"inferred"` for a parser-created node without a source slice;
-- `"none"` when span capture was not available.
+- `"inferred"` for a parser-created node without a source slice.
+
+When `captureSpans` is absent or false, nodes omit both `span` and
+`spanProvenance` instead of storing redundant per-node markers.
 
 Source-aware patching additionally requires `sourceRetention: "text"`. See
 [modifying HTML](./modifying-html.md).

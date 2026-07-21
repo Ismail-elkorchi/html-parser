@@ -72,6 +72,13 @@ fragment cases, adversarial fragment chunks, and exact fingerprinted
 classifications. Corpus details and refresh constraints are in
 [corpora.md](./corpora.md).
 
+`npm run oracle:documents` runs every one of the 1,698 scripting-invariant
+document cases in the pinned WPT tree-construction corpus plus 26 focused
+product probes against Chromium, Firefox, and WebKit. The complete outcome and
+known-difference inventories are fingerprinted per pinned browser version; a
+browser update or any parser/browser result change requires an explicit
+baseline review.
+
 `npm run qualification:serialization` verifies the exact pinned WPT
 serialization inventory, calls `dist/mod.js#serialize` for every applicable
 expectation, requires the named positive round trips to remain structurally
@@ -98,7 +105,7 @@ an oracle's behavior blindly.
   report and gate, and release qualification invokes it directly. It compares
   parsing with the accepted independent-parser
   revision, serialization with the first corrected public serializer revision,
-  and retains tagged `v0.1.1` parsing as report-only recovery evidence. Samples
+  and retains tagged `v0.1.1` parsing as an enforced recovery horizon. Samples
   are fresh-process and balanced across revisions; throughput and retained
   result memory use the same metric for every horizon.
 - `npm run qualification:resources` compares bounded and unbounded parser work

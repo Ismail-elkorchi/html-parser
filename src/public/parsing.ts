@@ -160,8 +160,11 @@ function publicSpan(span: SourceSpan | null, captureSpans: boolean): Span | unde
   return Object.freeze({ start: span.startUtf16Offset, end: span.endUtf16Offset });
 }
 
-function spanProvenance(span: SourceSpan | null, captureSpans: boolean): SpanProvenance {
-  if (!captureSpans) return "none";
+function spanProvenance(
+  span: SourceSpan | null,
+  captureSpans: boolean
+): SpanProvenance | undefined {
+  if (!captureSpans) return undefined;
   return span === null ? "inferred" : "input";
 }
 
@@ -184,6 +187,7 @@ function attributes(
   element: HtmlTreeElement,
   model: HtmlTreeModel,
   captureSpans: boolean,
+  names: Map<string, string>,
   operation: OperationContext
 ): readonly Attribute[] {
   const sourceAttributes = model.attributesOf(element);
@@ -195,15 +199,24 @@ function attributes(
     const span = publicSpan(attribute.sourceSpan, captureSpans);
     result[index] = Object.freeze({
       namespaceUri: attribute.namespaceUri,
-      prefix: attribute.prefix,
-      localName: attribute.localName,
-      name: attribute.qualifiedName,
-      value: attribute.value,
+      localName: intern(names, attribute.localName),
+      value: internShort(names, attribute.value),
       ...(span === undefined ? {} : { span })
     });
     index += 1;
   }
   return Object.freeze(result);
+}
+
+function intern(values: Map<string, string>, value: string): string {
+  const retained = values.get(value);
+  if (retained !== undefined) return retained;
+  values.set(value, value);
+  return value;
+}
+
+function internShort(values: Map<string, string>, value: string): string {
+  return value.length <= 64 ? intern(values, value) : value;
 }
 
 function externalId(value: HtmlTreeDoctypeExternalId) {
@@ -266,63 +279,76 @@ function convertedChildren(
   return Object.freeze(result);
 }
 
+function finishPublicNode<T extends object>(
+  node: T,
+  provenance: SpanProvenance | undefined,
+  span: Span | undefined
+): Readonly<T> {
+  const mutable = node as T & { spanProvenance?: SpanProvenance; span?: Span };
+  if (provenance !== undefined) mutable.spanProvenance = provenance;
+  if (span !== undefined) mutable.span = span;
+  return Object.freeze(node);
+}
+
 function createPublicNode(
   source: ConversionSource,
   model: HtmlTreeModel,
   assigner: NodeIdAssigner,
   captureSpans: boolean,
+  names: Map<string, string>,
   directChildren: readonly HtmlNode[],
   templateContent: HtmlNode | undefined,
   operation: OperationContext
 ): HtmlNode {
   if (source.kind === "template-contents") {
-    return Object.freeze({
+    return finishPublicNode({
       id: assigner.next(),
-      kind: "templateContent",
-      children: directChildren,
-      spanProvenance: "inferred"
-    } satisfies TemplateContentNode);
+      kind: "templateContent" as const,
+      children: directChildren
+    } satisfies Omit<TemplateContentNode, "spanProvenance">, captureSpans ? "inferred" : undefined, undefined);
   }
   const span = publicSpan(source.sourceSpan, captureSpans);
   const provenance = spanProvenance(source.sourceSpan, captureSpans);
   if (source.kind === "text") {
-    return Object.freeze({
-      id: assigner.next(), kind: "text", value: source.data, spanProvenance: provenance,
-      ...(span === undefined ? {} : { span })
-    });
+    return finishPublicNode({
+      id: assigner.next(), kind: "text" as const, value: internShort(names, source.data)
+    }, provenance, span);
   }
   if (source.kind === "comment") {
-    return Object.freeze({
-      id: assigner.next(), kind: "comment", value: source.data, spanProvenance: provenance,
-      ...(span === undefined ? {} : { span })
-    });
+    return finishPublicNode({
+      id: assigner.next(), kind: "comment" as const, value: internShort(names, source.data)
+    }, provenance, span);
   }
   if (source.kind === "processing-instruction") {
-    return Object.freeze({
-      id: assigner.next(), kind: "processingInstruction",
-      target: source.target, data: source.data, spanProvenance: provenance,
-      ...(span === undefined ? {} : { span })
-    });
+    return finishPublicNode({
+      id: assigner.next(), kind: "processingInstruction" as const,
+      target: source.target, data: source.data
+    }, provenance, span);
   }
   if (source.kind === "doctype") {
-    return Object.freeze({
-      id: assigner.next(), kind: "doctype", name: source.name,
-      externalId: externalId(source.externalId), spanProvenance: provenance,
-      ...(span === undefined ? {} : { span })
-    });
+    return finishPublicNode({
+      id: assigner.next(), kind: "doctype" as const, name: source.name,
+      externalId: externalId(source.externalId)
+    }, provenance, span);
   }
   if (templateContent !== undefined && templateContent.kind !== "templateContent") {
     failInternalState("PUBLIC_PARSER_TEMPLATE_CONTENT_KIND_MISMATCH");
   }
-  return Object.freeze({
-    id: assigner.next(), kind: "element",
-    namespaceUri: source.namespaceUri, prefix: source.prefix,
-    localName: source.localName, tagName: source.qualifiedName,
-    attributes: attributes(source, model, captureSpans, operation), children: directChildren,
-    ...(templateContent === undefined ? {} : { templateContent }),
-    spanProvenance: provenance,
-    ...(span === undefined ? {} : { span })
-  });
+  const element = {
+    id: assigner.next(), kind: "element" as const,
+    namespaceUri: source.namespaceUri, localName: intern(names, source.localName),
+    attributes: attributes(source, model, captureSpans, names, operation), children: directChildren
+  } as {
+    id: NodeId;
+    kind: "element";
+    namespaceUri: HtmlTreeElement["namespaceUri"];
+    localName: string;
+    attributes: readonly Attribute[];
+    children: readonly HtmlNode[];
+    templateContent?: TemplateContentNode;
+  };
+  if (templateContent !== undefined) element.templateContent = templateContent;
+  return finishPublicNode(element, provenance, span);
 }
 
 function convertReadySource(
@@ -331,6 +357,7 @@ function convertReadySource(
   converted: readonly (HtmlNode | undefined)[],
   assigner: NodeIdAssigner,
   captureSpans: boolean,
+  names: Map<string, string>,
   operation: OperationContext
 ): HtmlNode {
   const directChildren = source.kind === "template-contents" ||
@@ -345,6 +372,7 @@ function convertReadySource(
     model,
     assigner,
     captureSpans,
+    names,
     directChildren,
     templateContent,
     operation
@@ -356,6 +384,7 @@ function convertRecursively(
   model: HtmlTreeModel,
   assigner: NodeIdAssigner,
   captureSpans: boolean,
+  names: Map<string, string>,
   operation: OperationContext
 ): HtmlNode {
   if (operation.interruptible) operation.checkpoint();
@@ -367,6 +396,7 @@ function convertRecursively(
       model,
       assigner,
       captureSpans,
+      names,
       operation
     );
   } else if (source.kind === "element" || source.kind === "template-contents") {
@@ -380,6 +410,7 @@ function convertRecursively(
           model,
           assigner,
           captureSpans,
+          names,
           operation
         );
         index += 1;
@@ -392,6 +423,7 @@ function convertRecursively(
     model,
     assigner,
     captureSpans,
+    names,
     directChildren,
     templateContent,
     operation
@@ -407,10 +439,11 @@ function convertNodes(
   operation: OperationContext
 ): readonly HtmlNode[] {
   const converted: Array<HtmlNode | undefined> = [];
+  const names = new Map<string, string>();
   const roots = children(root, model, operation);
   if (maxDepth <= 128) {
     return Object.freeze(roots.map((source) =>
-      convertRecursively(source, model, assigner, captureSpans, operation)
+      convertRecursively(source, model, assigner, captureSpans, names, operation)
     ));
   } else {
     const sources: ConversionSource[] = [];
@@ -438,6 +471,7 @@ function convertNodes(
           converted,
           assigner,
           captureSpans,
+          names,
           operation
         );
       }
@@ -523,6 +557,7 @@ function parseDocumentOperation(
     result = runHtmlEngine({
       inputChunks: [html],
       retainNodeSpans: captureSpans,
+      trackSteps: false,
       parser: { kind: "document", scriptingMode: "inert" },
       limits: engineLimits(budgets),
       ...(options.signal === undefined ? {} : { signal: options.signal }),
@@ -727,6 +762,7 @@ export function parseFragment(
     result = runHtmlEngine({
       inputChunks: [html],
       retainNodeSpans: normalized.captureSpans ?? false,
+      trackSteps: false,
       parser: {
         kind: "fragment",
         scriptingMode: normalized.scriptingMode ?? "inert",
@@ -882,7 +918,7 @@ export async function tokenizeByteStreamEager(
       tokens.push(publicToken(token, operation));
       return token.kind !== "start-tag" || token.selfClosing;
     }
-  });
+  }, { reuseInputCharacters: true });
   try {
     tokenizer.write(decoded.text);
     tokenizer.close();

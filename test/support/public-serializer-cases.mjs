@@ -12,7 +12,7 @@ const DATA = "<&>\u00a0";
 let nextNodeId = 1;
 
 function text(value) {
-  return { id: nextNodeId++, kind: "text", value, spanProvenance: "none" };
+  return { id: nextNodeId++, kind: "text", value };
 }
 
 function element(namespaceUri, localName, children = [], attributes = []) {
@@ -20,17 +20,14 @@ function element(namespaceUri, localName, children = [], attributes = []) {
     id: nextNodeId++,
     kind: "element",
     namespaceUri,
-    prefix: null,
     localName,
-    tagName: localName,
     attributes,
-    children,
-    spanProvenance: "none"
+    children
   };
 }
 
-function attribute(namespaceUri, prefix, localName, name, value) {
-  return { namespaceUri, prefix, localName, name, value };
+function attribute(namespaceUri, localName, value) {
+  return { namespaceUri, localName, value };
 }
 
 function htmlElement(localName, children = [], attributes = []) {
@@ -83,29 +80,24 @@ export const PUBLIC_SERIALIZER_CASES = Object.freeze([
   {
     id: "attributes/ordinary",
     input: () => htmlElement("p", [], [
-      attribute(null, null, "data-x", "ignored-qualified-name", `${DATA}"`)
+      attribute(null, "data-x", `${DATA}"`)
     ]),
     expected: "<p data-x=\"&lt;&amp;&gt;&nbsp;&quot;\"></p>"
   },
   {
     id: "attributes/known-namespaces",
     input: () => element(SVG_NAMESPACE_URI, "svg", [], [
-      attribute(XML_NAMESPACE_URI, "wrong", "lang", "wrong:lang", "en"),
-      attribute(XMLNS_NAMESPACE_URI, "wrong", "svg", "wrong:svg", "urn:svg"),
-      attribute(XMLNS_NAMESPACE_URI, null, "xmlns", "wrong", "urn:default"),
-      attribute(XLINK_NAMESPACE_URI, "wrong", "href", "wrong:href", "icon")
+      attribute(XML_NAMESPACE_URI, "lang", "en"),
+      attribute(XMLNS_NAMESPACE_URI, "svg", "urn:svg"),
+      attribute(XMLNS_NAMESPACE_URI, "xmlns", "urn:default"),
+      attribute(XLINK_NAMESPACE_URI, "href", "icon")
     ]),
     expected: "<svg xml:lang=\"en\" xmlns:svg=\"urn:svg\" xmlns=\"urn:default\" xlink:href=\"icon\"></svg>"
   },
   {
     id: "names/known-element-namespace",
-    input: () => ({ ...element(SVG_NAMESPACE_URI, "linearGradient"), tagName: "wrong:gradient" }),
+    input: () => element(SVG_NAMESPACE_URI, "linearGradient"),
     expected: "<linearGradient></linearGradient>"
-  },
-  {
-    id: "names/other-namespace",
-    input: () => ({ ...element("urn:example", "widget"), tagName: "x:widget" }),
-    expected: "<x:widget></x:widget>"
   },
   ...["area", "base", "basefont", "bgsound", "br", "col", "embed", "frame", "hr", "img",
     "input", "keygen", "link", "meta", "param", "source", "track", "wbr"].map(voidCase),
@@ -147,8 +139,7 @@ export const PUBLIC_SERIALIZER_CASES = Object.freeze([
     input: () => ({
       id: nextNodeId++,
       kind: "comment",
-      value: "data",
-      spanProvenance: "none"
+      value: "data"
     }),
     expected: "<!--data-->"
   },
@@ -158,8 +149,7 @@ export const PUBLIC_SERIALIZER_CASES = Object.freeze([
       id: nextNodeId++,
       kind: "processingInstruction",
       target: "build",
-      data: "release",
-      spanProvenance: "none"
+      data: "release"
     }),
     expected: "<?build release?>"
   },
@@ -169,8 +159,7 @@ export const PUBLIC_SERIALIZER_CASES = Object.freeze([
       id: nextNodeId++,
       kind: "doctype",
       name: "html",
-      externalId: { kind: "public", publicId: "pub", systemId: "sys" },
-      spanProvenance: "none"
+      externalId: { kind: "public", publicId: "pub", systemId: "sys" }
     }),
     expected: "<!DOCTYPE html PUBLIC \"pub\" \"sys\">"
   }

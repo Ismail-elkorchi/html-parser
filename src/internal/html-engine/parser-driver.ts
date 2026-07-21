@@ -1,3 +1,5 @@
+import { isXmlLocalName } from "../foundation/name-validation.ts";
+
 import { fragmentTokenizerMode } from "./fragment-context.ts";
 import {
   HTML_NAMESPACE,
@@ -113,8 +115,8 @@ function validateFragmentAttribute(value: unknown, index: number): HtmlFragmentC
   if (prefix !== null && typeof prefix !== "string") {
     throw new EngineConfigurationError(`${option}.prefix`, "must be a string or null");
   }
-  if (typeof localName !== "string" || localName.length === 0) {
-    throw new EngineConfigurationError(`${option}.localName`, "must be a non-empty string");
+  if (typeof localName !== "string" || !isXmlLocalName(localName)) {
+    throw new EngineConfigurationError(`${option}.localName`, "must be a valid local name");
   }
   if (typeof qualifiedName !== "string" || qualifiedName.length === 0) {
     throw new EngineConfigurationError(`${option}.qualifiedName`, "must be a non-empty string");
@@ -148,8 +150,8 @@ function validateFragmentContext(value: unknown): HtmlFragmentContext {
     throw new EngineConfigurationError(`${option}.namespaceUri`, "must be an HTML, SVG, or MathML namespace");
   }
   const localName = value["localName"];
-  if (typeof localName !== "string" || localName.length === 0) {
-    throw new EngineConfigurationError(`${option}.localName`, "must be a non-empty string");
+  if (typeof localName !== "string" || !isXmlLocalName(localName)) {
+    throw new EngineConfigurationError(`${option}.localName`, "must be an XML local name");
   }
   const rawAttributes = value["attributes"] ?? [];
   if (!Array.isArray(rawAttributes)) {
@@ -261,7 +263,7 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
   assertAllowedKeys(
     record,
     new Set([
-      "inputChunks", "parser", "observer", "retainNodeSpans", "limits", "signal", "now", "startedAt"
+      "inputChunks", "parser", "observer", "retainNodeSpans", "trackSteps", "limits", "signal", "now", "startedAt"
     ]),
     "options"
   );
@@ -271,11 +273,15 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
   if (options.retainNodeSpans !== undefined && typeof options.retainNodeSpans !== "boolean") {
     throw new EngineConfigurationError("options.retainNodeSpans", "must be a boolean");
   }
+  if (options.trackSteps !== undefined && typeof options.trackSteps !== "boolean") {
+    throw new EngineConfigurationError("options.trackSteps", "must be a boolean");
+  }
   const resourceOptions: EngineResourceGuardOptions = {
     ...(options.limits === undefined ? {} : { limits: options.limits }),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.now === undefined ? {} : { now: options.now }),
-    ...(options.startedAt === undefined ? {} : { startedAt: options.startedAt })
+    ...(options.startedAt === undefined ? {} : { startedAt: options.startedAt }),
+    ...(options.trackSteps === undefined ? {} : { trackSteps: options.trackSteps })
   };
   const resources = createEngineResourceGuard(resourceOptions);
   const parseErrors: EngineParseError[] = [];
@@ -305,6 +311,7 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
       ? { initialState: fragmentTokenizerMode(parser.context, parser.scriptingMode) }
       : {}),
     protectTokenObservations: observer?.onToken !== undefined,
+    reuseInputCharacters: options.trackSteps === false,
     observer: {
       ...(observer?.onToken === undefined
         ? {}

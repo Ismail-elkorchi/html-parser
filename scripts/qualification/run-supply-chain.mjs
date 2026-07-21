@@ -73,12 +73,20 @@ const characterReferenceCheck = run(process.execPath, [
 ]);
 const notices = await readFile("THIRD_PARTY_NOTICES.md", "utf8");
 const publishWorkflow = await readFile(".github/workflows/publish.yml", "utf8");
-const manualPublishWorkflow = await readFile(".github/workflows/publish-manual.yml", "utf8");
 const provenance = {
-  npm: publishWorkflow.includes("npm publish --provenance") &&
-    manualPublishWorkflow.includes("npm publish --provenance"),
-  jsr: publishWorkflow.includes("jsr publish --allow-dirty --provenance") &&
-    manualPublishWorkflow.includes("jsr publish --allow-dirty --provenance")
+  npm: publishWorkflow.includes("npm publish --provenance"),
+  jsr: publishWorkflow.includes("jsr publish --allow-dirty --provenance")
+};
+const publicationBoundary = {
+  releaseOnly: publishWorkflow.includes("release:") &&
+    !publishWorkflow.includes("workflow_dispatch:"),
+  currentMainOnly: publishWorkflow.includes('git rev-parse origin/main') &&
+    publishWorkflow.includes('Release tag must identify the current main commit'),
+  exactCheckout: publishWorkflow.includes('test "$(git rev-parse HEAD)" = "${QUALIFIED_COMMIT}"'),
+  fullQualification: publishWorkflow.includes("npm run qualification:release"),
+  browsersInstalled: publishWorkflow.includes(
+    "npx playwright install --with-deps chromium firefox webkit"
+  )
 };
 const noticeCoverage = {
   wpt: notices.includes("web-platform-tests") || notices.includes("WPT"),
@@ -114,12 +122,15 @@ const report = {
     output: characterReferenceCheck.stdout.trim()
   },
   provenance,
+  publicationBoundary,
   noticeCoverage
 };
 const ok = runtimeDependencies.length === 0 && lockedRuntimeDependencies.length === 0 &&
   auditClean && sbomValid && bareImports.length === 0 &&
   report.characterReferences.exactGeneratedData &&
-  Object.values(provenance).every(Boolean) && Object.values(noticeCoverage).every(Boolean);
+  Object.values(provenance).every(Boolean) &&
+  Object.values(publicationBoundary).every(Boolean) &&
+  Object.values(noticeCoverage).every(Boolean);
 await writeJson("reports/supply-chain.json", { ...report, ok });
 console.log(JSON.stringify({ ...report, ok }, null, 2));
 if (!ok) process.exitCode = 1;

@@ -16,7 +16,7 @@ function fixtureAttributeName(attribute) {
   if (attribute.namespaceUri === XLINK_NAMESPACE_URI) return `xlink ${attribute.localName}`;
   if (attribute.namespaceUri === XML_NAMESPACE_URI) return `xml ${attribute.localName}`;
   if (attribute.namespaceUri === XMLNS_NAMESPACE_URI) return `xmlns ${attribute.localName}`;
-  return attribute.name;
+  return attribute.localName;
 }
 
 function quote(value) {

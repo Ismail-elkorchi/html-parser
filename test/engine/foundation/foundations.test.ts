@@ -227,6 +227,28 @@ void test("every foundation resource counter enforces zero and exact boundaries"
   );
 });
 
+void test("production resource accounting can omit the private step metric", () => {
+  const resources = createEngineResourceGuard({ trackSteps: false });
+  resources.checkpoint();
+  resources.reserveNodeAtDepth(2);
+  resources.reserveParseError();
+  const attributes = resources.beginStartTag();
+  attributes.beginAttribute();
+  attributes.appendCodePoint("é");
+  assert.deepEqual(resources.snapshot(), {
+    steps: 0,
+    nodes: 1,
+    maxDepth: 2,
+    parseErrors: 1,
+    attributes: 1,
+    attributeUtf8Bytes: 2
+  });
+  assert.throws(
+    () => createEngineResourceGuard({ trackSteps: false, limits: { maxSteps: 1 } }),
+    (error) => error instanceof EngineConfigurationError
+  );
+});
+
 void test("configuration, abort, deadlines, and observers stop before extra work", () => {
   assert.throws(
     () => createEngineResourceGuard({ limits: { maxSteps: Number.NaN } }),

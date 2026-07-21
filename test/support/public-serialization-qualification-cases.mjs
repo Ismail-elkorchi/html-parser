@@ -63,18 +63,17 @@ const element = (
 
 function publicNode(descriptor, ids) {
   if (descriptor.type === "text") {
-    return { id: ids.next++, kind: "text", value: descriptor.value, spanProvenance: "none" };
+    return { id: ids.next++, kind: "text", value: descriptor.value };
   }
   if (descriptor.type === "comment") {
-    return { id: ids.next++, kind: "comment", value: descriptor.value, spanProvenance: "none" };
+    return { id: ids.next++, kind: "comment", value: descriptor.value };
   }
   if (descriptor.type === "processingInstruction") {
     return {
       id: ids.next++,
       kind: "processingInstruction",
       target: descriptor.target,
-      data: descriptor.data,
-      spanProvenance: "none"
+      data: descriptor.data
     };
   }
   if (descriptor.type === "doctype") {
@@ -82,28 +81,20 @@ function publicNode(descriptor, ids) {
       id: ids.next++,
       kind: "doctype",
       name: descriptor.name,
-      externalId: descriptor.externalId,
-      spanProvenance: "none"
+      externalId: descriptor.externalId
     };
   }
   const node = {
     id: ids.next++,
     kind: "element",
     namespaceUri: descriptor.namespaceUri,
-    prefix: descriptor.qualifiedName.includes(":")
-      ? descriptor.qualifiedName.slice(0, descriptor.qualifiedName.indexOf(":"))
-      : null,
     localName: descriptor.localName,
-    tagName: descriptor.qualifiedName,
     attributes: descriptor.attributes.map((entry) => ({
       namespaceUri: entry.namespaceUri,
-      prefix: entry.prefix,
       localName: entry.localName,
-      name: entry.qualifiedName,
       value: entry.value
     })),
-    children: descriptor.children.map((child) => publicNode(child, ids)),
-    spanProvenance: "none"
+    children: descriptor.children.map((child) => publicNode(child, ids))
   };
   if (descriptor.templateChildren !== undefined) {
     node.templateContent = {

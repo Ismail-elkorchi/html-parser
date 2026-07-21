@@ -4,6 +4,25 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Validate the complete runtime edit shape in source patching, normalize HTML
+  attribute identity across HTML and foreign elements, reject ambiguous
+  namespace collisions and conflicting edits, and prevent malformed or
+  duplicate attribute syntax.
+- Validate fragment element and attribute local names against the XML local-name
+  grammar without trimming, normalize HTML-context attribute identity before
+  duplicate detection, and reject spaces, controls, separators, and invalid
+  name starts.
+- Reduce retained parse results by exposing namespace/local-name identity once,
+  deriving serialized names, omitting uncaptured span markers, interning common
+  strings, and removing duplicated public `prefix`, qualified-name, and outline
+  tag-name fields.
+- Qualify document parsing against all 1,698 applicable pinned WPT document
+  cases plus 26 focused probes in all three browser engines, with exact
+  per-browser outcome and known-difference fingerprints.
+- Restrict registry publication to a release tag on the exact current `main`
+  commit and rerun the complete browser, fuzz, mutation, resource, supply-chain,
+  package, runtime, and performance qualification on the published SHA; remove
+  the arbitrary-ref manual publication workflow.
 - Replace staged parser evidence and score-based evaluation wrappers with one
   direct test/qualification command surface; make fixture refreshes
   transactional, package checks exercise the installed tarball, mutation run

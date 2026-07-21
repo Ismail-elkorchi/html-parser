@@ -161,7 +161,7 @@ function accessibleNameFallback(
   if (!options.includeAccessibleNameFallback) {
     return undefined;
   }
-  const tagName = node.tagName.toLowerCase();
+  const tagName = node.localName.toLowerCase();
   if (tagName !== "input") {
     return undefined;
   }
@@ -862,7 +862,7 @@ function* iterateVisibleExtractionChunks(
     if (node.kind !== "element" || shouldSkipHiddenSubtree(node, options)) {
       continue;
     }
-    const tagName = node.tagName.toLowerCase();
+    const tagName = node.localName.toLowerCase();
     if (VISIBLE_TEXT_SKIP_TAGS.has(tagName)) {
       continue;
     }
@@ -953,7 +953,7 @@ function* iterateVisibleExtractionChunks(
       });
       let seenTableCell = false;
       for (const child of node.children) {
-        const childTagName = child.kind === "element" ? child.tagName.toLowerCase() : "";
+        const childTagName = child.kind === "element" ? child.localName.toLowerCase() : "";
         if ((childTagName === "td" || childTagName === "th") && seenTableCell) {
           actions.push({
             kind: "append",

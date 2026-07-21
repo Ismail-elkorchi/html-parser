@@ -1,22 +1,18 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 import { chromium, firefox, webkit } from "playwright";
 
 import { parse } from "../../dist/mod.js";
+import { parseTreeDatFixtures } from "../../test/support/tree-dat.mjs";
+import { verifyWptTreeCorpus } from "../../test/support/wpt-tree-corpus.mjs";
 import { writeJson } from "../lib/report.mjs";
 
-const CASES = Object.freeze([
-  {
-    id: "entities",
-    html: "<p title='&notit;'>&amp;&#x1f600;&notin;</p>",
-    acceptedBrowserTrees: {
-      chromium: {
-        publicSha256: "63a15bef825528331a1919ea51f47b4ba4e323317ba63223ff8b6a7beb4e5894",
-        browserSha256: "2340ee2fe185815809fca40512a6956b86013d7115a933b7924729bcf2b64263",
-        reason: "Chromium 149 consumes the semicolonless not match before an ASCII letter in an attribute; the current named-character-reference algorithm requires the literal &notit; value"
-      }
-    }
-  },
+const BASELINE_PATH = "test/fixtures/qualification/document-browser-baseline.json";
+
+const SUPPLEMENTAL_CASES = Object.freeze([
+  { id: "entities", html: "<p title='&notit;'>&amp;&#x1f600;&notin;</p>" },
   { id: "optional-tags", html: "<ul><li>a<li>b</ul><p>x<p>y" },
   { id: "comment-and-doctype", html: "<!doctype html><!--a--><p>b" },
   { id: "reconstruction-after-block", html: "<p><b>one<div>two</b>three" },
@@ -34,28 +30,8 @@ const CASES = Object.freeze([
   { id: "template-table", html: "<!doctype html><template><table><tr><td>x</template><p>y" },
   { id: "template-column-group", html: "<!doctype html><template><col>Hello</template>" },
   { id: "template-body-attributes", html: "<!doctype html><body data=kept><template><body data=ignored></template>" },
-  {
-    id: "relaxed-select",
-    html: "<!doctype html><select><div>x<option>a<select><option>b",
-    acceptedBrowserTrees: {
-      firefox: {
-        publicSha256: "e950f95225e1683318230ae941f94b4d2052282b4b8bed4cf4542ba4abfc88c3",
-        browserSha256: "dc41b5a343e78d2bcb7644bcd63cf137b0b69500a9580e759c34383acfc78e6e",
-        reason: "the bundled Firefox parser predates the relaxed-select tree-construction change"
-      }
-    }
-  },
-  {
-    id: "selectedcontent-option-clone",
-    html: "<!doctype html><select><button><selectedcontent></button><option>X<option selected><b>Y</b>",
-    acceptedBrowserTrees: {
-      firefox: {
-        publicSha256: "b6cbe1f823ae2ceeaaed5c47c04b5e82cfe912796314fe7c9498592a87aa86bb",
-        browserSha256: "9a072e51114310c7947704a9be9c137152021b7a9dfbb18c0b02c6003f7b6b53",
-        reason: "the bundled Firefox parser predates selectedcontent parser construction"
-      }
-    }
-  },
+  { id: "relaxed-select", html: "<!doctype html><select><div>x<option>a<select><option>b" },
+  { id: "selectedcontent-option-clone", html: "<!doctype html><select><button><selectedcontent></button><option>X<option selected><b>Y</b>" },
   { id: "table-select", html: "<!doctype html><table><select><option>a</select></table>" },
   { id: "frameset", html: "<!doctype html><frameset cols=*><frame src=x></frameset></html>" },
   { id: "svg-adjustments", html: "<!doctype html><svg viewbox='0 0 1 1'><lineargradient xlink:href='#x'/></svg>" },
@@ -63,11 +39,17 @@ const CASES = Object.freeze([
   { id: "foreign-breakout", html: "<!doctype html><svg><g><table><tr><td>x</table>" },
   { id: "foreign-cdata", html: "<!doctype html><svg><g><![CDATA[x<y]]></g></svg>" }
 ]);
-const ENGINES = Object.freeze([
-  ["chromium", chromium],
-  ["firefox", firefox],
-  ["webkit", webkit]
-]);
+
+const AVAILABLE_ENGINES = Object.freeze({ chromium, firefox, webkit });
+const requestedEngines = (process.env["HTML_PARSER_BROWSER_ENGINES"] ?? "chromium,firefox,webkit")
+  .split(",")
+  .map((name) => name.trim())
+  .filter((name) => name.length > 0);
+const engines = requestedEngines.map((name) => {
+  const launcher = AVAILABLE_ENGINES[name];
+  if (launcher === undefined) throw new Error(`Unsupported browser engine: ${name}`);
+  return [name, launcher];
+});
 
 function sha256(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -101,13 +83,24 @@ function normalizePublicNode(node) {
   ];
 }
 
-function normalizePublic(html) {
-  return parse(html).tree.children.map(normalizePublicNode);
+async function wptDocumentCases(corpus) {
+  const cases = [];
+  for (const relativePath of corpus.fixtureFiles) {
+    const filePath = path.join(corpus.corpusRoot, relativePath);
+    const fixtureIdPath = path.relative(corpus.repositoryRoot, filePath).split(path.sep).join("/");
+    const fixtures = parseTreeDatFixtures(await readFile(filePath, "utf8"), fixtureIdPath);
+    for (const fixture of fixtures) {
+      if (fixture.fragmentContext === null && fixture.scripting === "both") {
+        cases.push(Object.freeze({ id: `wpt:${fixture.id}`, html: fixture.data }));
+      }
+    }
+  }
+  return cases;
 }
 
-async function normalizeBrowser(page, html) {
-  return page.evaluate((input) => {
-    const document = new globalThis.DOMParser().parseFromString(input, "text/html");
+async function normalizeBrowserBatch(page, batch) {
+  return page.evaluate((inputs) => inputs.map(({ id, html }) => {
+    const document = new globalThis.DOMParser().parseFromString(html, "text/html");
     const normalize = (node) => {
       if (node.nodeType === globalThis.Node.TEXT_NODE) return ["text", node.nodeValue ?? ""];
       if (node.nodeType === globalThis.Node.COMMENT_NODE) return ["comment", node.nodeValue ?? ""];
@@ -121,7 +114,10 @@ async function normalizeBrowser(page, html) {
       const attributes = Array.from(node.attributes)
         .map((attribute) => [attribute.namespaceURI, attribute.localName, attribute.value])
         .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
-      const parent = node.localName === "template" ? node.content : node;
+      const parent = node.namespaceURI === "http://www.w3.org/1999/xhtml" &&
+          node.localName === "template" && node.content !== undefined
+        ? node.content
+        : node;
       return [
         "element",
         node.namespaceURI,
@@ -130,45 +126,90 @@ async function normalizeBrowser(page, html) {
         Array.from(parent.childNodes).map(normalize)
       ];
     };
-    return Array.from(document.childNodes).map(normalize);
-  }, html);
+    return { id, tree: Array.from(document.childNodes).map(normalize) };
+  }), batch);
+}
+
+const corpus = await verifyWptTreeCorpus();
+const wptCases = await wptDocumentCases(corpus);
+const cases = [
+  ...wptCases,
+  ...SUPPLEMENTAL_CASES.map((entry) => ({ ...entry, id: `supplemental:${entry.id}` }))
+];
+const publicCases = cases.map((testCase) => {
+  const tree = parse(testCase.html).tree.children.map(normalizePublicNode);
+  return { ...testCase, publicTree: tree, publicSha256: sha256(tree) };
+});
+const baseline = JSON.parse(await readFile(BASELINE_PATH, "utf8"));
+if (baseline.schemaVersion !== 1 ||
+    baseline.corpusCommit !== corpus.manifest.commit ||
+    baseline.corpusCompositeSha256 !== corpus.compositeSha256 ||
+    baseline.cases?.total !== cases.length ||
+    baseline.cases?.wptScriptingInvariant !== wptCases.length ||
+    baseline.cases?.supplemental !== SUPPLEMENTAL_CASES.length ||
+    typeof baseline.engines !== "object" || baseline.engines === null) {
+  throw new Error("Document browser baseline does not match the pinned qualification inputs");
 }
 
 const results = [];
-for (const [name, launcher] of ENGINES) {
+for (const [name, launcher] of engines) {
   let browser;
   try {
     browser = await launcher.launch({ headless: true });
     const page = await browser.newPage();
-    const failures = [];
-    const acceptedDifferences = [];
-    const outcomes = [];
-    for (const testCase of CASES) {
-      const publicTree = normalizePublic(testCase.html);
-      const browserTree = await normalizeBrowser(page, testCase.html);
-      outcomes.push({ id: testCase.id, publicTree, browserTree });
-      if (JSON.stringify(publicTree) === JSON.stringify(browserTree)) continue;
-      const difference = {
-        id: testCase.id,
-        publicSha256: sha256(publicTree),
-        browserSha256: sha256(browserTree)
-      };
-      const accepted = testCase.acceptedBrowserTrees?.[name];
-      if (accepted?.publicSha256 === difference.publicSha256 &&
-          accepted.browserSha256 === difference.browserSha256) {
-        acceptedDifferences.push({ ...difference, reason: accepted.reason });
-      } else {
-        failures.push({ ...difference, publicTree, browserTree });
+    const browserTrees = new Map();
+    for (let start = 0; start < cases.length; start += 100) {
+      const batch = cases.slice(start, start + 100).map(({ id, html }) => ({ id, html }));
+      for (const outcome of await normalizeBrowserBatch(page, batch)) {
+        browserTrees.set(outcome.id, outcome.tree);
       }
     }
+    const failures = [];
+    const outcomes = [];
+    for (const testCase of publicCases) {
+      const browserTree = browserTrees.get(testCase.id);
+      if (browserTree === undefined) throw new Error(`Missing browser result for ${testCase.id}`);
+      const browserSha256 = sha256(browserTree);
+      outcomes.push([testCase.id, testCase.publicSha256, browserSha256]);
+      if (testCase.publicSha256 === browserSha256) continue;
+      const difference = {
+        id: testCase.id,
+        publicSha256: testCase.publicSha256,
+        browserSha256
+      };
+      failures.push({ ...difference, publicTree: testCase.publicTree, browserTree });
+    }
+    const outcomeSha256 = sha256(outcomes);
+    const differenceRecords = failures.map(({ id, publicSha256, browserSha256 }) => ({
+      id, publicSha256, browserSha256
+    }));
+    const differenceSha256 = sha256(differenceRecords);
+    const version = browser.version();
+    const expected = baseline.engines[name];
+    const baselineMismatches = [];
+    if (expected === undefined) baselineMismatches.push("engine-not-baselined");
+    else {
+      if (expected.version !== version) baselineMismatches.push("browser-version");
+      if (expected.outcomesSha256 !== outcomeSha256) baselineMismatches.push("all-outcomes");
+      if (expected.differenceCount !== failures.length) baselineMismatches.push("difference-count");
+      if (expected.differencesSha256 !== differenceSha256) {
+        baselineMismatches.push("difference-inventory");
+      }
+    }
+    const baselineMatches = baselineMismatches.length === 0;
     results.push({
       name,
-      version: browser.version(),
-      status: failures.length === 0 ? "pass" : "fail",
-      cases: CASES.length,
-      outcomesSha256: sha256(outcomes),
-      acceptedDifferences,
-      failures
+      version,
+      status: baselineMatches ? "pass" : "fail",
+      cases: cases.length,
+      outcomesSha256: outcomeSha256,
+      knownDifferences: {
+        count: failures.length,
+        sha256: differenceSha256,
+        reason: baseline.reason
+      },
+      baselineMismatches,
+      failures: baselineMatches ? [] : failures
     });
   } catch (error) {
     results.push({
@@ -185,7 +226,13 @@ const report = {
   schemaVersion: 1,
   suite: "html-parser-document-browser-differential",
   generatedAt: new Date().toISOString(),
-  cases: CASES.length,
+  corpusCommit: corpus.manifest.commit,
+  corpusCompositeSha256: corpus.compositeSha256,
+  cases: {
+    total: cases.length,
+    wptScriptingInvariant: wptCases.length,
+    supplemental: SUPPLEMENTAL_CASES.length
+  },
   results
 };
 await writeJson("reports/document-browser-diff.json", report);
