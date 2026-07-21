@@ -224,15 +224,30 @@ test("computePatch keeps unnamespaced foreign attributes distinct from namespace
     "<svg viewBox=\"0 0 2 2\" xlink:href='#x'></svg>"
   );
 
-  assert.throws(
-    () => computePatch(parsed, [{ kind: "setAttr", target: svg.id, name: "xlink:href", value: "#y" }]),
-    (error) => error instanceof HtmlPatchPlanningError &&
-      error.reason === "ATTRIBUTE_NAME_COLLISION" && error.target === svg.id
+  for (const name of ["xlink:href", "xml:lang", "xmlns", "xmlns:xlink"]) {
+    assert.throws(
+      () => computePatch(parsed, [{ kind: "setAttr", target: svg.id, name, value: "#y" }]),
+      (error) => error instanceof HtmlPatchPlanningError &&
+        error.reason === "ATTRIBUTE_NAMESPACE_UNSUPPORTED" && error.target === svg.id
+    );
+    assert.throws(
+      () => computePatch(parsed, [{ kind: "removeAttr", target: svg.id, name }]),
+      (error) => error instanceof HtmlPatchPlanningError &&
+        error.reason === "ATTRIBUTE_NAMESPACE_UNSUPPORTED" && error.target === svg.id
+    );
+  }
+
+  const htmlParsed = parse("<p></p>", { captureSpans: true, sourceRetention: "text" });
+  const paragraph = findNode(
+    htmlParsed.tree.children,
+    (node) => node.kind === "element" && node.localName === "p"
   );
-  assert.throws(
-    () => computePatch(parsed, [{ kind: "removeAttr", target: svg.id, name: "xlink:href" }]),
-    (error) => error instanceof HtmlPatchPlanningError &&
-      error.reason === "ATTRIBUTE_NOT_FOUND" && error.target === svg.id
+  assert.ok(paragraph);
+  assert.equal(
+    computePatch(htmlParsed, [
+      { kind: "setAttr", target: paragraph.id, name: "xlink:href", value: "#y" }
+    ]).result,
+    "<p xlink:href=\"#y\"></p>"
   );
 });
 

@@ -1,10 +1,6 @@
-import {
-  MATHML_NAMESPACE,
-  SVG_NAMESPACE,
-  XLINK_NAMESPACE,
-  XML_NAMESPACE,
-  XMLNS_NAMESPACE
-} from "./namespaces.ts";
+import { foreignAttributeAdjustment } from "../foundation/foreign-attribute-adjustment.ts";
+
+import { MATHML_NAMESPACE, SVG_NAMESPACE } from "./namespaces.ts";
 
 import type { HtmlStartTagToken, HtmlTokenAttribute } from "./tokens.ts";
 import type { HtmlTreeAttributeInput, HtmlTreeElement } from "./tree-model.ts";
@@ -121,20 +117,6 @@ interface ForeignAttributeName {
   readonly localName: string;
 }
 
-const FOREIGN_ATTRIBUTE_NAMES = new Map<string, ForeignAttributeName>([
-  ["xlink:actuate", { namespaceUri: XLINK_NAMESPACE, prefix: "xlink", localName: "actuate" }],
-  ["xlink:arcrole", { namespaceUri: XLINK_NAMESPACE, prefix: "xlink", localName: "arcrole" }],
-  ["xlink:href", { namespaceUri: XLINK_NAMESPACE, prefix: "xlink", localName: "href" }],
-  ["xlink:role", { namespaceUri: XLINK_NAMESPACE, prefix: "xlink", localName: "role" }],
-  ["xlink:show", { namespaceUri: XLINK_NAMESPACE, prefix: "xlink", localName: "show" }],
-  ["xlink:title", { namespaceUri: XLINK_NAMESPACE, prefix: "xlink", localName: "title" }],
-  ["xlink:type", { namespaceUri: XLINK_NAMESPACE, prefix: "xlink", localName: "type" }],
-  ["xml:lang", { namespaceUri: XML_NAMESPACE, prefix: "xml", localName: "lang" }],
-  ["xml:space", { namespaceUri: XML_NAMESPACE, prefix: "xml", localName: "space" }],
-  ["xmlns", { namespaceUri: XMLNS_NAMESPACE, prefix: null, localName: "xmlns" }],
-  ["xmlns:xlink", { namespaceUri: XMLNS_NAMESPACE, prefix: "xmlns", localName: "xlink" }]
-]);
-
 const FOREIGN_BREAKOUT_START_TAGS = new Set([
   "b", "big", "blockquote", "body", "br", "center", "code", "dd", "div", "dl", "dt",
   "em", "embed", "h1", "h2", "h3", "h4", "h5", "h6", "head", "hr", "i", "img",
@@ -175,7 +157,7 @@ function adjustedAttributeName(
   attribute: HtmlTokenAttribute,
   namespaceUri: ForeignElementNamespaceUri
 ): ForeignAttributeName {
-  const foreign = FOREIGN_ATTRIBUTE_NAMES.get(attribute.name);
+  const foreign = foreignAttributeAdjustment(attribute.name);
   if (foreign !== undefined) return foreign;
   let localName = attribute.name;
   if (namespaceUri === MATHML_NAMESPACE && localName === "definitionurl") {

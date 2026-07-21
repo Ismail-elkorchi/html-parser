@@ -6,8 +6,8 @@ All notable changes are documented in this file.
 
 - Validate the complete runtime edit shape in source patching, normalize HTML
   attribute identity across HTML and foreign elements, reject ambiguous
-  namespace collisions and conflicting edits, and prevent malformed or
-  duplicate attribute syntax.
+  namespace-changing spellings and conflicting edits, and prevent malformed
+  or duplicate attribute syntax.
 - Validate fragment element and attribute local names against the XML local-name
   grammar without trimming, normalize HTML-context attribute identity before
   duplicate detection, and reject spaces, controls, separators, and invalid

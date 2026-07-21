@@ -1,3 +1,5 @@
+import { foreignAttributeAdjustment } from
+  "../internal/foundation/foreign-attribute-adjustment.ts";
 import { isHtmlAttributeName } from "../internal/foundation/name-validation.ts";
 
 import { HtmlPatchPlanningError } from "./errors.ts";
@@ -8,7 +10,7 @@ import {
   serializedAttributeName,
   serializesTextLiterally
 } from "./html-serialization-rules.ts";
-import { asciiLowercase, ownedChildNodes } from "./model.ts";
+import { asciiLowercase, HTML_NAMESPACE_URI, ownedChildNodes } from "./model.ts";
 import {
   parsedDocumentRegistration,
   patchPlanBelongsTo,
@@ -332,8 +334,11 @@ function normalizeEdit(
     return Object.freeze({ kind: typedKind, target, html: editString(record, "html", index) });
   }
 
-  requireElementNode(nodeById, target);
+  const element = requireElementNode(nodeById, target);
   const name = normalizedAttributeName(editString(record, "name", index), index, target);
+  if (element.namespaceUri !== HTML_NAMESPACE_URI && foreignAttributeAdjustment(name) !== undefined) {
+    failPatchPlanning("ATTRIBUTE_NAMESPACE_UNSUPPORTED", { target, detail: name });
+  }
   if (typedKind === "setAttr") {
     return Object.freeze({
       kind: typedKind,
@@ -375,17 +380,6 @@ function buildSetAttrReplacement(
       end: existing.span.end,
       replacementHtml: rendered
     };
-  }
-
-  const serializedCollision = element.attributes.find((attribute) =>
-    attribute.namespaceUri !== null &&
-    asciiLowercase(serializedAttributeName(attribute)) === edit.name
-  );
-  if (serializedCollision !== undefined) {
-    failPatchPlanning("ATTRIBUTE_NAME_COLLISION", {
-      target: edit.target,
-      detail: edit.name
-    });
   }
 
   const elementSpan = requireNodeSpan(spanByNode, edit.target);
