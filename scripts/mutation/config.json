@@ -55,8 +55,8 @@
         {
           "id": "performance-throughput-threshold",
           "description": "Allow an immediate throughput regression below the accepted threshold.",
-          "search": "minThroughputMedianRatio: 0.9",
-          "replace": "minThroughputMedianRatio: 0.8"
+          "search": "minCpuThroughputMedianRatio: 0.9",
+          "replace": "minCpuThroughputMedianRatio: 0.8"
         },
         {
           "id": "performance-memory-threshold",

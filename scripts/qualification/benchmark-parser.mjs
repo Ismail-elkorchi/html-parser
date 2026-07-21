@@ -109,6 +109,7 @@ for (const fixture of fixtures) {
   const retainedHeap = process.memoryUsage().heapUsed;
   const retainedHeapDelta = Math.max(0, retainedHeap - retainedHeapBaseline);
   const totalBytes = fixture.input.length * fixture.iterations;
+  const cpuMs = (throughput.cpu.user + throughput.cpu.system) / 1_000;
   results.push({
     name: fixture.name,
     operation: fixture.operation,
@@ -116,7 +117,9 @@ for (const fixture of fixtures) {
     warmupIterations: fixture.warmupIterations,
     iterations: fixture.iterations,
     elapsedMs: throughput.elapsedMs,
-    cpuMs: (throughput.cpu.user + throughput.cpu.system) / 1_000,
+    cpuMs,
+    cpuThroughputMbPerSec:
+      totalBytes / (1024 * 1024) / (cpuMs / 1_000),
     throughputMbPerSec:
       totalBytes / (1024 * 1024) / (throughput.elapsedMs / 1_000),
     retainedResultCount: retainedResults.length,

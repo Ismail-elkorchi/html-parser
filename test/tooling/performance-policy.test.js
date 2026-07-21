@@ -11,6 +11,7 @@ import {
 function benchmark(throughputMedian = 100, memoryMedian = 1_000, spread = 0.05) {
   return {
     throughputMbPerSec: { median: throughputMedian, robustSpreadFraction: spread },
+    cpuThroughputMbPerSec: { median: throughputMedian, robustSpreadFraction: spread },
     retainedHeapBytesPerResult: { median: memoryMedian, robustSpreadFraction: spread }
   };
 }
@@ -56,9 +57,9 @@ test("historical recovery gaps fail the release policy", () => {
     "parse-medium": benchmark(1_000, 100)
   }));
   assert.equal(result.ok, false);
-  assert.ok(result.failures.includes("historical:parse-medium:throughput-ratio"));
+  assert.ok(result.failures.includes("historical:parse-medium:cpu-throughput-ratio"));
   assert.ok(result.failures.includes("historical:parse-medium:memory-ratio"));
-  assert.ok(result.comparisons.historical["parse-medium"].throughputMedianRatio < 0.2);
+  assert.ok(result.comparisons.historical["parse-medium"].cpuThroughputMedianRatio < 0.2);
   assert.ok(result.comparisons.historical["parse-medium"].memoryMedianRatio > 5);
 });
 
@@ -71,9 +72,9 @@ test("controlled immediate threshold failures are exact", () => {
   }));
   assert.equal(result.ok, false);
   assert.deepEqual(result.failures, [
-    "parse-medium:throughput-ratio",
+    "parse-medium:cpu-throughput-ratio",
     "parse-large:memory-ratio",
-    "serialize-medium:candidate-throughput-spread",
+    "serialize-medium:candidate-cpu-throughput-spread",
     "serialize-medium:candidate-memory-spread",
     "serialize-large:candidate-memory-spread"
   ]);
@@ -86,15 +87,15 @@ test("missing or invalid evidence fails closed", () => {
   assert.equal(result.ok, false);
   assert.ok(result.failures.includes("parse-medium:memory-ratio"));
   assert.deepEqual(PERFORMANCE_THRESHOLDS, {
-    minThroughputMedianRatio: 0.9,
+    minCpuThroughputMedianRatio: 0.9,
     maxMemoryMedianRatio: 1.1,
-    maxThroughputRobustSpreadFraction: 0.2,
+    maxCpuThroughputRobustSpreadFraction: 0.2,
     maxMemoryRobustSpreadFraction: 0.15
   });
   assert.deepEqual(PERFORMANCE_HISTORICAL_THRESHOLDS, {
-    minThroughputMedianRatio: 0.8,
+    minCpuThroughputMedianRatio: 0.8,
     maxMemoryMedianRatio: 1.3,
-    maxThroughputRobustSpreadFraction: 0.25,
+    maxCpuThroughputRobustSpreadFraction: 0.25,
     maxMemoryRobustSpreadFraction: 0.15
   });
 });

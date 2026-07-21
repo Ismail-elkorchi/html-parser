@@ -103,6 +103,9 @@ function summarize(runResults) {
     );
     return [name, {
       throughputMbPerSec: stats(entries.map((entry) => entry?.throughputMbPerSec ?? 0)),
+      cpuThroughputMbPerSec: stats(
+        entries.map((entry) => entry?.cpuThroughputMbPerSec ?? 0)
+      ),
       cpuMs: stats(entries.map((entry) => entry?.cpuMs ?? 0)),
       retainedHeapBytes: stats(entries.map((entry) => entry?.retainedHeapBytes ?? 0)),
       retainedHeapDeltaBytes: stats(
@@ -213,6 +216,8 @@ const report = {
   samplingOrder: "deterministic-balanced-revision-interleaving",
   sampleOrder,
   percentileMethod: "linear interpolation between closest ranks",
+  throughputMetric:
+    "input MiB per process CPU second; wall throughput is retained as diagnostic evidence",
   memoryMetric:
     "post-GC heap delta per retained public result from an isolated post-warmup fixed-size cohort",
   runtimeHeapConfiguration: Object.freeze({

@@ -122,9 +122,13 @@ jobs:
       - name: Verify qualified revision
         env:
           QUALIFIED_COMMIT: ${{ steps.meta.outputs.commit_sha }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
+          git fetch --no-tags origin main
           test "$(git rev-parse HEAD)" = "${QUALIFIED_COMMIT}"
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "${QUALIFIED_COMMIT}"
+          test "$(git rev-parse origin/main)" = "${QUALIFIED_COMMIT}"
           git diff --quiet
           git diff --cached --quiet
           printf 'qualified_commit=%s\n' "${QUALIFIED_COMMIT}" >> publish-artifacts/publish-summary.txt

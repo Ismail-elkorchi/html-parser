@@ -1,14 +1,14 @@
 export const PERFORMANCE_THRESHOLDS = Object.freeze({
-  minThroughputMedianRatio: 0.9,
+  minCpuThroughputMedianRatio: 0.9,
   maxMemoryMedianRatio: 1.1,
-  maxThroughputRobustSpreadFraction: 0.2,
+  maxCpuThroughputRobustSpreadFraction: 0.2,
   maxMemoryRobustSpreadFraction: 0.15
 });
 
 export const PERFORMANCE_HISTORICAL_THRESHOLDS = Object.freeze({
-  minThroughputMedianRatio: 0.8,
+  minCpuThroughputMedianRatio: 0.8,
   maxMemoryMedianRatio: 1.3,
-  maxThroughputRobustSpreadFraction: 0.25,
+  maxCpuThroughputRobustSpreadFraction: 0.25,
   maxMemoryRobustSpreadFraction: 0.15
 });
 
@@ -54,20 +54,20 @@ function finiteRatio(numerator, denominator) {
 
 function compareBenchmark(candidate, baseline) {
   return {
-    throughputMedianRatio: finiteRatio(
-      candidate?.throughputMbPerSec?.median,
-      baseline?.throughputMbPerSec?.median
+    cpuThroughputMedianRatio: finiteRatio(
+      candidate?.cpuThroughputMbPerSec?.median,
+      baseline?.cpuThroughputMbPerSec?.median
     ),
     memoryMedianRatio: finiteRatio(
       candidate?.retainedHeapBytesPerResult?.median,
       baseline?.retainedHeapBytesPerResult?.median
     ),
-    baselineThroughputRobustSpreadFraction:
-      baseline?.throughputMbPerSec?.robustSpreadFraction ?? null,
+    baselineCpuThroughputRobustSpreadFraction:
+      baseline?.cpuThroughputMbPerSec?.robustSpreadFraction ?? null,
     baselineMemoryRobustSpreadFraction:
       baseline?.retainedHeapBytesPerResult?.robustSpreadFraction ?? null,
-    candidateThroughputRobustSpreadFraction:
-      candidate?.throughputMbPerSec?.robustSpreadFraction ?? null,
+    candidateCpuThroughputRobustSpreadFraction:
+      candidate?.cpuThroughputMbPerSec?.robustSpreadFraction ?? null,
     candidateMemoryRobustSpreadFraction:
       candidate?.retainedHeapBytesPerResult?.robustSpreadFraction ?? null
   };
@@ -76,16 +76,16 @@ function compareBenchmark(candidate, baseline) {
 function thresholdFailures(name, comparison, thresholds, prefix = "") {
   const failures = [];
   const checks = [
-    ["throughput-ratio", comparison.throughputMedianRatio, (value) =>
-      value >= thresholds.minThroughputMedianRatio],
+    ["cpu-throughput-ratio", comparison.cpuThroughputMedianRatio, (value) =>
+      value >= thresholds.minCpuThroughputMedianRatio],
     ["memory-ratio", comparison.memoryMedianRatio, (value) =>
       value <= thresholds.maxMemoryMedianRatio],
-    ["baseline-throughput-spread", comparison.baselineThroughputRobustSpreadFraction,
-      (value) => value <= thresholds.maxThroughputRobustSpreadFraction],
+    ["baseline-cpu-throughput-spread", comparison.baselineCpuThroughputRobustSpreadFraction,
+      (value) => value <= thresholds.maxCpuThroughputRobustSpreadFraction],
     ["baseline-memory-spread", comparison.baselineMemoryRobustSpreadFraction,
       (value) => value <= thresholds.maxMemoryRobustSpreadFraction],
-    ["candidate-throughput-spread", comparison.candidateThroughputRobustSpreadFraction,
-      (value) => value <= thresholds.maxThroughputRobustSpreadFraction],
+    ["candidate-cpu-throughput-spread", comparison.candidateCpuThroughputRobustSpreadFraction,
+      (value) => value <= thresholds.maxCpuThroughputRobustSpreadFraction],
     ["candidate-memory-spread", comparison.candidateMemoryRobustSpreadFraction,
       (value) => value <= thresholds.maxMemoryRobustSpreadFraction]
   ];
