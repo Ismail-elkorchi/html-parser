@@ -7,7 +7,100 @@
     "wptScriptingInvariant": 1698,
     "supplemental": 26
   },
-  "reason": "Exact reviewed differences between the pinned current-standard WPT expectations and the browser versions bundled by Playwright 1.61.1.",
+  "knownDifferenceGroups": [
+    {
+      "classification": "processing-instruction-implementation-lag",
+      "explanation": "The pinned WPT snapshot requires current HTML processing-instruction nodes; these browser DOMParser versions still expose different node shapes for the enumerated inputs.",
+      "engines": ["chromium", "firefox", "webkit"],
+      "caseIds": [
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/html5test-com.dat#12",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests1.dat#40",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests1.dat#44",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests1.dat#47"
+      ],
+      "caseIdPrefix": "wpt:test/fixtures/upstream/wpt-tree-construction/resources/processing-instructions.dat#",
+      "caseNumbers": [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
+        39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56,
+        57, 58, 59, 60, 61, 62, 63, 64, 65, 101, 102, 103, 104, 105, 106, 108, 109,
+        110, 111, 114, 115, 116, 117, 118, 119, 120, 124
+      ]
+    },
+    {
+      "classification": "foreign-cdata-implementation-lag",
+      "explanation": "Chromium 149 and WebKit 26.5 differ from the pinned WPT tree for CDATA sections at the enumerated SVG and MathML integration points.",
+      "engines": ["chromium", "webkit"],
+      "caseIds": [
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/html5test-com.dat#14",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/html5test-com.dat#15",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/html5test-com.dat#18"
+      ]
+    },
+    {
+      "classification": "character-reference-implementation-difference",
+      "explanation": "Chromium 149 produces a different attribute character-reference result for this focused ambiguous-ampersand case while the parser result matches the pinned tokenizer and WPT expectations.",
+      "engines": ["chromium"],
+      "caseIds": ["supplemental:entities"]
+    },
+    {
+      "classification": "adoption-recovery-implementation-difference",
+      "explanation": "Firefox 151 differs from the pinned WPT active-formatting recovery tree for this nested nobr/table case.",
+      "engines": ["firefox"],
+      "caseIds": [
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/adoption02.dat#3"
+      ]
+    },
+    {
+      "classification": "obsolete-select-element-implementation-difference",
+      "explanation": "Firefox 151 differs from the pinned WPT treatment of the enumerated obsolete menuitem and keygen elements in select mode.",
+      "engines": ["firefox"],
+      "caseIds": [
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/menuitem-element.dat#14",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests7.dat#34"
+      ]
+    },
+    {
+      "classification": "customizable-select-implementation-lag",
+      "explanation": "Firefox 151 does not yet produce the pinned current customizable-select and relaxed-select trees for these exact HTML, table, foreign-content, and plaintext interactions.",
+      "engines": ["firefox"],
+      "caseIds": [
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tables01.dat#18",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests1.dat#30",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests1.dat#100",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests10.dat#4",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests10.dat#5",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests10.dat#17",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests10.dat#18",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests18.dat#14",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests18.dat#15",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests9.dat#5",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests9.dat#6",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests9.dat#18",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/tests9.dat#19",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#36",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#38",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#39",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#40",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#41",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#42",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#43",
+        "supplemental:relaxed-select"
+      ]
+    },
+    {
+      "classification": "selectedcontent-implementation-lag",
+      "explanation": "Firefox 151 differs from the pinned current selectedcontent option-cloning and selectedness-update behavior for these exact cases.",
+      "engines": ["firefox"],
+      "caseIds": [
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#45",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#46",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#47",
+        "wpt:test/fixtures/upstream/wpt-tree-construction/resources/webkit02.dat#48",
+        "supplemental:selectedcontent-option-clone"
+      ]
+    }
+  ],
   "engines": {
     "chromium": {
       "version": "149.0.7827.55",

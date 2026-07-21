@@ -20,7 +20,7 @@ test("fragment context is normalized, retained, and deeply immutable", () => {
     localName: "TeXtArEa",
     attributes: [{ namespaceUri: XLINK_NAMESPACE_URI, localName: "href", value: "#x" }]
   };
-  const fragment = parseFragment("a<b>&amp;", input);
+  const { tree: fragment } = parseFragment("a<b>&amp;", input);
 
   assert.deepEqual(fragment.context, {
     namespaceUri: HTML_NAMESPACE_URI,
@@ -39,7 +39,7 @@ test("fragment context is normalized, retained, and deeply immutable", () => {
 });
 
 test("foreign fragment contexts and semantic attributes drive integration rules", () => {
-  const svg = parseFragment("<lineargradient/><foreignObject><p>x</p></foreignObject>", {
+  const { tree: svg } = parseFragment("<lineargradient/><foreignObject><p>x</p></foreignObject>", {
     namespaceUri: SVG_NAMESPACE_URI,
     localName: "svg"
   });
@@ -55,7 +55,7 @@ test("foreign fragment contexts and semantic attributes drive integration rules"
   assert.equal(foreignObject.children[0]?.kind, "element");
   assert.equal(foreignObject.children[0]?.namespaceUri, HTML_NAMESPACE_URI);
 
-  const annotation = parseFragment("<p>x</p>", {
+  const { tree: annotation } = parseFragment("<p>x</p>", {
     namespaceUri: MATHML_NAMESPACE_URI,
     localName: "annotation-xml",
     attributes: [{ namespaceUri: null, localName: "encoding", value: "text/html" }]
@@ -66,14 +66,14 @@ test("foreign fragment contexts and semantic attributes drive integration rules"
 
 test("fragment environment controls tree construction and is retained on the result", () => {
   const context = htmlContext("div");
-  const standards = parseFragment("<p>x<table><tr><td>y", context);
-  const quirks = parseFragment("<p>x<table><tr><td>y", context, { documentMode: "quirks" });
+  const { tree: standards } = parseFragment("<p>x<table><tr><td>y", context);
+  const { tree: quirks } = parseFragment("<p>x<table><tr><td>y", context, { documentMode: "quirks" });
   assert.notDeepEqual(quirks.children, standards.children);
   assert.equal(standards.documentMode, "no-quirks");
   assert.equal(quirks.documentMode, "quirks");
 
-  const withoutForm = parseFragment("<form><input>", context);
-  const withForm = parseFragment("<form><input>", context, { hasFormAncestor: true });
+  const { tree: withoutForm } = parseFragment("<form><input>", context);
+  const { tree: withForm } = parseFragment("<form><input>", context, { hasFormAncestor: true });
   assert.equal(withoutForm.children[0]?.kind, "element");
   assert.equal(withoutForm.children[0]?.localName, "form");
   assert.equal(withForm.children[0]?.kind, "element");
@@ -81,14 +81,14 @@ test("fragment environment controls tree construction and is retained on the res
   assert.equal(withForm.hasFormInContextChain, true);
   assert.equal(withoutForm.hasFormInContextChain, false);
 
-  const formContext = parseFragment("<form><input>", htmlContext("form"));
+  const { tree: formContext } = parseFragment("<form><input>", htmlContext("form"));
   assert.equal(formContext.children[0]?.kind, "element");
   assert.equal(formContext.children[0]?.localName, "input");
   assert.equal(formContext.hasFormInContextChain, true);
 });
 
 test("serialization and chunking inherit a fragment's scripting mode", () => {
-  const fragment = parseFragment(
+  const { tree: fragment } = parseFragment(
     "<noscript>&lt;b&gt;</noscript>",
     htmlContext("div"),
     { scriptingMode: "disabled" }
@@ -100,7 +100,7 @@ test("serialization and chunking inherit a fragment's scripting mode", () => {
 });
 
 test("frameset fragments serialize frame as an HTML void element", () => {
-  const fragment = parseFragment("</frameset><frame>", htmlContext("frameset"));
+  const { tree: fragment } = parseFragment("</frameset><frame>", htmlContext("frameset"));
   assert.equal(serialize(fragment), "<frame>");
 });
 
@@ -152,7 +152,7 @@ test("fragment context and environment validation reject ambiguous configuration
         error.reason === "INVALID_VALUE"
     );
   }
-  assert.equal(parseFragment("x", htmlContext("Élément")).context.localName, "Élément");
+  assert.equal(parseFragment("x", htmlContext("Élément")).tree.context.localName, "Élément");
   assert.throws(
     () => parseFragment("x", {
       ...htmlContext("div"),

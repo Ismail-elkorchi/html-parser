@@ -23,7 +23,7 @@ test("tokenizer handles long numeric character references without overflow failu
   const leadingZeroHex = await tokenizeByteStreamEager(
     byteStream(`&#x${"0".repeat(256)}41;`)
   );
-  assert.deepEqual(leadingZeroHex, [
+  assert.deepEqual(leadingZeroHex.tokens, [
     { kind: "chars", value: "A" },
     { kind: "eof" }
   ]);
@@ -31,7 +31,7 @@ test("tokenizer handles long numeric character references without overflow failu
   const outOfRangeDecimal = await tokenizeByteStreamEager(
     byteStream(`&#${"9".repeat(400)};`)
   );
-  assert.deepEqual(outOfRangeDecimal, [
+  assert.deepEqual(outOfRangeDecimal.tokens, [
     { kind: "chars", value: "\uFFFD" },
     { kind: "eof" }
   ]);

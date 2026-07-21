@@ -30,8 +30,9 @@ console.log(serialize(document.tree));
 `parse()`, `parseBytes()`, and `parseStream()` return a frozen
 `ParsedDocument`. Its `tree` is the parsed document, `metadata` describes the
 exact parse, and `sourceText` is `null` unless source retention was requested.
-`parseFragment()` instead returns a `FragmentTree` directly and requires the
-namespace and local name of the context element. See [fragments](./parsing.md#fragments).
+`parseFragment()` returns a frozen `ParsedFragment`: its `tree` is the fragment
+and its `metadata` records successful resource use. It requires the namespace
+and local name of the context element. See [fragments](./parsing.md#fragments).
 
 HTML recovery diagnostics do not normally throw. Invalid configuration,
 exceeded budgets, cancellation, stream failures, and invalid patch operations

@@ -11,12 +11,14 @@ the package remain the exact source of truth.
   `ParsedDocument`.
 - `parseStream(stream, options?)` reads, decodes, and parses a byte stream.
 - `parseFragment(input, context, options?)` parses with an explicit
-  namespace-aware `HtmlFragmentContextInput` and returns a `FragmentTree`.
+  namespace-aware `HtmlFragmentContextInput` and returns a `ParsedFragment`.
 - `serialize(input, options?)` serializes a document, fragment, or complete node
   representation. `SerializeOptions.scriptingMode` controls the conditional
   `noscript` rule. A document or fragment inherits the mode retained from
   parsing; an individual node defaults to `"inert"`.
-- `tokenizeByteStreamEager(stream, options?)` returns logical tokens after EOF.
+- `tokenizeByteStreamEager(stream, options?)` returns a
+  `TokenizeByteStreamEagerResult` containing logical tokens plus encoding and
+  resource evidence after EOF. Its budgets include deterministic `maxSteps`.
 - `getParseErrorSpecRef(parseErrorId)` maps a named parser diagnostic to its
   dedicated HTML Standard anchor and other identifiers to the general
   parse-errors section.
@@ -75,9 +77,9 @@ Key exported type groups include:
   `ParseStreamOptions`, `TokenizeByteStreamEagerBudgetOptions`,
   `TokenizeByteStreamEagerOptions`, `SerializeOptions`, `HtmlScriptingMode`,
   `OperationOptions`, `SourceRetention`;
-- trees and metadata: `ParsedDocument`, `ParsedDocumentMetadata`,
+- trees and metadata: `ParsedDocument`, `ParsedFragment`, `ParseMetadata`,
   `ParseEncodingMetadata`, `ParseResourceUsage`, `DocumentTree`,
-  `FragmentTree`, `HtmlNode`, `NodeKind`, `ElementNode`,
+  `FragmentTree`, `HtmlNode`, `NodeKind`, `ElementNode`, `SerializableNode`,
   `TemplateContentNode`, `TextNode`, `CommentNode`,
   `ProcessingInstructionNode`, `DoctypeNode`, `DoctypeExternalId`, `Attribute`,
   `Span`, `SpanProvenance`, `ParseError`, `NodeId`, `NodeVisitor`, and
@@ -88,7 +90,8 @@ Key exported type groups include:
   `TraceParseErrorEvent`, `TraceStreamEvent`, `TraceTokenEvent`,
   `TraceTreeMutationEvent`, `Token`, `TokenAttribute`, `StartTagToken`,
   `EndTagToken`, `CharsToken`, `CommentToken`, `ProcessingInstructionToken`,
-  `DoctypeToken`, and `EofToken`;
+  `DoctypeToken`, `EofToken`, `TokenizationResourceUsage`,
+  `TokenizeByteStreamEagerMetadata`, and `TokenizeByteStreamEagerResult`;
 - extraction: `TextExtractionPolicy`, `TextExtractionOptions`,
   `TextExtractionOptionsBase`,
   `VisibleTextExtractionOptions`, `TextContentExtractionOptions`,

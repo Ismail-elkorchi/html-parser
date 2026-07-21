@@ -43,8 +43,8 @@ const contextualFragment = parseFragment("<p>x", mathContext, {
   documentMode: "limited-quirks",
   hasFormAncestor: true
 });
-const normalizedContext: HtmlFragmentContext = contextualFragment.context;
-const documentMode: HtmlDocumentMode = contextualFragment.documentMode;
+const normalizedContext: HtmlFragmentContext = contextualFragment.tree.context;
+const documentMode: HtmlDocumentMode = contextualFragment.tree.documentMode;
 const attributeNamespace: HtmlAttributeNamespaceUri = normalizedContext.attributes[0]?.namespaceUri ?? null;
 void documentMode;
 void attributeNamespace;
@@ -92,13 +92,16 @@ if (element?.kind === "element") {
     void attribute.name;
   }
 }
-const tokenPromise: Promise<readonly (
-  ProcessingInstructionToken | Exclude<Awaited<ReturnType<typeof tokenizeByteStreamEager>>[number], ProcessingInstructionToken>
-)[]> = tokenizeByteStreamEager(new ReadableStream());
+const tokenPromise = tokenizeByteStreamEager(new ReadableStream());
+const tokenKinds: readonly (
+  ProcessingInstructionToken |
+  Exclude<Awaited<typeof tokenPromise>["tokens"][number], ProcessingInstructionToken>
+)[] = (await tokenPromise).tokens;
 void fragment;
 void templateContent;
 void instruction;
 void tokenPromise;
+void tokenKinds;
 const scriptingMode: HtmlScriptingMode = "inert";
 const serializeOptions: SerializeOptions = { scriptingMode, maxTimeMs: 10 };
 void serializeOptions;

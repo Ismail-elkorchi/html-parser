@@ -6,6 +6,7 @@ import {
 import { utf8ByteLength } from "./html-input.ts";
 import {
   HTML_NAMESPACE_URI,
+  OwnedNodeTracker,
   asciiLowercase,
   isHtmlElement
 } from "./model.ts";
@@ -795,6 +796,7 @@ function* iterateVisibleExtractionChunks(
   }
   type Action = VisitAction | AppendAction;
   const stack: Action[] = [];
+  const ownership = new OwnedNodeTracker();
   const pushVisits = (
     nodes: readonly HtmlNode[],
     preserveWhitespace: boolean,
@@ -846,6 +848,7 @@ function* iterateVisibleExtractionChunks(
     }
 
     const { node, preserveWhitespace, sourceOverride } = action;
+    ownership.observe(node);
     if (node.kind === "text") {
       pushAppend(
         node,
@@ -1016,6 +1019,7 @@ function* iterateRawExtractionChunks(
     ? nodeOrTree.children
     : [nodeOrTree];
   const stack: HtmlNode[] = [];
+  const ownership = new OwnedNodeTracker();
   for (let index = roots.length - 1; index >= 0; index -= 1) {
     const root = roots[index];
     if (root !== undefined) {
@@ -1028,6 +1032,7 @@ function* iterateRawExtractionChunks(
     if (node === undefined) {
       continue;
     }
+    ownership.observe(node);
     if (node.kind === "text") {
       if (node.value.length > 0) {
         yield {
@@ -1201,7 +1206,8 @@ function createTextOperations(
   });
 }
 
-const textOperations = createTextOperations(parseFragment);
+const textOperations = createTextOperations((html, context, options) =>
+  parseFragment(html, context, options).tree);
 
 /**
  * Iterates bounded policy tokens and returns the final result when fully drained.

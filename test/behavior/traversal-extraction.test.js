@@ -2,11 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  HtmlConfigurationError,
   TEXT_CONTENT_POLICY,
+  chunk,
   extractText,
   findAllByAttr,
+  findAllByAttrNS,
   findAllByTagName,
+  findAllByTagNameNS,
   findById,
+  getAttributeValue,
+  getAttributeValueNS,
+  hasAttribute,
+  hasAttributeNS,
   outline,
   parse,
   walk,
@@ -39,6 +47,82 @@ test("walk and walkElements are deterministic", () => {
 
   assert.deepEqual(firstElements, secondElements);
   assert.ok(firstElements.length >= 3);
+});
+
+test("query helpers reject invalid JavaScript arguments with one public error category", () => {
+  const { tree } = parse("<p class=x></p>");
+  const element = [...findAllByTagName(tree, "p")][0];
+  assert.ok(element);
+  const invalidCalls = [
+    () => getAttributeValue(element, 1),
+    () => getAttributeValue(null, "class"),
+    () => getAttributeValue({ ...element, attributes: [null] }, "class"),
+    () => hasAttribute(element, 1),
+    () => getAttributeValueNS(element, 1, "class"),
+    () => getAttributeValueNS(element, null, 1),
+    () => hasAttributeNS(element, null, 1),
+    () => findAllByTagName(tree, 1),
+    () => findAllByTagNameNS(tree, 1, "p"),
+    () => findAllByTagNameNS(tree, "urn:test", 1),
+    () => findAllByAttr(tree, 1),
+    () => findAllByAttr(tree, "class", 1),
+    () => findAllByAttrNS(tree, 1, "class"),
+    () => findAllByAttrNS(tree, null, 1),
+    () => findAllByAttrNS(tree, null, "class", 1),
+    () => findById(tree, 0),
+    () => findById(null, 1),
+    () => walk(null, () => undefined),
+    () => walk(tree, null),
+    () => walkElements(tree, null),
+    () => [...findAllByAttr({
+      ...tree,
+      children: [{ ...element, attributes: null }]
+    }, "class")]
+  ];
+  for (const invoke of invalidCalls) {
+    assert.throws(invoke, HtmlConfigurationError);
+  }
+});
+
+test("all public tree traversals reject cyclic caller graphs deterministically", () => {
+  const element = {
+    id: 2,
+    kind: "element",
+    namespaceUri: "http://www.w3.org/1999/xhtml",
+    localName: "div",
+    attributes: [],
+    children: []
+  };
+  element.children.push(element);
+  const tree = {
+    id: 1,
+    kind: "fragment",
+    context: {
+      namespaceUri: "http://www.w3.org/1999/xhtml",
+      localName: "div",
+      attributes: []
+    },
+    scriptingMode: "inert",
+    documentMode: "no-quirks",
+    hasFormInContextChain: false,
+    children: [element],
+    errors: []
+  };
+
+  const operations = [
+    () => walk(tree, () => undefined),
+    () => [...findAllByTagName(tree, "div")],
+    () => outline(tree),
+    () => extractText(tree, {
+      policy: TEXT_CONTENT_POLICY,
+      maxOutputBytes: 100,
+      maxTokens: 100
+    }),
+    () => chunk(tree)
+  ];
+  for (const operation of operations) {
+    assert.throws(operation, HtmlConfigurationError);
+  }
 });
 
 test("outline entry text uses a scalar-safe 200-byte UTF-8 prefix", () => {

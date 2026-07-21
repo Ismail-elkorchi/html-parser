@@ -21,8 +21,10 @@ reader.
 | `maxTraceBytes` | Canonical UTF-8 bytes of retained events; valid only with `trace: "events"` |
 | `maxTimeMs` | Elapsed monotonic time across the operation |
 
-Stream budgets also accept `maxEncodingPrescanBytes`, a prefix-retention cap
-rather than a throwing total-input budget. Extraction has separate required
+Stream budgets also accept `maxEncodingPrescanBytes`, an optional meta-encoding
+prefix-retention cap rather than a throwing total-input budget. BOM detection
+remains active when this value is zero. Eager stream tokenization accepts
+`maxSteps` and reports the observed count when it is enabled. Extraction has separate required
 `maxOutputBytes` and `maxTokens` limits; visible-text extraction also requires
 `maxFallbackInputBytes` and `maxFallbackNodes`.
 

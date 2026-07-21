@@ -26,7 +26,7 @@ for (const relativePath of corpus.fixtureFiles) {
   baseCases += fixtureCases.length;
   for (const fixtureCase of expandTreeDatCases(fixtureCases, { includeModeInId: true })) {
     executions += 1;
-    const fragment = parseFragment(
+    const { tree: fragment } = parseFragment(
       fixtureCase.data,
       { ...fixtureCase.fragmentContext, attributes: [] },
       {

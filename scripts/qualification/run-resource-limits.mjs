@@ -61,6 +61,16 @@ function fixture(name) {
       expectedLimit: 65_536
     };
   }
+  if (name === "byte-source-none" || name === "byte-source-text") {
+    const sourceRetention = name === "byte-source-none" ? "none" : "text";
+    return {
+      input: new Uint8Array(8 * 1024 * 1024).fill(0x20),
+      collectAfterRun: true,
+      run(mod, input) {
+        return mod.parseBytes(input, { sourceRetention });
+      }
+    };
+  }
   if (name === "trace") {
     return {
       input: "\0".repeat(2_000),
@@ -96,6 +106,7 @@ if (workerCase) {
   }
   const wallMs = performance.now() - startedAt;
   const cpu = process.cpuUsage(cpuBefore);
+  if (selected.collectAfterRun === true) globalThis.gc();
   const after = process.memoryUsage();
   const peakRssBytes = process.resourceUsage().maxRSS * 1024;
 
@@ -135,7 +146,8 @@ if (workerCase) {
           actual: failure.actual
         }
       : { code: "OK" },
-    retainedResultKind: retainedResult?.tree?.kind ?? retainedResult?.kind ?? null
+    retainedResultKind: retainedResult?.tree?.kind ?? retainedResult?.kind ?? null,
+    retainedSourceCodeUnits: retainedResult?.sourceText?.length ?? 0
   };
   process.stdout.write(`${JSON.stringify(report)}\n`);
   process.exit(0);
@@ -144,19 +156,28 @@ if (workerCase) {
 const fixtureNames = ["nodes", "attributes", "errors", "decoded-output", "trace"];
 const comparisons = [];
 
-for (const name of fixtureNames) {
-  const runs = {};
-  for (const mode of ["unbounded", "bounded"]) {
-    const result = spawnSync(
-      process.execPath,
-      ["--expose-gc", fileURLToPath(import.meta.url), `--worker=${name}`, ...(mode === "bounded" ? ["--bounded"] : [])],
-      { encoding: "utf8", maxBuffer: 1024 * 1024 }
-    );
-    if (result.status !== 0) {
-      throw new Error(`${name}/${mode} worker failed:\n${result.stderr || result.stdout}`);
-    }
-    runs[mode] = JSON.parse(result.stdout.trim());
+function runWorker(name, isBounded = false) {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--expose-gc",
+      fileURLToPath(import.meta.url),
+      `--worker=${name}`,
+      ...(isBounded ? ["--bounded"] : [])
+    ],
+    { encoding: "utf8", maxBuffer: 1024 * 1024 }
+  );
+  if (result.status !== 0) {
+    throw new Error(`${name}/${isBounded ? "bounded" : "unbounded"} worker failed:\n${result.stderr || result.stdout}`);
   }
+  return JSON.parse(result.stdout.trim());
+}
+
+for (const name of fixtureNames) {
+  const runs = {
+    unbounded: runWorker(name),
+    bounded: runWorker(name, true)
+  };
   if (runs.bounded.retainedHeapDeltaBytes >= runs.unbounded.retainedHeapDeltaBytes) {
     throw new Error(`${name}: bounded retained heap was not lower than the unbounded run`);
   }
@@ -167,6 +188,19 @@ for (const name of fixtureNames) {
     retainedHeapReductionBytes:
       runs.unbounded.retainedHeapDeltaBytes - runs.bounded.retainedHeapDeltaBytes
   });
+}
+
+const byteSourceRetention = {
+  none: runWorker("byte-source-none"),
+  text: runWorker("byte-source-text")
+};
+if (byteSourceRetention.none.retainedSourceCodeUnits !== 0 ||
+    byteSourceRetention.text.retainedSourceCodeUnits !== byteSourceRetention.text.inputBytes) {
+  throw new Error("byte source-retention workers returned the wrong public source shape");
+}
+if (byteSourceRetention.none.retainedHeapDeltaBytes >=
+    byteSourceRetention.text.retainedHeapDeltaBytes) {
+  throw new Error("byte parsing without source retention did not retain less heap");
 }
 
 const report = {
@@ -183,10 +217,17 @@ const report = {
     isolation: "one fresh process for each bounded or unbounded fixture",
     baseline: "explicit GC after fixture construction and before the parse",
     retainedHeap: "heapUsed sampled immediately after synchronous return or throw",
+    sourceRetentionHeap: "heapUsed sampled after explicit post-parse GC for byte source-retention fixtures",
     peakRss: "process.resourceUsage().maxRSS high-water mark",
-    assertion: "every bounded run reports limit + 1 and retains less heap than its paired unbounded run"
+    assertion: "hard budgets fail at limit + 1 and byte parsing retains decoded source only when requested"
   },
-  comparisons
+  comparisons,
+  byteSourceRetention: {
+    ...byteSourceRetention,
+    retainedHeapReductionBytes:
+      byteSourceRetention.text.retainedHeapDeltaBytes -
+      byteSourceRetention.none.retainedHeapDeltaBytes
+  }
 };
 
 await writeJson(options.report, report);

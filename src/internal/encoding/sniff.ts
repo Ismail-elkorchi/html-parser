@@ -1,17 +1,17 @@
-interface EncodingSniffOptions {
+export interface EncodingSniffOptions {
   readonly transportEncodingLabel?: string;
   readonly maxPrescanBytes?: number;
   readonly defaultEncoding?: string;
 }
 
-interface EncodingSniffResult {
+export interface EncodingSniffResult {
   readonly encoding: string;
   readonly source: "bom" | "transport" | "meta" | "default";
 }
 
-interface HtmlByteDecodeOptions extends EncodingSniffOptions {
-  readonly onDecodedChunk?: (chunk: string) => void;
-}
+export type EncodingSniffDecision =
+  | { readonly status: "pending" }
+  | { readonly status: "decided"; readonly result: EncodingSniffResult };
 
 const WINDOWS_1252_ALIASES = new Set([
   "iso-8859-1",
@@ -35,6 +35,33 @@ function detectBom(bytes: Uint8Array): string | null {
   }
 
   return null;
+}
+
+function bomPrefixState(
+  bytes: Uint8Array,
+  endOfStream: boolean
+): "pending" | "absent" | "utf-8" | "utf-16be" | "utf-16le" {
+  const first = bytes[0];
+  if (first === undefined) return endOfStream ? "absent" : "pending";
+  if (first === 0xef) {
+    const second = bytes[1];
+    if (second === undefined) return endOfStream ? "absent" : "pending";
+    if (second !== 0xbb) return "absent";
+    const third = bytes[2];
+    if (third === undefined) return endOfStream ? "absent" : "pending";
+    return third === 0xbf ? "utf-8" : "absent";
+  }
+  if (first === 0xfe) {
+    const second = bytes[1];
+    if (second === undefined) return endOfStream ? "absent" : "pending";
+    return second === 0xff ? "utf-16be" : "absent";
+  }
+  if (first === 0xff) {
+    const second = bytes[1];
+    if (second === undefined) return endOfStream ? "absent" : "pending";
+    return second === 0xfe ? "utf-16le" : "absent";
+  }
+  return "absent";
 }
 
 function stripQuotes(value: string): string {
@@ -291,31 +318,46 @@ export function sniffHtmlEncoding(bytes: Uint8Array, options: EncodingSniffOptio
   return { encoding: defaultEncoding, source: "default" };
 }
 
-export function decodeHtmlBytes(bytes: Uint8Array, options: HtmlByteDecodeOptions = {}): { text: string; sniff: EncodingSniffResult } {
-  const sniff = sniffHtmlEncoding(bytes, {
-    ...(options.transportEncodingLabel !== undefined
-      ? { transportEncodingLabel: options.transportEncodingLabel }
-      : {}),
-    ...(options.maxPrescanBytes !== undefined ? { maxPrescanBytes: options.maxPrescanBytes } : {}),
-    ...(options.defaultEncoding !== undefined ? { defaultEncoding: options.defaultEncoding } : {})
-  });
-  const decoder = new TextDecoder(sniff.encoding);
-  const parts: string[] = [];
-  const decodeChunkBytes = 16_384;
-  for (let offset = 0; offset < bytes.byteLength; offset += decodeChunkBytes) {
-    const decoded = decoder.decode(bytes.subarray(offset, offset + decodeChunkBytes), { stream: true });
-    if (decoded.length > 0) {
-      options.onDecodedChunk?.(decoded);
-      parts.push(decoded);
+/** Determines whether the available stream prefix is sufficient to select an encoding. */
+export function decideHtmlEncoding(
+  bytes: Uint8Array,
+  options: EncodingSniffOptions & { readonly endOfStream: boolean }
+): EncodingSniffDecision {
+  const bomState = bomPrefixState(bytes, options.endOfStream);
+  if (bomState === "pending") return Object.freeze({ status: "pending" });
+  if (bomState !== "absent") {
+    return Object.freeze({
+      status: "decided",
+      result: Object.freeze({ encoding: bomState, source: "bom" })
+    });
+  }
+
+  if (options.transportEncodingLabel !== undefined) {
+    const transport = canonicalizeLabel(options.transportEncodingLabel, "transport");
+    if (transport !== null) {
+      return Object.freeze({
+        status: "decided",
+        result: Object.freeze({ encoding: transport, source: "transport" })
+      });
     }
   }
-  const final = decoder.decode();
-  if (final.length > 0) {
-    options.onDecodedChunk?.(final);
-    parts.push(final);
+
+  const maxPrescanBytes = options.maxPrescanBytes ?? 16_384;
+  const meta = sniffMetaCharset(bytes, maxPrescanBytes);
+  if (meta !== null) {
+    return Object.freeze({
+      status: "decided",
+      result: Object.freeze({ encoding: meta, source: "meta" })
+    });
   }
-  return {
-    text: parts.join(""),
-    sniff
-  };
+  if (!options.endOfStream && bytes.byteLength < maxPrescanBytes) {
+    return Object.freeze({ status: "pending" });
+  }
+
+  const fallback = canonicalizeLabel(options.defaultEncoding ?? "windows-1252", "default") ??
+    "windows-1252";
+  return Object.freeze({
+    status: "decided",
+    result: Object.freeze({ encoding: fallback, source: "default" })
+  });
 }

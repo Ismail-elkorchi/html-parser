@@ -17,7 +17,7 @@ if (!serialize(bytes.tree).includes("<p>bytes</p>")) {
   throw new Error("installed package byte parsing failed");
 }
 
-const fragment = parseFragment("<b>fragment</b>", {
+const { tree: fragment } = parseFragment("<b>fragment</b>", {
   namespaceUri: HTML_NAMESPACE_URI,
   localName: "section"
 });

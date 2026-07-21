@@ -149,7 +149,15 @@ async function computeDeterminismHash() {
 
   const canonicalPayload = {
     node: normalizeNode(parsed),
-    parseErrors: Array.isArray(parsed.errors) ? parsed.errors.map((entry) => normalizeParseError(entry)) : []
+    parseErrors: Array.isArray(parsed.errors) ? parsed.errors.map((entry) => normalizeParseError(entry)) : [],
+    fragment: parseFragment("<p a=1>x</p>", {
+      namespaceUri: HTML_NAMESPACE_URI,
+      localName: "section"
+    }, { budgets: { maxSteps: 10_000 } }),
+    tokenization: await tokenizeByteStreamEager(
+      createByteStream([new TextEncoder().encode("<p a=1>x</p>")]),
+      { budgets: { maxSteps: 10_000 } }
+    )
   };
 
   return sha256Hex(JSON.stringify(canonicalPayload));
@@ -198,11 +206,16 @@ async function runSmokeAssertions() {
   const second = parse("deterministic");
   ensure(JSON.stringify(first) === JSON.stringify(second), "deterministic output mismatch");
 
-  const fragment = parseFragment("child", {
+  const fragmentResult = parseFragment("child", {
     namespaceUri: HTML_NAMESPACE_URI,
     localName: "section"
-  });
+  }, { budgets: { maxSteps: 10_000 } });
+  const { tree: fragment } = fragmentResult;
   ensure(fragment.context.localName === "section", "fragment context mismatch");
+  ensure(
+    Number.isSafeInteger(fragmentResult.metadata.resourceUsage.steps),
+    "fragment resource metadata mismatch"
+  );
 
   const sampleBytes = new Uint8Array([
     0x3c, 0x6d, 0x65, 0x74, 0x61, 0x20, 0x63, 0x68, 0x61, 0x72, 0x73, 0x65, 0x74, 0x3d, 0x77, 0x69, 0x6e, 0x64,
@@ -218,12 +231,18 @@ async function runSmokeAssertions() {
     "parseStream output mismatch vs parseBytes"
   );
 
-  const tokenKinds = (await tokenizeByteStreamEager(
-    createByteStream([new TextEncoder().encode("<p>smoke</p>")])
-  )).map((token) => token.kind);
+  const tokenization = await tokenizeByteStreamEager(
+    createByteStream([new TextEncoder().encode("<p>smoke</p>")]),
+    { budgets: { maxSteps: 10_000 } }
+  );
+  const tokenKinds = tokenization.tokens.map((token) => token.kind);
   ensure(
     JSON.stringify(tokenKinds) === JSON.stringify(["startTag", "chars", "endTag", "eof"]),
     "tokenizeByteStreamEager mismatch"
+  );
+  ensure(
+    Number.isSafeInteger(tokenization.metadata.resourceUsage.steps),
+    "tokenization resource metadata mismatch"
   );
 
   const outlineResult = outline(parsed);

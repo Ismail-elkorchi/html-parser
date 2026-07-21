@@ -1,4 +1,3 @@
-import { decodeHtmlBytes } from "../internal/encoding/sniff.ts";
 import {
   failInternalState,
   requireInternalValue
@@ -19,7 +18,7 @@ import { enforceBudget } from "./budgets.ts";
 import { HtmlAbortError, HtmlBudgetExceededError } from "./errors.ts";
 import { normalizeFragmentContext, toEngineFragmentContext } from "./fragment-context.ts";
 import {
-  DecodedUtf8BudgetCounter,
+  decodeByteArray,
   decodeByteStream,
   requireByteArray,
   requireReadableByteStream,
@@ -36,7 +35,10 @@ import {
   normalizeTokenizeByteStreamEagerOptions
 } from "./operation.ts";
 import { normalizeParseErrorId, TraceSink } from "./parse-trace.ts";
-import { registerParsedDocument } from "./parsed-document-registry.ts";
+import {
+  registerParsedDocument,
+  registerParsedFragmentTree
+} from "./parsed-output-registry.ts";
 
 import type { OperationContext } from "./operation.ts";
 import type {
@@ -49,15 +51,17 @@ import type {
   NodeId,
   ParseBytesOptions,
   ParseFragmentOptions,
+  ParsedFragment,
   ParseOptions,
   ParsedDocument,
-  ParsedDocumentMetadata,
+  ParseMetadata,
   ParseResourceUsage,
   ParseStreamOptions,
   Span,
   SpanProvenance,
   TemplateContentNode,
   Token,
+  TokenizeByteStreamEagerResult,
   TokenizeByteStreamEagerOptions
 } from "./types.ts";
 import type {
@@ -84,12 +88,12 @@ import type {
 } from "../internal/html-engine/tree-model.ts";
 
 interface ParseInputContext {
-  readonly inputKind: ParsedDocumentMetadata["inputKind"];
+  readonly inputKind: ParseMetadata["inputKind"];
   readonly byteLength: number;
   readonly decodedUtf8ByteLength: number;
   readonly decodedCodeUnits: number;
   readonly transportByteLength: number | null;
-  readonly metadataEncoding: ParsedDocumentMetadata["encoding"];
+  readonly metadataEncoding: ParseMetadata["encoding"];
   readonly encodingPrescanBytes: number;
   readonly operation: OperationContext;
   readonly startedAt: number;
@@ -780,6 +784,29 @@ function finishDocumentOperation(
   return parsed;
 }
 
+function fragmentResourceUsage(
+  inputBytes: number,
+  decodedCodeUnits: number,
+  budgets: ParseFragmentOptions["budgets"],
+  result: HtmlEngineProductResult,
+  trace: TraceSink
+): ParseResourceUsage {
+  return Object.freeze({
+    inputBytes,
+    decodedUtf8Bytes: inputBytes,
+    decodedCodeUnits,
+    steps: budgets?.maxSteps === undefined ? null : result.resources.steps,
+    nodes: result.resources.nodes,
+    maxDepth: result.resources.maxDepth,
+    parseErrors: result.resources.parseErrors,
+    attributes: result.resources.attributes,
+    attributeUtf8Bytes: result.resources.attributeUtf8Bytes,
+    encodingPrescanBytes: 0,
+    traceEvents: trace.eventCount,
+    traceUtf8Bytes: trace.eventUtf8Bytes
+  });
+}
+
 function parseDocumentOperation(
   html: string,
   options: ParseOptions | ParseBytesOptions | ParseStreamOptions,
@@ -844,28 +871,65 @@ export function parseBytes(
   const operation = createOperationContext(normalized.budgets?.maxTimeMs, normalized.signal, startedAt);
   operation.checkpoint();
   enforceBudget("maxInputBytes", normalized.budgets?.maxInputBytes, bytes.byteLength);
-  const decodedBudget = new DecodedUtf8BudgetCounter(
-    normalized.budgets?.maxDecodedUtf8Bytes,
+  const trace = new TraceSink(
+    normalized.trace ?? "none",
+    normalized.onTraceEvent,
+    normalized.budgets,
     operation
   );
-  const decoded = decodeHtmlBytes(bytes, {
-    ...(normalized.transportEncodingLabel === undefined
-      ? {}
-      : { transportEncodingLabel: normalized.transportEncodingLabel }),
-    onDecodedChunk(chunk): void { decodedBudget.append(chunk); }
-  });
-  return parseDocumentOperation(decoded.text, normalized, {
+  let engine: ReturnType<typeof createDocumentEngine> | undefined;
+  let decoded;
+  try {
+    decoded = decodeByteArray(bytes, {
+      retainText: normalized.sourceRetention === "text",
+      ...(normalized.transportEncodingLabel === undefined
+        ? {}
+        : { transportEncodingLabel: normalized.transportEncodingLabel }),
+      ...(normalized.budgets?.maxDecodedUtf8Bytes === undefined
+        ? {}
+        : { maxDecodedUtf8Bytes: normalized.budgets.maxDecodedUtf8Bytes }),
+      onEncodingSniff(sniff): void {
+        trace.emit({
+          kind: "decode",
+          source: "sniff",
+          encoding: sniff.encoding,
+          sniffSource: sniff.source
+        });
+        engine = createDocumentEngine(normalized, startedAt, trace);
+      },
+      onDecodedChunk(chunk): void {
+        requireInternalValue(
+          engine,
+          "PUBLIC_PARSER_BYTES_ENGINE_NOT_INITIALIZED"
+        ).session.write(chunk);
+      }
+    }, operation);
+  } catch (error) {
+    return mapEngineFailure(error);
+  }
+  const activeEngine = requireInternalValue(
+    engine,
+    "PUBLIC_PARSER_BYTES_ENGINE_NOT_INITIALIZED"
+  );
+  let result: HtmlEngineProductResult;
+  try {
+    result = activeEngine.session.finishForPublicConversion();
+  } catch (error) {
+    return mapEngineFailure(error);
+  }
+  trace.emitBudget("maxInputBytes", normalized.budgets?.maxInputBytes, bytes.byteLength);
+  return finishDocumentOperation(decoded.text, normalized, {
     inputKind: "bytes",
     byteLength: bytes.byteLength,
-    decodedUtf8ByteLength: decodedBudget.bytes,
-    decodedCodeUnits: decoded.text.length,
+    decodedUtf8ByteLength: decoded.decodedUtf8Bytes,
+    decodedCodeUnits: decoded.decodedCodeUnits,
     transportByteLength: bytes.byteLength,
     metadataEncoding: { name: decoded.sniff.encoding, source: decoded.sniff.source },
     encodingPrescanBytes: 0,
     operation,
     startedAt,
     decode: { source: "sniff", encoding: decoded.sniff.encoding, sniffSource: decoded.sniff.source }
-  });
+  }, trace, result, activeEngine.state.tokenCount);
 }
 
 /**
@@ -879,14 +943,14 @@ export function parseBytes(
  *   namespaceUri: HTML_NAMESPACE_URI,
  *   localName: "tr"
  * });
- * console.log(fragment.children.length);
+ * console.log(fragment.tree.children.length);
  * ```
  */
 export function parseFragment(
   html: string,
   contextInput: HtmlFragmentContextInput,
   options: ParseFragmentOptions = {}
-): FragmentTree {
+): ParsedFragment {
   const startedAt = performance.now();
   const normalized = normalizeParseFragmentOptions(options);
   requireString(html, "input");
@@ -989,7 +1053,7 @@ export function parseFragment(
     encodingPrescanBytes: null,
     encodingPrescanLimitBytes: null
   });
-  return Object.freeze({
+  const tree: FragmentTree = Object.freeze({
     id: fragmentId,
     kind: "fragment",
     context,
@@ -999,6 +1063,22 @@ export function parseFragment(
     children: publicChildren,
     errors,
     ...(traceResult === undefined ? {} : { trace: traceResult })
+  });
+  registerParsedFragmentTree(tree);
+  return Object.freeze({
+    tree,
+    metadata: Object.freeze({
+      inputKind: "text",
+      transportByteLength: null,
+      encoding: Object.freeze({ name: null, source: "already-decoded" }),
+      resourceUsage: fragmentResourceUsage(
+        inputBytes,
+        html.length,
+        normalized.budgets,
+        result,
+        trace
+      )
+    })
   });
 }
 
@@ -1039,16 +1119,16 @@ function publicToken(token: HtmlToken, operation: OperationContext): Token {
 export async function tokenizeByteStreamEager(
   stream: ReadableStream<Uint8Array>,
   options: TokenizeByteStreamEagerOptions = {}
-): Promise<readonly Token[]> {
+): Promise<TokenizeByteStreamEagerResult> {
   const startedAt = performance.now();
   const normalized = normalizeTokenizeByteStreamEagerOptions(options);
   requireReadableByteStream(stream, "input");
   const operation = createOperationContext(normalized.budgets?.maxTimeMs, normalized.signal, startedAt);
-  const decoded = await decodeByteStream(stream, {
-    ...normalized,
-    retainText: true
-  }, operation);
+  operation.checkpoint();
   const limits: EngineResourceLimits = Object.freeze({
+    ...(normalized.budgets?.maxSteps === undefined
+      ? {}
+      : { maxSteps: normalized.budgets.maxSteps }),
     ...(normalized.budgets?.maxParseErrors === undefined
       ? {}
       : { maxParseErrors: normalized.budgets.maxParseErrors }),
@@ -1065,7 +1145,8 @@ export async function tokenizeByteStreamEager(
   const resources = createEngineResourceGuard({
     limits,
     ...(normalized.signal === undefined ? {} : { signal: normalized.signal }),
-    startedAt
+    startedAt,
+    trackSteps: normalized.budgets?.maxSteps !== undefined
   });
   const tokens: Token[] = [];
   const tokenizer = new HtmlTokenizer(resources, {
@@ -1075,14 +1156,37 @@ export async function tokenizeByteStreamEager(
       return token.kind !== "start-tag" || token.selfClosing;
     }
   }, { reuseInputCharacters: true });
+  let decoded;
   try {
-    tokenizer.write(requireInternalValue(decoded.text, "PUBLIC_TOKENIZER_RETAINED_TEXT_MISSING"));
+    decoded = await decodeByteStream(stream, {
+      ...normalized,
+      retainText: false,
+      onDecodedChunk(chunk): void { tokenizer.write(chunk); }
+    }, operation);
     tokenizer.close();
   } catch (error) {
     return mapEngineFailure(error);
   }
   operation.checkpoint();
-  return Object.freeze(tokens);
+  const usage = resources.snapshot();
+  return Object.freeze({
+    tokens: Object.freeze(tokens),
+    metadata: Object.freeze({
+      inputKind: "stream",
+      transportByteLength: decoded.totalBytes,
+      encoding: Object.freeze({ name: decoded.sniff.encoding, source: decoded.sniff.source }),
+      resourceUsage: Object.freeze({
+        inputBytes: decoded.totalBytes,
+        decodedUtf8Bytes: decoded.decodedUtf8Bytes,
+        decodedCodeUnits: decoded.decodedCodeUnits,
+        steps: normalized.budgets?.maxSteps === undefined ? null : usage.steps,
+        parseErrors: usage.parseErrors,
+        attributes: usage.attributes,
+        attributeUtf8Bytes: usage.attributeUtf8Bytes,
+        encodingPrescanBytes: decoded.encodingPrescanBytes
+      })
+    })
+  });
 }
 
 /**

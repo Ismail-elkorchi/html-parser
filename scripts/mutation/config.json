@@ -31,13 +31,66 @@
     },
     {
       "targetFile": "dist/public/serialization.js",
-      "testCommand": ["node", "--test", "test/behavior/fragment-context.test.js"],
+      "testCommand": [
+        "node",
+        "--test",
+        "test/behavior/fragment-context.test.js",
+        "test/behavior/serialization.test.js"
+      ],
       "mutants": [
         {
           "id": "parsed-tree-serializer-scripting-inheritance",
           "description": "Serialize every parsed tree under the inert scripting environment.",
           "search": "(tree.kind === \"document\" || tree.kind === \"fragment\" ? tree.scriptingMode : \"inert\")",
           "replace": "\"inert\""
+        }
+      ]
+    },
+    {
+      "targetFile": "dist/public/tree-validation.js",
+      "testCommand": ["node", "--test", "test/behavior/serialization.test.js"],
+      "mutants": [
+        {
+          "id": "serializer-element-name-preflight",
+          "description": "Allow an unsafe caller-constructed element name through serializer preflight.",
+          "search": "if (!isHtmlElementName(localName)) {",
+          "replace": "if (false && !isHtmlElementName(localName)) {"
+        },
+        {
+          "id": "serializer-serialized-attribute-uniqueness",
+          "description": "Allow two caller attributes to emit the same serialized HTML name.",
+          "search": "if (serializedNames.has(identity.serializedName)) {",
+          "replace": "if (false && serializedNames.has(identity.serializedName)) {"
+        },
+        {
+          "id": "serializer-template-content-ownership",
+          "description": "Allow an HTML template element without its owned template-content node.",
+          "search": "if (templateContent === undefined) {\n                invalid(`${entry.path}.templateContent`, \"must be present on an HTML template element\");\n            }\n            pending.push({\n                value: templateContent,\n                path: `${entry.path}.templateContent`,\n                placement: \"template\"\n            });",
+          "replace": "if (templateContent !== undefined) {\n                pending.push({\n                    value: templateContent,\n                    path: `${entry.path}.templateContent`,\n                    placement: \"template\"\n                });\n            }"
+        }
+      ]
+    },
+    {
+      "targetFile": "dist/public/html-input.js",
+      "testCommand": ["node", "--test", "test/behavior/streaming.test.js"],
+      "mutants": [
+        {
+          "id": "stream-early-meta-decision",
+          "description": "Delay a complete early meta-encoding decision until the prescan cap or EOF.",
+          "search": "pendingBytes <= 3 || lastBufferedByte === 0x3e ||",
+          "replace": "pendingBytes <= 3 || false ||"
+        }
+      ]
+    },
+    {
+      "targetFile": "dist/public/model.js",
+      "testCommand": ["node", "--test", "test/behavior/traversal-extraction.test.js"],
+      "mutants": [
+        {
+          "id": "query-element-attribute-shape",
+          "description": "Skip attribute-record validation at the shared query and traversal boundary.",
+          "search": "for (const attribute of attributes)\n        validateAttributeShape(attribute, option);",
+          "replace": "for (const attribute of [])\n        validateAttributeShape(attribute, option);"
         }
       ]
     },
@@ -185,7 +238,12 @@
     },
     {
       "targetFile": "dist/internal/encoding/sniff.js",
-      "testCommand": ["node", "--test", "test/behavior/encoding-sniff.test.js"],
+      "testCommand": [
+        "node",
+        "--test",
+        "test/behavior/encoding-sniff.test.js",
+        "test/behavior/streaming.test.js"
+      ],
       "mutants": [
         {
           "id": "encoding-alias-windows1252",
@@ -210,6 +268,12 @@
           "description": "Disable UTF-8 BOM detection.",
           "search": "if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {",
           "replace": "if (false && bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {"
+        },
+        {
+          "id": "stream-bom-prefix-wait",
+          "description": "Stop waiting for the complete mandatory BOM prefix before lower-priority encoding evidence.",
+          "search": "if (bomState === \"pending\")\n        return Object.freeze({ status: \"pending\" });",
+          "replace": "if (false && bomState === \"pending\")\n        return Object.freeze({ status: \"pending\" });"
         }
       ]
     },
@@ -768,8 +832,8 @@
         {
           "id": "product-trace-byte-accounting",
           "description": "Discard retained trace byte accounting from public resource observations.",
-          "search": "traceUtf8Bytes: trace.eventUtf8Bytes",
-          "replace": "traceUtf8Bytes: 0"
+          "search": "encodingPrescanBytes: input.encodingPrescanBytes,\n        traceEvents: trace.eventCount,\n        traceUtf8Bytes: trace.eventUtf8Bytes",
+          "replace": "encodingPrescanBytes: input.encodingPrescanBytes,\n        traceEvents: trace.eventCount,\n        traceUtf8Bytes: 0"
         },
         {
           "id": "product-step-budget-forwarding",
@@ -800,6 +864,24 @@
           "description": "Discard decoded chunks instead of feeding tree construction before EOF.",
           "search": "requireInternalValue(engine, \"PUBLIC_PARSER_STREAM_ENGINE_NOT_INITIALIZED\").session.write(chunk);",
           "replace": "void chunk;"
+        },
+        {
+          "id": "eager-tokenization-step-limit",
+          "description": "Drop the public eager-tokenization step limit before engine construction.",
+          "search": ": { maxSteps: normalized.budgets.maxSteps }),",
+          "replace": ": {}),"
+        },
+        {
+          "id": "eager-tokenization-step-evidence",
+          "description": "Hide the observed eager-tokenization step count after successful work.",
+          "search": "steps: normalized.budgets?.maxSteps === undefined ? null : usage.steps,",
+          "replace": "steps: null,"
+        },
+        {
+          "id": "fragment-step-evidence",
+          "description": "Hide the observed fragment parser step count after successful work.",
+          "search": "function fragmentResourceUsage(inputBytes, decodedCodeUnits, budgets, result, trace) {\n    return Object.freeze({\n        inputBytes,\n        decodedUtf8Bytes: inputBytes,\n        decodedCodeUnits,\n        steps: budgets?.maxSteps === undefined ? null : result.resources.steps,",
+          "replace": "function fragmentResourceUsage(inputBytes, decodedCodeUnits, budgets, result, trace) {\n    return Object.freeze({\n        inputBytes,\n        decodedUtf8Bytes: inputBytes,\n        decodedCodeUnits,\n        steps: null,"
         }
       ]
     }

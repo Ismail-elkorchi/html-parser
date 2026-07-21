@@ -72,9 +72,9 @@ function normalizeNodes(nodes) {
 const failures = [];
 const positive = [];
 for (const testCase of POSITIVE_CASES) {
-  const first = parseFragment(testCase.html, HTML_DIV_CONTEXT);
+  const first = parseFragment(testCase.html, HTML_DIV_CONTEXT).tree;
   const serialized = serialize(first);
-  const second = parseFragment(serialized, HTML_DIV_CONTEXT);
+  const second = parseFragment(serialized, HTML_DIV_CONTEXT).tree;
   const before = normalizeNodes(first.children);
   const after = normalizeNodes(second.children);
   const stable = JSON.stringify(before) === JSON.stringify(after);
@@ -87,16 +87,16 @@ for (const testCase of POSITIVE_CASES) {
   if (!stable) failures.push({ id: testCase.id, reason: "unexpected-roundtrip-difference" });
 }
 
-const plaintextFirst = parseFragment("<plaintext>a<b>", HTML_DIV_CONTEXT);
+const plaintextFirst = parseFragment("<plaintext>a<b>", HTML_DIV_CONTEXT).tree;
 const plaintextSerialized = serialize(plaintextFirst);
-const plaintextSecond = parseFragment(plaintextSerialized, HTML_DIV_CONTEXT);
+const plaintextSecond = parseFragment(plaintextSerialized, HTML_DIV_CONTEXT).tree;
 const rawCase = PUBLIC_SERIALIZATION_QUALIFICATION_CASES.find(
   (testCase) => testCase.id === "classified/raw-effective-end-tag"
 );
 if (rawCase === undefined) throw new Error("missing raw effective-end-tag qualification case");
 const rawNode = createPublicSerializationNode(rawCase.descriptor);
 const rawSerialized = serialize(rawNode);
-const rawSecond = parseFragment(rawSerialized, HTML_DIV_CONTEXT);
+const rawSecond = parseFragment(rawSerialized, HTML_DIV_CONTEXT).tree;
 
 const classified = [
   {

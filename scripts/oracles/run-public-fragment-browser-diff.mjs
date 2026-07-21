@@ -140,7 +140,7 @@ function normalizePublicNode(node) {
 }
 
 function normalizePublic(testCase) {
-  return parseFragment(testCase.html, testCase.context, testCase.options).children.map(normalizePublicNode);
+  return parseFragment(testCase.html, testCase.context, testCase.options).tree.children.map(normalizePublicNode);
 }
 
 async function normalizeBrowser(page, testCase) {

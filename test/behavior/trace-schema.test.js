@@ -124,7 +124,7 @@ test("trace counts logical parser tokens once, including EOF", () => {
     "a<b>&amp;</b>",
     htmlContext("textarea"),
     { trace: "events" }
-  )), 2);
+  ).tree), 2);
 });
 
 test("trace includes parseError events for malformed input", () => {

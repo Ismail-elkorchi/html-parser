@@ -1,9 +1,11 @@
+import { HtmlConfigurationError } from "./errors.ts";
 import { requireString } from "./html-input.ts";
 import {
   HTML_NAMESPACE_URI,
   asciiLowercase,
   isHtmlElement,
-  iterateNodes
+  iterateNodes,
+  requireElementNode
 } from "./model.ts";
 import {
   createOperationContext,
@@ -21,6 +23,42 @@ import type {
   OperationOptions
 } from "./types.ts";
 
+function invalid(option: string, expected: string): never {
+  throw new HtmlConfigurationError(option, "INVALID_VALUE", expected);
+}
+
+function requireTree(
+  value: unknown,
+  option: string
+): asserts value is DocumentTree | FragmentTree {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    invalid(option, "must be a document or fragment tree");
+  }
+  const source = value as Readonly<Record<PropertyKey, unknown>>;
+  if ((source["kind"] !== "document" && source["kind"] !== "fragment") ||
+      !Array.isArray(source["children"])) {
+    invalid(option, "must be a document or fragment tree");
+  }
+}
+
+function requireCallback(value: unknown, option: string): asserts value is (...args: never[]) => unknown {
+  if (typeof value !== "function") invalid(option, "must be a function");
+}
+
+function requireNodeId(value: unknown, option: string): asserts value is NodeId {
+  if (!Number.isSafeInteger(value) || (value as number) < 1) {
+    invalid(option, "must be a positive safe integer");
+  }
+}
+
+function requireNullableString(value: unknown, option: string): asserts value is string | null {
+  if (value !== null) requireString(value, option);
+}
+
+function requireOptionalString(value: unknown, option: string): asserts value is string | undefined {
+  if (value !== undefined) requireString(value, option);
+}
+
 /** Visits every node in depth-first tree order. */
 export function walk(
   tree: DocumentTree | FragmentTree,
@@ -29,6 +67,8 @@ export function walk(
 ): void {
   const startedAt = performance.now();
   const normalizedOptions = normalizeOperationOptions(options);
+  requireTree(tree, "tree");
+  requireCallback(visitor, "visitor");
   const operation = createOperationContext(
     normalizedOptions.maxTimeMs,
     normalizedOptions.signal,
@@ -49,6 +89,8 @@ export function walkElements(
 ): void {
   const startedAt = performance.now();
   const normalizedOptions = normalizeOperationOptions(options);
+  requireTree(tree, "tree");
+  requireCallback(visitor, "visitor");
   const operation = createOperationContext(
     normalizedOptions.maxTimeMs,
     normalizedOptions.signal,
@@ -71,6 +113,8 @@ export function findById(
 ): HtmlNode | null {
   const startedAt = performance.now();
   const normalizedOptions = normalizeOperationOptions(options);
+  requireTree(tree, "tree");
+  requireNodeId(id, "id");
   const operation = createOperationContext(
     normalizedOptions.maxTimeMs,
     normalizedOptions.signal,
@@ -91,11 +135,13 @@ export function getAttributeValue(
   node: Extract<HtmlNode, { kind: "element" }>,
   name: string
 ): string | undefined {
-  if (node.namespaceUri !== HTML_NAMESPACE_URI) {
+  const element = requireElementNode(node, "node");
+  requireString(name, "name");
+  if (element.namespaceUri !== HTML_NAMESPACE_URI) {
     return undefined;
   }
   const target = asciiLowercase(name);
-  for (const attribute of node.attributes) {
+  for (const attribute of element.attributes) {
     if (attribute.namespaceUri === null && asciiLowercase(attribute.localName) === target) {
       return attribute.value;
     }
@@ -117,7 +163,10 @@ export function getAttributeValueNS(
   namespaceUri: string | null,
   localName: string
 ): string | undefined {
-  return node.attributes.find((attribute) =>
+  const element = requireElementNode(node, "node");
+  requireNullableString(namespaceUri, "namespaceUri");
+  requireString(localName, "localName");
+  return element.attributes.find((attribute) =>
     attribute.namespaceUri === namespaceUri && attribute.localName === localName
   )?.value;
 }
@@ -151,6 +200,8 @@ export function findAllByTagName(
   options: OperationOptions = {}
 ): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
   const startedAt = performance.now();
+  requireTree(tree, "tree");
+  requireString(tagName, "tagName");
   const normalizedOptions = normalizeOperationOptions(options);
   const operation = createOperationContext(
     normalizedOptions.maxTimeMs,
@@ -186,6 +237,7 @@ export function findAllByTagNameNS(
   options: OperationOptions = {}
 ): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
   const startedAt = performance.now();
+  requireTree(tree, "tree");
   requireString(namespaceUri, "namespaceUri");
   requireString(localName, "localName");
   const normalizedOptions = normalizeOperationOptions(options);
@@ -231,6 +283,9 @@ export function findAllByAttr(
   options: OperationOptions = {}
 ): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
   const startedAt = performance.now();
+  requireTree(tree, "tree");
+  requireString(name, "name");
+  requireOptionalString(value, "value");
   const normalizedOptions = normalizeOperationOptions(options);
   const operation = createOperationContext(
     normalizedOptions.maxTimeMs,
@@ -272,10 +327,10 @@ export function findAllByAttrNS(
   options: OperationOptions = {}
 ): IterableIterator<Extract<HtmlNode, { kind: "element" }>> {
   const startedAt = performance.now();
-  if (namespaceUri !== null) {
-    requireString(namespaceUri, "namespaceUri");
-  }
+  requireTree(tree, "tree");
+  requireNullableString(namespaceUri, "namespaceUri");
   requireString(localName, "localName");
+  requireOptionalString(value, "value");
   const normalizedOptions = normalizeOperationOptions(options);
   const operation = createOperationContext(
     normalizedOptions.maxTimeMs,

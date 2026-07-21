@@ -84,10 +84,11 @@ async function runBrowserSmoke(baseUrl) {
       const serialized = mod.serialize(parsed);
       const parsedBytes = mod.parseBytes(new TextEncoder().encode(sampleHtml)).tree;
       const bytesSerialized = mod.serialize(parsedBytes);
-      const fragment = mod.parseFragment("child", {
+      const fragmentResult = mod.parseFragment("child", {
         namespaceUri: mod.HTML_NAMESPACE_URI,
         localName: "section"
-      });
+      }, { budgets: { maxSteps: 10_000 } });
+      const fragment = fragmentResult.tree;
       const streamParsed = (await mod.parseStream(streamFromText(sampleHtml))).tree;
       const streamSerialized = mod.serialize(streamParsed);
 
@@ -108,15 +109,19 @@ async function runBrowserSmoke(baseUrl) {
         abortError = error;
       }
 
-      const tokenKinds = (await mod.tokenizeByteStreamEager(
-        streamFromText(sampleHtml)
-      )).map((token) => token.kind);
+      const tokenization = await mod.tokenizeByteStreamEager(
+        streamFromText(sampleHtml),
+        { budgets: { maxSteps: 10_000 } }
+      );
+      const tokenKinds = tokenization.tokens.map((token) => token.kind);
 
       const stablePayload = {
         serialized,
         bytesSerialized,
         streamSerialized,
         fragmentContext: fragment.context,
+        fragmentResources: fragmentResult.metadata.resourceUsage,
+        tokenizationResources: tokenization.metadata.resourceUsage,
         tokenKinds
       };
       const hashBuffer = await globalThis.crypto.subtle.digest(
@@ -135,13 +140,16 @@ async function runBrowserSmoke(baseUrl) {
         parseBytes: bytesSerialized.includes("<p>smoke</p>"),
         parseStream: streamSerialized.includes("<p>smoke</p>"),
         parseFragment: fragment.context.localName === "section" &&
-          fragment.context.namespaceUri === mod.HTML_NAMESPACE_URI,
+          fragment.context.namespaceUri === mod.HTML_NAMESPACE_URI &&
+          Number.isSafeInteger(fragmentResult.metadata.resourceUsage.steps),
         traceSummary: traceSummary?.mode === "summary" &&
           !("events" in traceSummary) &&
           traceSummary.summary.eventCount > 0 &&
           traceSummary.summary.eventKinds.includes("token") &&
           JSON.stringify(traceSummary) === JSON.stringify(secondTraceSummary),
-        tokenizeByteStreamEager: tokenKinds.includes("startTag") && tokenKinds.includes("endTag"),
+        tokenizeByteStreamEager: tokenKinds.includes("startTag") &&
+          tokenKinds.includes("endTag") &&
+          Number.isSafeInteger(tokenization.metadata.resourceUsage.steps),
         errorGuards: typeof mod.isHtmlBudgetExceededError === "function" &&
           mod.isHtmlBudgetExceededError(budgetError) &&
           budgetError.code === "BUDGET_EXCEEDED" &&

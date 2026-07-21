@@ -4,6 +4,7 @@ import {
   normalizeChunkOptions
 } from "./operation.ts";
 import { serializeNodes } from "./serialization.ts";
+import { validateSerializableInput } from "./tree-validation.ts";
 
 import type {
   Chunk,
@@ -23,6 +24,7 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
     startedAt
   );
   operation.checkpoint();
+  validateSerializableInput(tree, operation);
   const maxChars = normalizedOptions.maxChars ?? 8192;
   const maxNodes = normalizedOptions.maxNodes ?? 256;
   const maxBytes = normalizedOptions.maxBytes ?? Number.POSITIVE_INFINITY;

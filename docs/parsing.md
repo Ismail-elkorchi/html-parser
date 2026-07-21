@@ -52,8 +52,8 @@ document or fragment and inherited by serialization and chunking.
 `parseFragment()` interprets input in the parsing context of an external HTML,
 SVG, or MathML element. The context is a descriptor, not a tag-name shortcut,
 because namespace and selected attributes affect tokenization and tree
-construction. It returns a `FragmentTree`, not a `ParsedDocument`, and does
-not support source retention.
+construction. It returns a `ParsedFragment` containing a `FragmentTree` and
+successful parse metadata. Fragment parsing does not support source retention.
 
 ```ts
 import {
@@ -62,14 +62,14 @@ import {
   serialize
 } from "@ismail-elkorchi/html-parser";
 
-const fragment = parseFragment("<tr><td>A<td>B", {
+const { tree: fragment, metadata } = parseFragment("<tr><td>A<td>B", {
   namespaceUri: HTML_NAMESPACE_URI,
   localName: "tbody"
 }, {
   budgets: { maxNodes: 32, maxDepth: 8 }
 });
 
-console.log(fragment.kind); // "fragment"
+console.log(fragment.kind, metadata.resourceUsage.nodes); // "fragment", observed nodes
 console.log(serialize(fragment));
 ```
 
@@ -92,7 +92,7 @@ parsing environment:
   descriptor is an HTML `form`. A context that is itself an HTML `form` is
   recognized directly and does not require a redundant option.
 
-These values are retained on the returned fragment. `serialize(fragment)` and
+These values are retained on the returned fragment tree. `serialize(fragment)` and
 `chunk(fragment)` inherit its scripting mode; an explicit serialization option
 still overrides it. Supply environment values from the real context document
 when parity with browser `innerHTML` parsing matters.
@@ -100,7 +100,7 @@ when parity with browser `innerHTML` parsing matters.
 ## Parse diagnostics
 
 Malformed HTML is normally recovered according to HTML parsing rules. The
-result keeps non-fatal diagnostics in `tree.errors` or `fragment.errors`; each
+result keeps non-fatal diagnostics in its tree's `errors` array; each
 entry has a stable `parseErrorId`, location data when available, and a short
 message. `getParseErrorSpecRef()` returns the dedicated HTML Standard anchor
 for a named tokenizer or input-stream error. Unnamed tree-construction errors

@@ -15,7 +15,7 @@ import {
   parsedDocumentRegistration,
   patchPlanBelongsTo,
   registerPatchPlan
-} from "./parsed-document-registry.ts";
+} from "./parsed-output-registry.ts";
 
 import type {
   Edit,

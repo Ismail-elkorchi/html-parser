@@ -74,10 +74,12 @@ classifications. Corpus details and refresh constraints are in
 
 `npm run oracle:documents` runs every one of the 1,698 scripting-invariant
 document cases in the pinned WPT tree-construction corpus plus 26 focused
-product probes against Chromium, Firefox, and WebKit. The complete outcome and
-known-difference inventories are fingerprinted per pinned browser version; a
-browser update or any parser/browser result change requires an explicit
-baseline review.
+product probes against Chromium, Firefox, and WebKit. The complete outcome is
+fingerprinted per pinned browser version. Every known difference also has an
+exact case identifier, classification, explanation, and public/browser result
+hashes; aggregate counts and hashes are secondary drift guards. A browser
+update or any parser/browser result change requires an explicit baseline
+review.
 
 `npm run qualification:serialization` verifies the exact pinned WPT
 serialization inventory, calls `dist/mod.js#serialize` for every applicable
@@ -115,7 +117,8 @@ an oracle's behavior blindly.
   immediate-regression thresholds.
 - `npm run qualification:resources` compares bounded and unbounded parser work
   in isolated processes and requires every limit to fail at its first
-  unavailable unit while retaining less heap.
+  unavailable unit while retaining less heap. It also verifies that byte
+  parsing without source retention does not retain the complete decoded source.
 - `npm run qualification:mutation` requires every configured mutation to be
   killed; invalid or surviving mutations fail the command.
 
@@ -132,3 +135,9 @@ three-browser oracles, fuzzing, resource and mutation checks, supply-chain
 evidence, and cross-revision performance. Both profiles fail at the first
 failed command and retain diagnostic reports under `reports/`; they do not
 assign an artificial quality score.
+
+The blocking CI runtime contract verifies exact Node, Deno, and Bun output
+agreement on Linux, macOS, and Windows. The separate Linux Node-version matrix
+owns linting, types, documentation, builds, and tests; npm/JSR public-surface
+parity belongs to the Linux cross-runtime job because it requires both Node and
+Deno. Browser engines are exercised by the qualification workflow.

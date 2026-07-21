@@ -29,12 +29,6 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      - name: Setup Deno
-        if: matrix.node-version == 20
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-        with:
-          deno-version: v2.x
-
       - name: Install
         run: npm ci
 
@@ -50,15 +44,22 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Public surface parity
-        if: matrix.node-version == 20
-        run: npm run test:public-surface
-
       - name: Test
         run: npm test
 
-  deno:
-    runs-on: ubuntu-latest
+  platform-runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux
+          - os: macos-latest
+            name: macos
+          - os: windows-latest
+            name: windows
+    runs-on: ${{ matrix.os }}
+    name: runtime-${{ matrix.name }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -74,35 +75,15 @@ jobs:
         with:
           deno-version: v2.x
 
-      - name: Install
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Control smoke (Deno)
-        run: npm run smoke:deno
-
-  bun:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 20
-          cache: npm
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Install
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Runtime agreement
+        run: npm run qualification:runtime
 
-      - name: Control smoke (Bun)
-        run: npm run smoke:bun
+      - name: Public surface parity
+        if: matrix.name == 'linux'
+        run: npm run test:public-surface
