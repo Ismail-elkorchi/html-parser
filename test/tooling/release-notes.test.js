@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -43,4 +44,15 @@ test("changelog updates retain one generated Changes block", () => {
   assert.match(twice, /### Changes \(v0\.1\.1\.\.\.main\)\n- Two/);
   assert.doesNotMatch(twice, /- One/);
   assert.equal((twice.match(/release-notes:start/g) ?? []).length, 1);
+});
+
+test("the no-checkout release publisher supplies explicit repository identity", async () => {
+  const workflow = await readFile(
+    new URL("../../.github/workflows/release.yml", import.meta.url),
+    "utf8"
+  );
+  const publisher = workflow.slice(workflow.indexOf("  publish-release-notes:"));
+
+  assert.match(publisher, /gh release edit .* --repo "\$\{GITHUB_REPOSITORY\}"/);
+  assert.doesNotMatch(publisher, /uses: actions\/checkout/);
 });
