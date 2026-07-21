@@ -7,6 +7,9 @@ import { nowIso, sha256, writeJson } from "../lib/report.mjs";
 
 const REPORT_PATH = "reports/package.json";
 const WORK_DIRECTORY = path.resolve("tmp/package-qualification");
+const PACKAGE_ARTIFACT_DIRECTORY = process.env["HTML_PARSER_PACKAGE_ARTIFACT_DIRECTORY"] === undefined
+  ? undefined
+  : path.resolve(process.env["HTML_PARSER_PACKAGE_ARTIFACT_DIRECTORY"]);
 const FORBIDDEN_PREFIXES = Object.freeze([
   "scripts/",
   "test/",
@@ -216,6 +219,17 @@ try {
     installed,
     failures
   };
+  if (report.ok && PACKAGE_ARTIFACT_DIRECTORY !== undefined) {
+    const relativeArtifactDirectory = path.relative(process.cwd(), PACKAGE_ARTIFACT_DIRECTORY);
+    if (
+      relativeArtifactDirectory === "" ||
+      (!relativeArtifactDirectory.startsWith(`..${path.sep}`) && relativeArtifactDirectory !== "..")
+    ) {
+      throw new Error("publication artifacts must be preserved outside the checkout");
+    }
+    await mkdir(PACKAGE_ARTIFACT_DIRECTORY, { recursive: true });
+    await copyFile(tarballPath, path.join(PACKAGE_ARTIFACT_DIRECTORY, packInfo.filename));
+  }
 } catch (error) {
   report = {
     schemaVersion: 1,

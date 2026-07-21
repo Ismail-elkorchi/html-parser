@@ -1,6 +1,6 @@
 {
   "name": "@ismail-elkorchi/html-parser",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "HTML parser with bounded text extraction, fragment parsing, and structural traversal.",
   "license": "MIT",
   "repository": {

@@ -11,7 +11,19 @@ Publication has one route: publish a GitHub release whose tag is exactly
 `v<package.json version>`. The tag, release event SHA, checked-out commit, and
 current `main` commit must all be identical. The publish workflow reruns the
 complete release qualification on that checkout before either registry is
-written. There is no manual branch, tag, or arbitrary-SHA publishing path.
+written. It preserves the exact npm tarball installed by package qualification,
+publishes that artifact, and verifies npm integrity/provenance and the complete
+JSR file manifest after publication. Registry writes are idempotent only when
+an existing version is byte-for-byte identical, so a partially completed run
+can be safely retried. There is no manual branch, tag, or arbitrary-SHA
+publishing path.
+
+Release builds use the npm version declared by `packageManager` and a pinned
+Deno runtime for native JSR publication on GitHub-hosted runners. The npm
+trusted publisher must identify
+`Ismail-elkorchi/html-parser`, `publish.yml`, and the `npm publish` action; the
+JSR package must remain linked to the same GitHub repository. Both registries
+use OIDC and require `id-token: write`.
 
 Use the manually dispatchable release-audit workflow for registry dry runs.
 It never publishes.

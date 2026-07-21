@@ -16,6 +16,9 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      NPM_CLI_VERSION: "11.10.0"
+      DENO_PUBLISH_VERSION: "2.9.3"
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -28,15 +31,26 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          cache: npm
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Pin npm CLI
+        run: |
+          npm install --global "npm@${NPM_CLI_VERSION}"
+          test "$(npm --version)" = "${NPM_CLI_VERSION}"
 
       - name: Setup Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
-          deno-version: v2.x
+          deno-version: v${{ env.DENO_PUBLISH_VERSION }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Initialize release paths
+        run: |
+          echo "PUBLISH_ARTIFACTS_DIR=${RUNNER_TEMP}/html-parser-publish" >> "${GITHUB_ENV}"
+          echo "HTML_PARSER_PACKAGE_ARTIFACT_DIRECTORY=${RUNNER_TEMP}/html-parser-publish" >> "${GITHUB_ENV}"
 
       - name: Install dependencies
         run: npm ci
@@ -66,17 +80,14 @@ jobs:
           fi
 
           expected_version="${RELEASE_TAG#v}"
-
           if ! printf '%s' "${expected_version}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::Expected semantic version x.y.z, got '${expected_version}'"
             exit 1
           fi
-
           if [ "${expected_version}" != "${package_version}" ]; then
             echo "::error::Version mismatch: expected=${expected_version} package=${package_version}"
             exit 1
           fi
-
           if [ "${RELEASE_TAG}" != "v${package_version}" ]; then
             echo "::error::Release tag must be v${package_version}, got ${RELEASE_TAG}"
             exit 1
@@ -95,14 +106,16 @@ jobs:
             exit 1
           fi
 
-          mkdir -p publish-artifacts
+          mkdir -p "${PUBLISH_ARTIFACTS_DIR}"
           {
             echo "package_name=${package_name}"
             echo "version=${package_version}"
             echo "commit_sha=${checkout_commit}"
             echo "release_tag=${RELEASE_TAG}"
             echo "main_commit=${main_commit}"
-          } | tee publish-artifacts/publish-summary.txt
+            echo "npm_cli=${NPM_CLI_VERSION}"
+            echo "deno_publish_cli=${DENO_PUBLISH_VERSION}"
+          } | tee "${PUBLISH_ARTIFACTS_DIR}/publish-summary.txt"
 
           {
             echo "package_name=${package_name}"
@@ -129,93 +142,129 @@ jobs:
           test "$(git rev-parse HEAD)" = "${QUALIFIED_COMMIT}"
           test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "${QUALIFIED_COMMIT}"
           test "$(git rev-parse origin/main)" = "${QUALIFIED_COMMIT}"
-          git diff --quiet
-          git diff --cached --quiet
-          printf 'qualified_commit=%s\n' "${QUALIFIED_COMMIT}" >> publish-artifacts/publish-summary.txt
+          test -z "$(git status --porcelain)"
+          printf 'qualified_commit=%s\n' "${QUALIFIED_COMMIT}" >> "${PUBLISH_ARTIFACTS_DIR}/publish-summary.txt"
 
-      - name: Ensure npm version does not already exist
-        env:
-          PACKAGE_NAME: ${{ steps.meta.outputs.package_name }}
-          VERSION: ${{ steps.meta.outputs.version }}
+      - name: Resolve exact qualified npm artifact
+        id: artifact
         run: |
           set -euo pipefail
-          set +e
-          npm_view_output="$(npm view "${PACKAGE_NAME}@${VERSION}" version 2>&1)"
-          npm_view_status=$?
-          set -e
-
-          if [ ${npm_view_status} -eq 0 ]; then
-            echo "::error::npm version already exists: ${PACKAGE_NAME}@${VERSION}"
-            echo "${npm_view_output}"
+          tarball_name="$(jq -er '.tarball.name' reports/package.json)"
+          expected_sha256="$(jq -er '.tarball.sha256' reports/package.json)"
+          expected_integrity="$(jq -er '.tarball.integrity' reports/package.json)"
+          tarball_path="${PUBLISH_ARTIFACTS_DIR}/${tarball_name}"
+          test -f "${tarball_path}"
+          actual_sha256="$(sha256sum "${tarball_path}" | awk '{print $1}')"
+          if [ "${actual_sha256}" != "${expected_sha256}" ]; then
+            echo "::error::Qualified tarball SHA-256 mismatch"
             exit 1
           fi
-
-          if printf '%s' "${npm_view_output}" | grep -Eqi 'E404|404 Not Found|not found'; then
-            echo "npm version does not exist yet: ${PACKAGE_NAME}@${VERSION}"
-          else
-            echo "::error::Unable to verify npm version state for ${PACKAGE_NAME}@${VERSION}"
-            echo "${npm_view_output}"
-            exit 1
-          fi
-
-      - name: Ensure JSR version does not already exist
-        env:
-          PACKAGE_NAME: ${{ steps.meta.outputs.package_name }}
-          VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          set -euo pipefail
-          set +e
-          jsr_info_output="$(npx -y jsr info "${PACKAGE_NAME}@${VERSION}" 2>&1)"
-          jsr_info_status=$?
-          set -e
-
-          if [ ${jsr_info_status} -eq 0 ]; then
-            echo "::error::JSR version already exists: ${PACKAGE_NAME}@${VERSION}"
-            echo "${jsr_info_output}"
-            exit 1
-          fi
-
-          if printf '%s' "${jsr_info_output}" | grep -Eqi '404|not found|Received 404'; then
-            echo "JSR version does not exist yet: ${PACKAGE_NAME}@${VERSION}"
-          else
-            echo "::error::Unable to verify JSR version state for ${PACKAGE_NAME}@${VERSION}"
-            echo "${jsr_info_output}"
-            exit 1
-          fi
-
-      - name: Generate npm pack manifest
-        run: |
-          set -euo pipefail
-          pack_json="$(npm pack --json)"
-          printf '%s\n' "${pack_json}" > publish-artifacts/npm-pack.json
-          tarball="$(printf '%s\n' "${pack_json}" | node -e 'const fs=require("node:fs");const data=JSON.parse(fs.readFileSync(0,"utf8"));process.stdout.write(data[0].filename);')"
-          tar -tzf "${tarball}" | sort > publish-artifacts/npm-pack-file-list.txt
-          rm -f "${tarball}"
+          jq '.tarball' reports/package.json > "${PUBLISH_ARTIFACTS_DIR}/npm-pack.json"
+          tar -tzf "${tarball_path}" | LC_ALL=C sort > "${PUBLISH_ARTIFACTS_DIR}/npm-pack-file-list.txt"
+          {
+            echo "tarball_path=${tarball_path}"
+            echo "integrity=${expected_integrity}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Run JSR publish dry-run
         run: |
           set -euo pipefail
-          npx -y jsr publish --dry-run --allow-dirty 2>&1 | tee publish-artifacts/jsr-publish-dry-run.txt
+          test "$(deno --version | head -1 | awk '{print $2}')" = "${DENO_PUBLISH_VERSION}"
+          deno publish --dry-run 2>&1 | tee "${PUBLISH_ARTIFACTS_DIR}/jsr-publish-dry-run.txt"
 
-      - name: Upload publish artifacts
+      - name: Check npm publication state
+        id: npm-state
+        run: |
+          set -euo pipefail
+          node scripts/release/check-registry-version.mjs --registry=npm > "${PUBLISH_ARTIFACTS_DIR}/npm-state-before.json"
+          state="$(jq -r '.state' "${PUBLISH_ARTIFACTS_DIR}/npm-state-before.json")"
+          case "${state}" in
+            absent) action=publish ;;
+            identical) action=skip ;;
+            *) echo "::error::Unexpected npm state: ${state}"; exit 1 ;;
+          esac
+          echo "action=${action}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check JSR publication state
+        id: jsr-state
+        run: |
+          set -euo pipefail
+          node scripts/release/check-registry-version.mjs --registry=jsr > "${PUBLISH_ARTIFACTS_DIR}/jsr-state-before.json"
+          state="$(jq -r '.state' "${PUBLISH_ARTIFACTS_DIR}/jsr-state-before.json")"
+          case "${state}" in
+            absent) action=publish ;;
+            identical) action=skip ;;
+            *) echo "::error::Unexpected JSR state: ${state}"; exit 1 ;;
+          esac
+          echo "action=${action}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload pre-publication evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: publish-${{ steps.meta.outputs.version }}
           path: |
-            publish-artifacts/
+            ${{ runner.temp }}/html-parser-publish/
             reports/**
 
-      - name: Ensure tokenless npm auth for OIDC publish
+      - name: Revalidate publication boundary
+        env:
+          QUALIFIED_COMMIT: ${{ steps.meta.outputs.commit_sha }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          test "$(git rev-parse HEAD)" = "${QUALIFIED_COMMIT}"
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "${QUALIFIED_COMMIT}"
+          test "$(git rev-parse origin/main)" = "${QUALIFIED_COMMIT}"
+          test -z "$(git status --porcelain)"
+
+      - name: Publish JSR
+        if: ${{ steps.jsr-state.outputs.action == 'publish' }}
+        run: |
+          set -euo pipefail
+          deno publish 2>&1 | tee "${PUBLISH_ARTIFACTS_DIR}/jsr-publish.txt"
+
+      - name: Verify JSR publication
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if node scripts/release/check-registry-version.mjs --registry=jsr --require-present > "${PUBLISH_ARTIFACTS_DIR}/jsr-state-after.json"; then
+              exit 0
+            fi
+            if [ "${attempt}" -lt 12 ]; then sleep 5; fi
+          done
+          echo "::error::JSR publication did not become exactly verifiable"
+          exit 1
+
+      - name: Ensure tokenless npm auth
         run: |
           unset NODE_AUTH_TOKEN
           npm config delete //registry.npmjs.org/:_authToken || true
 
-      - name: Publish npm (trusted publishing)
+      - name: Publish npm exact artifact
+        if: ${{ steps.npm-state.outputs.action == 'publish' }}
         env:
           NPM_CONFIG_PROVENANCE: true
         run: |
+          set -euo pipefail
           unset NODE_AUTH_TOKEN
-          npm publish --provenance --access public
+          npm publish "${{ steps.artifact.outputs.tarball_path }}" --provenance --access public
 
-      - name: Publish JSR
-        run: npx -y jsr publish --allow-dirty --provenance
+      - name: Verify npm publication
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if node scripts/release/check-registry-version.mjs --registry=npm --require-present > "${PUBLISH_ARTIFACTS_DIR}/npm-state-after.json"; then
+              exit 0
+            fi
+            if [ "${attempt}" -lt 12 ]; then sleep 5; fi
+          done
+          echo "::error::npm publication did not become exactly verifiable"
+          exit 1
+
+      - name: Upload publication results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: publication-${{ steps.meta.outputs.version }}
+          path: ${{ runner.temp }}/html-parser-publish/

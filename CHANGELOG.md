@@ -4,6 +4,8 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+## [0.2.0] - 2026-07-21
+
 - Validate the complete runtime edit shape in source patching, normalize HTML
   attribute identity across HTML and foreign elements, reject ambiguous
   namespace-changing spellings and conflicting edits, and prevent malformed
@@ -156,7 +158,8 @@ All notable changes are documented in this file.
   trees for serialization and chunking, and report successful step counts only
   when enabled.
 - Make parser-step accounting invariant to decoded-input chunk boundaries and
-  replace single-GC retained-heap evidence with fixed-point collection.
+  qualify retained-result memory with fixed full collection and cohorts sized
+  to amortize process-level parser initialization.
 - Return exact HTML Standard anchors for named parse errors and remove the
   unpopulated `ParseError.nodeId` field.
 - Strengthen strict TypeScript and type-aware ESLint checks for unreachable and
