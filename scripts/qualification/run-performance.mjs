@@ -219,7 +219,7 @@ const report = {
   throughputMetric:
     "input MiB per process CPU second; wall throughput is retained as diagnostic evidence",
   memoryMetric:
-    "post-GC heap delta per retained public result from an isolated post-warmup fixed-size cohort",
+    "post-GC incremental heap per retained public result from an isolated post-warmup fixed-size cohort; caller-owned parse strings and serializer trees are prepared and retained before the heap baseline",
   runtimeHeapConfiguration: Object.freeze({
     maxOldSpaceSizeMb: 256,
     maxSemiSpaceSizeMb: 8
