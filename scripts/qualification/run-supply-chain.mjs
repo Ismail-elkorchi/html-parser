@@ -74,8 +74,9 @@ const characterReferenceCheck = run(process.execPath, [
 const notices = await readFile("THIRD_PARTY_NOTICES.md", "utf8");
 const publishWorkflow = await readFile(".github/workflows/publish.yml", "utf8");
 const provenance = {
-  npm: publishWorkflow.includes("npm publish --provenance"),
-  jsr: publishWorkflow.includes("jsr publish --allow-dirty --provenance")
+  npm: publishWorkflow.includes("--provenance --access public"),
+  jsr: publishWorkflow.includes("deno publish") &&
+    !publishWorkflow.includes("deno publish --no-provenance")
 };
 const publicationBoundary = {
   releaseOnly: publishWorkflow.includes("release:") &&
@@ -86,7 +87,33 @@ const publicationBoundary = {
   fullQualification: publishWorkflow.includes("npm run qualification:release"),
   browsersInstalled: publishWorkflow.includes(
     "npx playwright install --with-deps chromium firefox webkit"
+  ),
+  cleanCheckout: publishWorkflow.includes('test -z "$(git status --porcelain)"'),
+  revalidatedBeforeWrite: publishWorkflow.includes("Revalidate publication boundary")
+};
+const publicationArtifact = {
+  qualifiedTarballPreserved: publishWorkflow.includes(
+    "HTML_PARSER_PACKAGE_ARTIFACT_DIRECTORY"
+  ),
+  exactTarballPublished: publishWorkflow.includes(
+    'npm publish "${{ steps.artifact.outputs.tarball_path }}"'
+  ),
+  exactIntegrityVerified: publishWorkflow.includes(
+    "scripts/release/check-registry-version.mjs --registry=npm --require-present"
   )
+};
+const publicationRecovery = {
+  npm: publishWorkflow.includes("steps.npm-state.outputs.action == 'publish'") &&
+    publishWorkflow.includes("--registry=npm >"),
+  jsr: publishWorkflow.includes("steps.jsr-state.outputs.action == 'publish'") &&
+    publishWorkflow.includes("--registry=jsr >")
+};
+const publicationToolchain = {
+  npmPinned: publishWorkflow.includes('NPM_CLI_VERSION: "11.10.0"') &&
+    publishWorkflow.includes('npm@${NPM_CLI_VERSION}'),
+  denoPublisherPinned: publishWorkflow.includes('DENO_PUBLISH_VERSION: "2.9.3"') &&
+    publishWorkflow.includes("deno-version: v${{ env.DENO_PUBLISH_VERSION }}"),
+  releaseCacheDisabled: publishWorkflow.includes("package-manager-cache: false")
 };
 const noticeCoverage = {
   wpt: notices.includes("web-platform-tests") || notices.includes("WPT"),
@@ -123,6 +150,9 @@ const report = {
   },
   provenance,
   publicationBoundary,
+  publicationArtifact,
+  publicationRecovery,
+  publicationToolchain,
   noticeCoverage
 };
 const ok = runtimeDependencies.length === 0 && lockedRuntimeDependencies.length === 0 &&
@@ -130,6 +160,9 @@ const ok = runtimeDependencies.length === 0 && lockedRuntimeDependencies.length 
   report.characterReferences.exactGeneratedData &&
   Object.values(provenance).every(Boolean) &&
   Object.values(publicationBoundary).every(Boolean) &&
+  Object.values(publicationArtifact).every(Boolean) &&
+  Object.values(publicationRecovery).every(Boolean) &&
+  Object.values(publicationToolchain).every(Boolean) &&
   Object.values(noticeCoverage).every(Boolean);
 await writeJson("reports/supply-chain.json", { ...report, ok });
 console.log(JSON.stringify({ ...report, ok }, null, 2));
