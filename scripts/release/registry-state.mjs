@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { execFileSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
 import {
@@ -10,6 +11,18 @@ const PROVENANCE_PREDICATE = "https://slsa.dev/provenance/v1";
 
 function immutableResult(state, failures = []) {
   return Object.freeze({ state, failures: Object.freeze(failures) });
+}
+
+/** Resolves the immutable source commit owned by a published package version. */
+export function resolveVersionTagCommit(version, execute = execFileSync) {
+  if (!/^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/u.test(version)) {
+    throw new Error(`registry version check: invalid published version ${version}`);
+  }
+  return execute(
+    "git",
+    ["rev-parse", "--verify", `v${version}^{commit}`],
+    { encoding: "utf8" }
+  ).trim();
 }
 
 /** Resolves npm metadata while treating delayed attestation availability as transient. */

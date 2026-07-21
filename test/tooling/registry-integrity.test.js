@@ -10,6 +10,7 @@ import {
 } from "../../scripts/release/registry-integrity.mjs";
 import {
   resolveNpmVersionState,
+  resolveVersionTagCommit,
   waitForRegistryState
 } from "../../scripts/release/registry-state.mjs";
 
@@ -196,4 +197,26 @@ test("publication delegates eventual consistency to the typed registry state", a
     /--registry=npm --require-present --wait-seconds=300/
   );
   assert.doesNotMatch(workflow, /for attempt in \{1\.\.12\}/);
+});
+
+test("published provenance is bound to the version tag rather than current HEAD", async () => {
+  let invocation;
+  const commit = resolveVersionTagCommit("0.2.0", (...arguments_) => {
+    invocation = arguments_;
+    return "0123456789abcdef\n";
+  });
+  assert.equal(commit, "0123456789abcdef");
+  assert.deepEqual(invocation, [
+    "git",
+    ["rev-parse", "--verify", "v0.2.0^{commit}"],
+    { encoding: "utf8" }
+  ]);
+  assert.throws(() => resolveVersionTagCommit("0.2.0-next.1"), /invalid published version/);
+
+  const auditWorkflow = await readFile(
+    new URL("../../.github/workflows/release-audit.yml", import.meta.url),
+    "utf8"
+  );
+  assert.match(auditWorkflow, /fetch-depth: 0/);
+  assert.match(auditWorkflow, /fetch-tags: true/);
 });

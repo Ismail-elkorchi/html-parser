@@ -1,5 +1,4 @@
 import { Buffer } from "node:buffer";
-import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import process from "node:process";
 
@@ -10,6 +9,7 @@ import {
 } from "./registry-integrity.mjs";
 import {
   resolveNpmVersionState,
+  resolveVersionTagCommit,
   waitForRegistryState
 } from "./registry-state.mjs";
 
@@ -69,8 +69,7 @@ const npmExpected = {
   version,
   integrity,
   sha512: Buffer.from(encodedDigest, "base64").toString("hex"),
-  repository,
-  commit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()
+  repository
 };
 const jsrExpected = options.registry === "jsr"
   ? await buildExpectedJsrVersion(process.cwd(), jsrManifest)
@@ -92,7 +91,10 @@ async function readState() {
   }
   const metadata = await response.json();
   if (options.registry === "npm") {
-    return resolveNpmVersionState(metadata, npmExpected);
+    return resolveNpmVersionState(metadata, {
+      ...npmExpected,
+      commit: resolveVersionTagCommit(version)
+    });
   }
   const comparison = compareJsrVersionMetadata(metadata, jsrExpected);
   return Object.freeze({
