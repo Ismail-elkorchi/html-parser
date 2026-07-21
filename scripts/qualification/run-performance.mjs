@@ -220,7 +220,7 @@ const report = {
   throughputMetric:
     "input MiB per process CPU second; wall throughput is retained as diagnostic evidence",
   memoryMetric:
-    "fixed-point full-GC incremental heap per retained public result from an isolated post-warmup fixed-size cohort; caller-owned parse strings and serializer trees are prepared and retained before the heap baseline",
+    "fixed-point full-GC incremental heap per retained public result from an isolated post-warmup fixed-size cohort; caller-owned parse strings are materialized and serializer trees are prepared before the heap baseline",
   memoryCollection: PERFORMANCE_MEMORY_COLLECTION,
   runtimeHeapConfiguration: Object.freeze({
     maxOldSpaceSizeMb: 256,

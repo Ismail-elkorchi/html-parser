@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -40,7 +41,7 @@ const fixtures = Object.freeze([
     operation: "serialize",
     input: "<main><h1>Title</h1><p data-value='a&amp;b'>alpha &lt; beta</p><svg><text>x</text></svg></main>".repeat(160),
     warmupIterations: 20,
-    iterations: 120,
+    iterations: 720,
     retainedResultCount: 128
   }),
   Object.freeze({
@@ -48,7 +49,7 @@ const fixtures = Object.freeze([
     operation: "serialize",
     input: "<section><template><article><h2>x</h2><p>payload</p></article></template></section>".repeat(900),
     warmupIterations: 10,
-    iterations: 24,
+    iterations: 160,
     retainedResultCount: 32
   })
 ]);
@@ -59,6 +60,13 @@ function prepare(fixture, input = fixture.input) {
 
 function execute(fixture, prepared) {
   return fixture.operation === "parse" ? parse(prepared) : serialize(prepared);
+}
+
+function materializeOwnedInput(input) {
+  // Template concatenation may leave a V8 cons string whose flattening cost is
+  // otherwise charged to the retained parse tree at nondeterministic times.
+  // Keep a standalone caller-owned string alive before taking the heap baseline.
+  return Buffer.from(input, "utf8").toString("utf8");
 }
 
 function measureThroughput(fixture) {
@@ -91,7 +99,7 @@ for (const fixture of fixtures) {
     { length: fixture.retainedResultCount },
     (_, index) => prepare(
       fixture,
-      `${fixture.input}<!--retained-${String(index)}-->`
+      materializeOwnedInput(`${fixture.input}<!--retained-${String(index)}-->`)
     )
   );
   const retainedHeapBaseline = stabilizedHeapUsed();
@@ -116,7 +124,7 @@ for (const fixture of fixtures) {
     throughputMbPerSec:
       totalBytes / (1024 * 1024) / (throughput.elapsedMs / 1_000),
     retainedResultCount: retainedResults.length,
-    retainedInputPreparation: "caller-owned-inputs-before-baseline",
+    retainedInputPreparation: "materialized-caller-owned-inputs-before-baseline",
     retainedHeapBaselineBytes: retainedHeapBaseline.heapUsed,
     retainedHeapBaselineFullGcPasses: retainedHeapBaseline.fullGcPasses,
     retainedHeapBytes: retainedHeap.heapUsed,
