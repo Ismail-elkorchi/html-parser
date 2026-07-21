@@ -133,6 +133,47 @@
       ]
     },
     {
+      "targetFile": "dist/public/patching.js",
+      "testCommand": ["node", "--test", "test/behavior/spans-patch.test.js"],
+      "mutants": [
+        {
+          "id": "patch-attribute-name-validation",
+          "description": "Allow malformed attribute syntax into a patch plan.",
+          "search": "if (!isHtmlAttributeName(value)) {",
+          "replace": "if (false && !isHtmlAttributeName(value)) {"
+        },
+        {
+          "id": "patch-attribute-case-normalization",
+          "description": "Preserve caller case instead of matching the HTML tokenizer's attribute identity.",
+          "search": "return asciiLowercase(value);",
+          "replace": "return value;"
+        },
+        {
+          "id": "patch-foreign-namespace-boundary",
+          "description": "Allow an unnamespaced foreign-element edit to acquire a namespace when reparsed.",
+          "search": "if (element.namespaceUri !== HTML_NAMESPACE_URI && foreignAttributeAdjustment(name) !== undefined) {",
+          "replace": "if (false && element.namespaceUri !== HTML_NAMESPACE_URI && foreignAttributeAdjustment(name) !== undefined) {"
+        }
+      ]
+    },
+    {
+      "targetFile": "dist/internal/foundation/foreign-attribute-adjustment.js",
+      "testCommand": [
+        "node",
+        "--test",
+        "test/behavior/namespaces-stack.test.js",
+        "test/behavior/spans-patch.test.js"
+      ],
+      "mutants": [
+        {
+          "id": "foreign-xlink-adjustment",
+          "description": "Remove the shared XLink href namespace adjustment.",
+          "search": "[\"xlink:href\", adjustment(XLINK_NAMESPACE, \"xlink\", \"href\")],",
+          "replace": "[\"xlink:href-disabled\", adjustment(XLINK_NAMESPACE, \"xlink\", \"href\")],"
+        }
+      ]
+    },
+    {
       "targetFile": "dist/internal/encoding/sniff.js",
       "testCommand": ["node", "--test", "test/behavior/encoding-sniff.test.js"],
       "mutants": [
