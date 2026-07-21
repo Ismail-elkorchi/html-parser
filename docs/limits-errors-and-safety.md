@@ -11,6 +11,7 @@ reader.
 | --- | --- |
 | `maxInputBytes` | UTF-8 bytes for text input; transport bytes for byte and stream input |
 | `maxDecodedUtf8Bytes` | UTF-8 bytes produced by decoding |
+| `maxSteps` | Deterministic independent-engine work checkpoints |
 | `maxNodes` | Public root plus input and recovery node allocations |
 | `maxDepth` | Tree depth, with the public document or fragment root at depth 1 |
 | `maxParseErrors` | Emitted non-fatal parse diagnostics |
@@ -27,7 +28,8 @@ rather than a throwing total-input budget. Extraction has separate required
 
 A hard-budget failure reports deterministic `actual: limit + 1`, representing
 the first unavailable unit, rather than continuing expensive work to count the
-complete rejected input.
+complete rejected input. Successful results report `resourceUsage.steps` when
+`maxSteps` enabled counting and `null` otherwise.
 
 ## Operational errors
 

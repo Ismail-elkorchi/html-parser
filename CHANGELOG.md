@@ -147,7 +147,21 @@ All notable changes are documented in this file.
   non-stream parse options, and report prescan high-water data on stream traces.
 - Replace the misleading token-stream iterator with
   `tokenizeByteStreamEager()`, which returns one promised token collection after
-  EOF, and document full-document buffering and peak-memory ownership.
+  EOF.
+- Feed decoded stream chunks directly into tree construction after encoding
+  selection, avoid retaining complete decoded stream text by default, and
+  release mutable tree storage during public conversion.
+- Expose document scripting environments and deterministic parser-step budgets
+  on every document entry point, retaining the effective mode on document
+  trees for serialization and chunking, and report successful step counts only
+  when enabled.
+- Make parser-step accounting invariant to decoded-input chunk boundaries and
+  replace single-GC retained-heap evidence with fixed-point collection.
+- Return exact HTML Standard anchors for named parse errors and remove the
+  unpopulated `ParseError.nodeId` field.
+- Strengthen strict TypeScript and type-aware ESLint checks for unreachable and
+  non-erasable code, unchecked imports/index access, style, and exhaustive
+  switches.
 - Validate closed parser option schemas and hard-stop node, depth, parse-error,
   attribute, decoded-output, trace, input, and monotonic-time budgets at the
   first unavailable unit.

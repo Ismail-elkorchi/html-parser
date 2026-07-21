@@ -1888,7 +1888,7 @@ export class HtmlTreeBuilder implements TokenSink {
     for (let index = this.#openElements.length - 1; index >= 0; index -= 1) {
       this.#resources.checkpoint();
       const element = this.#openElements.at(index);
-      if (element === null || element.namespaceUri !== HTML_NAMESPACE) continue;
+      if (element?.namespaceUri !== HTML_NAMESPACE) continue;
       if (lastTemplateIndex < 0 && element.localName === "template") lastTemplateIndex = index;
       if (lastTableIndex < 0 && element.localName === "table") lastTableIndex = index;
       if (lastTemplateIndex >= 0 && lastTableIndex >= 0) break;

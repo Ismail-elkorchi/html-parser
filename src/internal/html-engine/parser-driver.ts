@@ -45,20 +45,33 @@ type HtmlEngineParserConfiguration =
   | HtmlEngineDocumentConfiguration
   | HtmlEngineFragmentConfiguration;
 
-interface HtmlEngineOptions extends EngineResourceGuardOptions {
-  readonly inputChunks: readonly string[];
+interface HtmlEngineSessionOptions extends EngineResourceGuardOptions {
   readonly parser: HtmlEngineParserConfiguration;
   readonly observer?: EngineObserver;
   readonly retainNodeSpans?: boolean;
 }
 
-interface HtmlEngineResult {
+interface HtmlEngineOptions extends HtmlEngineSessionOptions {
+  readonly inputChunks: readonly string[];
+}
+
+export interface HtmlEngineProductResult {
   readonly standardBaseline: typeof ENGINE_STANDARD_BASELINE;
   readonly parser: HtmlEngineParserConfiguration;
   readonly model: HtmlTreeModel;
-  readonly state: HtmlTreeBuilderState;
   readonly parseErrors: readonly EngineParseError[];
   readonly resources: EngineResourceUsage;
+}
+
+export interface HtmlEngineResult extends HtmlEngineProductResult {
+  readonly state: HtmlTreeBuilderState;
+}
+
+/** One isolated engine operation accepting decoded input incrementally. */
+export interface HtmlEngineSession {
+  write(chunk: string): void;
+  finish(): HtmlEngineResult;
+  finishForPublicConversion(): HtmlEngineProductResult;
 }
 
 function assertAllowedKeys(
@@ -253,8 +266,8 @@ function validateObserver(observer: EngineObserver | undefined): EngineObserver 
   return observer;
 }
 
-/** Runs one isolated incremental independent-engine operation. */
-export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
+/** Creates one isolated independent-engine operation before decoded input arrives. */
+export function createHtmlEngineSession(options: HtmlEngineSessionOptions): HtmlEngineSession {
   const unknownOptions: unknown = options;
   if (!isRecord(unknownOptions)) {
     throw new EngineConfigurationError("options", "must be an object");
@@ -263,11 +276,10 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
   assertAllowedKeys(
     record,
     new Set([
-      "inputChunks", "parser", "observer", "retainNodeSpans", "trackSteps", "limits", "signal", "now", "startedAt"
+      "parser", "observer", "retainNodeSpans", "trackSteps", "limits", "signal", "now", "startedAt"
     ]),
     "options"
   );
-  const inputChunks = validateInputChunks(record["inputChunks"]);
   const parser = validateParser(record["parser"]);
   const observer = validateObserver(options.observer);
   if (options.retainNodeSpans !== undefined && typeof options.retainNodeSpans !== "boolean") {
@@ -298,7 +310,7 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
     ...(observer === undefined ? {} : { observer }),
     onParseError(error: EngineParseError) { parseErrors.push(error); }
   };
-  const builder = parser.kind === "fragment"
+  let builder: HtmlTreeBuilder | undefined = parser.kind === "fragment"
     ? new HtmlTreeBuilder({
         ...treeBuilderCommon,
         fragmentContext: parser.context,
@@ -306,12 +318,12 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
         hasFormInContextChain: parser.hasFormInContextChain
       })
     : new HtmlTreeBuilder(treeBuilderCommon);
-  const tokenizer = new HtmlTokenizer(resources, builder, {
+  let tokenizer: HtmlTokenizer | undefined = new HtmlTokenizer(resources, builder, {
     ...(parser.kind === "fragment"
       ? { initialState: fragmentTokenizerMode(parser.context, parser.scriptingMode) }
       : {}),
     protectTokenObservations: observer?.onToken !== undefined,
-    reuseInputCharacters: options.trackSteps === false,
+    reuseInputCharacters: true,
     observer: {
       ...(observer?.onToken === undefined
         ? {}
@@ -323,14 +335,67 @@ export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
     }
   });
   builder.connectTokenizer(tokenizer);
-  for (const chunk of inputChunks) tokenizer.write(chunk);
-  tokenizer.close();
+  let finished = false;
+  const complete = (retainState: boolean): HtmlEngineResult | HtmlEngineProductResult => {
+    if (finished || tokenizer === undefined || builder === undefined) {
+      throw new EngineConfigurationError("session", "can finish only once");
+    }
+    tokenizer.close();
+    const common = {
+      standardBaseline: ENGINE_STANDARD_BASELINE,
+      parser,
+      model,
+      parseErrors: Object.freeze(parseErrors),
+      resources: resources.snapshot()
+    };
+    const result = retainState
+      ? Object.freeze({ ...common, state: builder.state() })
+      : Object.freeze(common);
+    finished = true;
+    tokenizer = undefined;
+    builder = undefined;
+    return result;
+  };
   return Object.freeze({
-    standardBaseline: ENGINE_STANDARD_BASELINE,
-    parser,
-    model,
-    state: builder.state(),
-    parseErrors: Object.freeze(parseErrors),
-    resources: resources.snapshot()
+    write(chunk: string): void {
+      if (finished || tokenizer === undefined) {
+        throw new EngineConfigurationError("session", "cannot accept input after finish");
+      }
+      tokenizer.write(chunk);
+    },
+    finish(): HtmlEngineResult {
+      return complete(true) as HtmlEngineResult;
+    },
+    finishForPublicConversion(): HtmlEngineProductResult {
+      return complete(false);
+    }
   });
+}
+
+/** Runs one isolated independent-engine operation over supplied decoded chunks. */
+export function runHtmlEngine(options: HtmlEngineOptions): HtmlEngineResult {
+  const unknownOptions: unknown = options;
+  if (!isRecord(unknownOptions)) {
+    throw new EngineConfigurationError("options", "must be an object");
+  }
+  assertAllowedKeys(
+    unknownOptions,
+    new Set([
+      "inputChunks", "parser", "observer", "retainNodeSpans", "trackSteps", "limits", "signal", "now", "startedAt"
+    ]),
+    "options"
+  );
+  const inputChunks = validateInputChunks(unknownOptions["inputChunks"]);
+  const session = createHtmlEngineSession({
+    parser: options.parser,
+    ...(options.observer === undefined ? {} : { observer: options.observer }),
+    ...(options.retainNodeSpans === undefined ? {} : { retainNodeSpans: options.retainNodeSpans }),
+    ...(options.trackSteps === undefined ? {} : { trackSteps: options.trackSteps }),
+    ...(options.limits === undefined ? {} : { limits: options.limits }),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.startedAt === undefined ? {} : { startedAt: options.startedAt })
+  });
+  for (const chunk of inputChunks) session.write(chunk);
+  return session.finish();
 }

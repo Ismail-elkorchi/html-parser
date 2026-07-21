@@ -155,10 +155,7 @@ void test("token feedback, insertion transitions, and mutations are synchronous 
 
   assert.deepEqual(treeShape(chunked.model), treeShape(whole.model));
   assert.deepEqual(chunked.parseErrors, whole.parseErrors);
-  assert.deepEqual(
-    { ...chunked.resources, steps: 0 },
-    { ...whole.resources, steps: 0 }
-  );
+  assert.deepEqual(chunked.resources, whole.resources);
   assert.ok(transitions.some(({ from, to }) => from === "in-head" && to === "text"));
   assert.ok(transitions.some(({ from, to }) => from === "text" && to === "in-head"));
   assert.ok(mutations.length > 0);
@@ -581,10 +578,7 @@ void test("contextual tree construction is invariant across adversarial chunk bo
     const chunked = run(input.split(""));
     assert.deepEqual(treeShape(chunked.result.model), treeShape(whole.result.model));
     assert.deepEqual(chunked.result.parseErrors, whole.result.parseErrors);
-    assert.deepEqual(
-      { ...chunked.result.resources, steps: 0 },
-      { ...whole.result.resources, steps: 0 }
-    );
+    assert.deepEqual(chunked.result.resources, whole.result.resources);
     assert.deepEqual(chunked.mutations, whole.mutations);
     assert.deepEqual(chunked.transitions, whole.transitions);
   }
@@ -706,9 +700,6 @@ void test("formatting recovery trees, diagnostics, and mutations are chunk-invar
 
   assert.deepEqual(treeShape(unitChunks.result.model), treeShape(whole.result.model));
   assert.deepEqual(unitChunks.result.parseErrors, whole.result.parseErrors);
-  assert.deepEqual(
-    { ...unitChunks.result.resources, steps: 0 },
-    { ...whole.result.resources, steps: 0 }
-  );
+  assert.deepEqual(unitChunks.result.resources, whole.result.resources);
   assert.deepEqual(unitChunks.mutations, whole.mutations);
 });

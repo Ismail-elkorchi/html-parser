@@ -30,7 +30,7 @@ test("parse trace parseError events align with parseErrorId", () => {
   assert.ok(traceIds.every((entry) => typeof entry === "string" && entry.length > 0));
 });
 
-test("getParseErrorSpecRef returns stable WHATWG parse-errors section URL", () => {
+test("getParseErrorSpecRef returns dedicated anchors and the unnamed-error section", () => {
   const { tree: parsed } = parse("<p><div></p>");
   const ids = parsed.errors.map((entry) => entry.parseErrorId);
   assert.ok(ids.length > 0);
@@ -38,4 +38,15 @@ test("getParseErrorSpecRef returns stable WHATWG parse-errors section URL", () =
   for (const parseErrorId of ids) {
     assert.equal(getParseErrorSpecRef(parseErrorId), PARSE_ERRORS_SECTION_URL);
   }
+  assert.equal(
+    getParseErrorSpecRef("missing-doctype-name"),
+    "https://html.spec.whatwg.org/multipage/parsing.html#parse-error-missing-doctype-name"
+  );
+  assert.equal(getParseErrorSpecRef("vendor:unknown"), PARSE_ERRORS_SECTION_URL);
+});
+
+test("public parse diagnostics expose only fields the parser can populate", () => {
+  const error = parse("<p><div></p>").tree.errors[0];
+  assert.ok(error);
+  assert.equal(Object.hasOwn(error, "nodeId"), false);
 });

@@ -21,6 +21,7 @@ const document = await parseStream(stream, {
     maxInputBytes: 4_096,
     maxEncodingPrescanBytes: 1_024,
     maxDecodedUtf8Bytes: 4_096,
+    maxSteps: 100_000,
     maxNodes: 256,
     maxTimeMs: 250
   }
@@ -31,16 +32,21 @@ console.log(document.sourceText, document.metadata.encoding);
 
 ## Lifecycle
 
-The current implementation streams transport reads and decoding but buffers
-the complete decoded document before tree construction. The promise therefore
-cannot resolve before EOF. This is a lifecycle guarantee, not a claim that tree
-construction is incremental.
+After encoding selection, decoded chunks feed tree construction immediately.
+The promise still resolves only after EOF because the final immutable document
+cannot be observed before parsing is complete.
 
 On success, the stream is read through EOF and its reader lock is released
 before resolution. A read or decode failure initiates cancellation with the
 original error and releases the lock; cancellation failure does not replace
-the original failure. Parsing begins after EOF, when the reader is no longer
-held.
+the original failure. Parser budgets, including deterministic `maxSteps`, can
+therefore stop input consumption before EOF.
+
+By default, stream parsing does not assemble a second complete decoded string.
+Select `sourceRetention: "text"` only when the exact decoded source is needed.
+During conversion to the immutable public result, already-converted internal
+children and attributes are released so the mutable and immutable trees are
+not both retained in full at the peak.
 
 `tokenizeByteStreamEager()` has the same eager boundary: it returns all tokens
 after EOF and does not expose tokens progressively.

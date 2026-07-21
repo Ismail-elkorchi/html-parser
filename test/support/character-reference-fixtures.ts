@@ -8,9 +8,7 @@ const CHARACTER_REFERENCE_SOURCES = new Set([
   "tokenizer/numericEntities.test"
 ]);
 
-interface JsonRecord {
-  readonly [key: string]: unknown;
-}
+type JsonRecord = Readonly<Record<string, unknown>>;
 
 export interface CharacterReferenceFixture {
   readonly id: string;

@@ -11,13 +11,16 @@
 - `metadata: ParsedDocumentMetadata` records input kind, transport size,
   encoding evidence, and successful resource observations.
 
+`DocumentTree` retains the effective `scriptingMode` used for parsing.
 `parseFragment()` returns a frozen `FragmentTree` with its normalized
 namespace-aware `context`, effective `scriptingMode`, `documentMode`,
 `hasFormInContextChain` decision, children, diagnostics, and optional trace. It
 has no source-retention wrapper.
 
 Resource observations describe the exact successful parse; they are not
-limits and do not imply that budgets were enabled.
+limits. `steps` is the exception because counting it has a hot-path cost: it is
+reported only when `maxSteps` enabled deterministic counting, and is `null`
+otherwise.
 
 ## Nodes
 
@@ -94,8 +97,9 @@ Documents and fragments serialize their top-level children. Passing one
 the node's namespace-aware parent: HTML raw-text parents emit literal data,
 while ordinary, RCDATA, SVG, and MathML text is escaped. `noscript` follows the
 serialization operation's scripting mode. When no serialization override is
-supplied, a fragment keeps the scripting mode under which it was parsed;
-documents and individual nodes default to `"inert"`.
+supplied, a document or fragment keeps the scripting mode under which it was
+parsed; an individual node has no owning-document environment and therefore
+defaults to `"inert"`.
 
 Serialization preserves the package's lossless public/system doctype model,
 which is an intentional extension beyond the HTML fragment algorithm's

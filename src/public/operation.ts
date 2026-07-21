@@ -23,6 +23,7 @@ import type {
 const PARSE_BUDGET_KEYS = Object.freeze([
   "maxInputBytes",
   "maxDecodedUtf8Bytes",
+  "maxSteps",
   "maxNodes",
   "maxDepth",
   "maxParseErrors",
@@ -48,6 +49,7 @@ const TOKENIZE_BYTE_STREAM_EAGER_BUDGET_KEYS = Object.freeze([
 
 const PARSE_COMMON_OPTION_KEYS = [
   "captureSpans",
+  "scriptingMode",
   "trace",
   "onTraceEvent",
   "budgets",
@@ -64,7 +66,6 @@ const PARSE_BYTES_OPTION_KEYS = new Set<PropertyKey>([
 ]);
 const PARSE_FRAGMENT_OPTION_KEYS = new Set<PropertyKey>([
   ...PARSE_COMMON_OPTION_KEYS,
-  "scriptingMode",
   "documentMode",
   "hasFormAncestor"
 ]);
@@ -185,6 +186,13 @@ function sourceRetention(value: unknown, option: string): ParseOptions["sourceRe
   return value;
 }
 
+function scriptingMode(value: unknown, option: string): ParseOptions["scriptingMode"] {
+  if (value !== undefined && value !== "inert" && value !== "disabled") {
+    invalidConfiguration(option, 'must be "inert" or "disabled" when provided');
+  }
+  return value;
+}
+
 function limit(value: unknown, option: string): number | undefined {
   if (
     value !== undefined &&
@@ -287,6 +295,10 @@ function normalizeParseLikeOptions(
   const normalizedSourceRetention = capabilities.sourceRetention
     ? sourceRetention(read(record, "sourceRetention", "options.sourceRetention"), "options.sourceRetention")
     : undefined;
+  const normalizedScriptingMode = scriptingMode(
+    read(record, "scriptingMode", "options.scriptingMode"),
+    "options.scriptingMode"
+  );
   const transportEncodingLabel = capabilities.transportEncoding
     ? optionalString(
         read(record, "transportEncodingLabel", "options.transportEncodingLabel"),
@@ -311,6 +323,7 @@ function normalizeParseLikeOptions(
     record,
     normalized: Object.freeze({
       ...(captureSpans === undefined ? {} : { captureSpans }),
+      scriptingMode: normalizedScriptingMode ?? "inert",
       ...(capabilities.sourceRetention
         ? { sourceRetention: normalizedSourceRetention ?? "none" }
         : {}),
@@ -351,10 +364,6 @@ export function normalizeParseFragmentOptions(options: ParseFragmentOptions): Pa
     PARSE_FRAGMENT_OPTION_KEYS,
     { sourceRetention: false, transportEncoding: false }
   );
-  const scriptingMode = read(record, "scriptingMode", "options.scriptingMode");
-  if (scriptingMode !== undefined && scriptingMode !== "inert" && scriptingMode !== "disabled") {
-    invalidConfiguration("options.scriptingMode", 'must be "inert" or "disabled"');
-  }
   const documentMode = read(record, "documentMode", "options.documentMode");
   if (
     documentMode !== undefined &&
@@ -373,7 +382,6 @@ export function normalizeParseFragmentOptions(options: ParseFragmentOptions): Pa
   );
   return Object.freeze({
     ...common,
-    scriptingMode: scriptingMode ?? "inert",
     documentMode: documentMode ?? "no-quirks",
     hasFormAncestor: hasFormAncestor ?? false
   });

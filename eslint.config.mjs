@@ -6,12 +6,12 @@ import importPlugin from "eslint-plugin-import-x";
 
 const typedFiles = ["src/**/*.ts", "test/**/*.ts"];
 
-const recommendedTypeChecked = tseslint.configs.recommendedTypeChecked.map((config) => ({
+const strictTypeChecked = tseslint.configs.strictTypeChecked.map((config) => ({
   ...config,
   files: typedFiles
 }));
 
-const strictTypeChecked = tseslint.configs.strictTypeChecked.map((config) => ({
+const stylisticTypeChecked = tseslint.configs.stylisticTypeChecked.map((config) => ({
   ...config,
   files: typedFiles
 }));
@@ -36,8 +36,8 @@ export default [
       }
     }
   },
-  ...recommendedTypeChecked,
   ...strictTypeChecked,
+  ...stylisticTypeChecked,
   {
     files: typedFiles,
     languageOptions: {
@@ -75,6 +75,7 @@ export default [
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-misused-promises": "error",
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "@typescript-eslint/switch-exhaustiveness-check": "error",
       "import-x/no-duplicates": "error",
       "import-x/order": [
         "error",

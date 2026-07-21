@@ -71,6 +71,7 @@ test("full-document parse results have one stable source and metadata shape", ()
       inputBytes: 9,
       decodedUtf8Bytes: 9,
       decodedCodeUnits: 8,
+      steps: null,
       nodes: 6,
       maxDepth: 5,
       parseErrors: 1,
@@ -222,6 +223,22 @@ test("resource usage reports attempted duplicate attributes and observable trace
   );
   assert.equal(nodeBudget?.actual, traced.metadata.resourceUsage.nodes);
   assert.equal(depthBudget?.actual, traced.metadata.resourceUsage.maxDepth);
+});
+
+test("step observations are available exactly when deterministic counting is enabled", () => {
+  const untracked = parse("<main><p>x</p></main>");
+  assert.equal(untracked.metadata.resourceUsage.steps, null);
+
+  const tracked = parse("<main><p>x</p></main>", {
+    budgets: { maxSteps: 100_000 },
+    trace: "events"
+  });
+  assert.ok(Number.isSafeInteger(tracked.metadata.resourceUsage.steps));
+  assert.ok(tracked.metadata.resourceUsage.steps > 0);
+  const stepBudget = tracked.tree.trace.events.find(
+    (event) => event.kind === "budget" && event.budget === "maxSteps"
+  );
+  assert.equal(stepBudget?.actual, tracked.metadata.resourceUsage.steps);
 });
 
 test("patch planning and application require exact registered parse identity", () => {

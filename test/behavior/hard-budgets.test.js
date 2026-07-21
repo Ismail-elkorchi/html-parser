@@ -143,6 +143,14 @@ test("zero limits are valid and fail at the first unavailable unit", () => {
     assertBudget(error, "maxNodes", 0, 1));
   assert.throws(() => parse("", { budgets: { maxDepth: 0 } }), (error) =>
     assertBudget(error, "maxDepth", 0, 1));
+  assert.throws(() => parse("", { budgets: { maxSteps: 0 } }), (error) =>
+    assertBudget(error, "maxSteps", 0, 1));
+  assert.throws(() => parseBytes(new Uint8Array(), { budgets: { maxSteps: 0 } }), (error) =>
+    assertBudget(error, "maxSteps", 0, 1));
+  assert.throws(
+    () => parseFragment("", HTML_DIV_CONTEXT, { budgets: { maxSteps: 0 } }),
+    (error) => assertBudget(error, "maxSteps", 0, 1)
+  );
   assert.throws(() => parse("x", { budgets: { maxParseErrors: 0 } }), (error) =>
     assertBudget(error, "maxParseErrors", 0, 1));
   assert.throws(() => parse("<x a>", { budgets: { maxAttributesPerElement: 0 } }), (error) =>

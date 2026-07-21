@@ -438,8 +438,7 @@ class BoundedTextCollector {
     parts.push(value);
     const previous = ranges[ranges.length - 1];
     if (
-      previous !== undefined &&
-      previous.outputByteEnd === start &&
+      previous?.outputByteEnd === start &&
       sameExtractionSource(previous.source, source)
     ) {
       previous.outputByteEnd = end;
@@ -564,8 +563,7 @@ class ExtractionSourceRunBuffer {
     }
     const previous = this.#runs[this.#runs.length - 1];
     if (
-      previous !== undefined &&
-      previous.value === value &&
+      previous?.value === value &&
       sameExtractionSource(previous.source, source)
     ) {
       previous.count += 1;
@@ -739,7 +737,7 @@ function boundedNoscriptFallbackChildren(
     return null;
   }
   const onlyChild = node.children[0];
-  if (!onlyChild || onlyChild.kind !== "text") {
+  if (onlyChild?.kind !== "text") {
     return null;
   }
   const rawMarkup = onlyChild.value;
@@ -780,13 +778,13 @@ function* iterateVisibleExtractionChunks(
   roots: readonly HtmlNode[],
   options: ResolvedVisibleTextOptions
 ): IterableIterator<ExtractionSourceChunk> {
-  type VisitAction = {
+  interface VisitAction {
     readonly kind: "visit";
     readonly node: HtmlNode;
     readonly preserveWhitespace: boolean;
     readonly sourceOverride: ExtractionSourceMeta | null;
-  };
-  type AppendAction = {
+  }
+  interface AppendAction {
     readonly kind: "append";
     readonly node: HtmlNode;
     readonly value: string;
@@ -794,7 +792,7 @@ function* iterateVisibleExtractionChunks(
     readonly normalizeSegment: boolean;
     readonly preserveWhitespace: boolean;
     readonly sourceOverride: ExtractionSourceMeta | null;
-  };
+  }
   type Action = VisitAction | AppendAction;
   const stack: Action[] = [];
   const pushVisits = (

@@ -46,6 +46,11 @@ console.log(heading?.localName); // "h1"
 console.log(document.tree.errors); // non-fatal HTML parse diagnostics
 ```
 
+Document and fragment parsers accept `scriptingMode: "disabled"` when the
+source environment has scripting disabled. For untrusted input, combine the
+structural limits with deterministic `budgets.maxSteps` and a deadline or
+abort signal.
+
 Full-document entry points return a `ParsedDocument`:
 
 ```txt

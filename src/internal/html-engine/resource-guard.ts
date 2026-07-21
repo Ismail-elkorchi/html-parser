@@ -81,6 +81,7 @@ interface ElementResourceAttribute {
 export interface EngineResourceGuard {
   ensureActive(): void;
   checkpoint(): void;
+  checkpointMany(count: number): void;
   reserveNode(): void;
   reserveNodes(count: number): void;
   reserveNodeAtDepth(depth: number): void;
@@ -109,6 +110,10 @@ const LIMIT_NAMES = Object.freeze([
   "maxAttributeUtf8BytesPerElement",
   "maxTimeMs"
 ] as const satisfies readonly EngineResourceLimitName[]);
+
+function noOperation(): void {
+  // The unguarded fast path intentionally has no work to perform.
+}
 
 function validateLimit(value: unknown, option: string): number | undefined {
   if (value === undefined) return undefined;
@@ -233,6 +238,64 @@ function stringUtf8ByteLength(value: string): number {
   return bytes;
 }
 
+function createUntrackedResourceGuard(): EngineResourceGuard {
+  let nodes = 0;
+  let maxDepth = 0;
+  let parseErrors = 0;
+  let attributes = 0;
+  let attributeUtf8Bytes = 0;
+  const guard: EngineResourceGuard = {
+    ensureActive: noOperation,
+    checkpoint: noOperation,
+    checkpointMany(count): void {
+      if (!Number.isSafeInteger(count) || count < 0) {
+        throw new EngineConfigurationError("checkpoint count", "must be a non-negative safe integer");
+      }
+    },
+    reserveNode(): void { nodes += 1; },
+    reserveNodes(count): void {
+      if (!Number.isSafeInteger(count) || count < 1) {
+        throw new EngineConfigurationError("node reservation count", "must be a positive safe integer");
+      }
+      nodes += count;
+    },
+    reserveNodeAtDepth(depth): void {
+      if (!Number.isSafeInteger(depth) || depth < 1) {
+        throw new EngineConfigurationError("depth", "must be a positive safe integer");
+      }
+      nodes += 1;
+      maxDepth = Math.max(maxDepth, depth);
+    },
+    observeDepth(depth): void {
+      if (!Number.isSafeInteger(depth) || depth < 1) {
+        throw new EngineConfigurationError("depth", "must be a positive safe integer");
+      }
+      maxDepth = Math.max(maxDepth, depth);
+    },
+    reserveParseError(): void { parseErrors += 1; },
+    beginStartTag(): StartTagResourceGuard {
+      return {
+        beginAttribute(): void { attributes += 1; },
+        appendCodePoint(value): void {
+          attributeUtf8Bytes += codePointUtf8ByteLength(value);
+        }
+      };
+    },
+    checkElementAttributes: noOperation,
+    snapshot(): EngineResourceUsage {
+      return Object.freeze({
+        steps: 0,
+        nodes,
+        maxDepth,
+        parseErrors,
+        attributes,
+        attributeUtf8Bytes
+      });
+    }
+  };
+  return Object.freeze(guard);
+}
+
 /** Creates one validated resource guard before engine work begins. */
 export function createEngineResourceGuard(
   options: EngineResourceGuardOptions = {}
@@ -246,10 +309,20 @@ export function createEngineResourceGuard(
   let attributes = 0;
   let attributeUtf8Bytes = 0;
 
+  if (Reflect.ownKeys(limits).length === 0 && signal === undefined && !trackSteps) {
+    return createUntrackedResourceGuard();
+  }
+
   if (Reflect.ownKeys(limits).length === 0 && signal === undefined) {
     const guard: EngineResourceGuard = {
-      ensureActive(): void {},
+      ensureActive: noOperation,
       checkpoint(): void { if (trackSteps) steps += 1; },
+      checkpointMany(count): void {
+        if (!Number.isSafeInteger(count) || count < 0) {
+          throw new EngineConfigurationError("checkpoint count", "must be a non-negative safe integer");
+        }
+        if (trackSteps) steps += count;
+      },
       reserveNode(): void {
         if (trackSteps) steps += 1;
         nodes += 1;
@@ -293,7 +366,7 @@ export function createEngineResourceGuard(
           }
         };
       },
-      checkElementAttributes(): void {},
+      checkElementAttributes: noOperation,
       snapshot(): EngineResourceUsage {
         return Object.freeze({
           steps,
@@ -339,6 +412,17 @@ export function createEngineResourceGuard(
       if (!trackSteps) return;
       const actual = steps + 1;
       checkLimit("maxSteps", actual);
+      steps = actual;
+    },
+    checkpointMany(count): void {
+      if (!Number.isSafeInteger(count) || count < 0) {
+        throw new EngineConfigurationError("checkpoint count", "must be a non-negative safe integer");
+      }
+      guard.ensureActive();
+      if (!trackSteps || count === 0) return;
+      const actual = steps + count;
+      const limit = limits.maxSteps;
+      if (limit !== undefined && actual > limit) fail("maxSteps", limit, limit + 1);
       steps = actual;
     },
     reserveNode(): void {

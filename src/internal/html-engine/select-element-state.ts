@@ -78,7 +78,7 @@ export class HtmlSelectElementState {
       this.#resources.checkpoint();
       if (isHtmlElement(ancestor, "select")) {
         const state = this.#stateFor(ancestor);
-        if (state.primarySelectedContent === null) state.primarySelectedContent = selectedContent;
+        state.primarySelectedContent ??= selectedContent;
       }
       ancestor = this.#parentElement(ancestor);
     }

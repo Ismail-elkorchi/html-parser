@@ -138,9 +138,6 @@ function normalizeParseError(parseError) {
   if (typeof parseError.offset === "number") {
     normalized.offset = parseError.offset;
   }
-  if (typeof parseError.nodeId === "number") {
-    normalized.nodeId = parseError.nodeId;
-  }
   return normalized;
 }
 
