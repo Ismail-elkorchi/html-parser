@@ -689,8 +689,8 @@
         {
           "id": "product-template-content-conversion",
           "description": "Drop the owned template-content fragment during public conversion.",
-          "search": "...(templateContent === undefined ? {} : { templateContent }),",
-          "replace": "...(templateContent === undefined ? {} : {}),"
+          "search": "if (templateContent !== undefined)\n        element.templateContent = templateContent;",
+          "replace": "if (false && templateContent !== undefined)\n        element.templateContent = templateContent;"
         },
         {
           "id": "product-processing-instruction-token",
