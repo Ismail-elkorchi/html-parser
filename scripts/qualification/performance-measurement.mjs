@@ -1,36 +1,34 @@
 import process from "node:process";
 
-/** Fixed-point collection policy shared by measurement and its report. */
+/** Fixed collection policy shared by measurement and its report. */
 export const PERFORMANCE_MEMORY_COLLECTION = Object.freeze({
-  minimumFullGcPasses: 3,
-  maximumFullGcPasses: 8,
-  heapStabilityBytes: 8_192
+  fullGcPasses: 8
 });
 
-/** Returns heap usage after weak references and deferred garbage have settled. */
-export function stabilizedHeapUsed() {
+/** Cohort sizes large enough to amortize fixed process-level parser work. */
+export const PERFORMANCE_RETAINED_RESULT_COUNTS = Object.freeze({
+  "parse-medium": 32,
+  "parse-large": 8,
+  "serialize-medium": 128,
+  "serialize-large": 32
+});
+
+/** Returns heap usage after the qualification's fixed full-collection sequence. */
+export function fullyCollectedHeapUsed() {
   if (typeof globalThis.gc !== "function") {
     throw new Error("Heap measurement requires --expose-gc");
   }
-  let previous = Number.POSITIVE_INFINITY;
   let heapUsed = 0;
   for (
     let pass = 1;
-    pass <= PERFORMANCE_MEMORY_COLLECTION.maximumFullGcPasses;
+    pass <= PERFORMANCE_MEMORY_COLLECTION.fullGcPasses;
     pass += 1
   ) {
     globalThis.gc();
     heapUsed = process.memoryUsage().heapUsed;
-    if (
-      pass >= PERFORMANCE_MEMORY_COLLECTION.minimumFullGcPasses &&
-      Math.abs(heapUsed - previous) <= PERFORMANCE_MEMORY_COLLECTION.heapStabilityBytes
-    ) {
-      return { heapUsed, fullGcPasses: pass };
-    }
-    previous = heapUsed;
   }
   return {
     heapUsed,
-    fullGcPasses: PERFORMANCE_MEMORY_COLLECTION.maximumFullGcPasses
+    fullGcPasses: PERFORMANCE_MEMORY_COLLECTION.fullGcPasses
   };
 }
