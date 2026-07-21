@@ -136,6 +136,8 @@ evidence, and cross-revision performance. Both profiles fail at the first
 failed command and retain diagnostic reports under `reports/`; they do not
 assign an artificial quality score.
 
-The blocking CI runtime contract runs on Linux, macOS, and Windows. Linux also
-executes the separate Node, Deno, Bun, and browser jobs so cross-runtime output
-agreement and platform coverage remain distinct signals.
+The blocking CI runtime contract verifies exact Node, Deno, and Bun output
+agreement on Linux, macOS, and Windows. The separate Linux Node-version matrix
+owns linting, types, documentation, builds, and tests; npm/JSR public-surface
+parity belongs to the Linux cross-runtime job because it requires both Node and
+Deno. Browser engines are exercised by the qualification workflow.
