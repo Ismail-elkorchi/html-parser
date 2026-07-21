@@ -14,11 +14,12 @@ the package remain the exact source of truth.
   namespace-aware `HtmlFragmentContextInput` and returns a `FragmentTree`.
 - `serialize(input, options?)` serializes a document, fragment, or complete node
   representation. `SerializeOptions.scriptingMode` controls the conditional
-  `noscript` rule. A fragment inherits the mode retained from parsing; other
-  inputs default to `"inert"`.
+  `noscript` rule. A document or fragment inherits the mode retained from
+  parsing; an individual node defaults to `"inert"`.
 - `tokenizeByteStreamEager(stream, options?)` returns logical tokens after EOF.
-- `getParseErrorSpecRef(parseErrorId)` maps a diagnostic id to its HTML
-  specification reference.
+- `getParseErrorSpecRef(parseErrorId)` maps a named parser diagnostic to its
+  dedicated HTML Standard anchor and other identifiers to the general
+  parse-errors section.
 
 ## Query and traversal
 

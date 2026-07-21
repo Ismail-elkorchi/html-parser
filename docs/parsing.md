@@ -38,6 +38,15 @@ console.log(document.metadata.inputKind, document.metadata.encoding);
 For a `ReadableStream<Uint8Array>`, use `parseStream()` and read
 [streams and encoding](./streams-and-encoding.md).
 
+## Scripting environment
+
+Every document and fragment entry point accepts `scriptingMode`. The default
+`"inert"` models a document whose scripting flag is enabled while guaranteeing
+that this package never executes scripts. Use `"disabled"` when the source
+document has scripting disabled; this changes standards-defined parsing of
+elements such as `noscript`. The effective mode is retained on the returned
+document or fragment and inherited by serialization and chunking.
+
 ## Fragments
 
 `parseFragment()` interprets input in the parsing context of an external HTML,
@@ -74,10 +83,9 @@ namespace separators, and other non-name syntax are rejected rather than
 trimmed or accepted ambiguously. Unnamespaced attributes on an HTML context
 are ASCII-lowercased before duplicate detection.
 
-`ParseFragmentOptions` also records the external parsing environment:
+`ParseFragmentOptions` also records fragment-specific parts of the external
+parsing environment:
 
-- `scriptingMode` is `"inert"` by default or `"disabled"` for a document in
-  which scripting is disabled;
 - `documentMode` is `"no-quirks"` by default and may be `"limited-quirks"` or
   `"quirks"`; and
 - `hasFormAncestor` says whether an ancestor outside the supplied context
@@ -94,8 +102,9 @@ when parity with browser `innerHTML` parsing matters.
 Malformed HTML is normally recovered according to HTML parsing rules. The
 result keeps non-fatal diagnostics in `tree.errors` or `fragment.errors`; each
 entry has a stable `parseErrorId`, location data when available, and a short
-message. `getParseErrorSpecRef()` maps a known identifier to its specification
-reference on the npm surface.
+message. `getParseErrorSpecRef()` returns the dedicated HTML Standard anchor
+for a named tokenizer or input-stream error. Unnamed tree-construction errors
+and extension identifiers map to the general parse-errors section.
 
 Use thrown [operational errors](./limits-errors-and-safety.md#operational-errors)
 for control flow. Do not treat a non-empty diagnostics array as an exception

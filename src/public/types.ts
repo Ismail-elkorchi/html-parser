@@ -45,8 +45,6 @@ export interface ParseError {
   readonly parseErrorId: string;
   /** Human-readable diagnostic message. */
   readonly message: string;
-  /** Related parsed node when one can be identified. */
-  readonly nodeId?: NodeId;
   /** Related decoded-input range when one can be identified. */
   readonly span?: Span;
 }
@@ -57,6 +55,8 @@ export interface ParseBudgetOptions {
   readonly maxInputBytes?: number;
   /** UTF-8 bytes produced by decoding, checked before retaining each decoded chunk. */
   readonly maxDecodedUtf8Bytes?: number;
+  /** Deterministic independent-engine work checkpoints. */
+  readonly maxSteps?: number;
   /** Public root plus input and parser-recovery node allocations. */
   readonly maxNodes?: number;
   /** Tree depth with the public document or fragment root at depth one. */
@@ -82,6 +82,8 @@ export type SourceRetention = "none" | "text";
 export interface ParseOptions {
   /** Captures node and attribute source spans when available. */
   readonly captureSpans?: boolean;
+  /** Non-executing scripting environment; defaults to `"inert"`. */
+  readonly scriptingMode?: HtmlScriptingMode;
   /** Exact decoded source retention; defaults to `"none"`. */
   readonly sourceRetention?: SourceRetention;
   /** Returned trace retention mode; defaults to `"none"`. */
@@ -144,8 +146,6 @@ export type HtmlDocumentMode = "no-quirks" | "limited-quirks" | "quirks";
 
 /** Options accepted by already-decoded fragment parsing. */
 export interface ParseFragmentOptions extends Omit<ParseOptions, "sourceRetention"> {
-  /** Non-executing scripting environment; defaults to `"inert"`. */
-  readonly scriptingMode?: HtmlScriptingMode;
   /** Context owner-document mode; defaults to `"no-quirks"`. */
   readonly documentMode?: HtmlDocumentMode;
   /** Whether an ancestor outside the supplied context descriptor is an HTML `form`. */
@@ -588,6 +588,8 @@ export interface DocumentTree {
   readonly id: NodeId;
   /** Root discriminator. */
   readonly kind: "document";
+  /** Effective non-executing scripting environment used for this parse. */
+  readonly scriptingMode: HtmlScriptingMode;
   /** Top-level document nodes in tree order. */
   readonly children: readonly HtmlNode[];
   /** Non-fatal parse errors in emission order. */
@@ -604,6 +606,8 @@ export interface ParseResourceUsage {
   readonly decodedUtf8Bytes: number;
   /** UTF-16 code units in the exact decoded source. */
   readonly decodedCodeUnits: number;
+  /** Deterministic engine checkpoints, or null when `maxSteps` did not enable counting. */
+  readonly steps: number | null;
   /** Public root plus all input and recovery allocations counted by `maxNodes`. */
   readonly nodes: number;
   /** Highest parser-assigned depth, with the public root at depth one. */
@@ -945,6 +949,7 @@ export interface PatchPlan {
 export type HtmlBudgetName =
   | "maxInputBytes"
   | "maxDecodedUtf8Bytes"
+  | "maxSteps"
   | "maxNodes"
   | "maxDepth"
   | "maxParseErrors"

@@ -21,14 +21,14 @@ function expandedName(namespaceUri: HtmlElementNamespaceUri, localName: string):
  */
 export class OpenElementStack {
   readonly #entries: HtmlTreeElement[] = [];
-  readonly #open = new Set<HtmlTreeElement>();
+  #open: Set<HtmlTreeElement> | undefined;
   readonly #order = new Map<HtmlTreeElement, number>();
   readonly #byExpandedName = new Map<string, HtmlTreeElement[]>();
-  readonly #checkpoint: () => void;
+  readonly #resources: Pick<EngineResourceGuard, "checkpoint"> | undefined;
   #nextOrder = 1;
 
   constructor(resources?: Pick<EngineResourceGuard, "checkpoint">) {
-    this.#checkpoint = resources === undefined ? () => {} : () => { resources.checkpoint(); };
+    this.#resources = resources;
   }
 
   get length(): number {
@@ -45,13 +45,14 @@ export class OpenElementStack {
   }
 
   push(element: HtmlTreeElement): void {
-    if (this.#open.has(element)) failInternalState("TREE_BUILDER_OPEN_ELEMENT_ALREADY_PRESENT");
+    if (this.includes(element)) failInternalState("TREE_BUILDER_OPEN_ELEMENT_ALREADY_PRESENT");
     this.#entries.push(element);
-    this.#open.add(element);
     if (this.#entries.length === 65) {
+      this.#open = new Set(this.#entries);
       this.#relabel();
       this.#rebuildNameIndex();
     } else if (this.#entries.length > 65) {
+      this.#open?.add(element);
       this.#order.set(element, this.#nextOrder);
       this.#nextOrder += 1;
       this.#appendNameIndex(element);
@@ -65,6 +66,7 @@ export class OpenElementStack {
     );
     this.#removeIndex(element);
     if (this.#entries.length <= 64) {
+      this.#open = undefined;
       this.#byExpandedName.clear();
       this.#order.clear();
       this.#nextOrder = 1;
@@ -73,11 +75,11 @@ export class OpenElementStack {
   }
 
   includes(element: HtmlTreeElement): boolean {
-    return this.#open.has(element);
+    return this.#open?.has(element) ?? this.#entries.includes(element);
   }
 
   indexOf(element: HtmlTreeElement): number {
-    if (!this.#open.has(element)) return -1;
+    if (!this.includes(element)) return -1;
     for (let index = this.#entries.length - 1; index >= 0; index -= 1) {
       this.#checkpoint();
       if (this.#entries[index] === element) return index;
@@ -86,12 +88,13 @@ export class OpenElementStack {
   }
 
   remove(element: HtmlTreeElement): void {
-    if (!this.#open.has(element)) failInternalState("TREE_BUILDER_OPEN_ELEMENT_NOT_PRESENT");
+    if (!this.includes(element)) failInternalState("TREE_BUILDER_OPEN_ELEMENT_NOT_PRESENT");
     const index = this.indexOf(element);
     if (index < 0) failInternalState("TREE_BUILDER_OPEN_ELEMENT_NOT_PRESENT");
     this.#entries.splice(index, 1);
     this.#removeIndex(element);
     if (this.#entries.length <= 64) {
+      this.#open = undefined;
       this.#byExpandedName.clear();
       this.#order.clear();
       this.#nextOrder = 1;
@@ -99,7 +102,7 @@ export class OpenElementStack {
   }
 
   replace(current: HtmlTreeElement, replacement: HtmlTreeElement): void {
-    if (this.#open.has(replacement)) {
+    if (this.includes(replacement)) {
       failInternalState("TREE_BUILDER_OPEN_ELEMENT_ALREADY_PRESENT");
     }
     const index = this.indexOf(current);
@@ -107,7 +110,7 @@ export class OpenElementStack {
     const order = this.#entries.length > 64 ? this.#elementOrder(current) : null;
     this.#entries[index] = replacement;
     this.#removeIndex(current);
-    this.#open.add(replacement);
+    this.#open?.add(replacement);
     if (this.#entries.length > 64) {
       this.#order.set(
         replacement,
@@ -118,7 +121,7 @@ export class OpenElementStack {
   }
 
   insertAfter(reference: HtmlTreeElement, element: HtmlTreeElement): void {
-    if (this.#open.has(element)) failInternalState("TREE_BUILDER_OPEN_ELEMENT_ALREADY_PRESENT");
+    if (this.includes(element)) failInternalState("TREE_BUILDER_OPEN_ELEMENT_ALREADY_PRESENT");
     const referenceIndex = this.indexOf(reference);
     if (referenceIndex < 0) failInternalState("TREE_BUILDER_OPEN_ELEMENT_NOT_PRESENT");
     if (referenceIndex === this.#entries.length - 1) {
@@ -127,11 +130,12 @@ export class OpenElementStack {
     }
     const insertionIndex = referenceIndex + 1;
     this.#entries.splice(insertionIndex, 0, element);
-    this.#open.add(element);
     if (this.#entries.length === 65) {
+      this.#open = new Set(this.#entries);
       this.#relabel();
       this.#rebuildNameIndex();
     } else if (this.#entries.length > 65) {
+      this.#open?.add(element);
       this.#relabel();
       this.#insertNameIndex(element, insertionIndex);
     }
@@ -184,7 +188,7 @@ export class OpenElementStack {
       }
       return false;
     }
-    if (!this.#open.has(element)) return false;
+    if (this.#open?.has(element) !== true) return false;
     const targetOrder = this.#elementOrder(element);
     let latestBoundaryOrder = -1;
     for (const boundaryName of htmlBoundaryNames) {
@@ -289,7 +293,7 @@ export class OpenElementStack {
   }
 
   #removeIndex(element: HtmlTreeElement): void {
-    this.#open.delete(element);
+    this.#open?.delete(element);
     this.#order.delete(element);
     if (this.#byExpandedName.size === 0) return;
     const key = expandedName(element.namespaceUri, element.localName);
@@ -344,5 +348,9 @@ export class OpenElementStack {
       if (entry !== undefined) this.#order.set(entry, index + 1);
     }
     this.#nextOrder = this.#entries.length + 1;
+  }
+
+  #checkpoint(): void {
+    this.#resources?.checkpoint();
   }
 }

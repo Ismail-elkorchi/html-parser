@@ -20,10 +20,11 @@ interface StreamEncodingSniff {
 }
 
 interface StreamDecodeResult {
-  readonly text: string;
+  readonly text: string | null;
   readonly sniff: StreamEncodingSniff;
   readonly totalBytes: number;
   readonly decodedUtf8Bytes: number;
+  readonly decodedCodeUnits: number;
   readonly encodingPrescanBytes: number;
   readonly encodingPrescanLimitBytes: number;
 }
@@ -161,11 +162,14 @@ async function readStreamChunk(
 }
 
 /** Reads and decodes one byte stream under a shared operation lifecycle. */
-export async function decodeStreamToText(
+export async function decodeByteStream(
   stream: ReadableStream<Uint8Array>,
   options: {
     readonly transportEncodingLabel?: string;
     readonly budgets?: ParseStreamBudgetOptions | TokenizeByteStreamEagerOptions["budgets"];
+    readonly retainText: boolean;
+    readonly onEncodingSniff?: (sniff: StreamEncodingSniff) => void;
+    readonly onDecodedChunk?: (chunk: string) => void;
   },
   operation: OperationContext
 ): Promise<StreamDecodeResult> {
@@ -186,7 +190,8 @@ export async function decodeStreamToText(
   let pendingBytes = 0;
   let encodingPrescanBytes = 0;
   let decoderState: StreamDecoderState | undefined;
-  const decodedParts: string[] = [];
+  const decodedParts: string[] | null = options.retainText ? [] : null;
+  let decodedCodeUnits = 0;
   const decodedBudget = new DecodedUtf8BudgetCounter(
     budgets?.maxDecodedUtf8Bytes,
     operation
@@ -198,7 +203,17 @@ export async function decodeStreamToText(
   const appendDecoded = (value: string): void => {
     if (value.length > 0) {
       decodedBudget.append(value);
-      decodedParts.push(value);
+      const nextCodeUnits = decodedCodeUnits + value.length;
+      if (!Number.isSafeInteger(nextCodeUnits)) {
+        throw new HtmlConfigurationError(
+          "input",
+          "INVALID_VALUE",
+          "decoded input must fit in a safe UTF-16 code-unit count"
+        );
+      }
+      decodedCodeUnits = nextCodeUnits;
+      options.onDecodedChunk?.(value);
+      decodedParts?.push(value);
     }
   };
   const decodeBytes = (decoder: TextDecoder, bytes: Uint8Array): void => {
@@ -213,6 +228,7 @@ export async function decodeStreamToText(
     const sniff = sniffHtmlEncoding(bufferedBytes, sniffOptions);
     const state = { decoder: new TextDecoder(sniff.encoding), sniff };
     decoderState = state;
+    options.onEncodingSniff?.(sniff);
     decodeBytes(state.decoder, bufferedBytes);
     return state;
   };
@@ -250,10 +266,11 @@ export async function decodeStreamToText(
     const finalState = decoderState ?? initializeDecoder();
     appendDecoded(finalState.decoder.decode());
     return {
-      text: decodedParts.join(""),
+      text: decodedParts?.join("") ?? null,
       sniff: finalState.sniff,
       totalBytes: total,
       decodedUtf8Bytes: decodedBudget.bytes,
+      decodedCodeUnits,
       encodingPrescanBytes,
       encodingPrescanLimitBytes: prescanLimit
     };

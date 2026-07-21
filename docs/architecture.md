@@ -29,11 +29,12 @@ public tree
         └─ source-aware patch planning
 ```
 
-Byte-stream input is read and decoded incrementally, but tree construction
-starts after EOF from the complete decoded string. Resource checks occur at
-the work or allocation boundary. Public tree walking and downstream operations
-use explicit stacks so accepted input depth does not depend on JavaScript's
-call-stack limit.
+After byte-stream encoding selection, decoded chunks feed tree construction
+incrementally. Exact decoded text is retained only when requested, and stream
+conversion releases internal tree storage as the immutable public tree is
+built. Resource checks occur at the work or allocation boundary. Public tree
+walking and downstream operations use explicit stacks so accepted input depth
+does not depend on JavaScript's call-stack limit.
 
 Production uses one independent standards-based TypeScript engine. There is no
 public engine selector, fallback, hybrid parser, installed runtime dependency,

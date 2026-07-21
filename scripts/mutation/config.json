@@ -2,7 +2,12 @@
   "targets": [
     {
       "targetFile": "dist/public/fragment-context.js",
-      "testCommand": ["node", "--test", "test/behavior/fragment-context.test.js"],
+      "testCommand": [
+        "node",
+        "--test",
+        "test/behavior/fragment-context.test.js",
+        "test/behavior/public-integration.test.js"
+      ],
       "mutants": [
         {
           "id": "fragment-public-html-name-normalization",
@@ -29,22 +34,27 @@
       "testCommand": ["node", "--test", "test/behavior/fragment-context.test.js"],
       "mutants": [
         {
-          "id": "fragment-serializer-scripting-inheritance",
-          "description": "Serialize every fragment under the inert scripting environment.",
-          "search": "(tree.kind === \"fragment\" ? tree.scriptingMode : \"inert\")",
-          "replace": "(tree.kind === \"fragment\" ? \"inert\" : \"inert\")"
+          "id": "parsed-tree-serializer-scripting-inheritance",
+          "description": "Serialize every parsed tree under the inert scripting environment.",
+          "search": "(tree.kind === \"document\" || tree.kind === \"fragment\" ? tree.scriptingMode : \"inert\")",
+          "replace": "\"inert\""
         }
       ]
     },
     {
       "targetFile": "dist/public/chunking.js",
-      "testCommand": ["node", "--test", "test/behavior/fragment-context.test.js"],
+      "testCommand": [
+        "node",
+        "--test",
+        "test/behavior/fragment-context.test.js",
+        "test/behavior/public-integration.test.js"
+      ],
       "mutants": [
         {
-          "id": "fragment-chunk-scripting-inheritance",
-          "description": "Chunk every fragment under the inert scripting environment.",
-          "search": "tree.kind === \"fragment\" ? tree.scriptingMode : \"inert\"",
-          "replace": "tree.kind === \"fragment\" ? \"inert\" : \"inert\""
+          "id": "parsed-tree-chunk-scripting-inheritance",
+          "description": "Chunk every parsed tree under the inert scripting environment.",
+          "search": "tree.scriptingMode",
+          "replace": "\"inert\""
         }
       ]
     },
@@ -437,7 +447,7 @@
         {
           "id": "tree-text-span-contiguity",
           "description": "Claim one exact source span for non-contiguous coalesced text.",
-          "search": "if (current === null || next === null || current.endUtf16Offset !== next.startUtf16Offset) {",
+          "search": "if (current?.endUtf16Offset !== next?.startUtf16Offset || current === null || next === null) {",
           "replace": "if (current === null || next === null) {"
         },
         {
@@ -712,7 +722,11 @@
         "node",
         "--test",
         "test/behavior/public-integration.test.js",
-        "test/behavior/fragment-context.test.js"
+        "test/behavior/fragment-context.test.js",
+        "test/behavior/hard-budgets.test.js",
+        "test/behavior/parse-errors.test.js",
+        "test/behavior/parse-result-metadata.test.js",
+        "test/behavior/streaming.test.js"
       ],
       "mutants": [
         {
@@ -728,10 +742,16 @@
           "replace": "if (false && resource === \"maxAttributeUtf8BytesPerElement\")"
         },
         {
-          "id": "product-template-content-conversion",
-          "description": "Drop the owned template-content fragment during public conversion.",
-          "search": "if (templateContent !== undefined)\n        element.templateContent = templateContent;",
-          "replace": "if (false && templateContent !== undefined)\n        element.templateContent = templateContent;"
+          "id": "product-unspanned-template-content-conversion",
+          "description": "Drop the owned template-content fragment during ordinary public conversion.",
+          "search": "if (templateContent !== undefined)\n        element.templateContent = templateContent;\n    return Object.freeze(element);",
+          "replace": "if (false && templateContent !== undefined)\n        element.templateContent = templateContent;\n    return Object.freeze(element);"
+        },
+        {
+          "id": "product-spanned-template-content-conversion",
+          "description": "Drop the owned template-content fragment during span-aware public conversion.",
+          "search": "if (templateContent !== undefined)\n        element.templateContent = templateContent;\n    return finishPublicNode(element, provenance, span);",
+          "replace": "if (false && templateContent !== undefined)\n        element.templateContent = templateContent;\n    return finishPublicNode(element, provenance, span);"
         },
         {
           "id": "product-processing-instruction-token",
@@ -750,6 +770,36 @@
           "description": "Discard retained trace byte accounting from public resource observations.",
           "search": "traceUtf8Bytes: trace.eventUtf8Bytes",
           "replace": "traceUtf8Bytes: 0"
+        },
+        {
+          "id": "product-step-budget-forwarding",
+          "description": "Drop the deterministic engine step limit from public parser budgets.",
+          "search": "...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),",
+          "replace": ""
+        },
+        {
+          "id": "product-document-scripting-mode",
+          "description": "Construct every document under the inert scripting environment.",
+          "search": "parser: { kind: \"document\", scriptingMode: options.scriptingMode ?? \"inert\" },",
+          "replace": "parser: { kind: \"document\", scriptingMode: \"inert\" },"
+        },
+        {
+          "id": "product-document-scripting-retention",
+          "description": "Report every document as using the inert scripting environment.",
+          "search": "kind: \"document\",\n        scriptingMode: options.scriptingMode ?? \"inert\",",
+          "replace": "kind: \"document\",\n        scriptingMode: \"inert\","
+        },
+        {
+          "id": "product-named-parse-error-reference",
+          "description": "Map named tokenizer diagnostics to the general parse-error section.",
+          "search": "return isHtmlParseErrorCode(parseErrorId)\n        ? `${WHATWG_PARSE_ERROR_ANCHOR_URL}${parseErrorId}`",
+          "replace": "return false\n        ? `${WHATWG_PARSE_ERROR_ANCHOR_URL}${parseErrorId}`"
+        },
+        {
+          "id": "product-incremental-stream-feed",
+          "description": "Discard decoded chunks instead of feeding tree construction before EOF.",
+          "search": "requireInternalValue(engine, \"PUBLIC_PARSER_STREAM_ENGINE_NOT_INITIALIZED\").session.write(chunk);",
+          "replace": "void chunk;"
         }
       ]
     }

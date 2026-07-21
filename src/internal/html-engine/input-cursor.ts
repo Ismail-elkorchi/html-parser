@@ -43,14 +43,18 @@ type InputParseErrorObserver = (error: EngineParseError) => void;
 class CursorInputCharacter implements InputCharacter {
   readonly kind = "character";
   readonly value: string;
+  readonly startUtf16Offset: number;
+  readonly endUtf16Offset: number;
   #span: SourceSpan | null = null;
 
   constructor(
     value: string,
-    readonly startUtf16Offset: number,
-    readonly endUtf16Offset: number
+    startUtf16Offset: number,
+    endUtf16Offset: number
   ) {
     this.value = value;
+    this.startUtf16Offset = startUtf16Offset;
+    this.endUtf16Offset = endUtf16Offset;
   }
 
   get span(): SourceSpan {
@@ -146,7 +150,7 @@ export class HtmlInputCursor {
     if (this.#closed) {
       throw new EngineConfigurationError("cursor", "cannot accept input after close");
     }
-    this.#guard.checkpoint();
+    this.#guard.ensureActive();
     const nextWrittenCodeUnits = this.#writtenCodeUnits + chunk.length;
     if (!Number.isSafeInteger(nextWrittenCodeUnits)) {
       throw new EngineConfigurationError("input", "must fit in a safe UTF-16 code-unit count");
@@ -158,7 +162,7 @@ export class HtmlInputCursor {
   /** Closes the input stream; subsequent exhaustion produces conceptual EOF. */
   close(): void {
     if (this.#closed) return;
-    this.#guard.checkpoint();
+    this.#guard.ensureActive();
     this.#closed = true;
   }
 
@@ -186,7 +190,7 @@ export class HtmlInputCursor {
     if (this.#reconsumePending) {
       throw new EngineConfigurationError("cursor", "cannot look ahead while reconsume is pending");
     }
-    this.#guard.checkpoint();
+    this.#guard.ensureActive();
     const codeUnit = this.#codeUnitAt(distance);
     if (codeUnit === undefined) {
       const boundary = sourcePosition(this.#writtenCodeUnits);
@@ -203,14 +207,19 @@ export class HtmlInputCursor {
 
   /** Consumes one normalized code point, reports a boundary wait, or returns conceptual EOF. */
   consume(): InputRead {
-    this.#guard.checkpoint();
     if (this.#reconsumePending) {
+      this.#guard.checkpoint();
       this.#reconsumePending = false;
-      return this.#current as InputCharacter;
+      return requireInternalValue(
+        this.#current,
+        "INPUT_CURSOR_RECONSUME_CHARACTER_MISSING"
+      );
     }
 
     const head = this.#chunks[this.#headChunk];
     if (head === undefined) {
+      if (this.#closed) this.#guard.checkpoint();
+      else this.#guard.ensureActive();
       const position = this.position();
       return Object.freeze(
         this.#closed ? { kind: "eof", position } : { kind: "need-more-input", position }
@@ -223,6 +232,7 @@ export class HtmlInputCursor {
     // cross-chunk/code-point path while preserving the same lazy span record.
     if (first === 0x09 || first === 0x0a || first === 0x0c ||
         (first >= 0x20 && first <= 0x7e)) {
+      this.#guard.checkpoint();
       const startUtf16Offset = this.#utf16Offset;
       const value = head.charAt(this.#headOffset);
       this.#headOffset += 1;
@@ -251,6 +261,7 @@ export class HtmlInputCursor {
     if (first === 0x0d) {
       const second = this.#codeUnitAt(1);
       if (second === undefined && !this.#closed) {
+        this.#guard.ensureActive();
         return Object.freeze({ kind: "need-more-input", position: this.position() });
       }
       if (second === 0x0a) width = 2;
@@ -258,6 +269,7 @@ export class HtmlInputCursor {
     } else if (isLeadingSurrogate(first)) {
       const second = this.#codeUnitAt(1);
       if (second === undefined && !this.#closed) {
+        this.#guard.ensureActive();
         return Object.freeze({ kind: "need-more-input", position: this.position() });
       }
       if (second !== undefined && isTrailingSurrogate(second)) {
@@ -271,6 +283,7 @@ export class HtmlInputCursor {
       value = String.fromCharCode(first);
     }
 
+    this.#guard.checkpoint();
     const startUtf16Offset = this.#utf16Offset;
     const endUtf16Offset = startUtf16Offset + width;
     const parseErrorCode = inputError(codePoint);

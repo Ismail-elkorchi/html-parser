@@ -12,7 +12,8 @@ import {
 function semanticOutcome(outcome: EngineTokenizerFixtureOutcome): unknown {
   return {
     tokens: outcome.tokens,
-    errors: outcome.errors.map(({ code, phase, span }) => ({ code, phase, span }))
+    errors: outcome.errors.map(({ code, phase, span }) => ({ code, phase, span })),
+    resources: outcome.resources
   };
 }
 

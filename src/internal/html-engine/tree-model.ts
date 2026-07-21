@@ -204,6 +204,11 @@ function modelOwner(value: object): HtmlTreeModel | undefined {
 class TreeElementNode implements HtmlTreeElement, HtmlTreeNodeIdentity {
   readonly kind = "element";
   readonly identity: HtmlTreeNodeIdentity = this;
+  readonly serial: number;
+  readonly namespaceUri: HtmlElementNamespaceUri;
+  readonly prefix: string | null;
+  readonly localName: string;
+  readonly qualifiedName: string;
   readonly [MODEL_OWNER]: HtmlTreeModel;
   readonly [NODE_STATE]: NodeState;
   readonly [PARENT_STATE]: ParentState;
@@ -211,15 +216,20 @@ class TreeElementNode implements HtmlTreeElement, HtmlTreeNodeIdentity {
 
   constructor(
     owner: HtmlTreeModel,
-    readonly serial: number,
-    readonly namespaceUri: HtmlElementNamespaceUri,
-    readonly prefix: string | null,
-    readonly localName: string,
-    readonly qualifiedName: string,
+    serial: number,
+    namespaceUri: HtmlElementNamespaceUri,
+    prefix: string | null,
+    localName: string,
+    qualifiedName: string,
     nodeState: NodeState,
     parentState: ParentState,
     elementState: ElementState
   ) {
+    this.serial = serial;
+    this.namespaceUri = namespaceUri;
+    this.prefix = prefix;
+    this.localName = localName;
+    this.qualifiedName = qualifiedName;
     this[MODEL_OWNER] = owner;
     this[NODE_STATE] = nodeState;
     this[PARENT_STATE] = parentState;
@@ -243,15 +253,19 @@ class TreeElementNode implements HtmlTreeElement, HtmlTreeNodeIdentity {
 class TreeTemplateContentsNode implements HtmlTemplateContents, HtmlTreeNodeIdentity {
   readonly kind = "template-contents";
   readonly identity: HtmlTreeNodeIdentity = this;
+  readonly serial: number;
+  readonly host: HtmlTreeElement;
   readonly [MODEL_OWNER]: HtmlTreeModel;
   readonly [PARENT_STATE]: ParentState;
 
   constructor(
     owner: HtmlTreeModel,
-    readonly serial: number,
-    readonly host: HtmlTreeElement,
+    serial: number,
+    host: HtmlTreeElement,
     parentState: ParentState
   ) {
+    this.serial = serial;
+    this.host = host;
     this[MODEL_OWNER] = owner;
     this[PARENT_STATE] = parentState;
     Object.freeze(this);
@@ -264,16 +278,18 @@ class TreeTemplateContentsNode implements HtmlTemplateContents, HtmlTreeNodeIden
 class TreeTextNode implements HtmlTreeText, HtmlTreeNodeIdentity {
   readonly kind = "text";
   readonly identity: HtmlTreeNodeIdentity = this;
+  readonly serial: number;
   readonly [MODEL_OWNER]: HtmlTreeModel;
   readonly [NODE_STATE]: NodeState;
   readonly [TEXT_STATE]: TextState;
 
   constructor(
     owner: HtmlTreeModel,
-    readonly serial: number,
+    serial: number,
     nodeState: NodeState,
     textState: TextState
   ) {
+    this.serial = serial;
     this[MODEL_OWNER] = owner;
     this[NODE_STATE] = nodeState;
     this[TEXT_STATE] = textState;
@@ -287,15 +303,19 @@ class TreeTextNode implements HtmlTreeText, HtmlTreeNodeIdentity {
 
 class TreeRootNode<Kind extends "document" | "fragment"> {
   readonly identity: HtmlTreeNodeIdentity = this;
+  readonly kind: Kind;
+  readonly serial: number;
   readonly [MODEL_OWNER]: HtmlTreeModel;
   readonly [PARENT_STATE]: ParentState;
 
   constructor(
-    readonly kind: Kind,
-    readonly serial: number,
+    kind: Kind,
+    serial: number,
     owner: HtmlTreeModel,
     parentState: ParentState
   ) {
+    this.kind = kind;
+    this.serial = serial;
     this[MODEL_OWNER] = owner;
     this[PARENT_STATE] = parentState;
     Object.freeze(this);
@@ -828,6 +848,16 @@ export class HtmlTreeModel {
     return this.#elementState(element).attributes;
   }
 
+  /** Releases child references after the completed model has been exported. */
+  releaseExportedChildren(parent: HtmlTreeParent): void {
+    this.#parentState(parent).children.length = 0;
+  }
+
+  /** Releases attribute references after the completed element has been exported. */
+  releaseExportedAttributes(element: HtmlTreeElement): void {
+    this.#elementState(element).attributes.length = 0;
+  }
+
   attribute(
     element: HtmlTreeElement,
     namespaceUri: HtmlAttributeNamespaceUri,
@@ -842,7 +872,7 @@ export class HtmlTreeModel {
   /** Walks every attached non-root node with the root fixed at depth one. */
   *walk(): IterableIterator<HtmlTreeWalkEntry> {
     const children = this.#parentState(this.root).children;
-    const stack: Array<{ readonly node: HtmlTreeNode; readonly depth: number }> = [];
+    const stack: { readonly node: HtmlTreeNode; readonly depth: number }[] = [];
     for (let index = children.length - 1; index >= 0; index -= 1) {
       const child = children[index];
       if (child !== undefined) stack.push({ node: child, depth: 2 });
@@ -864,7 +894,7 @@ export class HtmlTreeModel {
     const visited = new Set<number>([this.root.identity.serial]);
     let attachedNodes = 1;
     let maxDepth = 1;
-    const stack: Array<{ readonly parent: HtmlTreeParent; readonly depth: number }> = [
+    const stack: { readonly parent: HtmlTreeParent; readonly depth: number }[] = [
       { parent: this.root, depth: 1 }
     ];
 
@@ -927,10 +957,10 @@ export class HtmlTreeModel {
 
   #cloneSubtree(source: HtmlTreeNode): HtmlTreeNode {
     const root = this.#cloneNode(source);
-    const stack: Array<{
+    const stack: {
       readonly source: HtmlTreeElement;
       readonly clone: HtmlTreeElement;
-    }> = [];
+    }[] = [];
     if (source.kind === "element" && root.kind === "element") {
       stack.push({ source, clone: root });
     }
@@ -938,10 +968,10 @@ export class HtmlTreeModel {
       this.#resources.checkpoint();
       const pair = stack.pop();
       if (pair === undefined) break;
-      const childPairs: Array<{
+      const childPairs: {
         readonly source: HtmlTreeElement;
         readonly clone: HtmlTreeElement;
-      }> = [];
+      }[] = [];
       for (const sourceChild of this.#semanticChildren(pair.source)) {
         const childClone = this.#cloneNode(sourceChild);
         this.append(this.insertionParent(pair.clone), childClone);
@@ -1086,11 +1116,11 @@ export class HtmlTreeModel {
   ): { readonly assignments: SubtreeDepthAssignment[]; readonly maxRelativeDepth: number } {
     const assignments: SubtreeDepthAssignment[] = [];
     let maxRelativeDepth = 1;
-    const stack: Array<{
+    const stack: {
       readonly node: HtmlTreeNode;
       readonly depth: number | null;
       readonly relativeDepth: number;
-    }> = [
+    }[] = [
       { node, depth, relativeDepth: 1 }
     ];
     const visited = new Set<number>();
@@ -1122,7 +1152,7 @@ export class HtmlTreeModel {
   }
 
   #authorizeDepthApplication(assignments: readonly SubtreeDepthAssignment[]): void {
-    for (let index = 0; index < assignments.length; index += 1) this.#resources.checkpoint();
+    this.#resources.checkpointMany(assignments.length);
   }
 
   #applySubtreeDepths(assignments: readonly SubtreeDepthAssignment[]): void {
@@ -1190,7 +1220,7 @@ export class HtmlTreeModel {
   }
 
   #coalescedSpan(current: SourceSpan | null, next: SourceSpan | null): SourceSpan | null {
-    if (current === null || next === null || current.endUtf16Offset !== next.startUtf16Offset) {
+    if (current?.endUtf16Offset !== next?.startUtf16Offset || current === null || next === null) {
       return null;
     }
     return sourceSpan(current.startUtf16Offset, next.endUtf16Offset);

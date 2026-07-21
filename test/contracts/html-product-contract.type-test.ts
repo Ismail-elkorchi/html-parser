@@ -21,6 +21,14 @@ import type {
 } from "../../src/public/types.js";
 
 const parsed = parse("<?build release?><template>x</template>");
+const disabledDocument = parse("<noscript>x</noscript>", {
+  scriptingMode: "disabled",
+  budgets: { maxSteps: 10_000 }
+});
+const documentScriptingMode: HtmlScriptingMode = disabledDocument.tree.scriptingMode;
+const observedSteps: number | null = disabledDocument.metadata.resourceUsage.steps;
+void documentScriptingMode;
+void observedSteps;
 const fragment = parseFragment("x", {
   namespaceUri: HTML_NAMESPACE_URI,
   localName: "template"
@@ -63,6 +71,11 @@ const templateContent: TemplateContentNode | undefined = parsed.tree.children
 const instruction: ProcessingInstructionNode | undefined = parsed.tree.children.find(
   (node): node is ProcessingInstructionNode => node.kind === "processingInstruction"
 );
+const parseError = parse("<p><div></p>").tree.errors[0];
+if (parseError !== undefined) {
+  // @ts-expect-error - diagnostics do not claim a node identity the parser cannot establish.
+  void parseError.nodeId;
+}
 const element = parsed.tree.children.find((node) => node.kind === "element");
 if (element?.kind === "element") {
   void element.localName;

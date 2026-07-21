@@ -3,6 +3,7 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import { parseLongOptions } from "../lib/cli.mjs";
+import { stabilizedHeapUsed } from "./performance-measurement.mjs";
 
 const options = parseLongOptions(process.argv.slice(2), {
   "module-root": { type: "string", required: true },
@@ -10,10 +11,6 @@ const options = parseLongOptions(process.argv.slice(2), {
 }, "benchmark parser");
 const moduleRoot = options["module-root"];
 const selectedBenchmark = options.benchmark;
-if (typeof globalThis.gc !== "function") {
-  throw new Error("benchmark-parser.mjs requires --expose-gc");
-}
-
 const modulePath = `${moduleRoot}/dist/mod.js`;
 const module = await import(pathToFileURL(modulePath).href);
 const parse = module.parse;
@@ -69,7 +66,7 @@ function measureThroughput(fixture) {
   for (let iteration = 0; iteration < fixture.warmupIterations; iteration += 1) {
     execute(fixture, prepared);
   }
-  globalThis.gc();
+  stabilizedHeapUsed();
   let result;
   const cpuBefore = process.cpuUsage();
   const started = performance.now();
@@ -89,7 +86,7 @@ const results = [];
 for (const fixture of fixtures) {
   if (selectedBenchmark !== undefined && fixture.name !== selectedBenchmark) continue;
   const throughput = measureThroughput(fixture);
-  globalThis.gc();
+  stabilizedHeapUsed();
   const retainedInputs = Array.from(
     { length: fixture.retainedResultCount },
     (_, index) => prepare(
@@ -97,15 +94,13 @@ for (const fixture of fixtures) {
       `${fixture.input}<!--retained-${String(index)}-->`
     )
   );
-  globalThis.gc();
-  const retainedHeapBaseline = process.memoryUsage().heapUsed;
+  const retainedHeapBaseline = stabilizedHeapUsed();
   const retainedResults = new Array(fixture.retainedResultCount);
   for (let index = 0; index < retainedResults.length; index += 1) {
     retainedResults[index] = execute(fixture, retainedInputs[index]);
   }
-  globalThis.gc();
-  const retainedHeap = process.memoryUsage().heapUsed;
-  const retainedHeapDelta = Math.max(0, retainedHeap - retainedHeapBaseline);
+  const retainedHeap = stabilizedHeapUsed();
+  const retainedHeapDelta = Math.max(0, retainedHeap.heapUsed - retainedHeapBaseline.heapUsed);
   const totalBytes = fixture.input.length * fixture.iterations;
   const cpuMs = (throughput.cpu.user + throughput.cpu.system) / 1_000;
   results.push({
@@ -122,8 +117,10 @@ for (const fixture of fixtures) {
       totalBytes / (1024 * 1024) / (throughput.elapsedMs / 1_000),
     retainedResultCount: retainedResults.length,
     retainedInputPreparation: "caller-owned-inputs-before-baseline",
-    retainedHeapBaselineBytes: retainedHeapBaseline,
-    retainedHeapBytes: retainedHeap,
+    retainedHeapBaselineBytes: retainedHeapBaseline.heapUsed,
+    retainedHeapBaselineFullGcPasses: retainedHeapBaseline.fullGcPasses,
+    retainedHeapBytes: retainedHeap.heapUsed,
+    retainedHeapFullGcPasses: retainedHeap.fullGcPasses,
     retainedHeapDeltaBytes: retainedHeapDelta,
     retainedHeapBytesPerResult: retainedHeapDelta / retainedResults.length,
     resultSize: throughput.resultSize

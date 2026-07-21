@@ -82,11 +82,7 @@ function canonicalizeLabel(label: string, source: "bom" | "transport" | "meta" |
 
 function decodeLatin1(bytes: Uint8Array): string {
   let decodedText = "";
-  for (let index = 0; index < bytes.length; index += 1) {
-    const value = bytes[index];
-    if (value === undefined) {
-      continue;
-    }
+  for (const value of bytes) {
     decodedText += String.fromCharCode(value);
   }
   return decodedText;
@@ -204,7 +200,7 @@ function extractMetaTags(scan: string): string[] {
 }
 
 function extractCharsetFromContent(content: string): string | null {
-  const match = content.match(/charset\s*=\s*("[^"]*"|'[^']*'|[^\s;"'>]+)/i);
+  const match = /charset\s*=\s*("[^"]*"|'[^']*'|[^\s;"'>]+)/i.exec(content);
   if (!match) {
     return null;
   }

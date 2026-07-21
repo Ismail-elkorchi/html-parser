@@ -3,7 +3,11 @@ import {
   failInternalState,
   requireInternalValue
 } from "../internal/foundation/internal-state-error.ts";
-import { runHtmlEngine } from "../internal/html-engine/parser-driver.ts";
+import { isHtmlParseErrorCode } from "../internal/foundation/parse-error-codes.ts";
+import {
+  createHtmlEngineSession,
+  runHtmlEngine
+} from "../internal/html-engine/parser-driver.ts";
 import {
   EngineAbortError,
   EngineResourceLimitError,
@@ -16,7 +20,7 @@ import { HtmlAbortError, HtmlBudgetExceededError } from "./errors.ts";
 import { normalizeFragmentContext, toEngineFragmentContext } from "./fragment-context.ts";
 import {
   DecodedUtf8BudgetCounter,
-  decodeStreamToText,
+  decodeByteStream,
   requireByteArray,
   requireReadableByteStream,
   requireString,
@@ -59,6 +63,10 @@ import type {
 import type {
   EngineParseError
 } from "../internal/html-engine/diagnostics.ts";
+import type {
+  HtmlEngineProductResult,
+  HtmlEngineSession
+} from "../internal/html-engine/parser-driver.ts";
 import type { SourceSpan } from "../internal/html-engine/positions.ts";
 import type {
   EngineResourceLimitName,
@@ -79,6 +87,7 @@ interface ParseInputContext {
   readonly inputKind: ParsedDocumentMetadata["inputKind"];
   readonly byteLength: number;
   readonly decodedUtf8ByteLength: number;
+  readonly decodedCodeUnits: number;
   readonly transportByteLength: number | null;
   readonly metadataEncoding: ParsedDocumentMetadata["encoding"];
   readonly encodingPrescanBytes: number;
@@ -98,11 +107,14 @@ interface ParseInputContext {
 
 const WHATWG_PARSE_ERRORS_SECTION_URL =
   "https://html.spec.whatwg.org/multipage/parsing.html#parse-errors";
+const WHATWG_PARSE_ERROR_ANCHOR_URL =
+  "https://html.spec.whatwg.org/multipage/parsing.html#parse-error-";
 
-/** Returns the HTML Standard parse-errors section for a parser diagnostic. */
+/** Returns the most specific HTML Standard reference available for a parser diagnostic. */
 export function getParseErrorSpecRef(parseErrorId: string): string {
-  void parseErrorId;
-  return WHATWG_PARSE_ERRORS_SECTION_URL;
+  return isHtmlParseErrorCode(parseErrorId)
+    ? `${WHATWG_PARSE_ERROR_ANCHOR_URL}${parseErrorId}`
+    : WHATWG_PARSE_ERRORS_SECTION_URL;
 }
 
 class NodeIdAssigner {
@@ -121,9 +133,6 @@ class NodeIdAssigner {
 
 function publicBudgetName(resource: EngineResourceLimitName): HtmlBudgetName {
   if (resource === "maxAttributeUtf8BytesPerElement") return "maxAttributeBytes";
-  if (resource === "maxSteps") {
-    return failInternalState("PUBLIC_PARSER_UNMAPPED_RESOURCE_LIMIT");
-  }
   return resource;
 }
 
@@ -131,6 +140,7 @@ function engineLimits(options: ParseOptions["budgets"]): EngineResourceLimits {
   if (options === undefined) return Object.freeze({});
   return Object.freeze({
     ...(options.maxNodes === undefined ? {} : { maxNodes: options.maxNodes }),
+    ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
     ...(options.maxDepth === undefined ? {} : { maxDepth: options.maxDepth }),
     ...(options.maxParseErrors === undefined ? {} : { maxParseErrors: options.maxParseErrors }),
     ...(options.maxAttributesPerElement === undefined
@@ -291,6 +301,67 @@ function finishPublicNode<T extends object>(
   return Object.freeze(node);
 }
 
+function createUnspannedPublicNode(
+  source: ConversionSource,
+  model: HtmlTreeModel,
+  assigner: NodeIdAssigner,
+  names: Map<string, string>,
+  directChildren: readonly HtmlNode[],
+  templateContent: HtmlNode | undefined,
+  operation: OperationContext
+): HtmlNode {
+  if (source.kind === "template-contents") {
+    return Object.freeze({
+      id: assigner.next(),
+      kind: "templateContent" as const,
+      children: directChildren
+    });
+  }
+  if (source.kind === "text") {
+    return Object.freeze({
+      id: assigner.next(), kind: "text" as const, value: internShort(names, source.data)
+    });
+  }
+  if (source.kind === "comment") {
+    return Object.freeze({
+      id: assigner.next(), kind: "comment" as const, value: internShort(names, source.data)
+    });
+  }
+  if (source.kind === "processing-instruction") {
+    return Object.freeze({
+      id: assigner.next(), kind: "processingInstruction" as const,
+      target: source.target, data: source.data
+    });
+  }
+  if (source.kind === "doctype") {
+    return Object.freeze({
+      id: assigner.next(), kind: "doctype" as const, name: source.name,
+      externalId: externalId(source.externalId)
+    });
+  }
+  if (templateContent !== undefined && templateContent.kind !== "templateContent") {
+    failInternalState("PUBLIC_PARSER_TEMPLATE_CONTENT_KIND_MISMATCH");
+  }
+  const element = {
+    id: assigner.next(), kind: "element" as const,
+    namespaceUri: source.namespaceUri,
+    ...(source.prefix === null ? {} : { prefix: intern(names, source.prefix) }),
+    localName: intern(names, source.localName),
+    attributes: attributes(source, model, false, names, operation), children: directChildren
+  } as {
+    id: NodeId;
+    kind: "element";
+    namespaceUri: string;
+    prefix?: string;
+    localName: string;
+    attributes: readonly Attribute[];
+    children: readonly HtmlNode[];
+    templateContent?: TemplateContentNode;
+  };
+  if (templateContent !== undefined) element.templateContent = templateContent;
+  return Object.freeze(element);
+}
+
 function createPublicNode(
   source: ConversionSource,
   model: HtmlTreeModel,
@@ -301,12 +372,23 @@ function createPublicNode(
   templateContent: HtmlNode | undefined,
   operation: OperationContext
 ): HtmlNode {
+  if (!captureSpans) {
+    return createUnspannedPublicNode(
+      source,
+      model,
+      assigner,
+      names,
+      directChildren,
+      templateContent,
+      operation
+    );
+  }
   if (source.kind === "template-contents") {
     return finishPublicNode({
       id: assigner.next(),
       kind: "templateContent" as const,
       children: directChildren
-    } satisfies Omit<TemplateContentNode, "spanProvenance">, captureSpans ? "inferred" : undefined, undefined);
+    } satisfies Omit<TemplateContentNode, "spanProvenance">, "inferred", undefined);
   }
   const span = publicSpan(source.sourceSpan, captureSpans);
   const provenance = spanProvenance(source.sourceSpan, captureSpans);
@@ -355,6 +437,15 @@ function createPublicNode(
   return finishPublicNode(element, provenance, span);
 }
 
+function releaseConvertedSource(source: ConversionSource, model: HtmlTreeModel): void {
+  if (source.kind === "element") {
+    model.releaseExportedAttributes(source);
+    model.releaseExportedChildren(source);
+  } else if (source.kind === "template-contents") {
+    model.releaseExportedChildren(source);
+  }
+}
+
 function convertReadySource(
   source: ConversionSource,
   model: HtmlTreeModel,
@@ -371,7 +462,7 @@ function convertReadySource(
   const templateContent = source.kind === "element" && source.templateContents !== null
     ? converted[source.templateContents.identity.serial]
     : undefined;
-  return createPublicNode(
+  const node = createPublicNode(
     source,
     model,
     assigner,
@@ -381,6 +472,8 @@ function convertReadySource(
     templateContent,
     operation
   );
+  releaseConvertedSource(source, model);
+  return node;
 }
 
 function convertRecursively(
@@ -422,7 +515,7 @@ function convertRecursively(
       directChildren = Object.freeze(convertedChildren);
     }
   }
-  return createPublicNode(
+  const node = createPublicNode(
     source,
     model,
     assigner,
@@ -432,6 +525,8 @@ function convertRecursively(
     templateContent,
     operation
   );
+  releaseConvertedSource(source, model);
+  return node;
 }
 
 function convertNodes(
@@ -442,12 +537,20 @@ function convertNodes(
   maxDepth: number,
   operation: OperationContext
 ): readonly HtmlNode[] {
-  const converted: Array<HtmlNode | undefined> = [];
+  const converted: (HtmlNode | undefined)[] = [];
   const names = new Map<string, string>();
   const roots = children(root, model, operation);
+  model.releaseExportedChildren(root);
   if (maxDepth <= 128) {
     return Object.freeze(roots.map((source) =>
-      convertRecursively(source, model, assigner, captureSpans, names, operation)
+      convertRecursively(
+        source,
+        model,
+        assigner,
+        captureSpans,
+        names,
+        operation
+      )
     ));
   } else {
     const sources: ConversionSource[] = [];
@@ -530,6 +633,7 @@ function stringInputContext(
     inputKind: "text",
     byteLength,
     decodedUtf8ByteLength: byteLength,
+    decodedCodeUnits: html.length,
     transportByteLength: null,
     metadataEncoding: { name: null, source: "already-decoded" },
     encodingPrescanBytes: 0,
@@ -539,69 +643,72 @@ function stringInputContext(
   };
 }
 
-function parseDocumentOperation(
-  html: string,
+interface DocumentEngineState {
+  tokenCount: number;
+  previousCharacter: boolean;
+}
+
+function createDocumentEngine(
   options: ParseOptions | ParseBytesOptions | ParseStreamOptions,
-  input: ParseInputContext
+  startedAt: number,
+  trace: TraceSink
+): { readonly session: HtmlEngineSession; readonly state: DocumentEngineState } {
+  const state: DocumentEngineState = { tokenCount: 0, previousCharacter: false };
+  const session = createHtmlEngineSession({
+    retainNodeSpans: options.captureSpans ?? false,
+    trackSteps: options.budgets?.maxSteps !== undefined,
+    parser: { kind: "document", scriptingMode: options.scriptingMode ?? "inert" },
+    limits: engineLimits(options.budgets),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+    startedAt,
+    ...(trace.active
+      ? {
+          observer: {
+            onToken(token): void {
+              if (token.kind !== "character" || !state.previousCharacter) {
+                state.tokenCount += 1;
+              }
+              state.previousCharacter = token.kind === "character";
+            },
+            onParseError(error): void {
+              trace.emit({
+                kind: "parseError",
+                parseErrorId: normalizeParseErrorId(error.code),
+                startOffset: error.span.startUtf16Offset,
+                endOffset: error.span.endUtf16Offset
+              });
+            },
+            onInsertionModeTransition(transition): void {
+              trace.emit({
+                kind: "insertionModeTransition",
+                fromMode: transition.from,
+                toMode: transition.to,
+                tokenContext: {
+                  type: transition.token.kind,
+                  tagName: transition.token.tagName,
+                  startOffset: transition.token.span.startUtf16Offset,
+                  endOffset: transition.token.span.endUtf16Offset
+                }
+              });
+            }
+          }
+        }
+      : {})
+  });
+  return { session, state };
+}
+
+function finishDocumentOperation(
+  sourceText: string | null,
+  options: ParseOptions | ParseBytesOptions | ParseStreamOptions,
+  input: ParseInputContext,
+  trace: TraceSink,
+  result: HtmlEngineProductResult,
+  tokenCount: number
 ): ParsedDocument {
   const operation = input.operation;
   const budgets = options.budgets;
   const captureSpans = options.captureSpans ?? false;
-  const trace = new TraceSink(options.trace ?? "none", options.onTraceEvent, budgets, operation);
-  enforceBudget("maxInputBytes", budgets?.maxInputBytes, input.byteLength);
-  enforceBudget("maxDecodedUtf8Bytes", budgets?.maxDecodedUtf8Bytes, input.decodedUtf8ByteLength);
-  trace.emit({ kind: "decode", ...input.decode });
-  if (input.stream !== undefined) trace.emit({ kind: "stream", ...input.stream });
-  trace.emitBudget("maxInputBytes", budgets?.maxInputBytes, input.byteLength);
-
-  let tokenCount = 0;
-  let previousCharacter = false;
-  let result;
-  try {
-    result = runHtmlEngine({
-      inputChunks: [html],
-      retainNodeSpans: captureSpans,
-      trackSteps: false,
-      parser: { kind: "document", scriptingMode: "inert" },
-      limits: engineLimits(budgets),
-      ...(options.signal === undefined ? {} : { signal: options.signal }),
-      startedAt: input.startedAt,
-      ...(trace.active
-        ? {
-            observer: {
-              onToken(token): void {
-                if (token.kind !== "character" || !previousCharacter) tokenCount += 1;
-                previousCharacter = token.kind === "character";
-              },
-              onParseError(error): void {
-                trace.emit({
-                  kind: "parseError",
-                  parseErrorId: normalizeParseErrorId(error.code),
-                  startOffset: error.span.startUtf16Offset,
-                  endOffset: error.span.endUtf16Offset
-                });
-              },
-              onInsertionModeTransition(transition): void {
-                trace.emit({
-                  kind: "insertionModeTransition",
-                  fromMode: transition.from,
-                  toMode: transition.to,
-                  tokenContext: {
-                    type: transition.token.kind,
-                    tagName: transition.token.tagName,
-                    startOffset: transition.token.span.startUtf16Offset,
-                    endOffset: transition.token.span.endUtf16Offset
-                  }
-                });
-              }
-            }
-          }
-        : {})
-    });
-  } catch (error) {
-    return mapEngineFailure(error);
-  }
-
   trace.emit({ kind: "token", count: tokenCount });
   const assigner = new NodeIdAssigner();
   const documentId = assigner.next();
@@ -622,6 +729,9 @@ function parseDocumentOperation(
   });
   trace.emitBudget("maxNodes", budgets?.maxNodes, result.resources.nodes);
   trace.emitBudget("maxDepth", budgets?.maxDepth, result.resources.maxDepth);
+  if (budgets?.maxSteps !== undefined) {
+    trace.emitBudget("maxSteps", budgets.maxSteps, result.resources.steps);
+  }
   const traceResult = trace.finish({
     tokenCount,
     nodeCount: attachedNodes,
@@ -637,6 +747,7 @@ function parseDocumentOperation(
   const tree: DocumentTree = Object.freeze({
     id: documentId,
     kind: "document",
+    scriptingMode: options.scriptingMode ?? "inert",
     children: publicChildren,
     errors,
     ...(traceResult === undefined ? {} : { trace: traceResult })
@@ -644,7 +755,8 @@ function parseDocumentOperation(
   const resourceUsage: ParseResourceUsage = Object.freeze({
     inputBytes: input.byteLength,
     decodedUtf8Bytes: input.decodedUtf8ByteLength,
-    decodedCodeUnits: html.length,
+    decodedCodeUnits: input.decodedCodeUnits,
+    steps: budgets?.maxSteps === undefined ? null : result.resources.steps,
     nodes: result.resources.nodes,
     maxDepth: result.resources.maxDepth,
     parseErrors: result.resources.parseErrors,
@@ -656,7 +768,7 @@ function parseDocumentOperation(
   });
   const parsed: ParsedDocument = Object.freeze({
     tree,
-    sourceText: options.sourceRetention === "text" ? html : null,
+    sourceText,
     metadata: Object.freeze({
       inputKind: input.inputKind,
       transportByteLength: input.transportByteLength,
@@ -664,8 +776,41 @@ function parseDocumentOperation(
       resourceUsage
     })
   });
-  registerParsedDocument(parsed, parsed.sourceText, captureSpans);
+  registerParsedDocument(parsed, sourceText, captureSpans);
   return parsed;
+}
+
+function parseDocumentOperation(
+  html: string,
+  options: ParseOptions | ParseBytesOptions | ParseStreamOptions,
+  input: ParseInputContext
+): ParsedDocument {
+  const operation = input.operation;
+  const budgets = options.budgets;
+  const trace = new TraceSink(options.trace ?? "none", options.onTraceEvent, budgets, operation);
+  enforceBudget("maxInputBytes", budgets?.maxInputBytes, input.byteLength);
+  enforceBudget("maxDecodedUtf8Bytes", budgets?.maxDecodedUtf8Bytes, input.decodedUtf8ByteLength);
+  trace.emit({ kind: "decode", ...input.decode });
+  if (input.stream !== undefined) trace.emit({ kind: "stream", ...input.stream });
+  trace.emitBudget("maxInputBytes", budgets?.maxInputBytes, input.byteLength);
+
+  let engine: ReturnType<typeof createDocumentEngine>;
+  let result: HtmlEngineProductResult;
+  try {
+    engine = createDocumentEngine(options, input.startedAt, trace);
+    engine.session.write(html);
+    result = engine.session.finishForPublicConversion();
+  } catch (error) {
+    return mapEngineFailure(error);
+  }
+  return finishDocumentOperation(
+    options.sourceRetention === "text" ? html : null,
+    options,
+    input,
+    trace,
+    result,
+    engine.state.tokenCount
+  );
 }
 
 /**
@@ -713,6 +858,7 @@ export function parseBytes(
     inputKind: "bytes",
     byteLength: bytes.byteLength,
     decodedUtf8ByteLength: decodedBudget.bytes,
+    decodedCodeUnits: decoded.text.length,
     transportByteLength: bytes.byteLength,
     metadataEncoding: { name: decoded.sniff.encoding, source: decoded.sniff.source },
     encodingPrescanBytes: 0,
@@ -766,7 +912,7 @@ export function parseFragment(
     result = runHtmlEngine({
       inputChunks: [html],
       retainNodeSpans: normalized.captureSpans ?? false,
-      trackSteps: false,
+      trackSteps: normalized.budgets?.maxSteps !== undefined,
       parser: {
         kind: "fragment",
         scriptingMode: normalized.scriptingMode ?? "inert",
@@ -828,6 +974,9 @@ export function parseFragment(
   trace.emit({ kind: "tree-mutation", nodeCount: attachedNodes, errorCount: errors.length });
   trace.emitBudget("maxNodes", normalized.budgets?.maxNodes, result.resources.nodes);
   trace.emitBudget("maxDepth", normalized.budgets?.maxDepth, result.resources.maxDepth);
+  if (normalized.budgets?.maxSteps !== undefined) {
+    trace.emitBudget("maxSteps", normalized.budgets.maxSteps, result.resources.steps);
+  }
   const traceResult = trace.finish({
     tokenCount,
     nodeCount: attachedNodes,
@@ -895,7 +1044,10 @@ export async function tokenizeByteStreamEager(
   const normalized = normalizeTokenizeByteStreamEagerOptions(options);
   requireReadableByteStream(stream, "input");
   const operation = createOperationContext(normalized.budgets?.maxTimeMs, normalized.signal, startedAt);
-  const decoded = await decodeStreamToText(stream, normalized, operation);
+  const decoded = await decodeByteStream(stream, {
+    ...normalized,
+    retainText: true
+  }, operation);
   const limits: EngineResourceLimits = Object.freeze({
     ...(normalized.budgets?.maxParseErrors === undefined
       ? {}
@@ -924,7 +1076,7 @@ export async function tokenizeByteStreamEager(
     }
   }, { reuseInputCharacters: true });
   try {
-    tokenizer.write(decoded.text);
+    tokenizer.write(requireInternalValue(decoded.text, "PUBLIC_TOKENIZER_RETAINED_TEXT_MISSING"));
     tokenizer.close();
   } catch (error) {
     return mapEngineFailure(error);
@@ -934,8 +1086,7 @@ export async function tokenizeByteStreamEager(
 }
 
 /**
- * Reads and decodes a byte stream through EOF, releases its reader, and then
- * parses the buffered document deterministically.
+ * Reads, decodes, and incrementally parses a byte stream, resolving after EOF.
  *
  * @example
  * ```ts
@@ -954,11 +1105,59 @@ export async function parseStream(
   const normalized = normalizeParseStreamOptions(options);
   requireReadableByteStream(stream, "input");
   const operation = createOperationContext(normalized.budgets?.maxTimeMs, normalized.signal, startedAt);
-  const decoded = await decodeStreamToText(stream, normalized, operation);
-  return parseDocumentOperation(decoded.text, normalized, {
+  const trace = new TraceSink(
+    normalized.trace ?? "none",
+    normalized.onTraceEvent,
+    normalized.budgets,
+    operation
+  );
+  let engine: ReturnType<typeof createDocumentEngine> | undefined;
+  let decoded;
+  try {
+    decoded = await decodeByteStream(stream, {
+      ...normalized,
+      retainText: normalized.sourceRetention === "text",
+      onEncodingSniff(sniff): void {
+        trace.emit({
+          kind: "decode",
+          source: "sniff",
+          encoding: sniff.encoding,
+          sniffSource: sniff.source
+        });
+        engine = createDocumentEngine(normalized, startedAt, trace);
+      },
+      onDecodedChunk(chunk): void {
+        requireInternalValue(
+          engine,
+          "PUBLIC_PARSER_STREAM_ENGINE_NOT_INITIALIZED"
+        ).session.write(chunk);
+      }
+    }, operation);
+  } catch (error) {
+    return mapEngineFailure(error);
+  }
+  const activeEngine = requireInternalValue(
+    engine,
+    "PUBLIC_PARSER_STREAM_ENGINE_NOT_INITIALIZED"
+  );
+  let result: HtmlEngineProductResult;
+  try {
+    result = activeEngine.session.finishForPublicConversion();
+  } catch (error) {
+    return mapEngineFailure(error);
+  }
+  trace.emit({
+    kind: "stream",
+    bytesRead: decoded.totalBytes,
+    encodingPrescanBytes: decoded.encodingPrescanBytes,
+    encodingPrescanLimitBytes: decoded.encodingPrescanLimitBytes
+  });
+  trace.emitBudget("maxInputBytes", normalized.budgets?.maxInputBytes, decoded.totalBytes);
+  return finishDocumentOperation(decoded.text, normalized, {
     inputKind: "stream",
     byteLength: decoded.totalBytes,
     decodedUtf8ByteLength: decoded.decodedUtf8Bytes,
+    decodedCodeUnits: decoded.decodedCodeUnits,
     transportByteLength: decoded.totalBytes,
     metadataEncoding: { name: decoded.sniff.encoding, source: decoded.sniff.source },
     encodingPrescanBytes: decoded.encodingPrescanBytes,
@@ -970,5 +1169,5 @@ export async function parseStream(
       encodingPrescanBytes: decoded.encodingPrescanBytes,
       encodingPrescanLimitBytes: decoded.encodingPrescanLimitBytes
     }
-  });
+  }, trace, result, activeEngine.state.tokenCount);
 }

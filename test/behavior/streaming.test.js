@@ -92,10 +92,22 @@ test("parseStream budget outcome is independent of upstream chunk boundaries", a
     chunks.push(bytes.subarray(offset, offset + 1_024));
   }
 
-  const options = { trace: "events", budgets: { maxInputBytes: 30_000, maxEncodingPrescanBytes: 16_384 } };
+  const options = {
+    trace: "events",
+    budgets: {
+      maxInputBytes: 30_000,
+      maxEncodingPrescanBytes: 16_384,
+      maxSteps: 100_000
+    }
+  };
   const chunked = await parseStream(createByteStream(chunks), options);
   const single = await parseStream(createByteStream([bytes]), options);
   assert.deepEqual(chunked, single);
+  assert.ok(chunked.metadata.resourceUsage.steps > 0);
+  assert.equal(
+    chunked.metadata.resourceUsage.steps,
+    parseBytes(bytes, { budgets: { maxSteps: 100_000 } }).metadata.resourceUsage.steps
+  );
 });
 
 test("parseStream matches parseBytes for chunked transport with sniffing", async () => {
@@ -146,6 +158,28 @@ test("parseStream aborts before extra pulls when maxInputBytes is exceeded", asy
   );
 
   assert.equal(pullCounter.count, 2);
+});
+
+test("parseStream enforces parser work before EOF once encoding is selected", async () => {
+  const pullCounter = { count: 0 };
+  const stream = createPullCountStream(
+    [new TextEncoder().encode("<p>x</p>"), new TextEncoder().encode("unread")],
+    pullCounter
+  );
+
+  await assert.rejects(
+    parseStream(stream, {
+      budgets: { maxEncodingPrescanBytes: 0, maxSteps: 30 }
+    }),
+    (error) => {
+      assert.ok(error instanceof HtmlBudgetExceededError);
+      assert.equal(error.budget, "maxSteps");
+      assert.equal(error.actual, 31);
+      return true;
+    }
+  );
+  assert.equal(pullCounter.count, 1);
+  assert.equal(stream.locked, false);
 });
 
 test("parseStream cancels and releases its reader after budget failures", async () => {

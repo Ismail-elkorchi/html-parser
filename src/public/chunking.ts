@@ -59,7 +59,7 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
       [node],
       operation,
       null,
-      tree.kind === "fragment" ? tree.scriptingMode : "inert"
+      tree.scriptingMode
     );
     const nodes = countNodes(node, operation);
     const bytes = textEncoder.encode(content).length;
@@ -71,9 +71,7 @@ export function chunk(tree: DocumentTree | FragmentTree, options: ChunkOptions =
       flush();
     }
 
-    if (activeNodeId === null) {
-      activeNodeId = node.id;
-    }
+    activeNodeId ??= node.id;
 
     activeContent += content;
     activeNodes += nodes;

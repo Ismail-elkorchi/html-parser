@@ -5,6 +5,7 @@ import {
   HTML_NAMESPACE_URI,
   HtmlAbortError,
   HtmlBudgetExceededError,
+  chunk,
   computePatch,
   extractText,
   iterateText,
@@ -59,6 +60,31 @@ test("document and fragment parsing are deterministic", () => {
   );
 });
 
+test("every document entrypoint preserves the selected scripting environment", async () => {
+  const source = "<noscript><p>x</p></noscript>";
+  const bytes = new TextEncoder().encode(source);
+  const options = { scriptingMode: "disabled" };
+  const documents = [
+    parse(source, options),
+    parseBytes(bytes, options),
+    await parseStream(byteStream([bytes]), options)
+  ];
+
+  for (const document of documents) {
+    assert.equal(document.tree.scriptingMode, "disabled");
+    assert.equal(
+      serialize(document.tree),
+      "<html><head><noscript></noscript></head><body><p>x</p></body></html>"
+    );
+    assert.equal(
+      chunk(document.tree)[0]?.content,
+      "<html><head><noscript></noscript></head><body><p>x</p></body></html>"
+    );
+  }
+  assert.equal(parse(source).tree.scriptingMode, "inert");
+  assert.notDeepEqual(parse(source).tree, documents[0].tree);
+});
+
 test("document conversion is lossless for processing instructions and template content", () => {
   const source = "<?build release?><!doctype html><template><p>inside</p></template><main>outside</main>";
   const parsed = parse(source, {
@@ -72,6 +98,14 @@ test("document conversion is lossless for processing instructions and template c
   assert.equal(processingInstruction.target, "build");
   assert.equal(processingInstruction.data, "release");
   assert.deepEqual(processingInstruction.span, { start: 0, end: 17 });
+
+  const ordinary = parse("<template><p>ordinary</p></template>");
+  let ordinaryTemplate;
+  walk(ordinary.tree, (node) => {
+    if (node.kind === "element" && node.localName === "template") ordinaryTemplate = node;
+  });
+  assert.ok(ordinaryTemplate?.kind === "element");
+  assert.equal(ordinaryTemplate.templateContent?.children[0]?.kind, "element");
 
   const html = parsed.tree.children.find(
     (node) => node.kind === "element" && node.localName === "html"

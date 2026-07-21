@@ -140,7 +140,7 @@ export function serialize(
   );
   operation.checkpoint();
   const scriptingMode = normalizedOptions.scriptingMode ??
-    (tree.kind === "fragment" ? tree.scriptingMode : "inert");
+    (tree.kind === "document" || tree.kind === "fragment" ? tree.scriptingMode : "inert");
   if (tree.kind === "document" || tree.kind === "fragment") {
     return serializeNodes(tree.children, operation, null, scriptingMode);
   }
