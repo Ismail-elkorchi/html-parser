@@ -20,19 +20,17 @@ export interface Span {
   readonly end: number;
 }
 
-/** Describes whether a node's span came from input, inference, or no source range. */
-export type SpanProvenance = "input" | "inferred" | "none";
+/** Describes whether a captured node span came from input or parser inference. */
+export type SpanProvenance = "input" | "inferred";
 
 /** Immutable parsed attribute with namespace and optional source information. */
 export interface Attribute {
   /** Namespace URI, or null for an unnamespaced attribute. */
   readonly namespaceUri: string | null;
-  /** Namespace prefix, or null when the attribute is unprefixed. */
-  readonly prefix: string | null;
+  /** Namespace prefix when the qualified name has one. */
+  readonly prefix?: string;
   /** Local name supplied by the HTML tree builder. */
   readonly localName: string;
-  /** Qualified name, including the prefix when one exists. */
-  readonly name: string;
   /** Decoded attribute value. */
   readonly value: string;
   /** Full source span of the attribute, including its name and value syntax. */
@@ -472,8 +470,8 @@ export interface TextNode {
   readonly kind: "text";
   /** Text data. */
   readonly value: string;
-  /** Origin of the optional source span. */
-  readonly spanProvenance: SpanProvenance;
+  /** Origin of captured span information; omitted when spans were not requested. */
+  readonly spanProvenance?: SpanProvenance;
   /** Decoded-input range when captured and available. */
   readonly span?: Span;
 }
@@ -486,8 +484,8 @@ export interface CommentNode {
   readonly kind: "comment";
   /** Comment data. */
   readonly value: string;
-  /** Origin of the optional source span. */
-  readonly spanProvenance: SpanProvenance;
+  /** Origin of captured span information; omitted when spans were not requested. */
+  readonly spanProvenance?: SpanProvenance;
   /** Decoded-input range when captured and available. */
   readonly span?: Span;
 }
@@ -502,8 +500,8 @@ export interface ProcessingInstructionNode {
   readonly target: string;
   /** Processing-instruction data. */
   readonly data: string;
-  /** Origin of the optional source span. */
-  readonly spanProvenance: SpanProvenance;
+  /** Origin of captured span information; omitted when spans were not requested. */
+  readonly spanProvenance?: SpanProvenance;
   /** Decoded-input range when captured and available. */
   readonly span?: Span;
 }
@@ -528,8 +526,8 @@ export interface DoctypeNode {
   readonly name: string;
   /** Retained public or system identifier syntax. */
   readonly externalId: DoctypeExternalId;
-  /** Origin of the optional source span. */
-  readonly spanProvenance: SpanProvenance;
+  /** Origin of captured span information; omitted when spans were not requested. */
+  readonly spanProvenance?: SpanProvenance;
   /** Decoded-input range when captured and available. */
   readonly span?: Span;
 }
@@ -542,20 +540,18 @@ export interface ElementNode {
   readonly kind: "element";
   /** Namespace URI assigned by the HTML tree builder. */
   readonly namespaceUri: string;
-  /** Namespace prefix, or null when the parser did not provide one. */
-  readonly prefix: string | null;
+  /** Namespace prefix when the qualified name has one. */
+  readonly prefix?: string;
   /** Local element name supplied by the HTML tree builder. */
   readonly localName: string;
-  /** Qualified element name, including the prefix when one exists. */
-  readonly tagName: string;
   /** Attributes in parser order. */
   readonly attributes: readonly Attribute[];
   /** DOM child nodes; empty for an HTML template element. */
   readonly children: readonly HtmlNode[];
   /** Owned DocumentFragment, present only for an HTML template element. */
   readonly templateContent?: TemplateContentNode;
-  /** Origin of the optional source span. */
-  readonly spanProvenance: SpanProvenance;
+  /** Origin of captured span information; omitted when spans were not requested. */
+  readonly spanProvenance?: SpanProvenance;
   /** Decoded-input range when captured and available. */
   readonly span?: Span;
 }
@@ -568,8 +564,8 @@ export interface TemplateContentNode {
   readonly kind: "templateContent";
   /** Nodes owned by the template's document fragment. */
   readonly children: readonly HtmlNode[];
-  /** Template-content spans are inferred from parser ownership. */
-  readonly spanProvenance: "inferred";
+  /** Inferred ownership marker when span capture was requested. */
+  readonly spanProvenance?: "inferred";
 }
 
 /** Any immutable node that can occur below a public document or fragment root. */
@@ -684,8 +680,8 @@ export interface OutlineEntry {
   readonly nodeId: NodeId;
   /** Zero-based traversal depth of the source element. */
   readonly depth: number;
-  /** Qualified source element name. */
-  readonly tagName: string;
+  /** Local source element name. */
+  readonly localName: string;
   /** Bounded text extracted from the source element. */
   readonly text: string;
 }
@@ -902,9 +898,12 @@ export type HtmlPatchPlanningReason =
   | "NODE_NOT_FOUND"
   | "MISSING_NODE_SPAN"
   | "NON_INPUT_SPAN_PROVENANCE"
+  | "INVALID_EDIT"
   | "INVALID_EDIT_TARGET"
+  | "CONFLICTING_EDITS"
   | "UNREPRESENTABLE_TEXT_VALUE"
   | "ATTRIBUTE_NOT_FOUND"
+  | "ATTRIBUTE_NAMESPACE_UNSUPPORTED"
   | "ATTRIBUTE_SPAN_MISSING"
   | "ELEMENT_START_TAG_NOT_FOUND"
   | "OVERLAPPING_EDITS"

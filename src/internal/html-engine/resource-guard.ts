@@ -96,6 +96,8 @@ export interface EngineResourceGuardOptions {
   readonly signal?: AbortSignal;
   readonly now?: () => number;
   readonly startedAt?: number;
+  /** Retains the internal deterministic step counter; production callers can disable it. */
+  readonly trackSteps?: boolean;
 }
 
 const LIMIT_NAMES = Object.freeze([
@@ -126,6 +128,7 @@ function validateOptions(options: EngineResourceGuardOptions): {
   readonly signal: AbortSignal | undefined;
   readonly now: () => number;
   readonly startedAt: number;
+  readonly trackSteps: boolean;
 } {
   const unknownOptions: unknown = options;
   if (typeof unknownOptions !== "object" || unknownOptions === null || Array.isArray(unknownOptions)) {
@@ -133,7 +136,9 @@ function validateOptions(options: EngineResourceGuardOptions): {
   }
 
   const optionRecord = unknownOptions as Readonly<Record<PropertyKey, unknown>>;
-  const allowedOptions = new Set<PropertyKey>(["limits", "signal", "now", "startedAt"]);
+  const allowedOptions = new Set<PropertyKey>([
+    "limits", "signal", "now", "startedAt", "trackSteps"
+  ]);
   for (const key of Reflect.ownKeys(optionRecord)) {
     if (!allowedOptions.has(key)) {
       throw new EngineConfigurationError(`options.${String(key)}`, "is not supported");
@@ -189,11 +194,24 @@ function validateOptions(options: EngineResourceGuardOptions): {
     throw new EngineConfigurationError("options.startedAt", "must resolve to a finite number");
   }
 
+  const unknownTrackSteps = optionRecord["trackSteps"];
+  if (unknownTrackSteps !== undefined && typeof unknownTrackSteps !== "boolean") {
+    throw new EngineConfigurationError("options.trackSteps", "must be a boolean");
+  }
+  const trackSteps = unknownTrackSteps ?? true;
+  if (!trackSteps && normalizedLimits.maxSteps !== undefined) {
+    throw new EngineConfigurationError(
+      "options.trackSteps",
+      "must be true when limits.maxSteps is configured"
+    );
+  }
+
   return {
     limits: Object.freeze(normalizedLimits),
     signal: unknownSignal as AbortSignal | undefined,
     now,
-    startedAt
+    startedAt,
+    trackSteps
   };
 }
 
@@ -219,7 +237,7 @@ function stringUtf8ByteLength(value: string): number {
 export function createEngineResourceGuard(
   options: EngineResourceGuardOptions = {}
 ): EngineResourceGuard {
-  const { limits, signal, now, startedAt } = validateOptions(options);
+  const { limits, signal, now, startedAt, trackSteps } = validateOptions(options);
   const deadline = limits.maxTimeMs === undefined ? undefined : startedAt + limits.maxTimeMs;
   let steps = 0;
   let nodes = 0;
@@ -231,23 +249,23 @@ export function createEngineResourceGuard(
   if (Reflect.ownKeys(limits).length === 0 && signal === undefined) {
     const guard: EngineResourceGuard = {
       ensureActive(): void {},
-      checkpoint(): void { steps += 1; },
+      checkpoint(): void { if (trackSteps) steps += 1; },
       reserveNode(): void {
-        steps += 1;
+        if (trackSteps) steps += 1;
         nodes += 1;
       },
       reserveNodes(count: number): void {
         if (!Number.isSafeInteger(count) || count < 1) {
           throw new EngineConfigurationError("node reservation count", "must be a positive safe integer");
         }
-        steps += count;
+        if (trackSteps) steps += count;
         nodes += count;
       },
       reserveNodeAtDepth(depth: number): void {
         if (!Number.isSafeInteger(depth) || depth < 1) {
           throw new EngineConfigurationError("depth", "must be a positive safe integer");
         }
-        steps += 1;
+        if (trackSteps) steps += 1;
         nodes += 1;
         maxDepth = Math.max(maxDepth, depth);
       },
@@ -255,22 +273,22 @@ export function createEngineResourceGuard(
         if (!Number.isSafeInteger(depth) || depth < 1) {
           throw new EngineConfigurationError("depth", "must be a positive safe integer");
         }
-        steps += 1;
+        if (trackSteps) steps += 1;
         maxDepth = Math.max(maxDepth, depth);
       },
       reserveParseError(): void {
-        steps += 1;
+        if (trackSteps) steps += 1;
         parseErrors += 1;
       },
       beginStartTag(): StartTagResourceGuard {
-        steps += 1;
+        if (trackSteps) steps += 1;
         return {
           beginAttribute(): void {
-            steps += 1;
+            if (trackSteps) steps += 1;
             attributes += 1;
           },
           appendCodePoint(value: string): void {
-            steps += 1;
+            if (trackSteps) steps += 1;
             attributeUtf8Bytes += codePointUtf8ByteLength(value);
           }
         };
@@ -318,6 +336,7 @@ export function createEngineResourceGuard(
     },
     checkpoint(): void {
       guard.ensureActive();
+      if (!trackSteps) return;
       const actual = steps + 1;
       checkLimit("maxSteps", actual);
       steps = actual;
@@ -331,16 +350,18 @@ export function createEngineResourceGuard(
       }
       guard.ensureActive();
       const actualSteps = steps + count;
-      const stepLimit = limits.maxSteps;
-      if (stepLimit !== undefined && actualSteps > stepLimit) {
-        fail("maxSteps", stepLimit, stepLimit + 1);
+      if (trackSteps) {
+        const stepLimit = limits.maxSteps;
+        if (stepLimit !== undefined && actualSteps > stepLimit) {
+          fail("maxSteps", stepLimit, stepLimit + 1);
+        }
       }
       const actualNodes = nodes + count;
       const nodeLimit = limits.maxNodes;
       if (nodeLimit !== undefined && actualNodes > nodeLimit) {
         fail("maxNodes", nodeLimit, nodeLimit + 1);
       }
-      steps = actualSteps;
+      if (trackSteps) steps = actualSteps;
       nodes = actualNodes;
     },
     reserveNodeAtDepth(depth: number): void {

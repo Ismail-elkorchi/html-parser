@@ -68,7 +68,11 @@ The descriptor accepts `namespaceUri`, `localName`, and optional semantic
 attributes shaped as `{ namespaceUri, localName, value }`. Use the exported
 namespace constants. Prefixes and qualified names are derived, so conflicting
 representations cannot be supplied. HTML context names are ASCII-lowercased;
-SVG and MathML names retain case.
+SVG and MathML names retain case. Element and attribute local names must be
+exact XML local names: surrounding or internal whitespace, controls,
+namespace separators, and other non-name syntax are rejected rather than
+trimmed or accepted ambiguously. Unnamespaced attributes on an HTML context
+are ASCII-lowercased before duplicate detection.
 
 `ParseFragmentOptions` also records the external parsing environment:
 

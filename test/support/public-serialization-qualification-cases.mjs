@@ -63,18 +63,17 @@ const element = (
 
 function publicNode(descriptor, ids) {
   if (descriptor.type === "text") {
-    return { id: ids.next++, kind: "text", value: descriptor.value, spanProvenance: "none" };
+    return { id: ids.next++, kind: "text", value: descriptor.value };
   }
   if (descriptor.type === "comment") {
-    return { id: ids.next++, kind: "comment", value: descriptor.value, spanProvenance: "none" };
+    return { id: ids.next++, kind: "comment", value: descriptor.value };
   }
   if (descriptor.type === "processingInstruction") {
     return {
       id: ids.next++,
       kind: "processingInstruction",
       target: descriptor.target,
-      data: descriptor.data,
-      spanProvenance: "none"
+      data: descriptor.data
     };
   }
   if (descriptor.type === "doctype") {
@@ -82,28 +81,24 @@ function publicNode(descriptor, ids) {
       id: ids.next++,
       kind: "doctype",
       name: descriptor.name,
-      externalId: descriptor.externalId,
-      spanProvenance: "none"
+      externalId: descriptor.externalId
     };
   }
   const node = {
     id: ids.next++,
     kind: "element",
     namespaceUri: descriptor.namespaceUri,
-    prefix: descriptor.qualifiedName.includes(":")
-      ? descriptor.qualifiedName.slice(0, descriptor.qualifiedName.indexOf(":"))
-      : null,
+    ...(descriptor.qualifiedName.includes(":")
+      ? { prefix: descriptor.qualifiedName.slice(0, descriptor.qualifiedName.indexOf(":")) }
+      : {}),
     localName: descriptor.localName,
-    tagName: descriptor.qualifiedName,
     attributes: descriptor.attributes.map((entry) => ({
       namespaceUri: entry.namespaceUri,
-      prefix: entry.prefix,
+      ...(entry.prefix === null ? {} : { prefix: entry.prefix }),
       localName: entry.localName,
-      name: entry.qualifiedName,
       value: entry.value
     })),
-    children: descriptor.children.map((child) => publicNode(child, ids)),
-    spanProvenance: "none"
+    children: descriptor.children.map((child) => publicNode(child, ids))
   };
   if (descriptor.templateChildren !== undefined) {
     node.templateContent = {
@@ -267,6 +262,13 @@ export const PUBLIC_SERIALIZATION_QUALIFICATION_CASES = Object.freeze([
     { source: source("template.html", "non-standard namespaced template attribute") }
   ),
   qualificationCase(
+    "foreign/other-namespaced-element",
+    element("widget", [], "urn:example", [], { qualifiedName: "p:widget" }),
+    "<p:widget></p:widget>",
+    ["namespaced-elements"],
+    {}
+  ),
+  qualificationCase(
     "foreign/cdata-as-text",
     element("svg", [text("<img>")], SVG_NAMESPACE_URI, [
       attribute(XMLNS_NAMESPACE_URI, null, "xmlns", "xmlns", SVG_NAMESPACE_URI)
@@ -346,7 +348,7 @@ export const PUBLIC_SERIALIZATION_QUALIFICATION_CASES = Object.freeze([
 export const REQUIRED_SERIALIZATION_FEATURES = Object.freeze([
   "script", "style", "xmp", "iframe", "noembed", "noframes", "plaintext",
   "noscript", "noscript-disabled", "title", "textarea", "svg", "mathml",
-  "template", "namespaced-attributes", "ordinary", "text-escaping",
+  "template", "namespaced-attributes", "namespaced-elements", "ordinary", "text-escaping",
   "attribute-escaping", "void-elements", "comments", "processing-instructions",
   "doctype-extension", "initial-linefeed", "cdata-as-text", "element-inventory"
 ]);

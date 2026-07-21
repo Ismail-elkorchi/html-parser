@@ -31,7 +31,7 @@ test("captureSpans attaches source offsets for elements and attributes", () => {
   const { tree: parsed } = parse(html, { captureSpans: true });
   const paragraph = findNode(
     parsed.children,
-    (node) => node.kind === "element" && node.tagName === "p"
+    (node) => node.kind === "element" && node.localName === "p"
   );
 
   assert.ok(paragraph);
@@ -39,7 +39,7 @@ test("captureSpans attaches source offsets for elements and attributes", () => {
   assert.equal(paragraph.spanProvenance, "input");
   assert.equal(html.slice(paragraph.span.start, paragraph.span.end), "<p class=\"x\">Hi</p>");
 
-  const classAttribute = paragraph.attributes.find((attribute) => attribute.name === "class");
+  const classAttribute = paragraph.attributes.find((attribute) => attribute.localName === "class");
   assert.ok(classAttribute);
   assert.ok(classAttribute.span);
   assert.equal(html.slice(classAttribute.span.start, classAttribute.span.end), "class=\"x\"");
@@ -51,7 +51,7 @@ test("implied wrappers expose inferred span provenance", () => {
     parsed.children,
     (node) =>
       node.kind === "element" &&
-      (node.tagName === "html" || node.tagName === "body") &&
+      (node.localName === "html" || node.localName === "body") &&
       node.spanProvenance !== "input"
   );
 
@@ -65,7 +65,7 @@ test("computePatch supports deterministic structural edit plans", () => {
   const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
   const firstParagraph = findNode(
     parsed.tree.children,
-    (node) => node.kind === "element" && node.tagName === "p" && serialize(node) === "<p class=\"x\">one</p>"
+    (node) => node.kind === "element" && node.localName === "p" && serialize(node) === "<p class=\"x\">one</p>"
   );
   const firstText = findNode(
     parsed.tree.children,
@@ -142,7 +142,7 @@ test("computePatch edits attributes without rewriting full nodes", () => {
   const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
   const paragraph = findNode(
     parsed.tree.children,
-    (node) => node.kind === "element" && node.tagName === "p"
+    (node) => node.kind === "element" && node.localName === "p"
   );
 
   assert.ok(paragraph);
@@ -152,12 +152,111 @@ test("computePatch edits attributes without rewriting full nodes", () => {
   assert.equal(patched, "<div><p data-k=\"v\">one</p></div>");
 });
 
+test("computePatch normalizes HTML attribute identity and validates edit syntax", () => {
+  const original = "<p class=old>one</p>";
+  const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
+  const paragraph = findNode(
+    parsed.tree.children,
+    (node) => node.kind === "element" && node.localName === "p"
+  );
+  assert.ok(paragraph);
+
+  assert.equal(
+    computePatch(parsed, [{ kind: "setAttr", target: paragraph.id, name: "CLASS", value: "new" }]).result,
+    "<p class=\"new\">one</p>"
+  );
+  assert.equal(
+    computePatch(parsed, [{ kind: "removeAttr", target: paragraph.id, name: "CLASS" }]).result,
+    "<p>one</p>"
+  );
+
+  for (const name of ["", "bad name", "bad\tname", "x=y", "x/y", "x>y", "x\"y", "x'y", "x\u0000y", "x\u0080y"]) {
+    assert.throws(
+      () => computePatch(parsed, [{ kind: "setAttr", target: paragraph.id, name, value: "x" }]),
+      (error) => error instanceof HtmlPatchPlanningError &&
+        error.reason === "INVALID_EDIT" && error.target === paragraph.id
+    );
+  }
+  assert.throws(
+    () => computePatch(parsed, [{ kind: "unknown", target: paragraph.id, html: "x" }]),
+    (error) => error instanceof HtmlPatchPlanningError && error.reason === "INVALID_EDIT"
+  );
+  const inherited = Object.assign(
+    Object.create({ kind: "setAttr", target: paragraph.id }),
+    { name: "class", value: "x" }
+  );
+  assert.throws(
+    () => computePatch(parsed, [inherited]),
+    (error) => error instanceof HtmlPatchPlanningError && error.reason === "INVALID_EDIT"
+  );
+  assert.throws(
+    () => computePatch(parsed, { 0: { kind: "removeNode", target: paragraph.id }, length: 1 }),
+    (error) => error instanceof HtmlPatchPlanningError && error.reason === "INVALID_EDIT"
+  );
+  const sparse = new Array(1);
+  assert.throws(
+    () => computePatch(parsed, sparse),
+    (error) => error instanceof HtmlPatchPlanningError && error.reason === "INVALID_EDIT"
+  );
+  assert.throws(
+    () => computePatch(parsed, [
+      { kind: "setAttr", target: paragraph.id, name: "CLASS", value: "a" },
+      { kind: "removeAttr", target: paragraph.id, name: "class" }
+    ]),
+    (error) => error instanceof HtmlPatchPlanningError &&
+      error.reason === "CONFLICTING_EDITS" && error.target === paragraph.id
+  );
+});
+
+test("computePatch keeps unnamespaced foreign attributes distinct from namespace attributes", () => {
+  const parsed = parse("<svg viewBox='0 0 1 1' xlink:href='#x'></svg>", {
+    captureSpans: true,
+    sourceRetention: "text"
+  });
+  const svg = findNode(
+    parsed.tree.children,
+    (node) => node.kind === "element" && node.localName === "svg"
+  );
+  assert.ok(svg);
+
+  assert.equal(
+    computePatch(parsed, [{ kind: "setAttr", target: svg.id, name: "VIEWBOX", value: "0 0 2 2" }]).result,
+    "<svg viewBox=\"0 0 2 2\" xlink:href='#x'></svg>"
+  );
+
+  for (const name of ["xlink:href", "xml:lang", "xmlns", "xmlns:xlink"]) {
+    assert.throws(
+      () => computePatch(parsed, [{ kind: "setAttr", target: svg.id, name, value: "#y" }]),
+      (error) => error instanceof HtmlPatchPlanningError &&
+        error.reason === "ATTRIBUTE_NAMESPACE_UNSUPPORTED" && error.target === svg.id
+    );
+    assert.throws(
+      () => computePatch(parsed, [{ kind: "removeAttr", target: svg.id, name }]),
+      (error) => error instanceof HtmlPatchPlanningError &&
+        error.reason === "ATTRIBUTE_NAMESPACE_UNSUPPORTED" && error.target === svg.id
+    );
+  }
+
+  const htmlParsed = parse("<p></p>", { captureSpans: true, sourceRetention: "text" });
+  const paragraph = findNode(
+    htmlParsed.tree.children,
+    (node) => node.kind === "element" && node.localName === "p"
+  );
+  assert.ok(paragraph);
+  assert.equal(
+    computePatch(htmlParsed, [
+      { kind: "setAttr", target: paragraph.id, name: "xlink:href", value: "#y" }
+    ]).result,
+    "<p xlink:href=\"#y\"></p>"
+  );
+});
+
 test("computePatch supports insertHtmlBefore with removeNode", () => {
   const original = "<ul><li>a</li><li>b</li></ul>";
   const parsed = parse(original, { captureSpans: true, sourceRetention: "text" });
   const secondItem = findNode(
     parsed.tree.children,
-    (node) => node.kind === "element" && node.tagName === "li" && serialize(node) === "<li>b</li>"
+    (node) => node.kind === "element" && node.localName === "li" && serialize(node) === "<li>b</li>"
   );
 
   assert.ok(secondItem);
@@ -177,7 +276,7 @@ test("computePatch rejects targets with non-input span provenance", () => {
     parsed.tree.children,
     (node) =>
       node.kind === "element" &&
-      (node.tagName === "html" || node.tagName === "body") &&
+      (node.localName === "html" || node.localName === "body") &&
       node.spanProvenance !== "input"
   );
 

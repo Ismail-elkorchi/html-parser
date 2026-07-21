@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "corpusCommit": "e4ea1706fa708c3ac4523c534a65160d1ab20db8",
+  "corpusCompositeSha256": "9bf2315b5c8836b0d1bc7375cbabc746f9891735dc958491b99a1855b7cb2acc",
+  "cases": {
+    "total": 1724,
+    "wptScriptingInvariant": 1698,
+    "supplemental": 26
+  },
+  "reason": "Exact reviewed differences between the pinned current-standard WPT expectations and the browser versions bundled by Playwright 1.61.1.",
+  "engines": {
+    "chromium": {
+      "version": "149.0.7827.55",
+      "outcomesSha256": "b04d8e305c7567d66755d63f8372b4111eb21b7104c4e2a4b875fa8c30a8559c",
+      "differenceCount": 91,
+      "differencesSha256": "c2b615589ba78913c6dd3cfbc58d1afcc4140561382522975df5259d8052542d"
+    },
+    "firefox": {
+      "version": "151.0",
+      "outcomesSha256": "2459d4ba19dc7c7d5c116a8a1247b5431bf974db609179ca7dfdcd8a66cf014e",
+      "differenceCount": 116,
+      "differencesSha256": "3179321ed1c6b5e5e467014a199fd659c3628d0852530282404edcce1f53ae25"
+    },
+    "webkit": {
+      "version": "26.5",
+      "outcomesSha256": "dd88ecdc4089cefdb2e14bfc41cace42eb0ab78dfb4282ce5b89978a417d2b6c",
+      "differenceCount": 90,
+      "differencesSha256": "ae1109fa639c86b64fff9774a1c515b1a9614d213f2e1b011cc1f0f964c2cd82"
+    }
+  }
+}

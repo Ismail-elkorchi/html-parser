@@ -8,6 +8,7 @@ import {
   evaluatePerformance,
   PERFORMANCE_BENCHMARK_NAMES,
   PERFORMANCE_BASELINES,
+  PERFORMANCE_HISTORICAL_THRESHOLDS,
   PERFORMANCE_THRESHOLDS
 } from "./performance-policy.mjs";
 
@@ -102,6 +103,9 @@ function summarize(runResults) {
     );
     return [name, {
       throughputMbPerSec: stats(entries.map((entry) => entry?.throughputMbPerSec ?? 0)),
+      cpuThroughputMbPerSec: stats(
+        entries.map((entry) => entry?.cpuThroughputMbPerSec ?? 0)
+      ),
       cpuMs: stats(entries.map((entry) => entry?.cpuMs ?? 0)),
       retainedHeapBytes: stats(entries.map((entry) => entry?.retainedHeapBytes ?? 0)),
       retainedHeapDeltaBytes: stats(
@@ -212,14 +216,19 @@ const report = {
   samplingOrder: "deterministic-balanced-revision-interleaving",
   sampleOrder,
   percentileMethod: "linear interpolation between closest ranks",
+  throughputMetric:
+    "input MiB per process CPU second; wall throughput is retained as diagnostic evidence",
   memoryMetric:
-    "post-GC heap delta per retained public result from an isolated post-warmup fixed-size cohort",
+    "post-GC incremental heap per retained public result from an isolated post-warmup fixed-size cohort; caller-owned parse strings and serializer trees are prepared and retained before the heap baseline",
   runtimeHeapConfiguration: Object.freeze({
     maxOldSpaceSizeMb: 256,
     maxSemiSpaceSizeMb: 8
   }),
   baselinePolicy: PERFORMANCE_BASELINES,
-  thresholds: PERFORMANCE_THRESHOLDS,
+  thresholds: {
+    immediate: PERFORMANCE_THRESHOLDS,
+    historical: PERFORMANCE_HISTORICAL_THRESHOLDS
+  },
   revisions,
   ...evaluation
 };

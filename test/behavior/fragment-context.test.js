@@ -17,7 +17,7 @@ const htmlContext = (localName) => ({ namespaceUri: HTML_NAMESPACE_URI, localNam
 test("fragment context is normalized, retained, and deeply immutable", () => {
   const input = {
     namespaceUri: HTML_NAMESPACE_URI,
-    localName: " TeXtArEa ",
+    localName: "TeXtArEa",
     attributes: [{ namespaceUri: XLINK_NAMESPACE_URI, localName: "href", value: "#x" }]
   };
   const fragment = parseFragment("a<b>&amp;", input);
@@ -111,19 +111,19 @@ test("fragment context and environment validation reject ambiguous configuration
     (error) => error instanceof HtmlConfigurationError && error.option === "context"
   );
   assert.throws(
-    () => parseFragment("x", { ...htmlContext("div"), prefix: "html" }),
-    (error) => error instanceof HtmlConfigurationError && error.reason === "UNKNOWN_OPTION"
-  );
-  assert.throws(
     () => parseFragment("x", {
       ...htmlContext("div"),
       attributes: [
-        { namespaceUri: null, localName: "id", value: "a" },
+        { namespaceUri: null, localName: "ID", value: "a" },
         { namespaceUri: null, localName: "id", value: "b" }
       ]
     }),
     (error) => error instanceof HtmlConfigurationError &&
       error.option === "context.attributes[1]"
+  );
+  assert.throws(
+    () => parseFragment("x", { ...htmlContext("div"), prefix: "html" }),
+    (error) => error instanceof HtmlConfigurationError && error.reason === "UNKNOWN_OPTION"
   );
   assert.throws(
     () => parseFragment("x", htmlContext("div"), { scriptingMode: "enabled" }),
@@ -142,5 +142,31 @@ test("fragment context and environment validation reject ambiguous configuration
     (error) => error instanceof HtmlConfigurationError &&
       error.option === "options.hasFormInContextChain" &&
       error.reason === "UNKNOWN_OPTION"
+  );
+
+  for (const localName of ["", " div", "div ", "di v", "di\u0001v", "x/y", "x=y", "1div"]) {
+    assert.throws(
+      () => parseFragment("x", htmlContext(localName)),
+      (error) => error instanceof HtmlConfigurationError &&
+        error.option === "context.localName" &&
+        error.reason === "INVALID_VALUE"
+    );
+  }
+  assert.equal(parseFragment("x", htmlContext("Élément")).context.localName, "Élément");
+  assert.throws(
+    () => parseFragment("x", {
+      ...htmlContext("div"),
+      attributes: [{ namespaceUri: null, localName: "bad name", value: "x" }]
+    }),
+    (error) => error instanceof HtmlConfigurationError &&
+      error.option === "context.attributes[0].localName"
+  );
+  assert.throws(
+    () => parseFragment("x", {
+      ...htmlContext("div"),
+      attributes: [{ namespaceUri: null, localName: "data?value", value: "x" }]
+    }),
+    (error) => error instanceof HtmlConfigurationError &&
+      error.option === "context.attributes[0].localName"
   );
 });

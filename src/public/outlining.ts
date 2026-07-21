@@ -51,7 +51,7 @@ export function outline(
       entries.push({
         nodeId: entry.node.id,
         depth: entry.depth,
-        tagName: entry.node.tagName,
+        localName: entry.node.localName,
         text
       });
     }

@@ -59,6 +59,27 @@ class CursorInputCharacter implements InputCharacter {
   }
 }
 
+class ReusableCursorInputCharacter implements InputCharacter {
+  readonly kind = "character";
+  value = "";
+  startUtf16Offset = 0;
+  endUtf16Offset = 0;
+  #span: SourceSpan | null = null;
+
+  reset(value: string, startUtf16Offset: number, endUtf16Offset: number): this {
+    this.value = value;
+    this.startUtf16Offset = startUtf16Offset;
+    this.endUtf16Offset = endUtf16Offset;
+    this.#span = null;
+    return this;
+  }
+
+  get span(): SourceSpan {
+    this.#span ??= sourceSpan(this.startUtf16Offset, this.endUtf16Offset);
+    return this.#span;
+  }
+}
+
 function isLeadingSurrogate(codeUnit: number): boolean {
   return codeUnit >= 0xd800 && codeUnit <= 0xdbff;
 }
@@ -104,11 +125,17 @@ export class HtmlInputCursor {
   #writtenCodeUnits = 0;
   #closed = false;
   #current: InputCharacter | null = null;
+  readonly #reusableCharacter: ReusableCursorInputCharacter | null;
   #reconsumePending = false;
 
-  constructor(guard: EngineResourceGuard, onParseError?: InputParseErrorObserver) {
+  constructor(
+    guard: EngineResourceGuard,
+    onParseError?: InputParseErrorObserver,
+    reuseCharacters = false
+  ) {
     this.#guard = guard;
     this.#onParseError = onParseError;
+    this.#reusableCharacter = reuseCharacters ? new ReusableCursorInputCharacter() : null;
   }
 
   /** Appends decoded input without normalizing or joining retained chunks. */
@@ -182,12 +209,40 @@ export class HtmlInputCursor {
       return this.#current as InputCharacter;
     }
 
-    const first = this.#codeUnitAt(0);
-    if (first === undefined) {
+    const head = this.#chunks[this.#headChunk];
+    if (head === undefined) {
       const position = this.position();
       return Object.freeze(
         this.#closed ? { kind: "eof", position } : { kind: "need-more-input", position }
       );
+    }
+    const first = head.charCodeAt(this.#headOffset);
+
+    // ASCII characters that need neither preprocessing diagnostics nor CRLF
+    // lookahead dominate ordinary HTML. Advance them without the generic
+    // cross-chunk/code-point path while preserving the same lazy span record.
+    if (first === 0x09 || first === 0x0a || first === 0x0c ||
+        (first >= 0x20 && first <= 0x7e)) {
+      const startUtf16Offset = this.#utf16Offset;
+      const value = head.charAt(this.#headOffset);
+      this.#headOffset += 1;
+      this.#utf16Offset += 1;
+      if (this.#headOffset === head.length) {
+        this.#chunks[this.#headChunk] = "";
+        this.#headChunk += 1;
+        this.#headOffset = 0;
+        if (this.#headChunk >= 1024 && this.#headChunk * 2 >= this.#chunks.length) {
+          this.#chunks = this.#chunks.slice(this.#headChunk);
+          this.#headChunk = 0;
+        }
+      }
+      const result: InputCharacter = this.#reusableCharacter?.reset(
+        value,
+        startUtf16Offset,
+        startUtf16Offset + 1
+      ) ?? new CursorInputCharacter(value, startUtf16Offset, startUtf16Offset + 1);
+      this.#current = result;
+      return result;
     }
 
     let width = 1;
@@ -228,11 +283,11 @@ export class HtmlInputCursor {
     }
 
     this.#advance(width);
-    const result: InputCharacter = new CursorInputCharacter(
+    const result: InputCharacter = this.#reusableCharacter?.reset(
       value,
       startUtf16Offset,
       endUtf16Offset
-    );
+    ) ?? new CursorInputCharacter(value, startUtf16Offset, endUtf16Offset);
     this.#current = result;
     return result;
   }

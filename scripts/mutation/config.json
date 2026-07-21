@@ -55,8 +55,8 @@
         {
           "id": "performance-throughput-threshold",
           "description": "Allow an immediate throughput regression below the accepted threshold.",
-          "search": "minThroughputMedianRatio: 0.9",
-          "replace": "minThroughputMedianRatio: 0.8"
+          "search": "minCpuThroughputMedianRatio: 0.9",
+          "replace": "minCpuThroughputMedianRatio: 0.8"
         },
         {
           "id": "performance-memory-threshold",
@@ -129,6 +129,47 @@
           "description": "Allow replacement text to terminate its owning raw-text element.",
           "search": "if (!serializesTextLiterally(parent, scriptingMode) || parent === null)\n        return false;",
           "replace": "if (true || !serializesTextLiterally(parent, scriptingMode) || parent === null)\n        return false;"
+        }
+      ]
+    },
+    {
+      "targetFile": "dist/public/patching.js",
+      "testCommand": ["node", "--test", "test/behavior/spans-patch.test.js"],
+      "mutants": [
+        {
+          "id": "patch-attribute-name-validation",
+          "description": "Allow malformed attribute syntax into a patch plan.",
+          "search": "if (!isHtmlAttributeName(value)) {",
+          "replace": "if (false && !isHtmlAttributeName(value)) {"
+        },
+        {
+          "id": "patch-attribute-case-normalization",
+          "description": "Preserve caller case instead of matching the HTML tokenizer's attribute identity.",
+          "search": "return asciiLowercase(value);",
+          "replace": "return value;"
+        },
+        {
+          "id": "patch-foreign-namespace-boundary",
+          "description": "Allow an unnamespaced foreign-element edit to acquire a namespace when reparsed.",
+          "search": "if (element.namespaceUri !== HTML_NAMESPACE_URI && foreignAttributeAdjustment(name) !== undefined) {",
+          "replace": "if (false && element.namespaceUri !== HTML_NAMESPACE_URI && foreignAttributeAdjustment(name) !== undefined) {"
+        }
+      ]
+    },
+    {
+      "targetFile": "dist/internal/foundation/foreign-attribute-adjustment.js",
+      "testCommand": [
+        "node",
+        "--test",
+        "test/behavior/namespaces-stack.test.js",
+        "test/behavior/spans-patch.test.js"
+      ],
+      "mutants": [
+        {
+          "id": "foreign-xlink-adjustment",
+          "description": "Remove the shared XLink href namespace adjustment.",
+          "search": "[\"xlink:href\", adjustment(XLINK_NAMESPACE, \"xlink\", \"href\")],",
+          "replace": "[\"xlink:href-disabled\", adjustment(XLINK_NAMESPACE, \"xlink\", \"href\")],"
         }
       ]
     },
@@ -689,8 +730,8 @@
         {
           "id": "product-template-content-conversion",
           "description": "Drop the owned template-content fragment during public conversion.",
-          "search": "...(templateContent === undefined ? {} : { templateContent }),",
-          "replace": "...(templateContent === undefined ? {} : {}),"
+          "search": "if (templateContent !== undefined)\n        element.templateContent = templateContent;",
+          "replace": "if (false && templateContent !== undefined)\n        element.templateContent = templateContent;"
         },
         {
           "id": "product-processing-instruction-token",

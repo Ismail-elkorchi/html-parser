@@ -67,10 +67,12 @@ export function serializedAttributeName(attribute: Attribute): string {
     return attribute.localName === "xmlns" ? "xmlns" : `xmlns:${attribute.localName}`;
   }
   if (attribute.namespaceUri === XLINK_NAMESPACE_URI) return `xlink:${attribute.localName}`;
-  return attribute.name;
+  return attribute.prefix === undefined
+    ? attribute.localName
+    : `${attribute.prefix}:${attribute.localName}`;
 }
 
-/** Returns the serialized tag name for one public element. */
+/** Returns the namespace-aware serialized tag name for one public element. */
 export function serializedElementName(element: ElementNode): string {
   if (
     element.namespaceUri === HTML_NAMESPACE_URI ||
@@ -79,7 +81,9 @@ export function serializedElementName(element: ElementNode): string {
   ) {
     return element.localName;
   }
-  return element.tagName;
+  return element.prefix === undefined
+    ? element.localName
+    : `${element.prefix}:${element.localName}`;
 }
 
 /** Whether the element omits children and an end tag during HTML serialization. */

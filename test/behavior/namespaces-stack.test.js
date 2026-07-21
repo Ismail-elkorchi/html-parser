@@ -77,30 +77,26 @@ test("tree nodes retain namespace identity and adjusted foreign attributes", () 
 
   const main = only(findAllByTagName(tree, "MAIN"));
   assert.equal(main.namespaceUri, HTML_NAMESPACE_URI);
-  assert.equal(main.prefix, null);
   assert.equal(main.localName, "main");
-  assert.equal(main.tagName, "main");
   assert.equal(getAttributeValue(main, "DATA-ID"), "one");
   assert.equal(hasAttribute(main, "data-id"), true);
 
   const svg = only(findAllByTagNameNS(tree, SVG_NAMESPACE_URI, "svg"));
   const svgTitle = only(findAllByTagNameNS(tree, SVG_NAMESPACE_URI, "title"));
   const math = only(findAllByTagNameNS(tree, MATHML_NAMESPACE_URI, "math"));
-  assert.equal(svgTitle.tagName, "title");
+  assert.equal(svgTitle.localName, "title");
   assert.equal(math.localName, "math");
   assert.equal([...findAllByTagName(tree, "title")].length, 0);
 
   const expectedAttributes = [
-    [XML_NAMESPACE_URI, "xml", "lang", "xml:lang", "fr"],
-    [XMLNS_NAMESPACE_URI, "xmlns", "xlink", "xmlns:xlink", "urn:test"],
-    [XLINK_NAMESPACE_URI, "xlink", "href", "xlink:href", "icon"]
+    [XML_NAMESPACE_URI, "lang", "fr"],
+    [XMLNS_NAMESPACE_URI, "xlink", "urn:test"],
+    [XLINK_NAMESPACE_URI, "href", "icon"]
   ];
   assert.deepEqual(
     svg.attributes.map((attribute) => [
       attribute.namespaceUri,
-      attribute.prefix,
       attribute.localName,
-      attribute.name,
       attribute.value
     ]),
     expectedAttributes
@@ -111,7 +107,9 @@ test("tree nodes retain namespace identity and adjusted foreign attributes", () 
   assert.equal([...findAllByAttr(tree, "xlink:href")].length, 0);
   assert.equal(only(findAllByAttrNS(tree, XLINK_NAMESPACE_URI, "href", "icon")), svg);
 
-  const xlink = svg.attributes.find((attribute) => attribute.name === "xlink:href");
+  const xlink = svg.attributes.find((attribute) =>
+    attribute.namespaceUri === XLINK_NAMESPACE_URI && attribute.localName === "href"
+  );
   assert.ok(xlink?.span);
   assert.equal(html.slice(xlink.span.start, xlink.span.end), "xlink:href=icon");
 
@@ -146,8 +144,7 @@ test("doctype external identifiers preserve missing and explicit empty states", 
       id: 1,
       kind: "doctype",
       name: "html",
-      externalId: { kind: "system", systemId: "both\"and'" },
-      spanProvenance: "none"
+      externalId: { kind: "system", systemId: "both\"and'" }
     }),
     HtmlConfigurationError
   );
@@ -201,20 +198,16 @@ test("deep parsed and caller-built trees remain stack-safe across the public sur
   let child = {
     id: 1,
     kind: "text",
-    value: "leaf",
-    spanProvenance: "none"
+    value: "leaf"
   };
   for (let index = 0; index < depth; index += 1) {
     child = {
       id: index + 2,
       kind: "element",
       namespaceUri: HTML_NAMESPACE_URI,
-      prefix: null,
       localName: "div",
-      tagName: "div",
       attributes: [],
-      children: [child],
-      spanProvenance: "none"
+      children: [child]
     };
   }
   const manual = { id: depth + 2, kind: "document", children: [child], errors: [] };

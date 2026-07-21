@@ -90,25 +90,24 @@ for (const fixture of fixtures) {
   if (selectedBenchmark !== undefined && fixture.name !== selectedBenchmark) continue;
   const throughput = measureThroughput(fixture);
   globalThis.gc();
-  const retainedInputs = fixture.operation === "parse"
-    ? Array.from(
-        { length: fixture.retainedResultCount },
-        (_, index) => `${fixture.input}<!--retained-${String(index)}-->`
-      )
-    : null;
+  const retainedInputs = Array.from(
+    { length: fixture.retainedResultCount },
+    (_, index) => prepare(
+      fixture,
+      `${fixture.input}<!--retained-${String(index)}-->`
+    )
+  );
   globalThis.gc();
   const retainedHeapBaseline = process.memoryUsage().heapUsed;
   const retainedResults = new Array(fixture.retainedResultCount);
   for (let index = 0; index < retainedResults.length; index += 1) {
-    const uniqueInput = `${fixture.input}<!--retained-${String(index)}-->`;
-    retainedResults[index] = fixture.operation === "parse"
-      ? execute(fixture, retainedInputs?.[index])
-      : serialize(parse(uniqueInput).tree);
+    retainedResults[index] = execute(fixture, retainedInputs[index]);
   }
   globalThis.gc();
   const retainedHeap = process.memoryUsage().heapUsed;
   const retainedHeapDelta = Math.max(0, retainedHeap - retainedHeapBaseline);
   const totalBytes = fixture.input.length * fixture.iterations;
+  const cpuMs = (throughput.cpu.user + throughput.cpu.system) / 1_000;
   results.push({
     name: fixture.name,
     operation: fixture.operation,
@@ -116,10 +115,13 @@ for (const fixture of fixtures) {
     warmupIterations: fixture.warmupIterations,
     iterations: fixture.iterations,
     elapsedMs: throughput.elapsedMs,
-    cpuMs: (throughput.cpu.user + throughput.cpu.system) / 1_000,
+    cpuMs,
+    cpuThroughputMbPerSec:
+      totalBytes / (1024 * 1024) / (cpuMs / 1_000),
     throughputMbPerSec:
       totalBytes / (1024 * 1024) / (throughput.elapsedMs / 1_000),
     retainedResultCount: retainedResults.length,
+    retainedInputPreparation: "caller-owned-inputs-before-baseline",
     retainedHeapBaselineBytes: retainedHeapBaseline,
     retainedHeapBytes: retainedHeap,
     retainedHeapDeltaBytes: retainedHeapDelta,

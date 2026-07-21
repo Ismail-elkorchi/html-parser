@@ -4,6 +4,27 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Validate the complete runtime edit shape in source patching, normalize HTML
+  attribute identity across HTML and foreign elements, reject ambiguous
+  namespace-changing spellings and conflicting edits, and prevent malformed
+  or duplicate attribute syntax.
+- Validate fragment element and attribute local names against the XML local-name
+  grammar without trimming, normalize HTML-context attribute identity before
+  duplicate detection, and reject spaces, controls, separators, and invalid
+  name starts.
+- Reduce retained parse results by deriving qualified names from compact
+  namespace/prefix/local-name identity, omitting absent prefixes and uncaptured
+  span markers, interning common strings, and removing duplicated qualified-name
+  and outline tag-name fields; add a direct safe-ASCII cursor path and enforce tagged
+  throughput and retained-heap recovery limits instead of merely reporting
+  them.
+- Qualify document parsing against all 1,698 applicable pinned WPT document
+  cases plus 26 focused probes in all three browser engines, with exact
+  per-browser outcome and known-difference fingerprints.
+- Restrict registry publication to a release tag on the exact current `main`
+  commit and rerun the complete browser, fuzz, mutation, resource, supply-chain,
+  package, runtime, and performance qualification on the published SHA; remove
+  the arbitrary-ref manual publication workflow.
 - Replace staged parser evidence and score-based evaluation wrappers with one
   direct test/qualification command surface; make fixture refreshes
   transactional, package checks exercise the installed tarball, mutation run
@@ -27,9 +48,10 @@ All notable changes are documented in this file.
   against every pinned WPT fragment plus focused Chromium, Firefox, and WebKit
   contexts.
 
-- Consolidated release performance evidence into one balanced cross-revision
-  report: accepted independent parser and corrected serializer revisions are
-  enforced while tagged `v0.1.1` remains a report-only recovery horizon.
+- Consolidate release performance evidence into one balanced cross-revision
+  report: accepted independent parser and corrected serializer revisions and
+  tagged `v0.1.1` parser recovery are enforced using process-CPU throughput and
+  retained-result heap, while wall throughput remains diagnostic evidence.
 
 - Pin the maintained WPT serialization directory and qualify the built public
   serializer against explicit expectations, structural round trips, exact

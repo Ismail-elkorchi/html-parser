@@ -52,6 +52,7 @@ interface HtmlTokenizerOptions {
   readonly foreignContent?: boolean;
   readonly observer?: EngineObserver;
   readonly protectTokenObservations?: boolean;
+  readonly reuseInputCharacters?: boolean;
 }
 
 type StepResult = HtmlTokenizerRunResult | null;
@@ -191,7 +192,8 @@ export class HtmlTokenizer implements TokenizerControl {
     }
     const record = unknownOptions as Readonly<Record<PropertyKey, unknown>>;
     const allowed = new Set<PropertyKey>([
-      "initialState", "lastStartTagName", "foreignContent", "observer", "protectTokenObservations"
+      "initialState", "lastStartTagName", "foreignContent", "observer",
+      "protectTokenObservations", "reuseInputCharacters"
     ]);
     for (const key of Reflect.ownKeys(record)) {
       if (!allowed.has(key)) {
@@ -215,6 +217,10 @@ export class HtmlTokenizer implements TokenizerControl {
     ) {
       throw new EngineConfigurationError("token observation protection", "must be a boolean");
     }
+    if (options.reuseInputCharacters !== undefined &&
+        typeof options.reuseInputCharacters !== "boolean") {
+      throw new EngineConfigurationError("input character reuse", "must be a boolean");
+    }
     this.#validateObserver(options.observer);
     guard.ensureActive();
     this.#guard = guard;
@@ -224,9 +230,11 @@ export class HtmlTokenizer implements TokenizerControl {
     this.#state = initialState(entry);
     this.#lastStartTagName = options.lastStartTagName ?? null;
     this.#foreignContent = options.foreignContent ?? false;
-    this.#cursor = new HtmlInputCursor(guard, (error) => {
-      this.#observeParseError(error);
-    });
+    this.#cursor = new HtmlInputCursor(
+      guard,
+      (error) => { this.#observeParseError(error); },
+      options.reuseInputCharacters ?? false
+    );
   }
 
   /** Appends one decoded-input chunk and advances until another chunk is required. */

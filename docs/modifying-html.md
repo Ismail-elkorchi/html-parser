@@ -35,7 +35,12 @@ console.log(updated); // <main><h1>Published</h1><p>Body</p></main>
 
 Supported edits remove a node, replace a text node, set or remove an
 attribute, and insert HTML immediately before or after a node. Plans reject
-overlapping edits and targets without input-derived spans.
+overlapping edits, conflicting edits to the same attribute, invalid runtime
+edit records, and targets without input-derived spans. Attribute names must be
+valid HTML source syntax. Their ASCII case is normalized as the HTML tokenizer
+would normalize it, including on SVG and MathML elements, so `CLASS` replaces
+an existing `class` instead of creating duplicate source syntax. Namespaced
+attributes cannot be addressed through the unnamespaced edit contract.
 
 A plan is tied to the exact `ParsedDocument` that produced it. It cannot be
 applied to a different parse, even when the source strings happen to match.

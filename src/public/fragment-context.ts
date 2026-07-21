@@ -1,3 +1,5 @@
+import { isXmlLocalName } from "../internal/foundation/name-validation.ts";
+
 import { HtmlConfigurationError } from "./errors.ts";
 import {
   HTML_NAMESPACE_URI,
@@ -71,13 +73,11 @@ function read(record: UnknownRecord, key: PropertyKey, option: string): unknown 
   }
 }
 
-function localName(value: unknown, option: string): string {
-  if (typeof value !== "string") invalid(option, "must be a non-empty local name");
-  const normalized = value.trim();
-  if (normalized.length === 0 || normalized.includes(":")) {
-    invalid(option, 'must be a non-empty local name without a namespace prefix or ":"');
+function xmlLocalName(value: unknown, option: string): string {
+  if (typeof value !== "string" || !isXmlLocalName(value)) {
+    invalid(option, "must be an XML local name without a namespace prefix");
   }
-  return normalized;
+  return value;
 }
 
 function normalizeAttribute(value: unknown, index: number): HtmlFragmentContextAttribute {
@@ -97,9 +97,16 @@ function normalizeAttribute(value: unknown, index: number): HtmlFragmentContextA
   }
   const valueField = read(record, "value", `${option}.value`);
   if (typeof valueField !== "string") invalid(`${option}.value`, "must be a string");
+  const rawLocalName = read(record, "localName", `${option}.localName`);
+  if (typeof rawLocalName !== "string" || !isXmlLocalName(rawLocalName)) {
+    invalid(
+      `${option}.localName`,
+      "must be an XML local name without a namespace prefix"
+    );
+  }
   return Object.freeze({
     namespaceUri,
-    localName: localName(read(record, "localName", `${option}.localName`), `${option}.localName`),
+    localName: rawLocalName,
     value: valueField
   });
 }
@@ -115,7 +122,10 @@ export function normalizeFragmentContext(value: HtmlFragmentContextInput): HtmlF
   ) {
     invalid("context.namespaceUri", "must be the HTML, SVG, or MathML namespace URI");
   }
-  const rawLocalName = localName(read(record, "localName", "context.localName"), "context.localName");
+  const rawLocalName = xmlLocalName(
+    read(record, "localName", "context.localName"),
+    "context.localName"
+  );
   const attributesValue = read(record, "attributes", "context.attributes");
   if (attributesValue !== undefined && !Array.isArray(attributesValue)) {
     invalid("context.attributes", "must be an array when provided");
@@ -127,7 +137,10 @@ export function normalizeFragmentContext(value: HtmlFragmentContextInput): HtmlF
     if (!Object.hasOwn(rawAttributes, index)) {
       invalid(`context.attributes[${String(index)}]`, "must be an attribute object");
     }
-    const attribute = normalizeAttribute(rawAttributes[index], index);
+    const rawAttribute = normalizeAttribute(rawAttributes[index], index);
+    const attribute = namespaceUri === HTML_NAMESPACE_URI && rawAttribute.namespaceUri === null
+      ? Object.freeze({ ...rawAttribute, localName: asciiLowercase(rawAttribute.localName) })
+      : rawAttribute;
     const expandedName = `${attribute.namespaceUri ?? ""}\u0000${attribute.localName}`;
     if (expandedNames.has(expandedName)) {
       invalid(`context.attributes[${String(index)}]`, "must have a unique namespace and local name");

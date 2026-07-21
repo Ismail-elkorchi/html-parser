@@ -18,23 +18,23 @@ test("walk and walkElements are deterministic", () => {
 
   const firstWalk = [];
   walk(tree, (node, depth) => {
-    firstWalk.push(`${String(depth)}:${node.kind}:${node.kind === "element" ? node.tagName : ""}`);
+    firstWalk.push(`${String(depth)}:${node.kind}:${node.kind === "element" ? node.localName : ""}`);
   });
 
   const secondWalk = [];
   walk(tree, (node, depth) => {
-    secondWalk.push(`${String(depth)}:${node.kind}:${node.kind === "element" ? node.tagName : ""}`);
+    secondWalk.push(`${String(depth)}:${node.kind}:${node.kind === "element" ? node.localName : ""}`);
   });
 
   assert.deepEqual(firstWalk, secondWalk);
 
   const firstElements = [];
   walkElements(tree, (node, depth) => {
-    firstElements.push(`${String(depth)}:${node.tagName}`);
+    firstElements.push(`${String(depth)}:${node.localName}`);
   });
   const secondElements = [];
   walkElements(tree, (node, depth) => {
-    secondElements.push(`${String(depth)}:${node.tagName}`);
+    secondElements.push(`${String(depth)}:${node.localName}`);
   });
 
   assert.deepEqual(firstElements, secondElements);
@@ -45,6 +45,7 @@ test("outline entry text uses a scalar-safe 200-byte UTF-8 prefix", () => {
   const { tree } = parse(`<h1>${"😀".repeat(100)}Z</h1>`);
   const entry = outline(tree).entries[0];
   assert.ok(entry);
+  assert.equal(entry.localName, "h1");
   assert.equal(new TextEncoder().encode(entry.text).byteLength, 200);
   assert.equal(entry.text, "😀".repeat(50));
   assert.equal(/^[\uD800-\uDBFF]$/u.test(entry.text.at(-1) ?? ""), false);
@@ -59,7 +60,7 @@ test("bounded raw extraction and find helpers return expected nodes", () => {
   const leads = [...findAllByAttr(tree, "data-role", "lead")];
   assert.equal(leads.length, 1);
   assert.equal(leads[0]?.kind, "element");
-  assert.equal(leads[0]?.tagName, "p");
+  assert.equal(leads[0]?.localName, "p");
 
   const section = sections[0];
   assert.ok(section);

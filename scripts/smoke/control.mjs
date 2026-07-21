@@ -89,7 +89,8 @@ function normalizeSpan(spanValue) {
 
 function normalizeAttribute(attribute) {
   const normalized = {
-    name: String(attribute.name || ""),
+    namespaceUri: attribute.namespaceUri === null ? null : String(attribute.namespaceUri || ""),
+    localName: String(attribute.localName || ""),
     value: String(attribute.value || "")
   };
   if (attribute.span) {
@@ -104,8 +105,9 @@ function normalizeNode(node) {
     kind: String(node.kind || "")
   };
 
-  if (typeof node.tagName === "string") {
-    normalized.tagName = node.tagName;
+  if (typeof node.localName === "string") {
+    normalized.namespaceUri = String(node.namespaceUri || "");
+    normalized.localName = node.localName;
   }
   if (typeof node.value === "string") {
     normalized.value = node.value;

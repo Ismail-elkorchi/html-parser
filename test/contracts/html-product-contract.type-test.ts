@@ -63,6 +63,22 @@ const templateContent: TemplateContentNode | undefined = parsed.tree.children
 const instruction: ProcessingInstructionNode | undefined = parsed.tree.children.find(
   (node): node is ProcessingInstructionNode => node.kind === "processingInstruction"
 );
+const element = parsed.tree.children.find((node) => node.kind === "element");
+if (element?.kind === "element") {
+  void element.localName;
+  const elementPrefix: string | undefined = element.prefix;
+  void elementPrefix;
+  // @ts-expect-error - qualified names are derived during serialization.
+  void element.tagName;
+  const attribute = element.attributes[0];
+  if (attribute !== undefined) {
+    void attribute.localName;
+    const attributePrefix: string | undefined = attribute.prefix;
+    void attributePrefix;
+    // @ts-expect-error - qualified attribute names are not retained.
+    void attribute.name;
+  }
+}
 const tokenPromise: Promise<readonly (
   ProcessingInstructionToken | Exclude<Awaited<ReturnType<typeof tokenizeByteStreamEager>>[number], ProcessingInstructionToken>
 )[]> = tokenizeByteStreamEager(new ReadableStream());
