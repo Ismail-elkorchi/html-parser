@@ -37,12 +37,12 @@ Every tree and node has a parser-assigned numeric `NodeId`. Results, nodes,
 attributes, spans, diagnostics, traces, and their arrays are frozen at runtime,
 matching their readonly TypeScript types.
 
-An element's name is the exact `(namespaceUri, localName)` pair produced by
-tree construction. Attributes expose the same namespace/local-name identity;
-prefixes and qualified names are serialization details derived from the HTML
-parsing rules rather than duplicated on every retained node. Use the exported
-HTML, SVG, MathML, XLink, XML, and XMLNS namespace constants instead of copying
-URI strings.
+An element's name is its `(namespaceUri, prefix?, localName)` identity.
+Attributes expose the same components. The optional prefix is retained only
+when a qualified name has one; the redundant qualified-name string is derived
+during serialization. Parsed HTML trees use the standard HTML, SVG, MathML,
+XLink, XML, and XMLNS namespace constants, while caller-built trees can retain
+other namespace URIs without losing their qualified names.
 
 For an HTML `template`, `children` is empty and `templateContent` owns a
 `TemplateContentNode`. That fragment has its own `NodeId` and depth/resource

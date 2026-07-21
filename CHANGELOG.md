@@ -12,10 +12,10 @@ All notable changes are documented in this file.
   grammar without trimming, normalize HTML-context attribute identity before
   duplicate detection, and reject spaces, controls, separators, and invalid
   name starts.
-- Reduce retained parse results by exposing namespace/local-name identity once,
-  deriving serialized names, omitting uncaptured span markers, interning common
-  strings, and removing duplicated public `prefix`, qualified-name, and outline
-  tag-name fields; add a direct safe-ASCII cursor path and enforce tagged
+- Reduce retained parse results by deriving qualified names from compact
+  namespace/prefix/local-name identity, omitting absent prefixes and uncaptured
+  span markers, interning common strings, and removing duplicated qualified-name
+  and outline tag-name fields; add a direct safe-ASCII cursor path and enforce tagged
   throughput and retained-heap recovery limits instead of merely reporting
   them.
 - Qualify document parsing against all 1,698 applicable pinned WPT document
@@ -48,9 +48,10 @@ All notable changes are documented in this file.
   against every pinned WPT fragment plus focused Chromium, Firefox, and WebKit
   contexts.
 
-- Consolidated release performance evidence into one balanced cross-revision
-  report: accepted independent parser and corrected serializer revisions are
-  enforced while tagged `v0.1.1` remains a report-only recovery horizon.
+- Consolidate release performance evidence into one balanced cross-revision
+  report: accepted independent parser and corrected serializer revisions and
+  tagged `v0.1.1` parser recovery are enforced using process-CPU throughput and
+  retained-result heap, while wall throughput remains diagnostic evidence.
 
 - Pin the maintained WPT serialization directory and qualify the built public
   serializer against explicit expectations, structural round trips, exact

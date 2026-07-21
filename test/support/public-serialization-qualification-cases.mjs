@@ -88,9 +88,13 @@ function publicNode(descriptor, ids) {
     id: ids.next++,
     kind: "element",
     namespaceUri: descriptor.namespaceUri,
+    ...(descriptor.qualifiedName.includes(":")
+      ? { prefix: descriptor.qualifiedName.slice(0, descriptor.qualifiedName.indexOf(":")) }
+      : {}),
     localName: descriptor.localName,
     attributes: descriptor.attributes.map((entry) => ({
       namespaceUri: entry.namespaceUri,
+      ...(entry.prefix === null ? {} : { prefix: entry.prefix }),
       localName: entry.localName,
       value: entry.value
     })),
@@ -258,6 +262,13 @@ export const PUBLIC_SERIALIZATION_QUALIFICATION_CASES = Object.freeze([
     { source: source("template.html", "non-standard namespaced template attribute") }
   ),
   qualificationCase(
+    "foreign/other-namespaced-element",
+    element("widget", [], "urn:example", [], { qualifiedName: "p:widget" }),
+    "<p:widget></p:widget>",
+    ["namespaced-elements"],
+    {}
+  ),
+  qualificationCase(
     "foreign/cdata-as-text",
     element("svg", [text("<img>")], SVG_NAMESPACE_URI, [
       attribute(XMLNS_NAMESPACE_URI, null, "xmlns", "xmlns", SVG_NAMESPACE_URI)
@@ -337,7 +348,7 @@ export const PUBLIC_SERIALIZATION_QUALIFICATION_CASES = Object.freeze([
 export const REQUIRED_SERIALIZATION_FEATURES = Object.freeze([
   "script", "style", "xmp", "iframe", "noembed", "noframes", "plaintext",
   "noscript", "noscript-disabled", "title", "textarea", "svg", "mathml",
-  "template", "namespaced-attributes", "ordinary", "text-escaping",
+  "template", "namespaced-attributes", "namespaced-elements", "ordinary", "text-escaping",
   "attribute-escaping", "void-elements", "comments", "processing-instructions",
   "doctype-extension", "initial-linefeed", "cdata-as-text", "element-inventory"
 ]);

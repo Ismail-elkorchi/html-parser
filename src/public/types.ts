@@ -26,7 +26,9 @@ export type SpanProvenance = "input" | "inferred";
 /** Immutable parsed attribute with namespace and optional source information. */
 export interface Attribute {
   /** Namespace URI, or null for an unnamespaced attribute. */
-  readonly namespaceUri: HtmlAttributeNamespaceUri;
+  readonly namespaceUri: string | null;
+  /** Namespace prefix when the qualified name has one. */
+  readonly prefix?: string;
   /** Local name supplied by the HTML tree builder. */
   readonly localName: string;
   /** Decoded attribute value. */
@@ -537,7 +539,9 @@ export interface ElementNode {
   /** Node discriminator. */
   readonly kind: "element";
   /** Namespace URI assigned by the HTML tree builder. */
-  readonly namespaceUri: HtmlElementNamespaceUri;
+  readonly namespaceUri: string;
+  /** Namespace prefix when the qualified name has one. */
+  readonly prefix?: string;
   /** Local element name supplied by the HTML tree builder. */
   readonly localName: string;
   /** Attributes in parser order. */

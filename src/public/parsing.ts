@@ -199,6 +199,7 @@ function attributes(
     const span = publicSpan(attribute.sourceSpan, captureSpans);
     result[index] = Object.freeze({
       namespaceUri: attribute.namespaceUri,
+      ...(attribute.prefix === null ? {} : { prefix: intern(names, attribute.prefix) }),
       localName: intern(names, attribute.localName),
       value: internShort(names, attribute.value),
       ...(span === undefined ? {} : { span })
@@ -336,12 +337,15 @@ function createPublicNode(
   }
   const element = {
     id: assigner.next(), kind: "element" as const,
-    namespaceUri: source.namespaceUri, localName: intern(names, source.localName),
+    namespaceUri: source.namespaceUri,
+    ...(source.prefix === null ? {} : { prefix: intern(names, source.prefix) }),
+    localName: intern(names, source.localName),
     attributes: attributes(source, model, captureSpans, names, operation), children: directChildren
   } as {
     id: NodeId;
     kind: "element";
-    namespaceUri: HtmlTreeElement["namespaceUri"];
+    namespaceUri: string;
+    prefix?: string;
     localName: string;
     attributes: readonly Attribute[];
     children: readonly HtmlNode[];

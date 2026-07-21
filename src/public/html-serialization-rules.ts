@@ -1,5 +1,8 @@
 import {
   HTML_NAMESPACE_URI,
+  MATHML_NAMESPACE_URI,
+  SVG_NAMESPACE_URI,
+  XLINK_NAMESPACE_URI,
   XML_NAMESPACE_URI,
   XMLNS_NAMESPACE_URI,
   asciiLowercase
@@ -63,12 +66,24 @@ export function serializedAttributeName(attribute: Attribute): string {
   if (attribute.namespaceUri === XMLNS_NAMESPACE_URI) {
     return attribute.localName === "xmlns" ? "xmlns" : `xmlns:${attribute.localName}`;
   }
-  return `xlink:${attribute.localName}`;
+  if (attribute.namespaceUri === XLINK_NAMESPACE_URI) return `xlink:${attribute.localName}`;
+  return attribute.prefix === undefined
+    ? attribute.localName
+    : `${attribute.prefix}:${attribute.localName}`;
 }
 
-/** Returns the serialized tag name for one public element. */
+/** Returns the namespace-aware serialized tag name for one public element. */
 export function serializedElementName(element: ElementNode): string {
-  return element.localName;
+  if (
+    element.namespaceUri === HTML_NAMESPACE_URI ||
+    element.namespaceUri === SVG_NAMESPACE_URI ||
+    element.namespaceUri === MATHML_NAMESPACE_URI
+  ) {
+    return element.localName;
+  }
+  return element.prefix === undefined
+    ? element.localName
+    : `${element.prefix}:${element.localName}`;
 }
 
 /** Whether the element omits children and an end tag during HTML serialization. */
