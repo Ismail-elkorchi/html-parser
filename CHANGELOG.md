@@ -4,6 +4,8 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+## [0.2.1] - 2026-07-27
+
 - Validate complete caller-constructed serialization graphs before emitting
   markup, including names, namespaces, prefixes, attributes, document
   placement, template ownership, unique ids, unique ownership, and acyclicity;
