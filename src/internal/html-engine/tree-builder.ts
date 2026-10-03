@@ -334,6 +334,10 @@ export class HtmlTreeBuilder implements TokenSink {
     }
   }
 
+  get documentMode(): HtmlDocumentMode {
+    return this.#documentMode;
+  }
+
   state(): HtmlTreeBuilderState {
     return Object.freeze({
       insertionMode: this.#insertionMode,

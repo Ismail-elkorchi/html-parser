@@ -1,4 +1,5 @@
 import {
+  type HtmlDocumentMode,
   type HtmlNode,
   type ProcessingInstructionToken,
   type TemplateContentNode,
@@ -10,6 +11,7 @@ import {
 
 const parsed = parse("<?build release?><template><p>x</p></template>");
 const nodes: readonly HtmlNode[] = parsed.tree.children;
+const documentMode: HtmlDocumentMode = parsed.documentMode;
 const templateContent: TemplateContentNode | undefined = nodes
   .filter((node) => node.kind === "element")
   .flatMap((node) => node.templateContent === undefined ? [] : [node.templateContent])[0];
@@ -21,6 +23,7 @@ const instruction: ProcessingInstructionToken = {
 const tokens: readonly Token[] = [instruction];
 
 void templateContent;
+void documentMode;
 void tokens;
 void serialize(parsed.tree);
 void extractText(parsed.tree, {

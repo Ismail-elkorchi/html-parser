@@ -26,8 +26,10 @@ const disabledDocument = parse("<noscript>x</noscript>", {
   budgets: { maxSteps: 10_000 }
 });
 const documentScriptingMode: HtmlScriptingMode = disabledDocument.tree.scriptingMode;
+const parsedDocumentMode: HtmlDocumentMode = disabledDocument.documentMode;
 const observedSteps: number | null = disabledDocument.metadata.resourceUsage.steps;
 void documentScriptingMode;
+void parsedDocumentMode;
 void observedSteps;
 const fragment = parseFragment("x", {
   namespaceUri: HTML_NAMESPACE_URI,

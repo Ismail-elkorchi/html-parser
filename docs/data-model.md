@@ -6,6 +6,8 @@
 `ParsedDocument`:
 
 - `tree: DocumentTree` contains children, parse diagnostics, and optional trace;
+- `documentMode: HtmlDocumentMode` contains the `"no-quirks"`, `"limited-quirks"`,
+  or `"quirks"` mode selected by HTML tree construction;
 - `sourceText: string | null` contains the exact decoded input only when
   `sourceRetention: "text"` was selected;
 - `metadata: ParseMetadata` records input kind, transport size,

@@ -11,10 +11,16 @@ const document = parse("<p>package</p>");
 if (!serialize(document.tree).includes("<p>package</p>")) {
   throw new Error("installed package document parsing failed");
 }
+if (document.documentMode !== "quirks") {
+  throw new Error("installed package document mode failed");
+}
 
-const bytes = parseBytes(new TextEncoder().encode("<p>bytes</p>"));
+const bytes = parseBytes(new TextEncoder().encode("<!doctype html><p>bytes</p>"));
 if (!serialize(bytes.tree).includes("<p>bytes</p>")) {
   throw new Error("installed package byte parsing failed");
+}
+if (bytes.documentMode !== "no-quirks") {
+  throw new Error("installed package byte document mode failed");
 }
 
 const { tree: fragment } = parseFragment("<b>fragment</b>", {
@@ -27,11 +33,16 @@ if (!serialize(fragment).includes("<b>fragment</b>")) {
 
 const stream = new ReadableStream({
   start(controller) {
-    controller.enqueue(new TextEncoder().encode("<p>stream</p>"));
+    controller.enqueue(new TextEncoder().encode(
+      '<!doctype html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"><p>stream</p>'
+    ));
     controller.close();
   }
 });
 const streamed = await parseStream(stream);
 if (!serialize(streamed.tree).includes("<p>stream</p>")) {
   throw new Error("installed package stream parsing failed");
+}
+if (streamed.documentMode !== "limited-quirks") {
+  throw new Error("installed package stream document mode failed");
 }
