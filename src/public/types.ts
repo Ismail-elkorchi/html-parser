@@ -654,6 +654,8 @@ export interface ParseMetadata {
 export interface ParsedDocument {
   /** Parsed document tree. */
   readonly tree: DocumentTree;
+  /** Document mode selected by HTML tree construction from the input. */
+  readonly documentMode: HtmlDocumentMode;
   /** Exact decoded input when `sourceRetention: "text"`; otherwise null. */
   readonly sourceText: string | null;
   /** Input, encoding, and resource evidence from this parse. */

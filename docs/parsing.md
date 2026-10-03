@@ -38,6 +38,16 @@ console.log(document.metadata.inputKind, document.metadata.encoding);
 For a `ReadableStream<Uint8Array>`, use `parseStream()` and read
 [streams and encoding](./streams-and-encoding.md).
 
+## Document mode
+
+Every full-document result exposes `documentMode`, the mode selected by the
+same tree-construction operation that produced its tree. Standard HTML doctypes
+select `"no-quirks"`; a missing doctype selects `"quirks"`; legacy doctypes can
+select `"quirks"` or `"limited-quirks"` according to the HTML parsing rules.
+This value is available from `parse()`, `parseBytes()`, and `parseStream()`,
+including when source text is not retained. Use it when the document's parsing
+mode affects downstream behavior or a fragment's owner-document context.
+
 ## Scripting environment
 
 Every document and fragment entry point accepts `scriptingMode`. The default

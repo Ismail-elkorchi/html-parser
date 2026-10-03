@@ -772,6 +772,7 @@ function finishDocumentOperation(
   });
   const parsed: ParsedDocument = Object.freeze({
     tree,
+    documentMode: result.documentMode,
     sourceText,
     metadata: Object.freeze({
       inputKind: input.inputKind,

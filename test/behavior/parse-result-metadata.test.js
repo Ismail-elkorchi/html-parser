@@ -59,7 +59,8 @@ test("full-document parse results have one stable source and metadata shape", ()
   const discarded = parse(input);
   const retained = parse(input, { sourceRetention: "text" });
 
-  assert.deepEqual(Object.keys(discarded), ["tree", "sourceText", "metadata"]);
+  assert.deepEqual(Object.keys(discarded), ["tree", "documentMode", "sourceText", "metadata"]);
+  assert.equal(discarded.documentMode, "quirks");
   assert.equal(discarded.sourceText, null);
   assert.equal(retained.sourceText, input);
   assert.equal(retained.tree.kind, "document");
@@ -89,6 +90,48 @@ test("full-document parse results have one stable source and metadata shape", ()
   assert.equal(Object.isFrozen(retained.metadata), true);
   assert.equal(Object.isFrozen(retained.metadata.encoding), true);
   assert.equal(Object.isFrozen(retained.metadata.resourceUsage), true);
+});
+
+test("full-document modes come from tree construction for text, bytes, and streams", async () => {
+  const fixtures = [
+    { input: "", mode: "quirks" },
+    { input: "<!-- before document --><p>missing doctype</p>", mode: "quirks" },
+    { input: "<!doctype html><p>standard</p>", mode: "no-quirks" },
+    {
+      input: '<!doctype html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"><p>legacy</p>',
+      mode: "quirks"
+    },
+    {
+      input: '<!doctype html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd"><p>legacy system</p>',
+      mode: "limited-quirks"
+    },
+    {
+      input: '<!doctype html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"><p>xhtml</p>',
+      mode: "limited-quirks"
+    },
+    { input: "<!doctype potato><p>invalid doctype</p>", mode: "quirks" },
+    { input: "<p>late doctype</p><!doctype html>", mode: "quirks" }
+  ];
+
+  for (const fixture of fixtures) {
+    const bytes = new TextEncoder().encode(fixture.input);
+    for (const sourceRetention of ["none", "text"]) {
+      const options = { sourceRetention };
+      const results = [
+        parse(fixture.input, options),
+        parseBytes(bytes, options),
+        await parseStream(
+          byteStream([...bytes].map((value) => new Uint8Array([value]))),
+          options
+        )
+      ];
+      for (const result of results) {
+        assert.equal(result.documentMode, fixture.mode, fixture.input);
+        assert.equal(Object.isFrozen(result), true);
+        assert.throws(() => { result.documentMode = "no-quirks"; }, TypeError);
+      }
+    }
+  }
 });
 
 test("already-decoded APIs reject transport and source-retention category errors before work", () => {

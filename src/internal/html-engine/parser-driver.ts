@@ -58,6 +58,7 @@ interface HtmlEngineOptions extends HtmlEngineSessionOptions {
 export interface HtmlEngineProductResult {
   readonly standardBaseline: typeof ENGINE_STANDARD_BASELINE;
   readonly parser: HtmlEngineParserConfiguration;
+  readonly documentMode: HtmlDocumentMode;
   readonly model: HtmlTreeModel;
   readonly parseErrors: readonly EngineParseError[];
   readonly resources: EngineResourceUsage;
@@ -344,6 +345,7 @@ export function createHtmlEngineSession(options: HtmlEngineSessionOptions): Html
     const common = {
       standardBaseline: ENGINE_STANDARD_BASELINE,
       parser,
+      documentMode: builder.documentMode,
       model,
       parseErrors: Object.freeze(parseErrors),
       resources: resources.snapshot()
