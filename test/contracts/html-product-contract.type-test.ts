@@ -9,6 +9,8 @@ import {
 } from "../../src/mod.js";
 
 import type {
+  FormAssociation,
+  NodeId,
   HtmlAttributeNamespaceUri,
   HtmlDocumentMode,
   HtmlFragmentContext,
@@ -118,3 +120,19 @@ const extraction = extractText(parsed.tree, visibleOptions);
 const extractionIterator = iterateText(parsed.tree, visibleOptions);
 void extraction;
 void extractionIterator;
+
+const associations: readonly FormAssociation[] = parsed.formAssociations;
+const fragmentAssociations: readonly FormAssociation[] = fragment.formAssociations;
+for (const association of associations) {
+  const elementId: NodeId = association.elementId;
+  const formId: NodeId = association.formId;
+  void elementId;
+  void formId;
+  // @ts-expect-error - associations are immutable public numeric references.
+  association.formId = 0;
+  // @ts-expect-error - internal parser pointers are never exposed.
+  void association.form;
+}
+// @ts-expect-error - association arrays cannot be mutated.
+associations[0] = { elementId: 1, formId: 2 };
+void fragmentAssociations;

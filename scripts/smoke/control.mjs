@@ -8,6 +8,8 @@ import {
   isHtmlAbortError,
   isHtmlBudgetExceededError,
   chunk,
+  findById,
+  getAttributeValue,
   outline,
   parse,
   parseBytes,
@@ -149,6 +151,7 @@ async function computeDeterminismHash() {
 
   const canonicalPayload = {
     node: normalizeNode(parsed),
+    formAssociations: parse("<table><form id=f><tr><td><input name=q></table><input form=f>").formAssociations,
     parseErrors: Array.isArray(parsed.errors) ? parsed.errors.map((entry) => normalizeParseError(entry)) : [],
     fragment: parseFragment("<p a=1>x</p>", {
       namespaceUri: HTML_NAMESPACE_URI,
@@ -230,6 +233,29 @@ async function runSmokeAssertions() {
     JSON.stringify(streamResult) === JSON.stringify(bytesResult),
     "parseStream output mismatch vs parseBytes"
   );
+
+  const formHtml = "<table><form id=f><tr><td><input name=q></table><input form=f>";
+  const forms = parse(formHtml);
+  ensure(forms.formAssociations.length === 2, "parser-produced form association count mismatch");
+  ensure(forms.formAssociations.every(({ elementId, formId }) =>
+    findById(forms.tree, elementId)?.localName === "input" &&
+    getAttributeValue(findById(forms.tree, formId), "id") === "f"
+  ), "parser-produced form owner mismatch");
+  const utf16Text = "<title>Café😀</title>";
+  for (const littleEndian of [true, false]) {
+    const utf16Bytes = new Uint8Array(utf16Text.length * 2);
+    const view = new DataView(utf16Bytes.buffer);
+    for (let index = 0; index < utf16Text.length; index += 1) {
+      view.setUint16(index * 2, utf16Text.charCodeAt(index), littleEndian);
+    }
+    const transportEncodingLabel = littleEndian ? "utf-16le" : "utf-16be";
+    const result = await parseStream(
+      createByteStream(Array.from(utf16Bytes, (byte) => Uint8Array.of(byte))),
+      { transportEncodingLabel, sourceRetention: "text" }
+    );
+    ensure(result.sourceText === utf16Text, "split UTF-16 transport decoding mismatch");
+    ensure(result.metadata.encoding.name === transportEncodingLabel, "UTF-16 encoding metadata mismatch");
+  }
 
   const tokenization = await tokenizeByteStreamEager(
     createByteStream([new TextEncoder().encode("<p>smoke</p>")]),

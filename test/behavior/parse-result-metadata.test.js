@@ -59,7 +59,7 @@ test("full-document parse results have one stable source and metadata shape", ()
   const discarded = parse(input);
   const retained = parse(input, { sourceRetention: "text" });
 
-  assert.deepEqual(Object.keys(discarded), ["tree", "documentMode", "sourceText", "metadata"]);
+  assert.deepEqual(Object.keys(discarded), ["tree", "formAssociations", "documentMode", "sourceText", "metadata"]);
   assert.equal(discarded.documentMode, "quirks");
   assert.equal(discarded.sourceText, null);
   assert.equal(retained.sourceText, input);
@@ -291,7 +291,7 @@ test("fragment results expose the same immutable resource evidence as document r
     { namespaceUri: HTML_NAMESPACE_URI, localName: "section" },
     { budgets: { maxSteps: 1_000 } }
   );
-  assert.deepEqual(Object.keys(result), ["tree", "metadata"]);
+  assert.deepEqual(Object.keys(result), ["tree", "formAssociations", "metadata"]);
   assert.equal(result.tree.kind, "fragment");
   assert.deepEqual(result.metadata.encoding, { name: null, source: "already-decoded" });
   assert.equal(result.metadata.inputKind, "text");

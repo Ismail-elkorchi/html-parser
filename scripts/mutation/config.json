@@ -246,16 +246,16 @@
       ],
       "mutants": [
         {
-          "id": "encoding-alias-windows1252",
-          "description": "Disable latin1/latin-1/us-ascii alias mapping to windows-1252.",
-          "search": "if (WINDOWS_1252_ALIASES.has(normalized)) {",
-          "replace": "if (false && WINDOWS_1252_ALIASES.has(normalized)) {"
+          "id": "encoding-label-validation",
+          "description": "Bypass supported-label validation for transport and meta declarations.",
+          "search": "const encoding = new TextDecoder(label).encoding.toLowerCase();",
+          "replace": "const encoding = label.toLowerCase();"
         },
         {
           "id": "encoding-meta-utf16-fallback",
           "description": "Disable canonical UTF-16 to UTF-8 fallback after TextDecoder label normalization.",
-          "search": "if ((source === \"meta\" || source === \"transport\") && encoding.startsWith(\"utf-16\")) {",
-          "replace": "if (false && (source === \"meta\" || source === \"transport\") && encoding.startsWith(\"utf-16\")) {"
+          "search": "if (source === \"meta\" && (encoding === \"utf-16le\" || encoding === \"utf-16be\")) {",
+          "replace": "if (false && source === \"meta\" && (encoding === \"utf-16le\" || encoding === \"utf-16be\")) {"
         },
         {
           "id": "encoding-strip-comments-disabled",

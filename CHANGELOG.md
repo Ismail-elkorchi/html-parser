@@ -4,6 +4,12 @@ All notable changes are documented in this file.
 
 ## Unreleased
 
+- Preserve supported UTF-16 transport encodings without a BOM, validate labels
+  before meta-only coercion, and keep the first occurrence of meta attributes.
+- Add immutable `formAssociations` to document and fragment results using only
+  attached public node IDs, preserving repaired-tree parser ownership and
+  respecting explicit targets, template isolation, and reparenting.
+
 ## [0.2.1] - 2026-07-27
 
 - Validate complete caller-constructed serialization graphs before emitting

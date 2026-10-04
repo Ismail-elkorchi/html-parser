@@ -648,3 +648,96 @@ void test("explicit-stack mutation, validation, and traversal handle 5,000 level
   assert.equal(traversed, depth);
   assert.equal(lastDepth, depth + 1);
 });
+
+void test("parser-only ownership resets when a subtree is separated from its owner", () => {
+  const model = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });
+  const form = element(model, "form");
+  const branch = element(model, "div");
+  const next = element(model, "form");
+  const input = element(model, "input");
+  model.append(model.root, form);
+  model.append(model.root, branch);
+  model.append(model.root, next);
+  model.associateParserForm(input, form, branch);
+  model.append(branch, input);
+  assert.equal(model.formAssociationTarget(input, null, false), form);
+  model.append(next, branch);
+  assert.equal(model.formAssociationTarget(input, next, false), next);
+  model.validate();
+});
+
+void test("moving a form and its descendants together preserves their shared association", () => {
+  const model = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });
+  const form = element(model, "form");
+  const input = element(model, "input");
+  const branch = element(model, "div");
+  model.append(model.root, form);
+  model.associateParserForm(input, form, form);
+  model.append(form, input);
+  model.append(model.root, branch);
+  model.append(branch, form);
+  assert.equal(model.formAssociationTarget(input, null, false), form);
+  model.detach(form);
+  assert.equal(model.formAssociationTarget(input, null, false), form);
+  model.validate();
+});
+
+void test("bulk reparenting and clearing drop separated parser owners and do not clone them", () => {
+  const model = new HtmlTreeModel({ rootKind: "fragment", resources: createEngineResourceGuard() });
+  const form = element(model, "form");
+  const source = element(model, "div");
+  const destination = element(model, "div");
+  const input = element(model, "input");
+  for (const node of [form, source, destination]) model.append(model.root, node);
+  model.associateParserForm(input, form, source);
+  model.append(source, input);
+  model.replaceChildrenWithClones(source, destination);
+  const clone = destination.childAt(0);
+  assert.ok(clone?.kind === "element");
+  assert.equal(model.formAssociationTarget(clone, null, false), null);
+  model.moveChildren(source, destination);
+  assert.equal(model.formAssociationTarget(input, null, false), null);
+  model.associateParserForm(input, form, destination);
+  model.clearChildren(destination);
+  assert.equal(model.formAssociationTarget(input, null, false), null);
+  model.validate();
+});
+
+void test("form association reset preparation is atomic at every unavailable step", () => {
+  for (const operation of ["reparent", "detach", "move", "clear"] as const) {
+    function scenario(maxSteps?: number) {
+      const resources = createEngineResourceGuard(maxSteps === undefined ? {} : { limits: { maxSteps } });
+      const model = new HtmlTreeModel({ rootKind: "fragment", resources });
+      const form = element(model, "form");
+      const source = element(model, "div");
+      const destination = element(model, "div");
+      const input = element(model, "input");
+      for (const node of [form, source, destination]) model.append(model.root, node);
+      model.associateParserForm(input, form, source);
+      model.append(source, input);
+      function mutate() {
+        switch (operation) {
+          case "reparent": model.append(destination, source); break;
+          case "detach": model.detach(source); break;
+          case "move": model.moveChildren(source, destination); break;
+          case "clear": model.clearChildren(source); break;
+        }
+      }
+      return { resources, model, form, source, destination, input, mutate };
+    }
+    const successful = scenario();
+    const baseline = successful.resources.snapshot().steps;
+    successful.mutate();
+    const total = successful.resources.snapshot().steps;
+    for (let maxSteps = baseline; maxSteps < total; maxSteps += 1) {
+      const failed = scenario(maxSteps);
+      assert.throws(failed.mutate, (error) => error instanceof EngineResourceLimitError);
+      assert.equal(failed.source.parent, failed.model.root);
+      assert.equal(failed.input.parent, failed.source);
+      assert.equal(failed.source.childAt(0), failed.input);
+      assert.equal(failed.destination.childCount, 0);
+      assert.equal(failed.model.formAssociationTarget(failed.input, null, false), failed.form);
+      failed.model.validate();
+    }
+  }
+});

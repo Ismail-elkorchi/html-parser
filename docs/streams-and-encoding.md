@@ -59,6 +59,13 @@ Byte and stream entry points use the same HTML sniffing and decoding pipeline.
 `metadata.encoding.source` reports `"bom"`, `"transport"`, `"meta"`, or
 `"default"`; `metadata.encoding.name` reports the selected WHATWG encoding.
 
+Only encoding labels supported by the runtime's standards-based `TextDecoder`
+are accepted. Unsupported labels are ignored rather than matched by prefix.
+Supported UTF-16 transport labels retain their endianness even without a BOM;
+UTF-16 labels in meta declarations instead select UTF-8. BOMs take precedence
+over transport and meta declarations. Duplicate meta attribute names are
+ASCII-case-insensitive and keep their first value.
+
 Mandatory BOM detection always examines the required prefix of up to three
 bytes and is independent of `maxEncodingPrescanBytes`. That option limits only
 the prefix retained for optional `<meta charset>` prescanning; zero disables

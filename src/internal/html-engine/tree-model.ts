@@ -183,6 +183,12 @@ interface TextState {
   data: string;
 }
 
+const FORM_ASSOCIATED_NAMES = new Set([
+  "button", "fieldset", "input", "object", "output", "select", "textarea", "img"
+]);
+
+const EMPTY_FORM_RESETS: readonly HtmlTreeElement[] = Object.freeze([]);
+
 const MODEL_OWNER = Symbol("html-tree-model-owner");
 const NODE_STATE = Symbol("html-tree-node-state");
 const PARENT_STATE = Symbol("html-tree-parent-state");
@@ -430,6 +436,7 @@ export class HtmlTreeModel {
   readonly #resources: EngineResourceGuard;
   readonly #observer: EngineObserver | undefined;
   #nextSerial = 1;
+  #parserFormOwners: WeakMap<HtmlTreeElement, HtmlTreeElement> | undefined;
 
   constructor(options: HtmlTreeModelOptions) {
     this.#resources = options.resources;
@@ -576,6 +583,77 @@ export class HtmlTreeModel {
     return doctype;
   }
 
+  /** Applies the parser-only association before the element's first insertion. */
+  associateParserForm(
+    element: HtmlTreeElement,
+    form: HtmlTreeElement,
+    intendedParent: HtmlTreeParent
+  ): void {
+    if (!this.#isFormAssociated(element) ||
+        (element.localName !== "img" && this.attribute(element, null, "form") !== null) ||
+        this.#treeRoot(intendedParent) !== this.#treeRoot(form)) return;
+    this.#parserFormOwners ??= new WeakMap();
+    this.#parserFormOwners.set(element, form);
+  }
+
+  /** Resolves static ownership during export; connected explicit IDs resolve in tree order. */
+  formAssociationTarget(
+    element: HtmlTreeElement,
+    nearestForm: HtmlTreeElement | null,
+    connected: boolean
+  ): HtmlTreeElement | string | null {
+    if (!this.#isFormAssociated(element)) return null;
+    if (connected && element.localName !== "img") {
+      const explicit = this.attribute(element, null, "form");
+      if (explicit !== null) return explicit.value;
+    }
+    return this.#parserFormOwners?.get(element) ?? nearestForm;
+  }
+
+  #isFormAssociated(element: HtmlTreeElement): boolean {
+    return element.namespaceUri === HTML_NAMESPACE && FORM_ASSOCIATED_NAMES.has(element.localName);
+  }
+
+  #treeRoot(node: HtmlTreeParent): HtmlTreeParent {
+    let root = node;
+    while (root.kind === "element" && root.parent !== null) {
+      this.#resources.checkpoint();
+      root = root.parent;
+    }
+    return root;
+  }
+
+  // Prepare removal resets before committing the structural mutation so budget
+  // failures leave both the tree and parser associations unchanged. Template
+  // contents are a separate DOM tree, not descendants of their host.
+  #separatedParserForms(node: HtmlTreeNode): readonly HtmlTreeElement[] {
+    if (this.#parserFormOwners === undefined || node.kind !== "element") return EMPTY_FORM_RESETS;
+    const separated: HtmlTreeElement[] = [];
+    const stack = [node];
+    while (stack.length > 0) {
+      this.#resources.checkpoint();
+      const element = stack.pop();
+      if (element === undefined) break;
+      const owner = this.#parserFormOwners.get(element);
+      if (owner !== undefined) {
+        let ancestor: HtmlTreeParent | null = owner;
+        while (ancestor !== node && ancestor?.kind === "element") {
+          this.#resources.checkpoint();
+          ancestor = ancestor.parent;
+        }
+        if (ancestor !== node) separated.push(element);
+      }
+      for (const child of this.childrenOf(element)) {
+        if (child.kind === "element") stack.push(child);
+      }
+    }
+    return separated;
+  }
+
+  #resetParserForms(elements: readonly HtmlTreeElement[]): void {
+    for (const element of elements) this.#parserFormOwners?.delete(element);
+  }
+
   append(parent: HtmlTreeParent, node: HtmlTreeNode): void {
     this.insertBefore(parent, node, null);
   }
@@ -644,6 +722,7 @@ export class HtmlTreeModel {
       }
     }
 
+    const separatedForms = oldParent === null ? EMPTY_FORM_RESETS : this.#separatedParserForms(node);
     const oldParentSerial = oldParent === null ? null : this.#observableParentSerial(oldParent);
     if (oldParent !== null) {
       const oldState = this.#parentState(oldParent);
@@ -654,6 +733,7 @@ export class HtmlTreeModel {
     if (insertionIndex === targetState.children.length) targetState.children.push(node);
     else targetState.children.splice(insertionIndex, 0, node);
     nodeState.parent = target;
+    this.#resetParserForms(separatedForms);
     if (depthAssignments === null) nodeState.depth = parentDepth === null ? null : parentDepth + 1;
     else this.#applySubtreeDepths(depthAssignments);
 
@@ -670,8 +750,10 @@ export class HtmlTreeModel {
     const index = parentState.children.indexOf(node);
     if (index < 0) fail("TREE_MODEL_REFERENCE_NOT_CHILD");
     const depthAssignments = this.#prepareSubtreeDepths(node, null);
+    const separatedForms = this.#separatedParserForms(node);
     parentState.children.splice(index, 1);
     nodeState.parent = null;
+    this.#resetParserForms(separatedForms);
     this.#applySubtreeDepths(depthAssignments.assignments);
     this.#emit("node-detached", node.identity.serial, this.#observableParentSerial(parent));
     return true;
@@ -708,7 +790,9 @@ export class HtmlTreeModel {
       if (destinationDepth !== null) this.#authorizeDepthApplication(assignments);
     }
 
+    const separatedForms = children.flatMap((child) => this.#separatedParserForms(child));
     sourceState.children.length = 0;
+    this.#resetParserForms(separatedForms);
     for (let index = 0; index < children.length; index += 1) {
       const child = children[index];
       const assignments = childDepthAssignments[index];
@@ -1038,7 +1122,9 @@ export class HtmlTreeModel {
     for (const depths of previousDepths) this.#authorizeDepthApplication(depths.assignments);
     for (const depths of replacementDepths) this.#authorizeDepthApplication(depths.assignments);
 
+    const separatedForms = previous.flatMap((child) => this.#separatedParserForms(child));
     targetState.children.length = 0;
+    this.#resetParserForms(separatedForms);
     for (let index = 0; index < previous.length; index += 1) {
       const child = previous[index];
       const depths = previousDepths[index];
