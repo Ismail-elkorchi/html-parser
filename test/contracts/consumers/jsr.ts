@@ -1,4 +1,5 @@
 import {
+  type FormAssociation,
   type HtmlDocumentMode,
   type HtmlNode,
   type ProcessingInstructionToken,
@@ -31,3 +32,6 @@ void extractText(parsed.tree, {
   maxOutputBytes: 128,
   maxTokens: 16
 });
+
+const associations: readonly FormAssociation[] = parsed.formAssociations;
+void associations;

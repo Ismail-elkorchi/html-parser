@@ -77,7 +77,7 @@ Key exported type groups include:
   `ParseStreamOptions`, `TokenizeByteStreamEagerBudgetOptions`,
   `TokenizeByteStreamEagerOptions`, `SerializeOptions`, `HtmlScriptingMode`,
   `OperationOptions`, `SourceRetention`;
-- trees and metadata: `ParsedDocument`, `ParsedFragment`, `ParseMetadata`,
+- trees and metadata: `ParsedDocument`, `ParsedFragment`, `FormAssociation`, `ParseMetadata`,
   `ParseEncodingMetadata`, `ParseResourceUsage`, `DocumentTree`,
   `FragmentTree`, `HtmlNode`, `NodeKind`, `ElementNode`, `SerializableNode`,
   `TemplateContentNode`, `TextNode`, `CommentNode`,

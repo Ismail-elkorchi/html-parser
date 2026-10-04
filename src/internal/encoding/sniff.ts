@@ -13,14 +13,6 @@ export type EncodingSniffDecision =
   | { readonly status: "pending" }
   | { readonly status: "decided"; readonly result: EncodingSniffResult };
 
-const WINDOWS_1252_ALIASES = new Set([
-  "iso-8859-1",
-  "iso8859-1",
-  "latin1",
-  "latin-1",
-  "us-ascii"
-]);
-
 function detectBom(bytes: Uint8Array): string | null {
   if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
     return "utf-8";
@@ -65,39 +57,20 @@ function bomPrefixState(
 }
 
 function stripQuotes(value: string): string {
-  const trimmed = value.trim();
   if (
-    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    (value.startsWith("\"") && value.endsWith("\"")) ||
+    (value.startsWith("'") && value.endsWith("'"))
   ) {
-    return trimmed.slice(1, -1).trim();
+    return value.slice(1, -1);
   }
-
-  return trimmed;
+  return value;
 }
 
 function canonicalizeLabel(label: string, source: "bom" | "transport" | "meta" | "default"): string | null {
-  const normalized = stripQuotes(label).toLowerCase().trim();
-  if (normalized.length === 0) {
-    return null;
-  }
-
-  if (WINDOWS_1252_ALIASES.has(normalized)) {
-    return "windows-1252";
-  }
-
-  if ((source === "meta" || source === "transport") && normalized.startsWith("utf-16")) {
-    return "utf-8";
-  }
-
   try {
-    const encoding = new TextDecoder(normalized).encoding.toLowerCase();
+    const encoding = new TextDecoder(label).encoding.toLowerCase();
 
-    if (encoding === "iso-8859-1") {
-      return "windows-1252";
-    }
-
-    if ((source === "meta" || source === "transport") && encoding.startsWith("utf-16")) {
+    if (source === "meta" && (encoding === "utf-16le" || encoding === "utf-16be")) {
       return "utf-8";
     }
 
@@ -171,7 +144,7 @@ function parseMetaAttributes(tag: string): Map<string, string> {
       }
     }
 
-    attrs.set(rawName, value);
+    if (!attrs.has(rawName)) attrs.set(rawName, value);
   }
 
   return attrs;
@@ -227,7 +200,7 @@ function extractMetaTags(scan: string): string[] {
 }
 
 function extractCharsetFromContent(content: string): string | null {
-  const match = /charset\s*=\s*("[^"]*"|'[^']*'|[^\s;"'>]+)/i.exec(content);
+  const match = /charset[\t\n\f\r ]*=[\t\n\f\r ]*("[^"]*"|'[^']*'|[^\t\n\f\r ;"'>]+)/i.exec(content);
   if (!match) {
     return null;
   }
@@ -271,25 +244,24 @@ function sniffMetaCharset(bytes: Uint8Array, maxPrescanBytes: number): string | 
   for (const tag of extractMetaTags(scan)) {
     const attrs = parseMetaAttributes(tag);
 
-    const direct = attrs.get("charset");
-    if (direct) {
-      const canonical = canonicalizeLabel(direct, "meta");
-      if (canonical) {
-        return canonical;
-      }
-    }
-
-    const httpEquiv = attrs.get("http-equiv")?.toLowerCase();
-    const content = attrs.get("content");
-    if (httpEquiv === "content-type" && content) {
-      const extracted = extractCharsetFromContent(content);
-      if (extracted) {
-        const canonical = canonicalizeLabel(extracted, "meta");
-        if (canonical) {
-          return canonical;
+    let charset: string | null = null;
+    let needPragma: boolean | null = null;
+    let gotPragma = false;
+    for (const [name, value] of attrs) {
+      if (name === "http-equiv" && value.toLowerCase() === "content-type") {
+        gotPragma = true;
+      } else if (name === "content" && charset === null) {
+        const extracted = extractCharsetFromContent(value);
+        if (extracted !== null) {
+          charset = canonicalizeLabel(extracted, "meta");
+          if (charset !== null) needPragma = true;
         }
+      } else if (name === "charset") {
+        charset = canonicalizeLabel(value, "meta");
+        needPragma = false;
       }
     }
+    if (charset !== null && needPragma !== null && (!needPragma || gotPragma)) return charset;
   }
 
   return null;

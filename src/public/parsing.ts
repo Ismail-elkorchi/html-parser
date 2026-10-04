@@ -45,6 +45,7 @@ import type {
   Attribute,
   DocumentTree,
   FragmentTree,
+  FormAssociation,
   HtmlFragmentContextInput,
   HtmlBudgetName,
   HtmlNode,
@@ -253,16 +254,87 @@ function externalId(value: HtmlTreeDoctypeExternalId) {
 type ConversionSource = HtmlTreeNode | HtmlTemplateContents;
 const EMPTY_HTML_NODES: readonly HtmlNode[] = Object.freeze([]);
 
+interface ConversionAncestry {
+  readonly connected: boolean;
+  readonly nearestForm: HtmlTreeElement | null;
+}
+
+interface PendingFormAssociation {
+  readonly elementSerial: number;
+  readonly target: number | string;
+}
+
+/** Transaction-local projection; it retains numeric identities, never parser nodes. */
+class FormAssociationProjection {
+  readonly #firstIds = new Map<string, number | null>();
+  readonly #pending: PendingFormAssociation[] = [];
+  readonly #referenced = new Set<number>();
+  readonly #publicIds = new Map<number, NodeId>();
+
+  enter(
+    source: ConversionSource,
+    model: HtmlTreeModel,
+    ancestry: ConversionAncestry
+  ): ConversionAncestry {
+    if (source.kind === "template-contents") return { connected: false, nearestForm: null };
+    if (source.kind !== "element") return ancestry;
+    const isForm = source.namespaceUri === HTML_NAMESPACE_URI && source.localName === "form";
+    if (ancestry.connected) {
+      const id = model.attribute(source, null, "id")?.value;
+      if (id !== undefined && id !== "" && !this.#firstIds.has(id)) {
+        this.#firstIds.set(id, isForm ? source.identity.serial : null);
+      }
+    }
+    const target = model.formAssociationTarget(source, ancestry.nearestForm, ancestry.connected);
+    if (target !== null) {
+      this.#pending.push({
+        elementSerial: source.identity.serial,
+        target: typeof target === "string" ? target : target.identity.serial
+      });
+      this.#referenced.add(source.identity.serial);
+    }
+    if (isForm) this.#referenced.add(source.identity.serial);
+    return isForm ? { connected: ancestry.connected, nearestForm: source } : ancestry;
+  }
+
+  converted(source: ConversionSource, node: HtmlNode): void {
+    if (this.#referenced.has(source.identity.serial)) {
+      this.#publicIds.set(source.identity.serial, node.id);
+    }
+  }
+
+  finish(operation: OperationContext): readonly FormAssociation[] {
+    const result: FormAssociation[] = [];
+    for (const association of this.#pending) {
+      operation.checkpoint();
+      const targetSerial = typeof association.target === "string"
+        ? this.#firstIds.get(association.target)
+        : association.target;
+      const formId = targetSerial === undefined || targetSerial === null
+        ? undefined : this.#publicIds.get(targetSerial);
+      const elementId = this.#publicIds.get(association.elementSerial);
+      // Detached nodes and external fragment context owners never acquire public identities.
+      if (formId !== undefined && elementId !== undefined) {
+        result.push(Object.freeze({ elementId, formId }));
+      }
+    }
+    return Object.freeze(result);
+  }
+}
+
 function pushConversionChildren(
   source: ConversionSource,
   model: HtmlTreeModel,
   sources: ConversionSource[],
   expanded: boolean[],
+  ancestries: ConversionAncestry[],
+  ancestry: ConversionAncestry,
   operation: OperationContext
 ): void {
   if (source.kind === "element" && source.templateContents !== null) {
     sources.push(source.templateContents);
     expanded.push(false);
+    ancestries.push(ancestry);
     return;
   }
   if (source.kind !== "element" && source.kind !== "template-contents") return;
@@ -273,6 +345,7 @@ function pushConversionChildren(
     if (child !== undefined) {
       sources.push(child);
       expanded.push(false);
+      ancestries.push(ancestry);
     }
   }
 }
@@ -486,19 +559,17 @@ function convertRecursively(
   assigner: NodeIdAssigner,
   captureSpans: boolean,
   names: Map<string, string>,
+  forms: FormAssociationProjection,
+  ancestry: ConversionAncestry,
   operation: OperationContext
 ): HtmlNode {
   if (operation.interruptible) operation.checkpoint();
+  const childAncestry = forms.enter(source, model, ancestry);
   let directChildren = EMPTY_HTML_NODES;
   let templateContent: HtmlNode | undefined;
   if (source.kind === "element" && source.templateContents !== null) {
     templateContent = convertRecursively(
-      source.templateContents,
-      model,
-      assigner,
-      captureSpans,
-      names,
-      operation
+      source.templateContents, model, assigner, captureSpans, names, forms, childAncestry, operation
     );
   } else if (source.kind === "element" || source.kind === "template-contents") {
     const sourceChildren = model.childrenOf(source);
@@ -507,12 +578,7 @@ function convertRecursively(
       let index = 0;
       for (const child of sourceChildren) {
         convertedChildren[index] = convertRecursively(
-          child,
-          model,
-          assigner,
-          captureSpans,
-          names,
-          operation
+          child, model, assigner, captureSpans, names, forms, childAncestry, operation
         );
         index += 1;
       }
@@ -520,15 +586,9 @@ function convertRecursively(
     }
   }
   const node = createPublicNode(
-    source,
-    model,
-    assigner,
-    captureSpans,
-    names,
-    directChildren,
-    templateContent,
-    operation
+    source, model, assigner, captureSpans, names, directChildren, templateContent, operation
   );
+  forms.converted(source, node);
   releaseConvertedSource(source, model);
   return node;
 }
@@ -540,62 +600,60 @@ function convertNodes(
   captureSpans: boolean,
   maxDepth: number,
   operation: OperationContext
-): readonly HtmlNode[] {
+): { readonly children: readonly HtmlNode[]; readonly formAssociations: readonly FormAssociation[] } {
   const converted: (HtmlNode | undefined)[] = [];
   const names = new Map<string, string>();
+  const forms = new FormAssociationProjection();
+  const rootAncestry = { connected: root.kind === "document", nearestForm: null };
   const roots = children(root, model, operation);
   model.releaseExportedChildren(root);
+  let publicChildren: readonly HtmlNode[];
   if (maxDepth <= 128) {
-    return Object.freeze(roots.map((source) =>
+    publicChildren = Object.freeze(roots.map((source) =>
       convertRecursively(
-        source,
-        model,
-        assigner,
-        captureSpans,
-        names,
-        operation
+        source, model, assigner, captureSpans, names, forms, rootAncestry, operation
       )
     ));
   } else {
     const sources: ConversionSource[] = [];
     const expanded: boolean[] = [];
+    const ancestries: ConversionAncestry[] = [];
     for (let index = roots.length - 1; index >= 0; index -= 1) {
       const source = roots[index];
       if (source !== undefined) {
         sources.push(source);
         expanded.push(false);
+        ancestries.push(rootAncestry);
       }
     }
     while (sources.length > 0) {
       if (operation.interruptible) operation.checkpoint();
       const source = sources.pop();
       const isExpanded = expanded.pop();
-      if (source === undefined || isExpanded === undefined) break;
+      const ancestry = ancestries.pop();
+      if (source === undefined || isExpanded === undefined || ancestry === undefined) break;
       if (!isExpanded) {
+        const childAncestry = forms.enter(source, model, ancestry);
         sources.push(source);
         expanded.push(true);
-        pushConversionChildren(source, model, sources, expanded, operation);
+        ancestries.push(ancestry);
+        pushConversionChildren(source, model, sources, expanded, ancestries, childAncestry, operation);
       } else {
-        converted[source.identity.serial] = convertReadySource(
-          source,
-          model,
-          converted,
-          assigner,
-          captureSpans,
-          names,
-          operation
+        const node = convertReadySource(
+          source, model, converted, assigner, captureSpans, names, operation
         );
+        converted[source.identity.serial] = node;
+        forms.converted(source, node);
       }
     }
+    publicChildren = Object.freeze(roots.map((source) => {
+      if (operation.interruptible) operation.checkpoint();
+      return requireInternalValue(
+        converted[source.identity.serial], "PUBLIC_PARSER_ROOT_CONVERSION_MISSING"
+      );
+    }));
   }
-
-  return Object.freeze(roots.map((source) => {
-    if (operation.interruptible) operation.checkpoint();
-    return requireInternalValue(
-      converted[source.identity.serial],
-      "PUBLIC_PARSER_ROOT_CONVERSION_MISSING"
-    );
-  }));
+  return { children: publicChildren, formAssociations: forms.finish(operation) };
 }
 
 function diagnosticMessage(error: EngineParseError): string {
@@ -716,7 +774,7 @@ function finishDocumentOperation(
   trace.emit({ kind: "token", count: tokenCount });
   const assigner = new NodeIdAssigner();
   const documentId = assigner.next();
-  const publicChildren = convertNodes(
+  const converted = convertNodes(
     result.model.root,
     result.model,
     assigner,
@@ -752,7 +810,7 @@ function finishDocumentOperation(
     id: documentId,
     kind: "document",
     scriptingMode: options.scriptingMode ?? "inert",
-    children: publicChildren,
+    children: converted.children,
     errors,
     ...(traceResult === undefined ? {} : { trace: traceResult })
   });
@@ -772,6 +830,7 @@ function finishDocumentOperation(
   });
   const parsed: ParsedDocument = Object.freeze({
     tree,
+    formAssociations: converted.formAssociations,
     documentMode: result.documentMode,
     sourceText,
     metadata: Object.freeze({
@@ -1026,7 +1085,7 @@ export function parseFragment(
   trace.emit({ kind: "token", count: tokenCount });
   const assigner = new NodeIdAssigner();
   const fragmentId = assigner.next();
-  const publicChildren = convertNodes(
+  const converted = convertNodes(
     result.model.root,
     result.model,
     assigner,
@@ -1061,13 +1120,14 @@ export function parseFragment(
     scriptingMode: normalized.scriptingMode ?? "inert",
     documentMode: normalized.documentMode ?? "no-quirks",
     hasFormInContextChain,
-    children: publicChildren,
+    children: converted.children,
     errors,
     ...(traceResult === undefined ? {} : { trace: traceResult })
   });
   registerParsedFragmentTree(tree);
   return Object.freeze({
     tree,
+    formAssociations: converted.formAssociations,
     metadata: Object.freeze({
       inputKind: "text",
       transportByteLength: null,

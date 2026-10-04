@@ -1840,7 +1840,11 @@ export class HtmlTreeBuilder implements TokenSink {
 
   #insertElement(token: HtmlStartTagToken, retainSpan = true): HtmlTreeElement {
     const element = retainSpan ? this.#createElement(token) : this.#createElementNamed(token.name);
-    this.#insertAtAppropriateLocation(element);
+    const location = this.#adjustedInsertionLocation();
+    if (this.#formElement !== null && !this.#hasOpenHtmlElement("template")) {
+      this.#model.associateParserForm(element, this.#formElement, location.parent);
+    }
+    this.#model.insertBefore(location.parent, element, location.before);
     this.#selectElements.elementInserted(element);
     this.#openElements.push(element);
     return element;

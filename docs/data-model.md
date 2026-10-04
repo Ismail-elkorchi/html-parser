@@ -6,6 +6,8 @@
 `ParsedDocument`:
 
 - `tree: DocumentTree` contains children, parse diagnostics, and optional trace;
+- `formAssociations: readonly FormAssociation[]` records authoritative native
+  form ownership using public node IDs;
 - `documentMode: HtmlDocumentMode` contains the `"no-quirks"`, `"limited-quirks"`,
   or `"quirks"` mode selected by HTML tree construction;
 - `sourceText: string | null` contains the exact decoded input only when
@@ -24,6 +26,34 @@ Resource observations describe the exact successful parse; they are not
 limits. `steps` is the exception because counting it has a hot-path cost: it is
 reported only when `maxSteps` enabled deterministic counting, and is `null`
 otherwise.
+
+## Form associations
+
+Documents and fragments both return a frozen `formAssociations` array of frozen
+`{ elementId, formId }` records, in associated-element tree order (including
+owned template contents). Both IDs identify attached HTML elements within the
+same returned tree. An element absent from the relation has no represented owner;
+consumers must not infer an owner from ancestry. HTML error recovery can associate
+a control with a form that is not an ancestor.
+
+The native categories are `button`, `fieldset`, `input`, `object`, `output`,
+`select`, `textarea`, and the historical `img` association. These are ownership
+records, not a list of successful submission controls. Arbitrary descendants,
+options, and custom elements do not receive entries. Custom-element upgrading
+and scripting are not performed.
+
+Connected explicit `form` attributes use the first matching element ID in tree
+order; missing or non-form targets mean no owner. Template contents have their
+own disconnected tree and cannot target document IDs. Disconnected fragment and
+template controls use in-tree ancestry instead of resolving explicit ID links.
+External fragment contexts and ancestors never acquire public IDs or appear as
+owners. Parser-created non-ancestor associations follow the pinned tree-building
+and reparenting rules before projection into the result.
+
+The numeric relation is safe to copy with `structuredClone` or JSON alongside the
+tree. Cloning does not preserve JavaScript freezing; the parsed original remains
+immutable. Serializing HTML omits these parse-result records, and reparsing may
+change associations because repaired markup cannot encode parser-only pointers.
 
 ## Nodes
 

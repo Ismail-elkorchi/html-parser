@@ -650,10 +650,20 @@ export interface ParseMetadata {
   readonly resourceUsage: ParseResourceUsage;
 }
 
+/** Immutable association between attached native HTML elements in one parsed result. */
+export interface FormAssociation {
+  /** Public identity of the form-associated element. */
+  readonly elementId: NodeId;
+  /** Public identity of its HTML form owner in the same parsed result. */
+  readonly formId: NodeId;
+}
+
 /** Canonical result returned by every full-document parse entrypoint. */
 export interface ParsedDocument {
   /** Parsed document tree. */
   readonly tree: DocumentTree;
+  /** Parser-produced owners in element tree order; absence means no owner. */
+  readonly formAssociations: readonly FormAssociation[];
   /** Document mode selected by HTML tree construction from the input. */
   readonly documentMode: HtmlDocumentMode;
   /** Exact decoded input when `sourceRetention: "text"`; otherwise null. */
@@ -688,6 +698,8 @@ export interface FragmentTree {
 export interface ParsedFragment {
   /** Parsed fragment tree. */
   readonly tree: FragmentTree;
+  /** Owners within this fragment; external context elements are never referenced. */
+  readonly formAssociations: readonly FormAssociation[];
   /** Input and successful resource evidence from this parse. */
   readonly metadata: ParseMetadata;
 }
